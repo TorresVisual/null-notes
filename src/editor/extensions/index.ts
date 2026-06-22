@@ -2,6 +2,7 @@ import StarterKit from '@tiptap/starter-kit'
 import { Markdown } from 'tiptap-markdown'
 import Placeholder from '@tiptap/extension-placeholder'
 import { InkBlock } from './InkBlock'
+import { ExerciseBlock } from './ExerciseBlock'
 
 export const coreExtensions = [
   StarterKit,
@@ -14,4 +15,5 @@ export const coreExtensions = [
     placeholder: 'Start writing…',
   }),
   InkBlock,
+  ExerciseBlock,
 ]

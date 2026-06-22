@@ -1,6 +1,7 @@
 import { useNotesStore } from '../store/notes'
 import { useWorkspaceStore } from '../store/workspace'
 import { useWorkspace } from '../hooks/useWorkspace'
+import { ImportButton } from './ImportButton'
 import { api } from '../lib/tauri'
 
 export function Sidebar() {
@@ -34,6 +35,7 @@ export function Sidebar() {
       <button onClick={() => void handleCreate()} disabled={!workspacePath}>
         New Note
       </button>
+      <ImportButton />
       <ul>
         {notes.map((note) => (
           <li key={note.path}>
