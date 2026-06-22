@@ -1,6 +1,7 @@
 import StarterKit from '@tiptap/starter-kit'
 import { Markdown } from 'tiptap-markdown'
 import Placeholder from '@tiptap/extension-placeholder'
+import { InkBlock } from './InkBlock'
 
 export const coreExtensions = [
   StarterKit,
@@ -12,4 +13,5 @@ export const coreExtensions = [
   Placeholder.configure({
     placeholder: 'Start writing…',
   }),
+  InkBlock,
 ]
