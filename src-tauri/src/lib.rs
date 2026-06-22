@@ -24,6 +24,9 @@ pub fn run() {
             commands::notes::delete_note,
             commands::workspace::load_workspace,
             commands::workspace::save_workspace,
+            commands::ink::ensure_ink_dir,
+            commands::ink::read_ink,
+            commands::ink::write_ink,
         ])
         .run(tauri::generate_context!())
         .expect("error running app");
