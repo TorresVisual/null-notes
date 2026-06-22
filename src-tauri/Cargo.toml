@@ -32,10 +32,9 @@ regex = "1"
 image = "0.24"
 tempfile = "3"
 pdfium-render = { version = "0.8", features = ["image"], optional = true }
-leptess = { version = "0.14", optional = true }
 
 [features]
-pdf-native = ["pdfium-render", "leptess"]
+pdf-native = ["pdfium-render"]
 
 [dev-dependencies]
 tokio = { version = "1", features = ["full", "test-util"] }

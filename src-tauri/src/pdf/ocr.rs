@@ -1,50 +1,63 @@
 use super::models::{PdfPage, TextBox};
-use anyhow::Result;
+use anyhow::{Context, Result};
 
 pub async fn ocr_page(page: &PdfPage) -> Result<Vec<TextBox>> {
-    #[cfg(feature = "pdf-native")]
-    {
-        ocr_page_native(page).await
+    let image_path = page.image_path.clone();
+
+    let tmp_out = tempfile::Builder::new()
+        .prefix("null-notes-ocr-")
+        .tempfile()?;
+    let out_base = tmp_out.path().to_string_lossy().into_owned();
+    let out_txt = format!("{}.txt", out_base);
+    drop(tmp_out);
+
+    let status = tokio::process::Command::new("tesseract")
+        .args([&image_path, &out_base, "-l", "eng", "--psm", "1"])
+        .status()
+        .await
+        .context("tesseract not found — install it and ensure it is on PATH")?;
+
+    if !status.success() {
+        anyhow::bail!("tesseract exited with status {}", status);
     }
-    #[cfg(not(feature = "pdf-native"))]
-    {
-        let _ = page;
-        anyhow::bail!("OCR requires the pdf-native feature (Tesseract)")
-    }
+
+    let raw = tokio::fs::read_to_string(&out_txt).await?;
+    let _ = tokio::fs::remove_file(&out_txt).await;
+
+    let boxes = raw
+        .lines()
+        .filter(|l| !l.trim().is_empty())
+        .map(|line| TextBox {
+            text: line.trim().to_string(),
+            x: 0.0,
+            y: 0.0,
+            w: 1.0,
+            h: 0.0,
+            is_equation: false,
+            latex: None,
+        })
+        .collect();
+
+    Ok(boxes)
 }
 
-#[cfg(feature = "pdf-native")]
-async fn ocr_page_native(page: &PdfPage) -> Result<Vec<TextBox>> {
-    use leptess::LepTess;
-    use std::path::Path;
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-    let image_path = page.image_path.clone();
-    let page_width = page.width as f32;
-    let page_height = page.height as f32;
-
-    tokio::task::spawn_blocking(move || {
-        let mut lt = LepTess::new(None, "eng")?;
-        lt.set_image(Path::new(&image_path))?;
-
-        let words = lt.get_component_images(leptess::capi::TessPageIteratorLevel_RIL_WORD, true)?;
-        let mut boxes = Vec::new();
-
-        for (_, bbox, _, _) in words {
-            let text = lt.get_utf8_text().unwrap_or_default().trim().to_string();
-            if text.is_empty() {
-                continue;
-            }
-            boxes.push(TextBox {
-                text,
-                x: bbox.x as f32 / page_width,
-                y: bbox.y as f32 / page_height,
-                w: bbox.w as f32 / page_width,
-                h: bbox.h as f32 / page_height,
-                is_equation: false,
-                latex: None,
-            });
+    #[tokio::test]
+    #[ignore = "requires tesseract on PATH and a test fixture"]
+    async fn test_ocr_returns_text() {
+        let page = PdfPage {
+            index: 0,
+            image_path: "tests/fixtures/page-0.png".into(),
+            width: 1700,
+            height: 2200,
+        };
+        if !std::path::Path::new(&page.image_path).exists() {
+            return;
         }
-        Ok(boxes)
-    })
-    .await?
+        let boxes = ocr_page(&page).await.unwrap();
+        assert!(!boxes.is_empty());
+    }
 }
