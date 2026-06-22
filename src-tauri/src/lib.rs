@@ -1,6 +1,7 @@
 pub mod commands;
 pub mod db;
 pub mod models;
+pub mod pdf;
 
 use tauri::Manager;
 
@@ -27,6 +28,7 @@ pub fn run() {
             commands::ink::ensure_ink_dir,
             commands::ink::read_ink,
             commands::ink::write_ink,
+            commands::pdf::import_pdf,
         ])
         .run(tauri::generate_context!())
         .expect("error running app");
