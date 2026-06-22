@@ -25,6 +25,7 @@ dist-ssr
 
 # Tauri
 src-tauri/target/
+src-tauri/pix2tex-venv/
 
 # Workspace state
 .workspace.json
