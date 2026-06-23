@@ -14,7 +14,7 @@ export function useWorkspace() {
 
     setPath(selected)
     const [notes, session] = await Promise.all([
-      api.notes.list(selected),
+      api.notes.scan(selected),
       api.workspace.load(selected),
     ])
     setNotes(notes)

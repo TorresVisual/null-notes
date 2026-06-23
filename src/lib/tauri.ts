@@ -5,6 +5,8 @@ export const api = {
   notes: {
     list: (workspace: string) =>
       invoke<NoteMetadata[]>('list_notes', { workspace }),
+    scan: (workspace: string) =>
+      invoke<NoteMetadata[]>('scan_workspace', { workspace }),
     open: (path: string) =>
       invoke<string>('open_note', { path }),
     save: (path: string, content: string) =>

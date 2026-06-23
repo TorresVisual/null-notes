@@ -39,6 +39,47 @@ pub async fn list_notes(
 }
 
 #[tauri::command]
+pub async fn scan_workspace(
+    workspace: String,
+    db: State<'_, DbPool>,
+) -> Result<Vec<NoteMetadata>, String> {
+    let mut dir = tokio::fs::read_dir(&workspace)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    while let Some(entry) = dir.next_entry().await.map_err(|e| e.to_string())? {
+        let path = entry.path();
+        if path.extension().and_then(|e| e.to_str()) != Some("md") {
+            continue;
+        }
+        let path_str = path.to_string_lossy().into_owned();
+        let content = tokio::fs::read_to_string(&path).await.unwrap_or_default();
+        let updated_at = entry
+            .metadata()
+            .await
+            .ok()
+            .and_then(|m| m.modified().ok())
+            .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
+            .map(|d| d.as_millis() as i64)
+            .unwrap_or_else(now_ms);
+        let meta = NoteMetadata {
+            id: Uuid::new_v4().to_string(),
+            title: title_from_content(&content),
+            path: path_str,
+            workspace: workspace.clone(),
+            updated_at,
+        };
+        db::notes::index_note(&db, &meta)
+            .await
+            .map_err(|e| e.to_string())?;
+    }
+
+    db::notes::list_by_workspace(&db, &workspace)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub async fn open_note(path: String) -> Result<String, String> {
     tokio::fs::read_to_string(&path)
         .await
