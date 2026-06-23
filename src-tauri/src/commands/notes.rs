@@ -53,7 +53,11 @@ pub async fn scan_workspace(
             continue;
         }
         let path_str = path.to_string_lossy().into_owned();
-        let content = tokio::fs::read_to_string(&path).await.unwrap_or_default();
+        let title = path
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or("Untitled")
+            .to_string();
         let updated_at = entry
             .metadata()
             .await
@@ -64,7 +68,7 @@ pub async fn scan_workspace(
             .unwrap_or_else(now_ms);
         let meta = NoteMetadata {
             id: Uuid::new_v4().to_string(),
-            title: title_from_content(&content),
+            title,
             path: path_str,
             workspace: workspace.clone(),
             updated_at,
