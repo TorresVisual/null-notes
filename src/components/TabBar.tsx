@@ -1,6 +1,11 @@
 import { useWorkspaceStore } from '../store/workspace'
 
-export function TabBar() {
+interface TabBarProps {
+  viewMode: 'wysiwyg' | 'raw'
+  onToggleView: () => void
+}
+
+export function TabBar({ viewMode, onToggleView }: TabBarProps) {
   const { openTabs, activeTab, setActiveTab, closeTab } = useWorkspaceStore()
   if (openTabs.length === 0) return null
   return (
@@ -16,12 +21,21 @@ export function TabBar() {
             className={`tab${isActive ? ' active' : ''}`}
           >
             <button onClick={() => setActiveTab(path)}>{name}</button>
-            <button onClick={() => closeTab(path)} aria-label={`Close ${name}`}>
+            <button className="tab-close" onClick={() => closeTab(path)} aria-label={`Close ${name}`}>
               ✕
             </button>
           </div>
         )
       })}
+      {activeTab && (
+        <button
+          className={`view-toggle${viewMode === 'raw' ? ' active' : ''}`}
+          onClick={onToggleView}
+          title={viewMode === 'wysiwyg' ? 'View source' : 'View preview'}
+        >
+          {viewMode === 'wysiwyg' ? 'Source' : 'Preview'}
+        </button>
+      )}
     </div>
   )
 }
