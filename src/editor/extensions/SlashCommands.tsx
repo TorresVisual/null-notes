@@ -1,0 +1,247 @@
+import { Extension } from '@tiptap/core'
+import type { Editor, Range } from '@tiptap/core'
+import Suggestion from '@tiptap/suggestion'
+import { ReactRenderer } from '@tiptap/react'
+import { forwardRef, useEffect, useImperativeHandle, useState } from 'react'
+import { createPortal } from 'react-dom'
+import { inkApi } from '../../lib/ink'
+import type { InkData } from '../../ink/types'
+
+const EMPTY_INK: InkData = { width: 800, height: 400, strokes: [], shapes: [] }
+
+interface Cmd {
+  title: string
+  description: string
+  run: (params: { editor: Editor; range: Range }) => void
+}
+
+const COMMANDS: Cmd[] = [
+  {
+    title: 'Heading 1',
+    description: 'Large section heading',
+    run: ({ editor, range }) =>
+      editor.chain().focus().deleteRange(range).setHeading({ level: 1 }).run(),
+  },
+  {
+    title: 'Heading 2',
+    description: 'Medium section heading',
+    run: ({ editor, range }) =>
+      editor.chain().focus().deleteRange(range).setHeading({ level: 2 }).run(),
+  },
+  {
+    title: 'Heading 3',
+    description: 'Small section heading',
+    run: ({ editor, range }) =>
+      editor.chain().focus().deleteRange(range).setHeading({ level: 3 }).run(),
+  },
+  {
+    title: 'Code Block',
+    description: 'Syntax-highlighted code',
+    run: ({ editor, range }) =>
+      editor.chain().focus().deleteRange(range).setCodeBlock().run(),
+  },
+  {
+    title: 'Mermaid Diagram',
+    description: 'Flowchart, sequence, or Gantt diagram',
+    run: ({ editor, range }) =>
+      editor
+        .chain()
+        .focus()
+        .deleteRange(range)
+        .insertContent({ type: 'mermaidBlock', attrs: { code: 'graph LR\n    A --> B' } })
+        .run(),
+  },
+  {
+    title: 'Note',
+    description: 'Info callout',
+    run: ({ editor, range }) =>
+      editor
+        .chain()
+        .focus()
+        .deleteRange(range)
+        .insertContent({ type: 'callout', attrs: { calloutType: 'note', title: '' }, content: [{ type: 'paragraph' }] })
+        .run(),
+  },
+  {
+    title: 'Warning',
+    description: 'Warning callout',
+    run: ({ editor, range }) =>
+      editor
+        .chain()
+        .focus()
+        .deleteRange(range)
+        .insertContent({ type: 'callout', attrs: { calloutType: 'warning', title: '' }, content: [{ type: 'paragraph' }] })
+        .run(),
+  },
+  {
+    title: 'Tip',
+    description: 'Tip callout',
+    run: ({ editor, range }) =>
+      editor
+        .chain()
+        .focus()
+        .deleteRange(range)
+        .insertContent({ type: 'callout', attrs: { calloutType: 'tip', title: '' }, content: [{ type: 'paragraph' }] })
+        .run(),
+  },
+  {
+    title: 'Danger',
+    description: 'Danger callout',
+    run: ({ editor, range }) =>
+      editor
+        .chain()
+        .focus()
+        .deleteRange(range)
+        .insertContent({ type: 'callout', attrs: { calloutType: 'danger', title: '' }, content: [{ type: 'paragraph' }] })
+        .run(),
+  },
+  {
+    title: 'Task List',
+    description: 'Checkable to-do list',
+    run: ({ editor, range }) =>
+      editor.chain().focus().deleteRange(range).toggleTaskList().run(),
+  },
+  {
+    title: 'Ink Block',
+    description: 'Handwriting canvas',
+    run: ({ editor, range }) => {
+      const notePath = editor.storage.noteContext.notePath
+      if (!notePath) return
+      editor.chain().focus().deleteRange(range).run()
+      void inkApi.ensureDir(notePath).then((dir) => {
+        const sep = dir.includes('\\') ? '\\' : '/'
+        const svgPath = `${dir}${sep}sketch-${Date.now()}.svg`
+        return inkApi.write(svgPath, EMPTY_INK).then(() => {
+          editor.commands.insertContent({ type: 'inkBlock', attrs: { src: svgPath, width: 800, height: 400 } })
+        })
+      })
+    },
+  },
+]
+
+// ── Menu component ────────────────────────────────────────────────────────────
+
+interface MenuProps {
+  items: Cmd[]
+  onSelect: (cmd: Cmd) => void
+  clientRect: (() => DOMRect | null) | null
+}
+
+interface MenuHandle {
+  onKeyDown: (e: KeyboardEvent) => boolean
+}
+
+const SlashMenu = forwardRef<MenuHandle, MenuProps>(function SlashMenu(
+  { items, onSelect, clientRect },
+  ref,
+) {
+  const [selected, setSelected] = useState(0)
+
+  useEffect(() => setSelected(0), [items])
+
+  useImperativeHandle(ref, () => ({
+    onKeyDown(e) {
+      if (e.key === 'ArrowUp') {
+        setSelected((s) => Math.max(0, s - 1))
+        return true
+      }
+      if (e.key === 'ArrowDown') {
+        setSelected((s) => Math.min(items.length - 1, s + 1))
+        return true
+      }
+      if (e.key === 'Enter') {
+        const item = items[selected]
+        if (item) onSelect(item)
+        return true
+      }
+      return false
+    },
+  }))
+
+  const rect = clientRect?.()
+  if (!items.length || !rect) return null
+
+  return createPortal(
+    <div
+      className="slash-menu"
+      style={{ position: 'fixed', top: rect.bottom + 6, left: rect.left, zIndex: 50 }}
+    >
+      {items.map((item, i) => (
+        <button
+          key={item.title}
+          className={`slash-menu-item${i === selected ? ' selected' : ''}`}
+          onMouseEnter={() => setSelected(i)}
+          onMouseDown={(e) => {
+            e.preventDefault()
+            onSelect(item)
+          }}
+        >
+          <span className="slash-item-title">{item.title}</span>
+          <span className="slash-item-desc">{item.description}</span>
+        </button>
+      ))}
+    </div>,
+    document.body,
+  )
+})
+
+// ── Extension ─────────────────────────────────────────────────────────────────
+
+export const SlashCommands = Extension.create({
+  name: 'slashCommands',
+
+  addProseMirrorPlugins() {
+    return [
+      Suggestion({
+        editor: this.editor,
+        char: '/',
+        allowSpaces: false,
+        startOfLine: false,
+        items({ query }: { query: string }) {
+          const q = query.toLowerCase()
+          return q
+            ? COMMANDS.filter(
+                (c) => c.title.toLowerCase().includes(q) || c.description.toLowerCase().includes(q),
+              )
+            : COMMANDS
+        },
+        command({ editor, range, props }) {
+          ;(props as Cmd).run({ editor, range })
+        },
+        render() {
+          let renderer: ReactRenderer<MenuHandle, MenuProps>
+
+          return {
+            onStart(props) {
+              renderer = new ReactRenderer(SlashMenu, {
+                props: {
+                  items: props.items as Cmd[],
+                  onSelect: (cmd: Cmd) => props.command(cmd),
+                  clientRect: props.clientRect,
+                },
+                editor: props.editor,
+              })
+            },
+            onUpdate(props) {
+              renderer.updateProps({
+                items: props.items as Cmd[],
+                onSelect: (cmd: Cmd) => props.command(cmd),
+                clientRect: props.clientRect,
+              })
+            },
+            onKeyDown({ event }) {
+              if (event.key === 'Escape') {
+                renderer.destroy()
+                return true
+              }
+              return renderer.ref?.onKeyDown(event) ?? false
+            },
+            onExit() {
+              renderer.destroy()
+            },
+          }
+        },
+      }),
+    ]
+  },
+})

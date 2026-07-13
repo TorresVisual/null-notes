@@ -30,3 +30,6 @@ src-tauri/pix2tex-venv/
 # Workspace state
 .workspace.json
 *.workspace.json
+
+# Scratch workspace used for manual QA of the app
+/notes/
