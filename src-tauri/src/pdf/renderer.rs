@@ -1,8 +1,8 @@
-use super::models::PdfPage;
+use super::models::PdfPage as PageRecord;
 use anyhow::Result;
 use std::path::Path;
 
-pub async fn render_pages(pdf_path: &Path) -> Result<Vec<PdfPage>> {
+pub async fn render_pages(pdf_path: &Path) -> Result<Vec<PageRecord>> {
     #[cfg(feature = "pdf-native")]
     {
         render_pages_native(pdf_path).await
@@ -14,8 +14,10 @@ pub async fn render_pages(pdf_path: &Path) -> Result<Vec<PdfPage>> {
 }
 
 #[cfg(feature = "pdf-native")]
-async fn render_pages_native(pdf_path: &Path) -> Result<Vec<PdfPage>> {
-    use pdfium_render::prelude::*;
+async fn render_pages_native(pdf_path: &Path) -> Result<Vec<PageRecord>> {
+    use pdfium_render::prelude::{
+        Pdfium, PdfRenderConfig,
+    };
 
     let pdfium = Pdfium::new(
         Pdfium::bind_to_library(Pdfium::pdfium_platform_library_name_at_path("./"))
@@ -24,7 +26,7 @@ async fn render_pages_native(pdf_path: &Path) -> Result<Vec<PdfPage>> {
 
     let doc = pdfium.load_pdf_from_file(pdf_path, None)?;
     let tmp_dir = tempfile::tempdir()?;
-    let mut pages = Vec::new();
+    let mut records = Vec::new();
 
     for (index, page) in doc.pages().iter().enumerate() {
         let bitmap = page.render_with_config(
@@ -34,10 +36,10 @@ async fn render_pages_native(pdf_path: &Path) -> Result<Vec<PdfPage>> {
         )?;
 
         let img_path = tmp_dir.path().join(format!("page-{}.png", index));
-        bitmap.as_image().save(&img_path)?;
+        bitmap.as_image()?.save(&img_path)?;
 
         let (width, height) = (bitmap.width() as u32, bitmap.height() as u32);
-        pages.push(PdfPage {
+        records.push(PageRecord {
             index,
             image_path: img_path.to_string_lossy().into_owned(),
             width,
@@ -46,7 +48,7 @@ async fn render_pages_native(pdf_path: &Path) -> Result<Vec<PdfPage>> {
     }
 
     std::mem::forget(tmp_dir);
-    Ok(pages)
+    Ok(records)
 }
 
 #[cfg(test)]
