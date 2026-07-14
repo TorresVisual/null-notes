@@ -14,6 +14,8 @@ import { Link } from '@tiptap/extension-link'
 import { createLowlight, common } from 'lowlight'
 import { InkBlock } from './InkBlock'
 import { ExerciseBlock } from './ExerciseBlock'
+import { NoteContext } from './NoteContext'
+import { SlashCommands } from './SlashCommands'
 
 const lowlight = createLowlight(common)
 
@@ -74,4 +76,6 @@ export const coreExtensions = [
   TaskBracketFix,
   InkBlock,
   ExerciseBlock,
+  NoteContext,
+  SlashCommands,
 ]

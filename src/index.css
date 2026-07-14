@@ -339,6 +339,38 @@ body {
 
 .editor-toolbar button:hover { background: #2e2e2e; color: #e8e8e8; }
 
+/* Slash command menu */
+.slash-menu {
+  background: #1e1e1e;
+  border: 1px solid #333;
+  border-radius: 8px;
+  min-width: 240px;
+  max-height: 320px;
+  overflow-y: auto;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+  padding: 4px;
+}
+
+.slash-menu-item {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  padding: 7px 10px;
+  background: none;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  text-align: left;
+  color: #e8e8e8;
+  gap: 1px;
+}
+
+.slash-menu-item.selected,
+.slash-menu-item:hover { background: #2a2a2a; }
+
+.slash-item-title { font-size: 13px; font-weight: 500; }
+.slash-item-desc { font-size: 11px; color: #666; }
+
 /* Tab close button */
 .tab .tab-close {
   padding: 6px 6px 6px 2px;
