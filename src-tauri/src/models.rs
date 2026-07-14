@@ -24,3 +24,10 @@ pub struct WorkspaceState {
     pub open_tabs: Vec<String>,
     pub active_tab: Option<String>,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkspaceTree {
+    pub notes: Vec<NoteMetadata>,
+    pub folders: Vec<String>,
+}
