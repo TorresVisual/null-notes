@@ -14,6 +14,7 @@ export function TreeNode({ entry, depth }: TreeNodeProps) {
   const activeTab = useWorkspaceStore((s) => s.activeTab)
   const toggleFolder = useWorkspaceStore((s) => s.toggleFolder)
   const setSelectedFolder = useWorkspaceStore((s) => s.setSelectedFolder)
+  const openFolderContextMenu = useWorkspaceStore((s) => s.openFolderContextMenu)
   const openTab = useWorkspaceStore((s) => s.openTab)
   const closeTab = useWorkspaceStore((s) => s.closeTab)
   const removeNote = useNotesStore((s) => s.removeNote)
@@ -58,6 +59,10 @@ export function TreeNode({ entry, depth }: TreeNodeProps) {
         onClick={() => {
           toggleFolder(entry.path)
           setSelectedFolder(entry.path)
+        }}
+        onContextMenu={(e) => {
+          e.preventDefault()
+          openFolderContextMenu(entry.path, e.clientX, e.clientY)
         }}
       >
         <span className="tree-toggle">{isExpanded ? '▾' : '▸'}</span>

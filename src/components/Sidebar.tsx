@@ -4,6 +4,7 @@ import { useWorkspaceStore } from '../store/workspace'
 import { useWorkspace, refreshTree } from '../hooks/useWorkspace'
 import { ImportButton } from './ImportButton'
 import { FolderTree } from './FolderTree'
+import { FolderContextMenu } from './FolderContextMenu'
 import { buildFolderTree } from '../lib/folderTree'
 import { api } from '../lib/tauri'
 
@@ -90,6 +91,7 @@ export function Sidebar({ onSearchOpen }: SidebarProps) {
       />
       {folderError && <p className="sidebar-error">{folderError}</p>}
       <FolderTree entries={tree} />
+      <FolderContextMenu />
     </aside>
   )
 }

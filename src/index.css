@@ -555,3 +555,34 @@ body {
 }
 
 .tab .tab-close:hover { color: #e66; background: none; border: none; box-shadow: none; }
+
+/* Folder context menu */
+.context-menu-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+}
+
+.context-menu {
+  background: #1e1e1e;
+  border: 1px solid #333;
+  border-radius: 6px;
+  padding: 4px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+  min-width: 120px;
+}
+
+.context-menu button {
+  text-align: left;
+  padding: 6px 10px;
+  background: none;
+  border: none;
+  border-radius: 4px;
+  color: #e8e8e8;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.context-menu button:hover { background: #2a2a2a; }
