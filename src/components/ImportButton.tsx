@@ -30,8 +30,8 @@ export function ImportButton() {
       const result = await importPdf()
       if (!result) return
       const content = `# ${result.title}\n\n${exercisesToMarkdown(result.exercises)}`
-      const note = await api.notes.create(workspacePath, result.title)
-      await api.notes.save(note.path, content)
+      const note = await api.notes.create(workspacePath, workspacePath, result.title)
+      await api.notes.save(note.path, workspacePath, content)
       addNote({ ...note, title: result.title })
       openTab(note.path)
     } catch (e) {

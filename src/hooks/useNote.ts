@@ -1,9 +1,11 @@
 import { useState, useEffect, useCallback } from 'react'
 import { api } from '../lib/tauri'
+import { useWorkspaceStore } from '../store/workspace'
 
 export function useNote(path: string | null) {
   const [content, setContent] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const workspacePath = useWorkspaceStore((s) => s.path)
 
   useEffect(() => {
     if (!path) return
@@ -15,11 +17,11 @@ export function useNote(path: string | null) {
 
   const save = useCallback(
     async (markdown: string) => {
-      if (!path) return
+      if (!path || !workspacePath) return
       setContent(markdown)
-      await api.notes.save(path, markdown)
+      await api.notes.save(path, workspacePath, markdown)
     },
-    [path],
+    [path, workspacePath],
   )
 
   return { content, save, isLoading }

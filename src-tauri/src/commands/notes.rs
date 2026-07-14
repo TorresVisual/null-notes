@@ -21,13 +21,6 @@ pub fn title_from_content(content: &str) -> String {
         .to_string()
 }
 
-fn workspace_of(path: &str) -> String {
-    std::path::Path::new(path)
-        .parent()
-        .map(|p| p.to_string_lossy().into_owned())
-        .unwrap_or_default()
-}
-
 #[tauri::command]
 pub async fn list_notes(
     workspace: String,
@@ -93,6 +86,7 @@ pub async fn open_note(path: String) -> Result<String, String> {
 #[tauri::command]
 pub async fn save_note(
     path: String,
+    workspace: String,
     content: String,
     db: State<'_, DbPool>,
 ) -> Result<(), String> {
@@ -105,7 +99,7 @@ pub async fn save_note(
         id: Uuid::new_v4().to_string(),
         title: title.clone(),
         path: path.clone(),
-        workspace: workspace_of(&path),
+        workspace,
         updated_at: now_ms(),
     };
     db::notes::index_note(&db, &meta)
@@ -119,6 +113,7 @@ pub async fn save_note(
 #[tauri::command]
 pub async fn create_note(
     workspace: String,
+    folder: String,
     title: String,
     db: State<'_, DbPool>,
 ) -> Result<NoteMetadata, String> {
@@ -127,7 +122,7 @@ pub async fn create_note(
         .map(|c| if c.is_alphanumeric() || c == ' ' { c } else { '-' })
         .collect();
     let filename = format!("{}.md", safe_name.trim());
-    let path = std::path::Path::new(&workspace).join(&filename);
+    let path = std::path::Path::new(&folder).join(&filename);
 
     tokio::fs::write(&path, format!("# {}\n", title))
         .await

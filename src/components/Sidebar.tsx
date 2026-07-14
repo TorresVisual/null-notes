@@ -27,7 +27,7 @@ export function Sidebar({ onSearchOpen }: SidebarProps) {
     if (!workspacePath) return
     const title = prompt('Note title:')
     if (!title) return
-    const meta = await api.notes.create(workspacePath, title)
+    const meta = await api.notes.create(workspacePath, workspacePath, title)
     addNote(meta)
     openTab(meta.path)
   }
