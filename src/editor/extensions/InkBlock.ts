@@ -29,7 +29,16 @@ export const InkBlock = Node.create({
   },
 
   parseHTML() {
-    return [{ tag: 'div[data-type="ink-block"]' }]
+    return [
+      {
+        tag: 'div[data-type="ink-block"]',
+        getAttrs: (el) => ({
+          src: (el as HTMLElement).getAttribute('data-src'),
+          width: parseInt((el as HTMLElement).getAttribute('data-width') ?? '800', 10),
+          height: parseInt((el as HTMLElement).getAttribute('data-height') ?? '400', 10),
+        }),
+      },
+    ]
   },
 
   renderHTML({ HTMLAttributes }) {
@@ -38,5 +47,39 @@ export const InkBlock = Node.create({
 
   addNodeView() {
     return ReactNodeViewRenderer(InkBlockView)
+  },
+
+  addStorage() {
+    return {
+      markdown: {
+        serialize(state: Record<string, unknown>, node: { attrs: InkBlockAttrs }) {
+          const { src, width, height } = node.attrs
+          ;(state as { write: (s: string) => void; ensureNewLine: () => void; closeBlock: (n: unknown) => void }).write('```ink\n')
+          ;(state as { write: (s: string) => void }).write(JSON.stringify({ src, width, height }))
+          ;(state as { ensureNewLine: () => void }).ensureNewLine()
+          ;(state as { write: (s: string) => void }).write('```')
+          ;(state as { closeBlock: (n: unknown) => void }).closeBlock(node)
+        },
+        parse: {
+          updateDOM(element: HTMLElement) {
+            element.querySelectorAll<HTMLElement>('pre > code.language-ink').forEach((code) => {
+              const pre = code.parentElement
+              if (!pre) return
+              try {
+                const data = JSON.parse(code.textContent ?? '{}') as Partial<InkBlockAttrs>
+                const div = document.createElement('div')
+                div.setAttribute('data-type', 'ink-block')
+                div.setAttribute('data-src', data.src ?? '')
+                div.setAttribute('data-width', String(data.width ?? 800))
+                div.setAttribute('data-height', String(data.height ?? 400))
+                pre.replaceWith(div)
+              } catch {
+                // invalid JSON — leave as-is
+              }
+            })
+          },
+        },
+      },
+    }
   },
 })
