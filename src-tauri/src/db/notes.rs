@@ -42,8 +42,18 @@ pub async fn index_note_content(pool: &SqlitePool, path: &str, title: &str, body
     Ok(())
 }
 
+// Windows paths already contain literal backslashes, which collide with the
+// '\' ESCAPE character used below. Escape existing backslashes first so they
+// match literally, then escape SQL's own wildcard characters.
+fn escape_like(input: &str) -> String {
+    input
+        .replace('\\', "\\\\")
+        .replace('%', "\\%")
+        .replace('_', "\\_")
+}
+
 pub async fn rename_path_prefix(pool: &SqlitePool, old_prefix: &str, new_prefix: &str) -> Result<()> {
-    let like_pattern = format!("{}%", old_prefix.replace('%', "\\%").replace('_', "\\_"));
+    let like_pattern = format!("{}%", escape_like(old_prefix));
     let rows: Vec<(String,)> = sqlx::query_as("SELECT path FROM notes WHERE path LIKE ? ESCAPE '\\'")
         .bind(&like_pattern)
         .fetch_all(pool)
@@ -57,7 +67,7 @@ pub async fn rename_path_prefix(pool: &SqlitePool, old_prefix: &str, new_prefix:
 }
 
 pub async fn remove_notes_under(pool: &SqlitePool, prefix: &str) -> Result<()> {
-    let like_pattern = format!("{}%", prefix.replace('%', "\\%").replace('_', "\\_"));
+    let like_pattern = format!("{}%", escape_like(prefix));
     sqlx::query("DELETE FROM notes WHERE path LIKE ? ESCAPE '\\'")
         .bind(&like_pattern)
         .execute(pool)

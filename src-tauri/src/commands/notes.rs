@@ -222,6 +222,66 @@ pub async fn search_notes(
         .map_err(|e| e.to_string())
 }
 
+async fn create_folder_at(parent: &str, name: &str) -> anyhow::Result<String> {
+    let path = std::path::Path::new(parent).join(name);
+    tokio::fs::create_dir(&path).await?;
+    Ok(path.to_string_lossy().into_owned())
+}
+
+async fn rename_folder_at(old_path: &str, new_path: &str, db: &DbPool) -> anyhow::Result<()> {
+    tokio::fs::rename(old_path, new_path).await?;
+    let old_prefix = format!("{}{}", old_path, std::path::MAIN_SEPARATOR);
+    let new_prefix = format!("{}{}", new_path, std::path::MAIN_SEPARATOR);
+    db::notes::rename_path_prefix(db, &old_prefix, &new_prefix).await?;
+    Ok(())
+}
+
+async fn delete_folder_at(path: &str, db: &DbPool) -> anyhow::Result<()> {
+    tokio::fs::remove_dir_all(path).await?;
+    let prefix = format!("{}{}", path, std::path::MAIN_SEPARATOR);
+    db::notes::remove_notes_under(db, &prefix).await?;
+    Ok(())
+}
+
+async fn move_note_at(path: &str, dest_folder: &str, db: &DbPool) -> anyhow::Result<String> {
+    let file_name = std::path::Path::new(path)
+        .file_name()
+        .ok_or_else(|| anyhow::anyhow!("note path has no file name: {path}"))?
+        .to_os_string();
+    let new_path = std::path::Path::new(dest_folder).join(&file_name);
+    tokio::fs::rename(path, &new_path).await?;
+
+    let ink_dir = path.trim_end_matches(".md").to_string() + ".ink";
+    if tokio::fs::metadata(&ink_dir).await.is_ok() {
+        let new_ink_dir = new_path.to_string_lossy().trim_end_matches(".md").to_string() + ".ink";
+        tokio::fs::rename(&ink_dir, &new_ink_dir).await?;
+    }
+
+    let new_path_str = new_path.to_string_lossy().into_owned();
+    db::notes::update_path(db, path, &new_path_str).await?;
+    Ok(new_path_str)
+}
+
+#[tauri::command]
+pub async fn create_folder(parent: String, name: String) -> Result<String, String> {
+    create_folder_at(&parent, &name).await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn rename_folder(old_path: String, new_path: String, db: State<'_, DbPool>) -> Result<(), String> {
+    rename_folder_at(&old_path, &new_path, &db).await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn delete_folder(path: String, db: State<'_, DbPool>) -> Result<(), String> {
+    delete_folder_at(&path, &db).await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn move_note(path: String, dest_folder: String, db: State<'_, DbPool>) -> Result<String, String> {
+    move_note_at(&path, &dest_folder, &db).await.map_err(|e| e.to_string())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -290,5 +350,109 @@ mod tests {
 
         assert!(notes.is_empty());
         assert_eq!(folders.len(), 1);
+    }
+}
+
+#[cfg(test)]
+mod folder_tests {
+    use super::*;
+    use tempfile::tempdir;
+    use crate::db::schema::run_migrations;
+    use crate::db::notes::index_note as db_index_note;
+
+    async fn make_pool() -> DbPool {
+        let pool = DbPool::connect("sqlite::memory:").await.unwrap();
+        run_migrations(&pool).await.unwrap();
+        pool
+    }
+
+    #[tokio::test]
+    async fn test_create_folder_at_creates_directory() {
+        let tmp = tempdir().unwrap();
+        let parent = tmp.path().to_string_lossy().into_owned();
+        let path = create_folder_at(&parent, "Course101").await.unwrap();
+        assert!(std::path::Path::new(&path).is_dir());
+    }
+
+    #[tokio::test]
+    async fn test_rename_folder_at_moves_dir_and_updates_notes() {
+        let tmp = tempdir().unwrap();
+        let root = tmp.path();
+        let old_dir = root.join("Old");
+        std::fs::create_dir_all(&old_dir).unwrap();
+        std::fs::write(old_dir.join("note.md"), "# Note").unwrap();
+
+        let pool = make_pool().await;
+        let old_note_path = old_dir.join("note.md").to_string_lossy().into_owned();
+        db_index_note(&pool, &NoteMetadata {
+            id: "a".into(),
+            title: "Note".into(),
+            path: old_note_path,
+            workspace: root.to_string_lossy().into_owned(),
+            updated_at: 1000,
+        }).await.unwrap();
+
+        let new_dir = root.join("New").to_string_lossy().into_owned();
+        rename_folder_at(&old_dir.to_string_lossy(), &new_dir, &pool).await.unwrap();
+
+        assert!(std::path::Path::new(&new_dir).join("note.md").exists());
+        let notes = db::notes::list_by_workspace(&pool, &root.to_string_lossy()).await.unwrap();
+        let expected = std::path::Path::new(&new_dir).join("note.md").to_string_lossy().into_owned();
+        assert_eq!(notes[0].path, expected);
+    }
+
+    #[tokio::test]
+    async fn test_delete_folder_at_removes_dir_and_notes() {
+        let tmp = tempdir().unwrap();
+        let root = tmp.path();
+        let dir = root.join("ToDelete");
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("note.md"), "# Note").unwrap();
+
+        let pool = make_pool().await;
+        db_index_note(&pool, &NoteMetadata {
+            id: "a".into(),
+            title: "Note".into(),
+            path: dir.join("note.md").to_string_lossy().into_owned(),
+            workspace: root.to_string_lossy().into_owned(),
+            updated_at: 1000,
+        }).await.unwrap();
+
+        delete_folder_at(&dir.to_string_lossy(), &pool).await.unwrap();
+
+        assert!(!dir.exists());
+        let notes = db::notes::list_by_workspace(&pool, &root.to_string_lossy()).await.unwrap();
+        assert!(notes.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_move_note_at_moves_file_and_ink_sidecar() {
+        let tmp = tempdir().unwrap();
+        let root = tmp.path();
+        let src_dir = root.join("Src");
+        let dest_dir = root.join("Dest");
+        std::fs::create_dir_all(&src_dir).unwrap();
+        std::fs::create_dir_all(&dest_dir).unwrap();
+        std::fs::write(src_dir.join("note.md"), "# Note").unwrap();
+        std::fs::create_dir_all(src_dir.join("note.ink")).unwrap();
+        std::fs::write(src_dir.join("note.ink").join("sketch-1.svg"), "<svg></svg>").unwrap();
+
+        let pool = make_pool().await;
+        let old_path = src_dir.join("note.md").to_string_lossy().into_owned();
+        db_index_note(&pool, &NoteMetadata {
+            id: "a".into(),
+            title: "Note".into(),
+            path: old_path.clone(),
+            workspace: root.to_string_lossy().into_owned(),
+            updated_at: 1000,
+        }).await.unwrap();
+
+        let new_path = move_note_at(&old_path, &dest_dir.to_string_lossy(), &pool).await.unwrap();
+
+        assert!(std::path::Path::new(&new_path).exists());
+        assert!(dest_dir.join("note.ink").join("sketch-1.svg").exists());
+        assert!(!src_dir.join("note.md").exists());
+        let notes = db::notes::list_by_workspace(&pool, &root.to_string_lossy()).await.unwrap();
+        assert_eq!(notes[0].path, new_path);
     }
 }
