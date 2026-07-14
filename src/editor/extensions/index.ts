@@ -1,19 +1,77 @@
 import StarterKit from '@tiptap/starter-kit'
+import { Code } from '@tiptap/extension-code'
+import { markInputRule, Extension } from '@tiptap/core'
 import { Markdown } from 'tiptap-markdown'
 import Placeholder from '@tiptap/extension-placeholder'
+import { Table } from '@tiptap/extension-table'
+import { TableRow } from '@tiptap/extension-table-row'
+import { TableCell } from '@tiptap/extension-table-cell'
+import { TableHeader } from '@tiptap/extension-table-header'
+import { TaskList } from '@tiptap/extension-task-list'
+import { TaskItem } from '@tiptap/extension-task-item'
+import { CodeBlockLowlight } from '@tiptap/extension-code-block-lowlight'
+import { Link } from '@tiptap/extension-link'
+import { createLowlight, common } from 'lowlight'
 import { InkBlock } from './InkBlock'
 import { ExerciseBlock } from './ExerciseBlock'
 
+const lowlight = createLowlight(common)
+
+// TipTap 3's Code mark uses a function-based find for its input rule.
+// Negative lookbehind regex matches markInputRule's expectation: last capture
+// group is the content, full match covers only the delimiters + content.
+const CodeWithRegexpRule = Code.extend({
+  addInputRules() {
+    return [
+      markInputRule({
+        find: /(?<!`)`([^`\s](?:[^`]*[^`\s])?)`$/,
+        type: this.type,
+      }),
+    ]
+  },
+})
+
+// Files saved before TaskList was added have \[x\] and \[ \] because
+// prosemirror-markdown escaped bare brackets to prevent link mis-parsing.
+// Preprocess the raw source before markdown-it touches it so those become
+// proper task-list checkboxes on the next save.
+const TaskBracketFix = Extension.create({
+  name: 'taskBracketFix',
+  addStorage() {
+    return {
+      markdown: {
+        parse: {
+          setup(md: Record<string, unknown>) {
+            const orig = md['parse'] as (src: string, env: unknown) => unknown[]
+            md['parse'] = (src: string, env: unknown) => {
+              const fixed = src.replace(/^([ \t]*[-*+] +)\\\[([x ])\\\]/gm, '$1[$2]')
+              return orig.call(md, fixed, env)
+            }
+          },
+        },
+      },
+    }
+  },
+})
+
 export const coreExtensions = [
-  StarterKit,
+  StarterKit.configure({ code: false, codeBlock: false }),
+  CodeWithRegexpRule,
+  CodeBlockLowlight.configure({ lowlight }),
+  Table.configure({ resizable: false }),
+  TableRow,
+  TableHeader,
+  TableCell,
+  TaskList,
+  TaskItem.configure({ nested: true }),
+  Link.configure({ openOnClick: false, autolink: true }),
   Markdown.configure({
     html: false,
     transformPastedText: true,
     transformCopiedText: true,
   }),
-  Placeholder.configure({
-    placeholder: 'Start writing…',
-  }),
+  Placeholder.configure({ placeholder: 'Start writing…' }),
+  TaskBracketFix,
   InkBlock,
   ExerciseBlock,
 ]
