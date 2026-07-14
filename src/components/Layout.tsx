@@ -37,7 +37,7 @@ export function Layout() {
           <div className="editor-pane">
             {isLoading && <p className="status">Loading…</p>}
             {!isLoading && activeTab && viewMode === 'wysiwyg' && (
-              <NoteEditor content={content} onChange={(md) => void save(md)} />
+              <NoteEditor content={content} notePath={activeTab} onChange={(md) => void save(md)} />
             )}
             {!isLoading && activeTab && viewMode === 'raw' && (
               <RawEditor content={content} onChange={(md) => void save(md)} />
