@@ -20,5 +20,16 @@ pub async fn run_migrations(pool: &SqlitePool) -> Result<()> {
     .execute(pool)
     .await?;
 
+    sqlx::query(
+        "CREATE VIRTUAL TABLE IF NOT EXISTS notes_fts USING fts5(
+            path UNINDEXED,
+            title,
+            body,
+            tokenize = 'unicode61'
+        )",
+    )
+    .execute(pool)
+    .await?;
+
     Ok(())
 }

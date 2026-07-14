@@ -3,6 +3,7 @@ import { Sidebar } from './Sidebar'
 import { TabBar } from './TabBar'
 import { NoteEditor } from '../editor/NoteEditor'
 import { RawEditor } from '../editor/RawEditor'
+import { SearchModal } from './SearchModal'
 import { useWorkspaceStore } from '../store/workspace'
 import { useNote } from '../hooks/useNote'
 import { useWorkspace } from '../hooks/useWorkspace'
@@ -14,6 +15,7 @@ export function Layout() {
   const { content, save, isLoading } = useNote(activeTab)
   const { saveSession } = useWorkspace()
   const [viewMode, setViewMode] = useState<ViewMode>('wysiwyg')
+  const [searchOpen, setSearchOpen] = useState(false)
 
   useEffect(() => {
     const handler = () => { void saveSession() }
@@ -22,12 +24,24 @@ export function Layout() {
   }, [saveSession])
 
   useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault()
+        setSearchOpen(true)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
+
+  useEffect(() => {
     setViewMode('wysiwyg')
   }, [activeTab])
 
   return (
     <div className="layout">
-      <Sidebar />
+      {searchOpen && <SearchModal onClose={() => setSearchOpen(false)} />}
+      <Sidebar onSearchOpen={() => setSearchOpen(true)} />
       <div className="main">
         <TabBar
           viewMode={viewMode}

@@ -1,6 +1,6 @@
 use anyhow::Result;
 use sqlx::SqlitePool;
-use crate::models::NoteMetadata;
+use crate::models::{NoteMetadata, SearchResult};
 
 pub async fn index_note(pool: &SqlitePool, note: &NoteMetadata) -> Result<()> {
     sqlx::query(
@@ -26,6 +26,43 @@ pub async fn remove_note(pool: &SqlitePool, path: &str) -> Result<()> {
         .execute(pool)
         .await?;
     Ok(())
+}
+
+pub async fn index_note_content(pool: &SqlitePool, path: &str, title: &str, body: &str) -> Result<()> {
+    sqlx::query("DELETE FROM notes_fts WHERE path = ?")
+        .bind(path)
+        .execute(pool)
+        .await?;
+    sqlx::query("INSERT INTO notes_fts (path, title, body) VALUES (?, ?, ?)")
+        .bind(path)
+        .bind(title)
+        .bind(body)
+        .execute(pool)
+        .await?;
+    Ok(())
+}
+
+pub async fn remove_from_fts(pool: &SqlitePool, path: &str) -> Result<()> {
+    sqlx::query("DELETE FROM notes_fts WHERE path = ?")
+        .bind(path)
+        .execute(pool)
+        .await?;
+    Ok(())
+}
+
+pub async fn search_notes(pool: &SqlitePool, fts_query: &str) -> Result<Vec<SearchResult>> {
+    let rows = sqlx::query_as::<_, SearchResult>(
+        "SELECT path, title,
+                snippet(notes_fts, 2, '[[', ']]', '\u{2026}', 20) as snippet
+         FROM notes_fts
+         WHERE notes_fts MATCH ?
+         ORDER BY rank
+         LIMIT 20",
+    )
+    .bind(fts_query)
+    .fetch_all(pool)
+    .await?;
+    Ok(rows)
 }
 
 pub async fn list_by_workspace(pool: &SqlitePool, workspace: &str) -> Result<Vec<NoteMetadata>> {

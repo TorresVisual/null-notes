@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core'
-import type { NoteMetadata, WorkspaceState } from '../types'
+import type { NoteMetadata, WorkspaceState, SearchResult } from '../types'
 
 export const api = {
   notes: {
@@ -15,6 +15,8 @@ export const api = {
       invoke<NoteMetadata>('create_note', { workspace, title }),
     delete: (path: string) =>
       invoke<void>('delete_note', { path }),
+    search: (query: string) =>
+      invoke<SearchResult[]>('search_notes', { query }),
   },
   workspace: {
     load: (path: string) =>

@@ -2,7 +2,7 @@ use tauri::State;
 use uuid::Uuid;
 use std::time::{SystemTime, UNIX_EPOCH};
 use crate::db::{self, DbPool};
-use crate::models::NoteMetadata;
+use crate::models::{NoteMetadata, SearchResult};
 
 fn now_ms() -> i64 {
     SystemTime::now()
@@ -100,14 +100,18 @@ pub async fn save_note(
         .await
         .map_err(|e| e.to_string())?;
 
+    let title = title_from_content(&content);
     let meta = NoteMetadata {
         id: Uuid::new_v4().to_string(),
-        title: title_from_content(&content),
+        title: title.clone(),
         path: path.clone(),
         workspace: workspace_of(&path),
         updated_at: now_ms(),
     };
     db::notes::index_note(&db, &meta)
+        .await
+        .map_err(|e| e.to_string())?;
+    db::notes::index_note_content(&db, &path, &title, &content)
         .await
         .map_err(|e| e.to_string())
 }
@@ -131,12 +135,17 @@ pub async fn create_note(
 
     let meta = NoteMetadata {
         id: Uuid::new_v4().to_string(),
-        title,
+        title: title.clone(),
         path: path.to_string_lossy().into_owned(),
         workspace,
         updated_at: now_ms(),
     };
     db::notes::index_note(&db, &meta)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let body = format!("# {}", title);
+    db::notes::index_note_content(&db, &meta.path, &meta.title, &body)
         .await
         .map_err(|e| e.to_string())?;
 
@@ -156,6 +165,29 @@ pub async fn delete_note(
     let _ = tokio::fs::remove_dir_all(&ink_dir).await;
 
     db::notes::remove_note(&db, &path)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    db::notes::remove_from_fts(&db, &path)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn search_notes(
+    query: String,
+    db: State<'_, DbPool>,
+) -> Result<Vec<SearchResult>, String> {
+    let trimmed = query.trim();
+    if trimmed.is_empty() {
+        return Ok(vec![]);
+    }
+    let fts_query = trimmed
+        .split_whitespace()
+        .map(|w| format!("\"{}\"*", w.replace('"', "")))
+        .collect::<Vec<_>>()
+        .join(" ");
+    db::notes::search_notes(&db, &fts_query)
         .await
         .map_err(|e| e.to_string())
 }

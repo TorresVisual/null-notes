@@ -24,6 +24,7 @@ pub fn run() {
             commands::notes::save_note,
             commands::notes::create_note,
             commands::notes::delete_note,
+            commands::notes::search_notes,
             commands::workspace::load_workspace,
             commands::workspace::save_workspace,
             commands::ink::ensure_ink_dir,

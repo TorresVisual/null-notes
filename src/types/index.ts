@@ -6,6 +6,12 @@ export interface NoteMetadata {
   updatedAt: number
 }
 
+export interface SearchResult {
+  path: string
+  title: string
+  snippet: string
+}
+
 export interface WorkspaceState {
   openTabs: string[]
   activeTab: string | null

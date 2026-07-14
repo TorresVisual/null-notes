@@ -1,10 +1,15 @@
+import { useState } from 'react'
 import { useNotesStore } from '../store/notes'
 import { useWorkspaceStore } from '../store/workspace'
 import { useWorkspace } from '../hooks/useWorkspace'
 import { ImportButton } from './ImportButton'
 import { api } from '../lib/tauri'
 
-export function Sidebar() {
+interface SidebarProps {
+  onSearchOpen: () => void
+}
+
+export function Sidebar({ onSearchOpen }: SidebarProps) {
   const notes = useNotesStore((s) => s.notes)
   const removeNote = useNotesStore((s) => s.removeNote)
   const addNote = useNotesStore((s) => s.addNote)
@@ -12,6 +17,11 @@ export function Sidebar() {
   const openTab = useWorkspaceStore((s) => s.openTab)
   const closeTab = useWorkspaceStore((s) => s.closeTab)
   const { openWorkspace } = useWorkspace()
+  const [search, setSearch] = useState('')
+
+  const visibleNotes = search.trim()
+    ? notes.filter((n) => n.title.toLowerCase().includes(search.toLowerCase()))
+    : notes
 
   async function handleCreate() {
     if (!workspacePath) return
@@ -29,15 +39,31 @@ export function Sidebar() {
     closeTab(notePath)
   }
 
+  const workspaceName = workspacePath
+    ? workspacePath.split(/[\\/]/).filter(Boolean).pop() ?? workspacePath
+    : null
+
   return (
     <aside className="sidebar">
+      {workspaceName && <p className="workspace-name" title={workspacePath ?? ''}>{workspaceName}</p>}
       <button onClick={() => void openWorkspace()}>Open Workspace</button>
       <button onClick={() => void handleCreate()} disabled={!workspacePath}>
         New Note
       </button>
       <ImportButton />
+      <button className="search-open-btn" onClick={onSearchOpen}>
+        Search <kbd>Ctrl K</kbd>
+      </button>
+      <input
+        className="search-input"
+        type="search"
+        placeholder="Filter by title…"
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        aria-label="Filter notes by title"
+      />
       <ul>
-        {notes.map((note) => (
+        {visibleNotes.map((note) => (
           <li key={note.path}>
             <button className="note-link" onClick={() => openTab(note.path)}>
               {note.title}
