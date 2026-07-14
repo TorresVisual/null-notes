@@ -6,6 +6,11 @@ export interface NoteMetadata {
   updatedAt: number
 }
 
+export interface WorkspaceTree {
+  notes: NoteMetadata[]
+  folders: string[]
+}
+
 export interface SearchResult {
   path: string
   title: string
@@ -15,4 +20,5 @@ export interface SearchResult {
 export interface WorkspaceState {
   openTabs: string[]
   activeTab: string | null
+  expandedFolders: string[]
 }

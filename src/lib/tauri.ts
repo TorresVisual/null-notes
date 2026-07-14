@@ -1,12 +1,12 @@
 import { invoke } from '@tauri-apps/api/core'
-import type { NoteMetadata, WorkspaceState, SearchResult } from '../types'
+import type { NoteMetadata, WorkspaceState, WorkspaceTree, SearchResult } from '../types'
 
 export const api = {
   notes: {
     list: (workspace: string) =>
       invoke<NoteMetadata[]>('list_notes', { workspace }),
     scan: (workspace: string) =>
-      invoke<NoteMetadata[]>('scan_workspace', { workspace }),
+      invoke<WorkspaceTree>('scan_workspace', { workspace }),
     open: (path: string) =>
       invoke<string>('open_note', { path }),
     save: (path: string, workspace: string, content: string) =>
@@ -17,6 +17,14 @@ export const api = {
       invoke<void>('delete_note', { path }),
     search: (query: string) =>
       invoke<SearchResult[]>('search_notes', { query }),
+    createFolder: (parent: string, name: string) =>
+      invoke<string>('create_folder', { parent, name }),
+    renameFolder: (oldPath: string, newPath: string) =>
+      invoke<void>('rename_folder', { oldPath, newPath }),
+    deleteFolder: (path: string) =>
+      invoke<void>('delete_folder', { path }),
+    moveNote: (path: string, destFolder: string) =>
+      invoke<string>('move_note', { path, destFolder }),
   },
   workspace: {
     load: (path: string) =>

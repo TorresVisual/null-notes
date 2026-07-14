@@ -4,29 +4,39 @@ import { api } from '../lib/tauri'
 import { useWorkspaceStore } from '../store/workspace'
 import { useNotesStore } from '../store/notes'
 
+export async function refreshTree(): Promise<void> {
+  const path = useWorkspaceStore.getState().path
+  if (!path) return
+  const tree = await api.notes.scan(path)
+  useNotesStore.getState().setNotes(tree.notes)
+  useNotesStore.getState().setFolders(tree.folders)
+}
+
 export function useWorkspace() {
-  const { setPath, openTab } = useWorkspaceStore()
-  const { setNotes } = useNotesStore()
+  const { setPath, openTab, setExpandedFolders } = useWorkspaceStore()
+  const { setNotes, setFolders } = useNotesStore()
 
   const openWorkspace = useCallback(async () => {
     const selected = await open({ directory: true, multiple: false })
     if (!selected || Array.isArray(selected)) return
 
     setPath(selected)
-    const [notes, session] = await Promise.all([
+    const [tree, session] = await Promise.all([
       api.notes.scan(selected),
       api.workspace.load(selected),
     ])
-    setNotes(notes)
+    setNotes(tree.notes)
+    setFolders(tree.folders)
+    setExpandedFolders(session.expandedFolders)
     for (const tab of session.openTabs) {
       openTab(tab)
     }
-  }, [setPath, setNotes, openTab])
+  }, [setPath, setNotes, setFolders, setExpandedFolders, openTab])
 
   const saveSession = useCallback(async () => {
-    const { path, openTabs, activeTab } = useWorkspaceStore.getState()
+    const { path, openTabs, activeTab, expandedFolders } = useWorkspaceStore.getState()
     if (!path) return
-    await api.workspace.save(path, { openTabs, activeTab })
+    await api.workspace.save(path, { openTabs, activeTab, expandedFolders })
   }, [])
 
   return { openWorkspace, saveSession }

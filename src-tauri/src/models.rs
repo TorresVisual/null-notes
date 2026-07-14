@@ -23,6 +23,8 @@ pub struct SearchResult {
 pub struct WorkspaceState {
     pub open_tabs: Vec<String>,
     pub active_tab: Option<String>,
+    #[serde(default)]
+    pub expanded_folders: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
