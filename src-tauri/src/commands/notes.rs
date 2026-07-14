@@ -1,5 +1,7 @@
 use tauri::State;
 use uuid::Uuid;
+use regex::Regex;
+use std::collections::HashSet;
 use std::time::{SystemTime, UNIX_EPOCH};
 use crate::db::{self, DbPool};
 use crate::models::{NoteMetadata, SearchResult, WorkspaceTree};
@@ -19,6 +21,52 @@ pub fn title_from_content(content: &str) -> String {
         .trim_start_matches('#')
         .trim()
         .to_string()
+}
+
+fn strip_code(content: &str) -> String {
+    let without_fences = Regex::new(r"(?s)```.*?```")
+        .map(|re| re.replace_all(content, "").into_owned())
+        .unwrap_or_else(|_| content.to_string());
+    Regex::new(r"`[^`\n]*`")
+        .map(|re| re.replace_all(&without_fences, "").into_owned())
+        .unwrap_or(without_fences)
+}
+
+pub fn extract_tags(content: &str) -> Vec<String> {
+    let stripped = strip_code(content);
+    let re = match Regex::new(r"(?:^|\s)#([A-Za-z][\w-]*)") {
+        Ok(re) => re,
+        Err(_) => return Vec::new(),
+    };
+    let mut seen = HashSet::new();
+    let mut tags = Vec::new();
+    for cap in re.captures_iter(&stripped) {
+        if let Some(m) = cap.get(1) {
+            let tag = m.as_str().to_string();
+            if seen.insert(tag.to_lowercase()) {
+                tags.push(tag);
+            }
+        }
+    }
+    tags
+}
+
+pub fn extract_links(content: &str) -> Vec<String> {
+    let re = match Regex::new(r"\[\[([^\]\n]+)\]\]") {
+        Ok(re) => re,
+        Err(_) => return Vec::new(),
+    };
+    let mut seen = HashSet::new();
+    let mut links = Vec::new();
+    for cap in re.captures_iter(content) {
+        if let Some(m) = cap.get(1) {
+            let title = m.as_str().trim().to_string();
+            if !title.is_empty() && seen.insert(title.to_lowercase()) {
+                links.push(title);
+            }
+        }
+    }
+    links
 }
 
 #[tauri::command]
@@ -305,6 +353,65 @@ mod tests {
     #[test]
     fn test_title_from_content_leading_blank_lines() {
         assert_eq!(title_from_content("\n\n# Deep\n"), "Deep");
+    }
+
+    #[test]
+    fn test_extract_tags_finds_inline_hashtags() {
+        let tags = extract_tags("Notes on #recursion and #dynamic-programming today.");
+        assert_eq!(tags, vec!["recursion", "dynamic-programming"]);
+    }
+
+    #[test]
+    fn test_extract_tags_ignores_atx_headings() {
+        let tags = extract_tags("# Heading One\n## Heading Two\nSome #realtag here.");
+        assert_eq!(tags, vec!["realtag"]);
+    }
+
+    #[test]
+    fn test_extract_tags_ignores_fenced_code() {
+        let content = "See #important below.\n```c\n#include <stdio.h>\n#define MAX 10\n```\nDone.";
+        let tags = extract_tags(content);
+        assert_eq!(tags, vec!["important"]);
+    }
+
+    #[test]
+    fn test_extract_tags_ignores_inline_code() {
+        let tags = extract_tags("Use `#define` for macros, but #cpreprocessor is a real tag.");
+        assert_eq!(tags, vec!["cpreprocessor"]);
+    }
+
+    #[test]
+    fn test_extract_tags_deduplicates_case_insensitively() {
+        let tags = extract_tags("#CS101 material. Revisit #cs101 before the exam. #cs101");
+        assert_eq!(tags, vec!["CS101"]);
+    }
+
+    #[test]
+    fn test_extract_tags_ignores_hash_mid_word() {
+        let tags = extract_tags("issue#42 is not a tag, but #issue42 is.");
+        assert_eq!(tags, vec!["issue42"]);
+    }
+
+    #[test]
+    fn test_extract_tags_empty_content() {
+        assert!(extract_tags("").is_empty());
+    }
+
+    #[test]
+    fn test_extract_links_finds_wiki_links() {
+        let links = extract_links("See [[Big O Notation]] and [[Sorting Algorithms]].");
+        assert_eq!(links, vec!["Big O Notation", "Sorting Algorithms"]);
+    }
+
+    #[test]
+    fn test_extract_links_deduplicates_case_insensitively() {
+        let links = extract_links("[[Big O Notation]] again: [[big o notation]]");
+        assert_eq!(links, vec!["Big O Notation"]);
+    }
+
+    #[test]
+    fn test_extract_links_empty_content() {
+        assert!(extract_links("").is_empty());
     }
 
     #[tokio::test]
