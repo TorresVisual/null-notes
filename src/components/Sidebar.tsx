@@ -1,8 +1,10 @@
 import { useState } from 'react'
 import { useNotesStore } from '../store/notes'
 import { useWorkspaceStore } from '../store/workspace'
-import { useWorkspace } from '../hooks/useWorkspace'
+import { useWorkspace, refreshTree } from '../hooks/useWorkspace'
 import { ImportButton } from './ImportButton'
+import { FolderTree } from './FolderTree'
+import { buildFolderTree } from '../lib/folderTree'
 import { api } from '../lib/tauri'
 
 interface SidebarProps {
@@ -11,11 +13,12 @@ interface SidebarProps {
 
 export function Sidebar({ onSearchOpen }: SidebarProps) {
   const notes = useNotesStore((s) => s.notes)
-  const removeNote = useNotesStore((s) => s.removeNote)
+  const folders = useNotesStore((s) => s.folders)
   const addNote = useNotesStore((s) => s.addNote)
   const workspacePath = useWorkspaceStore((s) => s.path)
+  const selectedFolder = useWorkspaceStore((s) => s.selectedFolder)
+  const setSelectedFolder = useWorkspaceStore((s) => s.setSelectedFolder)
   const openTab = useWorkspaceStore((s) => s.openTab)
-  const closeTab = useWorkspaceStore((s) => s.closeTab)
   const { openWorkspace } = useWorkspace()
   const [search, setSearch] = useState('')
 
@@ -23,20 +26,38 @@ export function Sidebar({ onSearchOpen }: SidebarProps) {
     ? notes.filter((n) => n.title.toLowerCase().includes(search.toLowerCase()))
     : notes
 
-  async function handleCreate() {
+  const tree = workspacePath ? buildFolderTree(workspacePath, folders, visibleNotes) : []
+  const folderError = useWorkspaceStore((s) => s.folderError)
+  const setFolderError = useWorkspaceStore((s) => s.setFolderError)
+
+  async function handleCreateNote() {
     if (!workspacePath) return
     const title = prompt('Note title:')
     if (!title) return
-    const meta = await api.notes.create(workspacePath, workspacePath, title)
-    addNote(meta)
-    openTab(meta.path)
+    const folder = selectedFolder ?? workspacePath
+    try {
+      const meta = await api.notes.create(workspacePath, folder, title)
+      addNote(meta)
+      openTab(meta.path)
+      setFolderError(null)
+    } catch (e) {
+      setFolderError(e instanceof Error ? e.message : String(e))
+    }
   }
 
-  async function handleDelete(notePath: string) {
-    if (!confirm('Delete this note?')) return
-    await api.notes.delete(notePath)
-    removeNote(notePath)
-    closeTab(notePath)
+  async function handleCreateFolder() {
+    if (!workspacePath) return
+    const name = prompt('Folder name:')
+    if (!name) return
+    const parent = selectedFolder ?? workspacePath
+    try {
+      const newPath = await api.notes.createFolder(parent, name)
+      setSelectedFolder(newPath)
+      setFolderError(null)
+      await refreshTree()
+    } catch (e) {
+      setFolderError(e instanceof Error ? e.message : String(e))
+    }
   }
 
   const workspaceName = workspacePath
@@ -47,9 +68,14 @@ export function Sidebar({ onSearchOpen }: SidebarProps) {
     <aside className="sidebar">
       {workspaceName && <p className="workspace-name" title={workspacePath ?? ''}>{workspaceName}</p>}
       <button onClick={() => void openWorkspace()}>Open Workspace</button>
-      <button onClick={() => void handleCreate()} disabled={!workspacePath}>
-        New Note
-      </button>
+      <div className="sidebar-new-actions">
+        <button onClick={() => void handleCreateNote()} disabled={!workspacePath}>
+          New Note
+        </button>
+        <button onClick={() => void handleCreateFolder()} disabled={!workspacePath}>
+          New Folder
+        </button>
+      </div>
       <ImportButton />
       <button className="search-open-btn" onClick={onSearchOpen}>
         Search <kbd>Ctrl K</kbd>
@@ -62,22 +88,8 @@ export function Sidebar({ onSearchOpen }: SidebarProps) {
         onChange={(e) => setSearch(e.target.value)}
         aria-label="Filter notes by title"
       />
-      <ul>
-        {visibleNotes.map((note) => (
-          <li key={note.path}>
-            <button className="note-link" onClick={() => openTab(note.path)}>
-              {note.title}
-            </button>
-            <button
-              className="note-delete"
-              onClick={() => void handleDelete(note.path)}
-              aria-label={`Delete ${note.title}`}
-            >
-              ✕
-            </button>
-          </li>
-        ))}
-      </ul>
+      {folderError && <p className="sidebar-error">{folderError}</p>}
+      <FolderTree entries={tree} />
     </aside>
   )
 }
