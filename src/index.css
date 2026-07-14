@@ -339,6 +339,52 @@ body {
 
 .editor-toolbar button:hover { background: #2e2e2e; color: #e8e8e8; }
 
+/* Callout blocks */
+.callout {
+  border-left: 4px solid var(--callout-color, #4a9eff);
+  background: var(--callout-bg, #0d1f33);
+  border-radius: 0 6px 6px 0;
+  padding: 10px 14px;
+  margin: 0.8em 0;
+}
+
+.callout-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: var(--callout-color, #4a9eff);
+  text-transform: uppercase;
+  user-select: none;
+}
+
+.callout-title { font-weight: 400; text-transform: none; letter-spacing: 0; }
+
+.callout-body > *:last-child { margin-bottom: 0; }
+
+.callout-note  { --callout-color: #4a9eff; --callout-bg: #0d1f33; }
+.callout-info  { --callout-color: #4a9eff; --callout-bg: #0d1f33; }
+.callout-tip   { --callout-color: #3dbc6a; --callout-bg: #0d2018; }
+.callout-warning   { --callout-color: #f0a030; --callout-bg: #271c0a; }
+.callout-danger    { --callout-color: #e05050; --callout-bg: #270d0d; }
+.callout-important { --callout-color: #9b59b6; --callout-bg: #1a0d27; }
+
+/* Wiki links */
+.wiki-link {
+  color: #82aaff;
+  cursor: pointer;
+  text-decoration: underline dotted;
+  border-radius: 2px;
+  padding: 0 1px;
+}
+
+.wiki-link:hover { color: #a9c4ff; background: #1a2a3a; }
+.wiki-link-missing { color: #777; text-decoration: underline dotted #555; }
+.wiki-link-missing:hover { color: #999; background: #222; }
+
 /* Slash command menu */
 .slash-menu {
   background: #1e1e1e;
