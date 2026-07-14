@@ -42,6 +42,47 @@ pub async fn index_note_content(pool: &SqlitePool, path: &str, title: &str, body
     Ok(())
 }
 
+pub async fn rename_path_prefix(pool: &SqlitePool, old_prefix: &str, new_prefix: &str) -> Result<()> {
+    let like_pattern = format!("{}%", old_prefix.replace('%', "\\%").replace('_', "\\_"));
+    let rows: Vec<(String,)> = sqlx::query_as("SELECT path FROM notes WHERE path LIKE ? ESCAPE '\\'")
+        .bind(&like_pattern)
+        .fetch_all(pool)
+        .await?;
+
+    for (old_path,) in rows {
+        let new_path = format!("{}{}", new_prefix, &old_path[old_prefix.len()..]);
+        update_path(pool, &old_path, &new_path).await?;
+    }
+    Ok(())
+}
+
+pub async fn remove_notes_under(pool: &SqlitePool, prefix: &str) -> Result<()> {
+    let like_pattern = format!("{}%", prefix.replace('%', "\\%").replace('_', "\\_"));
+    sqlx::query("DELETE FROM notes WHERE path LIKE ? ESCAPE '\\'")
+        .bind(&like_pattern)
+        .execute(pool)
+        .await?;
+    sqlx::query("DELETE FROM notes_fts WHERE path LIKE ? ESCAPE '\\'")
+        .bind(&like_pattern)
+        .execute(pool)
+        .await?;
+    Ok(())
+}
+
+pub async fn update_path(pool: &SqlitePool, old_path: &str, new_path: &str) -> Result<()> {
+    sqlx::query("UPDATE notes SET path = ? WHERE path = ?")
+        .bind(new_path)
+        .bind(old_path)
+        .execute(pool)
+        .await?;
+    sqlx::query("UPDATE notes_fts SET path = ? WHERE path = ?")
+        .bind(new_path)
+        .bind(old_path)
+        .execute(pool)
+        .await?;
+    Ok(())
+}
+
 pub async fn remove_from_fts(pool: &SqlitePool, path: &str) -> Result<()> {
     sqlx::query("DELETE FROM notes_fts WHERE path = ?")
         .bind(path)
@@ -131,5 +172,56 @@ mod tests {
         remove_note(&pool, "/ws/b.md").await.unwrap();
         let notes = list_by_workspace(&pool, "/ws").await.unwrap();
         assert_eq!(notes.len(), 0);
+    }
+
+    #[tokio::test]
+    async fn test_rename_path_prefix_updates_matching_notes_and_fts() {
+        let pool = make_pool().await;
+        index_note(&pool, &note("a", "A", "/ws/Course1/a.md", "/ws")).await.unwrap();
+        index_note_content(&pool, "/ws/Course1/a.md", "A", "body text").await.unwrap();
+        index_note(&pool, &note("b", "B", "/ws/Course10/b.md", "/ws")).await.unwrap();
+
+        rename_path_prefix(&pool, "/ws/Course1/", "/ws/Renamed/").await.unwrap();
+
+        let notes = list_by_workspace(&pool, "/ws").await.unwrap();
+        let a = notes.iter().find(|n| n.id == "a").unwrap();
+        let b = notes.iter().find(|n| n.id == "b").unwrap();
+        assert_eq!(a.path, "/ws/Renamed/a.md");
+        assert_eq!(b.path, "/ws/Course10/b.md");
+
+        let fts_path: (String,) = sqlx::query_as("SELECT path FROM notes_fts WHERE title = 'A'")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(fts_path.0, "/ws/Renamed/a.md");
+    }
+
+    #[tokio::test]
+    async fn test_remove_notes_under_deletes_matching_notes_and_fts_only() {
+        let pool = make_pool().await;
+        index_note(&pool, &note("a", "A", "/ws/Course1/a.md", "/ws")).await.unwrap();
+        index_note_content(&pool, "/ws/Course1/a.md", "A", "body").await.unwrap();
+        index_note(&pool, &note("b", "B", "/ws/Course10/b.md", "/ws")).await.unwrap();
+
+        remove_notes_under(&pool, "/ws/Course1/").await.unwrap();
+
+        let notes = list_by_workspace(&pool, "/ws").await.unwrap();
+        assert_eq!(notes.len(), 1);
+        assert_eq!(notes[0].id, "b");
+
+        let count: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM notes_fts")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(count.0, 0);
+    }
+
+    #[tokio::test]
+    async fn test_update_path_changes_a_single_note() {
+        let pool = make_pool().await;
+        index_note(&pool, &note("a", "A", "/ws/old.md", "/ws")).await.unwrap();
+        update_path(&pool, "/ws/old.md", "/ws/Folder/old.md").await.unwrap();
+        let notes = list_by_workspace(&pool, "/ws").await.unwrap();
+        assert_eq!(notes[0].path, "/ws/Folder/old.md");
     }
 }
