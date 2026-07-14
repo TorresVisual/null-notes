@@ -586,3 +586,5 @@ body {
 }
 
 .context-menu button:hover { background: #2a2a2a; }
+
+.tree-row.drag-over { background: #2a3f2a; outline: 1px dashed #4a9eff; }
