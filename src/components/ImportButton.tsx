@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { usePdfImport } from '../pdf/usePdfImport'
 import { useWorkspaceStore } from '../store/workspace'
 import { useNotesStore } from '../store/notes'
@@ -20,17 +21,22 @@ export function ImportButton() {
   const workspacePath = useWorkspaceStore((s) => s.path)
   const addNote = useNotesStore((s) => s.addNote)
   const openTab = useWorkspaceStore((s) => s.openTab)
+  const [error, setError] = useState<string | null>(null)
 
   async function handleImport() {
     if (!workspacePath) return
-    const result = await importPdf()
-    if (!result) return
-
-    const content = `# ${result.title}\n\n${exercisesToMarkdown(result.exercises)}`
-    const note = await api.notes.create(workspacePath, result.title)
-    await api.notes.save(note.path, content)
-    addNote({ ...note, title: result.title })
-    openTab(note.path)
+    setError(null)
+    try {
+      const result = await importPdf()
+      if (!result) return
+      const content = `# ${result.title}\n\n${exercisesToMarkdown(result.exercises)}`
+      const note = await api.notes.create(workspacePath, result.title)
+      await api.notes.save(note.path, content)
+      addNote({ ...note, title: result.title })
+      openTab(note.path)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    }
   }
 
   return (
@@ -46,6 +52,7 @@ export function ImportButton() {
           {progress.stage} — {progress.page}/{progress.totalPages}
         </p>
       )}
+      {error && <p className="import-error">{error}</p>}
     </div>
   )
 }
