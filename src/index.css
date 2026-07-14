@@ -339,6 +339,19 @@ body {
 
 .editor-toolbar button:hover { background: #2e2e2e; color: #e8e8e8; }
 
+/* Mermaid diagram blocks */
+.mermaid-block {
+  background: #f5f5f5;
+  border-radius: 6px;
+  padding: 16px;
+  margin: 0.8em 0;
+  overflow-x: auto;
+  text-align: center;
+}
+
+.mermaid-block svg { max-width: 100%; height: auto; }
+.mermaid-error { color: #e66; font-family: monospace; font-size: 13px; }
+
 /* Callout blocks */
 .callout {
   border-left: 4px solid var(--callout-color, #4a9eff);

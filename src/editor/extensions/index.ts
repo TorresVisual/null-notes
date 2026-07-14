@@ -14,6 +14,9 @@ import { Link } from '@tiptap/extension-link'
 import { createLowlight, common } from 'lowlight'
 import { InkBlock } from './InkBlock'
 import { ExerciseBlock } from './ExerciseBlock'
+import { InlineMath } from './InlineMath'
+import { BlockMath } from './BlockMath'
+import { MermaidBlock } from './MermaidBlock'
 import { Callout } from './Callout'
 import { WikiLink } from './WikiLink'
 import { NoteContext } from './NoteContext'
@@ -78,6 +81,9 @@ export const coreExtensions = [
   TaskBracketFix,
   InkBlock,
   ExerciseBlock,
+  InlineMath,
+  BlockMath,
+  MermaidBlock,
   Callout,
   WikiLink,
   NoteContext,
