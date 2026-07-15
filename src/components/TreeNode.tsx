@@ -17,6 +17,7 @@ export function TreeNode({ entry, depth }: TreeNodeProps) {
   const activeTab = useWorkspaceStore((s) => s.activeTab)
   const toggleFolder = useWorkspaceStore((s) => s.toggleFolder)
   const setSelectedFolder = useWorkspaceStore((s) => s.setSelectedFolder)
+  const setTagFilter = useWorkspaceStore((s) => s.setTagFilter)
   const openFolderContextMenu = useWorkspaceStore((s) => s.openFolderContextMenu)
   const replaceOpenPath = useWorkspaceStore((s) => s.replaceOpenPath)
   const setFolderError = useWorkspaceStore((s) => s.setFolderError)
@@ -81,6 +82,7 @@ export function TreeNode({ entry, depth }: TreeNodeProps) {
         onClick={() => {
           toggleFolder(entry.path)
           setSelectedFolder(entry.path)
+          setTagFilter(null)
         }}
         onContextMenu={(e) => {
           e.preventDefault()

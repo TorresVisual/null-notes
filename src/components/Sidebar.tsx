@@ -1,12 +1,14 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNotesStore } from '../store/notes'
 import { useWorkspaceStore } from '../store/workspace'
 import { useWorkspace, refreshTree } from '../hooks/useWorkspace'
 import { ImportButton } from './ImportButton'
 import { FolderTree } from './FolderTree'
 import { FolderContextMenu } from './FolderContextMenu'
+import { TagList } from './TagList'
 import { buildFolderTree } from '../lib/folderTree'
 import { api } from '../lib/tauri'
+import type { NoteMetadata } from '../types'
 
 interface SidebarProps {
   onSearchOpen: () => void
@@ -19,17 +21,27 @@ export function Sidebar({ onSearchOpen }: SidebarProps) {
   const workspacePath = useWorkspaceStore((s) => s.path)
   const selectedFolder = useWorkspaceStore((s) => s.selectedFolder)
   const setSelectedFolder = useWorkspaceStore((s) => s.setSelectedFolder)
+  const tagFilter = useWorkspaceStore((s) => s.tagFilter)
   const openTab = useWorkspaceStore((s) => s.openTab)
+  const folderError = useWorkspaceStore((s) => s.folderError)
+  const setFolderError = useWorkspaceStore((s) => s.setFolderError)
   const { openWorkspace } = useWorkspace()
   const [search, setSearch] = useState('')
+  const [tagFilteredNotes, setTagFilteredNotes] = useState<NoteMetadata[]>([])
+
+  useEffect(() => {
+    if (!tagFilter || !workspacePath) {
+      setTagFilteredNotes([])
+      return
+    }
+    api.notes.notesWithTag(workspacePath, tagFilter).then(setTagFilteredNotes)
+  }, [tagFilter, workspacePath])
 
   const visibleNotes = search.trim()
     ? notes.filter((n) => n.title.toLowerCase().includes(search.toLowerCase()))
     : notes
 
   const tree = workspacePath ? buildFolderTree(workspacePath, folders, visibleNotes) : []
-  const folderError = useWorkspaceStore((s) => s.folderError)
-  const setFolderError = useWorkspaceStore((s) => s.setFolderError)
 
   async function handleCreateNote() {
     if (!workspacePath) return
@@ -90,7 +102,22 @@ export function Sidebar({ onSearchOpen }: SidebarProps) {
         aria-label="Filter notes by title"
       />
       {folderError && <p className="sidebar-error">{folderError}</p>}
-      <FolderTree entries={tree} />
+      <TagList />
+      {tagFilter ? (
+        <ul className="folder-tree">
+          {tagFilteredNotes.map((note) => (
+            <li
+              key={note.path}
+              className="tree-row tree-note"
+              onClick={() => openTab(note.path)}
+            >
+              <span className="tree-label">{note.title}</span>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <FolderTree entries={tree} />
+      )}
       <FolderContextMenu />
     </aside>
   )
