@@ -17,6 +17,12 @@ export const api = {
       invoke<void>('delete_note', { path }),
     search: (query: string) =>
       invoke<SearchResult[]>('search_notes', { query }),
+    listTags: (workspace: string) =>
+      invoke<string[]>('list_tags', { workspace }),
+    notesWithTag: (workspace: string, tag: string) =>
+      invoke<NoteMetadata[]>('notes_with_tag', { workspace, tag }),
+    backlinksFor: (workspace: string, title: string) =>
+      invoke<NoteMetadata[]>('backlinks_for', { workspace, title }),
     createFolder: (parent: string, name: string) =>
       invoke<string>('create_folder', { parent, name }),
     renameFolder: (oldPath: string, newPath: string) =>
