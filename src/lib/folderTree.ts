@@ -29,11 +29,11 @@ function relativeSegments(root: string, path: string): string[] {
   return rest.split(/[\\/]+/).filter(Boolean)
 }
 
-function ensureFolder(root: MutableFolder, segments: string[]): MutableFolder {
+function ensureFolder(root: MutableFolder, segments: string[], separator: string): MutableFolder {
   let current = root
   let currentPath = root.path
   for (const segment of segments) {
-    currentPath = `${currentPath}/${segment}`
+    currentPath = `${currentPath}${separator}${segment}`
     let next = current.folders.get(segment)
     if (!next) {
       next = { name: segment, path: currentPath, folders: new Map(), notes: [] }
@@ -61,12 +61,18 @@ export function buildFolderTree(
   folders: string[],
   notes: NoteMetadata[],
 ): TreeEntry[] {
+  // Reconstructed folder paths must use the same separator as the root
+  // (backslash on Windows) so they round-trip byte-for-byte through
+  // backend commands like create_note — a note created "in" a folder
+  // whose path mixes '/' into a Windows root gets a path string a later
+  // filesystem scan won't recognize as the same file.
+  const separator = root.includes('\\') ? '\\' : '/'
   const rootFolder: MutableFolder = { name: '', path: root, folders: new Map(), notes: [] }
 
   for (const folderPath of folders) {
     const segments = relativeSegments(root, folderPath)
     if (segments.length > 0) {
-      ensureFolder(rootFolder, segments)
+      ensureFolder(rootFolder, segments, separator)
     }
   }
 
@@ -74,7 +80,7 @@ export function buildFolderTree(
     const segments = relativeSegments(root, noteItem.path)
     const noteName = segments.pop()
     if (noteName === undefined) continue
-    const parent = ensureFolder(rootFolder, segments)
+    const parent = ensureFolder(rootFolder, segments, separator)
     parent.notes.push(noteItem)
   }
 
