@@ -4,7 +4,9 @@ import { TabBar } from './TabBar'
 import { NoteEditor } from '../editor/NoteEditor'
 import { RawEditor } from '../editor/RawEditor'
 import { SearchModal } from './SearchModal'
+import { BacklinksPanel } from './BacklinksPanel'
 import { useWorkspaceStore } from '../store/workspace'
+import { useNotesStore } from '../store/notes'
 import { useNote } from '../hooks/useNote'
 import { useWorkspace, refreshTags } from '../hooks/useWorkspace'
 
@@ -12,6 +14,8 @@ type ViewMode = 'wysiwyg' | 'raw'
 
 export function Layout() {
   const activeTab = useWorkspaceStore((s) => s.activeTab)
+  const notes = useNotesStore((s) => s.notes)
+  const currentNote = notes.find((n) => n.path === activeTab)
   const { content, save, isLoading } = useNote(activeTab)
   const { saveSession } = useWorkspace()
   const [viewMode, setViewMode] = useState<ViewMode>('wysiwyg')
@@ -62,6 +66,9 @@ export function Layout() {
             )}
             {!activeTab && (
               <p className="empty-state">Open a workspace and select a note</p>
+            )}
+            {!isLoading && activeTab && currentNote && (
+              <BacklinksPanel notePath={activeTab} noteTitle={currentNote.title} />
             )}
           </div>
         </div>
