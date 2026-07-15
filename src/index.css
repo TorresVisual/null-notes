@@ -656,3 +656,15 @@ body {
   color: #e88;
   font-size: 12px;
 }
+
+/* Inline #tag pill */
+.tag-pill {
+  color: #4a9eff;
+  cursor: pointer;
+  background: rgba(74, 158, 255, 0.12);
+  border-radius: 3px;
+  padding: 0 4px;
+}
+
+.tag-pill:hover { background: rgba(74, 158, 255, 0.22); }
+.tag-pill.active { background: rgba(74, 158, 255, 0.35); }

@@ -19,6 +19,7 @@ import { BlockMath } from './BlockMath'
 import { MermaidBlock } from './MermaidBlock'
 import { Callout } from './Callout'
 import { WikiLink } from './WikiLink'
+import { Tag } from './Tag'
 import { NoteContext } from './NoteContext'
 import { SlashCommands } from './SlashCommands'
 
@@ -86,6 +87,7 @@ export const coreExtensions = [
   MermaidBlock,
   Callout,
   WikiLink,
+  Tag,
   NoteContext,
   SlashCommands,
 ]
