@@ -190,6 +190,16 @@ pub async fn save_note(
         .map_err(|e| e.to_string())?;
     db::notes::index_note_content(&db, &path, &title, &content)
         .await
+        .map_err(|e| e.to_string())?;
+
+    let tags = extract_tags(&content);
+    db::notes::set_tags(&db, &path, &tags)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let links = extract_links(&content);
+    db::notes::set_links(&db, &path, &links)
+        .await
         .map_err(|e| e.to_string())
 }
 
@@ -206,8 +216,9 @@ pub async fn create_note(
         .collect();
     let filename = format!("{}.md", safe_name.trim());
     let path = std::path::Path::new(&folder).join(&filename);
+    let body = format!("# {}\n", title);
 
-    tokio::fs::write(&path, format!("# {}\n", title))
+    tokio::fs::write(&path, &body)
         .await
         .map_err(|e| e.to_string())?;
 
@@ -222,8 +233,17 @@ pub async fn create_note(
         .await
         .map_err(|e| e.to_string())?;
 
-    let body = format!("# {}", title);
     db::notes::index_note_content(&db, &meta.path, &meta.title, &body)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let tags = extract_tags(&body);
+    db::notes::set_tags(&db, &meta.path, &tags)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let links = extract_links(&body);
+    db::notes::set_links(&db, &meta.path, &links)
         .await
         .map_err(|e| e.to_string())?;
 
@@ -248,6 +268,14 @@ pub async fn delete_note(
 
     db::notes::remove_from_fts(&db, &path)
         .await
+        .map_err(|e| e.to_string())?;
+
+    db::notes::set_tags(&db, &path, &[])
+        .await
+        .map_err(|e| e.to_string())?;
+
+    db::notes::set_links(&db, &path, &[])
+        .await
         .map_err(|e| e.to_string())
 }
 
@@ -266,6 +294,35 @@ pub async fn search_notes(
         .collect::<Vec<_>>()
         .join(" ");
     db::notes::search_notes(&db, &fts_query)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn list_tags(workspace: String, db: State<'_, DbPool>) -> Result<Vec<String>, String> {
+    db::notes::list_tags(&db, &workspace)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn notes_with_tag(
+    workspace: String,
+    tag: String,
+    db: State<'_, DbPool>,
+) -> Result<Vec<NoteMetadata>, String> {
+    db::notes::notes_with_tag(&db, &workspace, &tag)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn backlinks_for(
+    workspace: String,
+    title: String,
+    db: State<'_, DbPool>,
+) -> Result<Vec<NoteMetadata>, String> {
+    db::notes::backlinks_for(&db, &workspace, &title)
         .await
         .map_err(|e| e.to_string())
 }
