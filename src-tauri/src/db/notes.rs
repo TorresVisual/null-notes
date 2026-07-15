@@ -76,6 +76,14 @@ pub async fn remove_notes_under(pool: &SqlitePool, prefix: &str) -> Result<()> {
         .bind(&like_pattern)
         .execute(pool)
         .await?;
+    sqlx::query("DELETE FROM note_tags WHERE note_path LIKE ? ESCAPE '\\'")
+        .bind(&like_pattern)
+        .execute(pool)
+        .await?;
+    sqlx::query("DELETE FROM note_links WHERE source_path LIKE ? ESCAPE '\\'")
+        .bind(&like_pattern)
+        .execute(pool)
+        .await?;
     Ok(())
 }
 
@@ -86,6 +94,16 @@ pub async fn update_path(pool: &SqlitePool, old_path: &str, new_path: &str) -> R
         .execute(pool)
         .await?;
     sqlx::query("UPDATE notes_fts SET path = ? WHERE path = ?")
+        .bind(new_path)
+        .bind(old_path)
+        .execute(pool)
+        .await?;
+    sqlx::query("UPDATE note_tags SET note_path = ? WHERE note_path = ?")
+        .bind(new_path)
+        .bind(old_path)
+        .execute(pool)
+        .await?;
+    sqlx::query("UPDATE note_links SET source_path = ? WHERE source_path = ?")
         .bind(new_path)
         .bind(old_path)
         .execute(pool)
@@ -111,6 +129,79 @@ pub async fn search_notes(pool: &SqlitePool, fts_query: &str) -> Result<Vec<Sear
          LIMIT 20",
     )
     .bind(fts_query)
+    .fetch_all(pool)
+    .await?;
+    Ok(rows)
+}
+
+pub async fn set_tags(pool: &SqlitePool, note_path: &str, tags: &[String]) -> Result<()> {
+    sqlx::query("DELETE FROM note_tags WHERE note_path = ?")
+        .bind(note_path)
+        .execute(pool)
+        .await?;
+    for tag in tags {
+        sqlx::query("INSERT INTO note_tags (note_path, tag) VALUES (?, ?)")
+            .bind(note_path)
+            .bind(tag)
+            .execute(pool)
+            .await?;
+    }
+    Ok(())
+}
+
+pub async fn set_links(pool: &SqlitePool, source_path: &str, targets: &[String]) -> Result<()> {
+    sqlx::query("DELETE FROM note_links WHERE source_path = ?")
+        .bind(source_path)
+        .execute(pool)
+        .await?;
+    for target in targets {
+        sqlx::query("INSERT INTO note_links (source_path, target_title) VALUES (?, ?)")
+            .bind(source_path)
+            .bind(target)
+            .execute(pool)
+            .await?;
+    }
+    Ok(())
+}
+
+pub async fn list_tags(pool: &SqlitePool, workspace: &str) -> Result<Vec<String>> {
+    let rows: Vec<(String,)> = sqlx::query_as(
+        "SELECT DISTINCT nt.tag FROM note_tags nt
+         JOIN notes n ON n.path = nt.note_path
+         WHERE n.workspace = ?
+         ORDER BY nt.tag COLLATE NOCASE",
+    )
+    .bind(workspace)
+    .fetch_all(pool)
+    .await?;
+    Ok(rows.into_iter().map(|(t,)| t).collect())
+}
+
+pub async fn notes_with_tag(pool: &SqlitePool, workspace: &str, tag: &str) -> Result<Vec<NoteMetadata>> {
+    let rows = sqlx::query_as::<_, NoteMetadata>(
+        "SELECT n.id, n.title, n.path, n.workspace, n.updated_at
+         FROM notes n
+         JOIN note_tags nt ON nt.note_path = n.path
+         WHERE n.workspace = ? AND nt.tag = ? COLLATE NOCASE
+         ORDER BY n.updated_at DESC",
+    )
+    .bind(workspace)
+    .bind(tag)
+    .fetch_all(pool)
+    .await?;
+    Ok(rows)
+}
+
+pub async fn backlinks_for(pool: &SqlitePool, workspace: &str, title: &str) -> Result<Vec<NoteMetadata>> {
+    let rows = sqlx::query_as::<_, NoteMetadata>(
+        "SELECT n.id, n.title, n.path, n.workspace, n.updated_at
+         FROM notes n
+         JOIN note_links nl ON nl.source_path = n.path
+         WHERE n.workspace = ? AND nl.target_title = ? COLLATE NOCASE
+         ORDER BY n.updated_at DESC",
+    )
+    .bind(workspace)
+    .bind(title)
     .fetch_all(pool)
     .await?;
     Ok(rows)
@@ -233,5 +324,94 @@ mod tests {
         update_path(&pool, "/ws/old.md", "/ws/Folder/old.md").await.unwrap();
         let notes = list_by_workspace(&pool, "/ws").await.unwrap();
         assert_eq!(notes[0].path, "/ws/Folder/old.md");
+    }
+
+    #[tokio::test]
+    async fn test_set_tags_replaces_existing_tags_for_a_note() {
+        let pool = make_pool().await;
+        index_note(&pool, &note("a", "A", "/ws/a.md", "/ws")).await.unwrap();
+        set_tags(&pool, "/ws/a.md", &["cs101".to_string(), "midterm".to_string()]).await.unwrap();
+        set_tags(&pool, "/ws/a.md", &["final".to_string()]).await.unwrap();
+
+        let tags = list_tags(&pool, "/ws").await.unwrap();
+        assert_eq!(tags, vec!["final".to_string()]);
+    }
+
+    #[tokio::test]
+    async fn test_notes_with_tag_returns_matching_notes_only() {
+        let pool = make_pool().await;
+        index_note(&pool, &note("a", "A", "/ws/a.md", "/ws")).await.unwrap();
+        index_note(&pool, &note("b", "B", "/ws/b.md", "/ws")).await.unwrap();
+        set_tags(&pool, "/ws/a.md", &["cs101".to_string()]).await.unwrap();
+        set_tags(&pool, "/ws/b.md", &["cs102".to_string()]).await.unwrap();
+
+        let notes = notes_with_tag(&pool, "/ws", "cs101").await.unwrap();
+        assert_eq!(notes.len(), 1);
+        assert_eq!(notes[0].id, "a");
+    }
+
+    #[tokio::test]
+    async fn test_notes_with_tag_matches_case_insensitively() {
+        let pool = make_pool().await;
+        index_note(&pool, &note("a", "A", "/ws/a.md", "/ws")).await.unwrap();
+        set_tags(&pool, "/ws/a.md", &["CS101".to_string()]).await.unwrap();
+
+        let notes = notes_with_tag(&pool, "/ws", "cs101").await.unwrap();
+        assert_eq!(notes.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_set_links_and_backlinks_for() {
+        let pool = make_pool().await;
+        index_note(&pool, &note("a", "A", "/ws/a.md", "/ws")).await.unwrap();
+        index_note(&pool, &note("b", "B", "/ws/b.md", "/ws")).await.unwrap();
+        set_links(&pool, "/ws/a.md", &["B".to_string()]).await.unwrap();
+
+        let backlinks = backlinks_for(&pool, "/ws", "B").await.unwrap();
+        assert_eq!(backlinks.len(), 1);
+        assert_eq!(backlinks[0].id, "a");
+    }
+
+    #[tokio::test]
+    async fn test_backlinks_for_matches_case_insensitively() {
+        let pool = make_pool().await;
+        index_note(&pool, &note("a", "A", "/ws/a.md", "/ws")).await.unwrap();
+        set_links(&pool, "/ws/a.md", &["big o notation".to_string()]).await.unwrap();
+
+        let backlinks = backlinks_for(&pool, "/ws", "Big O Notation").await.unwrap();
+        assert_eq!(backlinks.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_update_path_also_rewrites_tags_and_links() {
+        let pool = make_pool().await;
+        index_note(&pool, &note("a", "A", "/ws/old.md", "/ws")).await.unwrap();
+        set_tags(&pool, "/ws/old.md", &["cs101".to_string()]).await.unwrap();
+        set_links(&pool, "/ws/old.md", &["Target".to_string()]).await.unwrap();
+
+        update_path(&pool, "/ws/old.md", "/ws/Folder/old.md").await.unwrap();
+
+        let notes = notes_with_tag(&pool, "/ws", "cs101").await.unwrap();
+        assert_eq!(notes[0].path, "/ws/Folder/old.md");
+
+        let backlinks = backlinks_for(&pool, "/ws", "Target").await.unwrap();
+        assert_eq!(backlinks[0].path, "/ws/Folder/old.md");
+    }
+
+    #[tokio::test]
+    async fn test_remove_notes_under_also_deletes_tags_and_links() {
+        let pool = make_pool().await;
+        index_note(&pool, &note("a", "A", "/ws/Course1/a.md", "/ws")).await.unwrap();
+        set_tags(&pool, "/ws/Course1/a.md", &["cs101".to_string()]).await.unwrap();
+        set_links(&pool, "/ws/Course1/a.md", &["Target".to_string()]).await.unwrap();
+        index_note(&pool, &note("b", "B", "/ws/Course10/b.md", "/ws")).await.unwrap();
+        set_tags(&pool, "/ws/Course10/b.md", &["cs102".to_string()]).await.unwrap();
+
+        remove_notes_under(&pool, "/ws/Course1/").await.unwrap();
+
+        let all_tags = list_tags(&pool, "/ws").await.unwrap();
+        assert_eq!(all_tags, vec!["cs102".to_string()]);
+        let backlinks = backlinks_for(&pool, "/ws", "Target").await.unwrap();
+        assert!(backlinks.is_empty());
     }
 }
