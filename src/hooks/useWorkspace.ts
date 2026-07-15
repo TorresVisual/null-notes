@@ -12,6 +12,13 @@ export async function refreshTree(): Promise<void> {
   useNotesStore.getState().setFolders(tree.folders)
 }
 
+export async function refreshTags(): Promise<void> {
+  const path = useWorkspaceStore.getState().path
+  if (!path) return
+  const tags = await api.notes.listTags(path)
+  useNotesStore.getState().setTags(tags)
+}
+
 export function useWorkspace() {
   const { setPath, openTab, setExpandedFolders } = useWorkspaceStore()
   const { setNotes, setFolders } = useNotesStore()
@@ -31,6 +38,7 @@ export function useWorkspace() {
     for (const tab of session.openTabs) {
       openTab(tab)
     }
+    await refreshTags()
   }, [setPath, setNotes, setFolders, setExpandedFolders, openTab])
 
   const saveSession = useCallback(async () => {

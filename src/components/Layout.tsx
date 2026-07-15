@@ -6,7 +6,7 @@ import { RawEditor } from '../editor/RawEditor'
 import { SearchModal } from './SearchModal'
 import { useWorkspaceStore } from '../store/workspace'
 import { useNote } from '../hooks/useNote'
-import { useWorkspace } from '../hooks/useWorkspace'
+import { useWorkspace, refreshTags } from '../hooks/useWorkspace'
 
 type ViewMode = 'wysiwyg' | 'raw'
 
@@ -36,6 +36,10 @@ export function Layout() {
 
   useEffect(() => {
     setViewMode('wysiwyg')
+  }, [activeTab])
+
+  useEffect(() => {
+    void refreshTags()
   }, [activeTab])
 
   return (
