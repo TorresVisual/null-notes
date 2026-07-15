@@ -10,6 +10,7 @@ const reset = () =>
     selectedFolder: null,
     folderContextMenu: null,
     folderError: null,
+    tagFilter: null,
   })
 
 describe('useWorkspaceStore', () => {
@@ -82,5 +83,12 @@ describe('useWorkspaceStore', () => {
     expect(useWorkspaceStore.getState().folderError).toBe('a folder named X already exists')
     useWorkspaceStore.getState().setFolderError(null)
     expect(useWorkspaceStore.getState().folderError).toBeNull()
+  })
+
+  it('sets and clears the tag filter', () => {
+    useWorkspaceStore.getState().setTagFilter('cs101')
+    expect(useWorkspaceStore.getState().tagFilter).toBe('cs101')
+    useWorkspaceStore.getState().setTagFilter(null)
+    expect(useWorkspaceStore.getState().tagFilter).toBeNull()
   })
 })

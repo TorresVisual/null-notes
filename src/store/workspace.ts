@@ -27,6 +27,8 @@ interface WorkspaceStore {
   closeTabsUnder: (prefix: string) => void
   folderError: string | null
   setFolderError: (message: string | null) => void
+  tagFilter: string | null
+  setTagFilter: (tag: string | null) => void
 }
 
 export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
@@ -37,6 +39,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   selectedFolder: null,
   folderContextMenu: null,
   folderError: null,
+  tagFilter: null,
 
   setPath: (path) => set({ path, selectedFolder: path }),
 
@@ -90,4 +93,5 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   },
 
   setFolderError: (message) => set({ folderError: message }),
+  setTagFilter: (tag) => set({ tagFilter: tag }),
 }))
