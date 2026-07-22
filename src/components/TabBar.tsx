@@ -1,3 +1,4 @@
+import { X } from 'lucide-react'
 import { useWorkspaceStore } from '../store/workspace'
 
 interface TabBarProps {
@@ -22,7 +23,7 @@ export function TabBar({ viewMode, onToggleView }: TabBarProps) {
           >
             <button onClick={() => setActiveTab(path)}>{name}</button>
             <button className="tab-close" onClick={() => closeTab(path)} aria-label={`Close ${name}`}>
-              ✕
+              <X size={12} />
             </button>
           </div>
         )
