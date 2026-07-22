@@ -1,5 +1,6 @@
 import { useEditor, EditorContent } from '@tiptap/react'
 import { useEffect, useRef } from 'react'
+import { PenLine } from 'lucide-react'
 import { coreExtensions } from './extensions'
 import { inkApi } from '../lib/ink'
 import type { InkData } from '../ink/types'
@@ -62,8 +63,8 @@ export function NoteEditor({ content, notePath, onChange }: NoteEditorProps) {
   return (
     <div className="note-editor-wrap">
       <div className="editor-toolbar" role="toolbar" aria-label="Insert">
-        <button onClick={() => void insertInkBlock()} title="Insert ink block">
-          ✏ Ink
+        <button onClick={() => void insertInkBlock()} aria-label="Insert ink block" title="Insert ink block">
+          <PenLine size={14} /> Ink
         </button>
       </div>
       <EditorContent
