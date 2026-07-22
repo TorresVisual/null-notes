@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { Search } from 'lucide-react'
 import type { SearchResult } from '../types'
 import { api } from '../lib/tauri'
 import { useWorkspaceStore } from '../store/workspace'
@@ -59,14 +60,17 @@ export function SearchModal({ onClose }: SearchModalProps) {
         onMouseDown={(e) => e.stopPropagation()}
         onKeyDown={handleKeyDown}
       >
-        <input
-          ref={inputRef}
-          className="search-modal-input"
-          type="text"
-          placeholder="Search notes…"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-        />
+        <div className="search-modal-input-wrap">
+          <Search size={16} />
+          <input
+            ref={inputRef}
+            className="search-modal-input"
+            type="text"
+            placeholder="Search notes…"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+          />
+        </div>
         {results.length > 0 && (
           <ul className="search-results" role="listbox">
             {results.map((r, i) => (
