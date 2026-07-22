@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { ChevronRight, ChevronDown } from 'lucide-react'
 import { useWorkspaceStore } from '../store/workspace'
 import { api } from '../lib/tauri'
 import type { NoteMetadata } from '../types'
@@ -24,7 +25,7 @@ export function BacklinksPanel({ notePath, noteTitle }: BacklinksPanelProps) {
   return (
     <div className="backlinks-panel">
       <button className="backlinks-toggle" onClick={() => setCollapsed((c) => !c)}>
-        {collapsed ? '▸' : '▾'} Linked from ({backlinks.length})
+        {collapsed ? <ChevronRight size={12} /> : <ChevronDown size={12} />} Linked from ({backlinks.length})
       </button>
       {!collapsed && (
         backlinks.length === 0 ? (
