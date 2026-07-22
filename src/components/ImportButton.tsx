@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { FileUp } from 'lucide-react'
 import { usePdfImport } from '../pdf/usePdfImport'
 import { useWorkspaceStore } from '../store/workspace'
 import { useNotesStore } from '../store/notes'
@@ -45,7 +46,7 @@ export function ImportButton() {
         onClick={() => void handleImport()}
         disabled={isImporting || !workspacePath}
       >
-        {isImporting ? 'Importing…' : 'Import PDF'}
+        <FileUp size={14} /> {isImporting ? 'Importing…' : 'Import PDF'}
       </button>
       {isImporting && progress && (
         <p className="import-progress">
