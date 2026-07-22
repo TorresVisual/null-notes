@@ -33,3 +33,6 @@ src-tauri/pix2tex-venv/
 
 # Scratch workspace used for manual QA of the app
 /notes/
+
+# Brainstorming visual companion mockups
+.superpowers/
