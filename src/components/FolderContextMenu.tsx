@@ -1,3 +1,4 @@
+import { Pencil, Trash2 } from 'lucide-react'
 import { useWorkspaceStore } from '../store/workspace'
 import { useNotesStore } from '../store/notes'
 import { api } from '../lib/tauri'
@@ -57,8 +58,12 @@ export function FolderContextMenu() {
         style={{ position: 'fixed', top: menu.y, left: menu.x }}
         onMouseDown={(e) => e.stopPropagation()}
       >
-        <button onClick={() => void handleRename()}>Rename</button>
-        <button onClick={() => void handleDelete()}>Delete</button>
+        <button onClick={() => void handleRename()}>
+          <Pencil size={14} /> Rename
+        </button>
+        <button onClick={() => void handleDelete()}>
+          <Trash2 size={14} /> Delete
+        </button>
       </div>
     </div>
   )
