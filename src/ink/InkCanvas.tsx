@@ -1,13 +1,14 @@
+import { PenLine, Eraser, Minus, Circle, Square, MoveUpRight, Undo2, Redo2 } from 'lucide-react'
 import { useInkCanvas } from './useInkCanvas'
 import type { Tool } from './types'
 
-const TOOLS: { id: Tool; label: string }[] = [
-  { id: 'pen', label: 'Pen' },
-  { id: 'eraser', label: 'Eraser' },
-  { id: 'line', label: 'Line' },
-  { id: 'circle', label: 'Circle' },
-  { id: 'rect', label: 'Rect' },
-  { id: 'arrow', label: 'Arrow' },
+const TOOLS: { id: Tool; label: string; Icon: typeof PenLine }[] = [
+  { id: 'pen', label: 'Pen', Icon: PenLine },
+  { id: 'eraser', label: 'Eraser', Icon: Eraser },
+  { id: 'line', label: 'Line', Icon: Minus },
+  { id: 'circle', label: 'Circle', Icon: Circle },
+  { id: 'rect', label: 'Rectangle', Icon: Square },
+  { id: 'arrow', label: 'Arrow', Icon: MoveUpRight },
 ]
 
 interface InkCanvasProps {
@@ -34,14 +35,16 @@ export function InkCanvas({ svgPath, width, height }: InkCanvasProps) {
   return (
     <div className="ink-canvas-wrap">
       <div className="ink-toolbar" role="toolbar" aria-label="Drawing tools">
-        {TOOLS.map((t) => (
+        {TOOLS.map(({ id, label, Icon }) => (
           <button
-            key={t.id}
-            className={`ink-tool${tool === t.id ? ' active' : ''}`}
-            onClick={() => setTool(t.id)}
-            aria-pressed={tool === t.id}
+            key={id}
+            className={`ink-tool${tool === id ? ' active' : ''}`}
+            onClick={() => setTool(id)}
+            aria-pressed={tool === id}
+            aria-label={label}
+            title={label}
           >
-            {t.label}
+            <Icon size={15} />
           </button>
         ))}
         <span className="ink-sep" aria-hidden />
@@ -60,8 +63,12 @@ export function InkCanvas({ svgPath, width, height }: InkCanvasProps) {
           aria-label="Stroke size"
         />
         <span className="ink-sep" aria-hidden />
-        <button onClick={undo} disabled={!canUndo} aria-label="Undo">↩</button>
-        <button onClick={redo} disabled={!canRedo} aria-label="Redo">↪</button>
+        <button className="ink-tool" onClick={undo} disabled={!canUndo} aria-label="Undo" title="Undo">
+          <Undo2 size={15} />
+        </button>
+        <button className="ink-tool" onClick={redo} disabled={!canRedo} aria-label="Redo" title="Redo">
+          <Redo2 size={15} />
+        </button>
       </div>
       <div style={{ position: 'relative', width, height }}>
         <canvas
