@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { FilePlus, FolderPlus, Search } from 'lucide-react'
 import { useNotesStore } from '../store/notes'
 import { useWorkspaceStore } from '../store/workspace'
 import { useWorkspace, refreshTree } from '../hooks/useWorkspace'
@@ -83,15 +84,18 @@ export function Sidebar({ onSearchOpen }: SidebarProps) {
       <button onClick={() => void openWorkspace()}>Open Workspace</button>
       <div className="sidebar-new-actions">
         <button onClick={() => void handleCreateNote()} disabled={!workspacePath}>
-          New Note
+          <FilePlus size={14} /> New Note
         </button>
         <button onClick={() => void handleCreateFolder()} disabled={!workspacePath}>
-          New Folder
+          <FolderPlus size={14} /> New Folder
         </button>
       </div>
       <ImportButton />
       <button className="search-open-btn" onClick={onSearchOpen}>
-        Search <kbd>Ctrl K</kbd>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <Search size={13} /> Search
+        </span>
+        <kbd>Ctrl K</kbd>
       </button>
       <input
         className="search-input"
