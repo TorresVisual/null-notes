@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { ChevronRight, ChevronDown, Trash2 } from 'lucide-react'
 import { useWorkspaceStore } from '../store/workspace'
 import { useNotesStore } from '../store/notes'
 import { api } from '../lib/tauri'
@@ -50,7 +51,7 @@ export function TreeNode({ entry, depth }: TreeNodeProps) {
           onClick={(e) => void handleDelete(e)}
           aria-label={`Delete ${entry.name}`}
         >
-          ✕
+          <Trash2 size={12} />
         </button>
       </li>
     )
@@ -95,7 +96,9 @@ export function TreeNode({ entry, depth }: TreeNodeProps) {
         onDragLeave={() => setDragOver(false)}
         onDrop={(e) => void handleDrop(e)}
       >
-        <span className="tree-toggle">{isExpanded ? '▾' : '▸'}</span>
+        <span className="tree-toggle">
+          {isExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+        </span>
         <span className="tree-label">{entry.name}</span>
       </div>
       {isExpanded && (
