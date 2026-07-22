@@ -1,6 +1,7 @@
 import { Node } from '@tiptap/core'
 import { ReactNodeViewRenderer, NodeViewWrapper, NodeViewContent } from '@tiptap/react'
 import type { ReactNodeViewProps } from '@tiptap/react'
+import { Info, Lightbulb, TriangleAlert, CircleX, Star } from 'lucide-react'
 
 type CalloutType = 'note' | 'tip' | 'warning' | 'danger' | 'info' | 'important'
 
@@ -18,11 +19,22 @@ const CALLOUT_LABEL: Record<string, string> = {
   important: 'Important',
 }
 
+const CALLOUT_ICON: Record<string, typeof Info> = {
+  note: Info,
+  info: Info,
+  tip: Lightbulb,
+  warning: TriangleAlert,
+  danger: CircleX,
+  important: Star,
+}
+
 function CalloutView({ node }: ReactNodeViewProps) {
   const { calloutType, title } = node.attrs as unknown as CalloutAttrs
+  const Icon = CALLOUT_ICON[calloutType] ?? Info
   return (
     <NodeViewWrapper className={`callout callout-${calloutType}`}>
       <div className="callout-header" contentEditable={false}>
+        <Icon size={13} />
         <span className="callout-label">{CALLOUT_LABEL[calloutType] ?? calloutType.toUpperCase()}</span>
         {title && <span className="callout-title">{title}</span>}
       </div>
