@@ -39,13 +39,24 @@ export function shapeToElement(shape: Shape): string {
       const h = Math.abs(shape.y2 - shape.y1)
       return `<rect ${base} x="${x}" y="${y}" width="${w}" height="${h}" />`
     }
-    case 'circle':
-    case 'arrow': {
+    case 'circle': {
       const cx = (shape.x1 + shape.x2) / 2
       const cy = (shape.y1 + shape.y2) / 2
       const rx = Math.abs(shape.x2 - shape.x1) / 2
       const ry = Math.abs(shape.y2 - shape.y1) / 2
       return `<ellipse ${base} cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}" />`
+    }
+    case 'arrow': {
+      const angle = Math.atan2(shape.y2 - shape.y1, shape.x2 - shape.x1)
+      const dist = Math.hypot(shape.x2 - shape.x1, shape.y2 - shape.y1)
+      const headLength = Math.min(18, dist * 0.4)
+      const headAngle = 0.436
+      const ax = shape.x2 - headLength * Math.cos(angle - headAngle)
+      const ay = shape.y2 - headLength * Math.sin(angle - headAngle)
+      const bx = shape.x2 - headLength * Math.cos(angle + headAngle)
+      const by = shape.y2 - headLength * Math.sin(angle + headAngle)
+      const d = `M ${shape.x1} ${shape.y1} L ${shape.x2} ${shape.y2} M ${shape.x2} ${shape.y2} L ${ax.toFixed(2)} ${ay.toFixed(2)} M ${shape.x2} ${shape.y2} L ${bx.toFixed(2)} ${by.toFixed(2)}`
+      return `<path ${base} d="${d}" />`
     }
   }
 }
@@ -68,7 +79,7 @@ export function svgToInkData(svg: string): InkData {
   const height = Number(root?.getAttribute('data-height') ?? 600)
 
   const strokes: Stroke[] = []
-  for (const el of doc.querySelectorAll('path[data-id]')) {
+  for (const el of doc.querySelectorAll('path[data-id]:not([data-kind])')) {
     const id = el.getAttribute('data-id') ?? ''
     const color = el.getAttribute('data-color') ?? '#000000'
     const size = Number(el.getAttribute('data-size') ?? 4)
@@ -78,7 +89,7 @@ export function svgToInkData(svg: string): InkData {
   }
 
   const shapes: Shape[] = []
-  for (const selector of ['line[data-id]', 'rect[data-id]', 'ellipse[data-id]']) {
+  for (const selector of ['line[data-id]', 'rect[data-id]', 'ellipse[data-id]', 'path[data-kind="arrow"]']) {
     for (const el of doc.querySelectorAll(selector)) {
       shapes.push({
         id: el.getAttribute('data-id') ?? '',

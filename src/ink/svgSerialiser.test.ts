@@ -47,6 +47,14 @@ describe('shapeToElement', () => {
     const circle: Shape = { ...shape, id: 'sh3', kind: 'circle' }
     expect(shapeToElement(circle)).toContain('<ellipse')
   })
+
+  it('returns a path element with an arrowhead for arrow kind', () => {
+    const arrow: Shape = { ...shape, id: 'sh4', kind: 'arrow' }
+    const result = shapeToElement(arrow)
+    expect(result).toContain('<path')
+    expect(result).toContain('data-kind="arrow"')
+    expect(result).toContain('M 10 10 L 100 80')
+  })
 })
 
 describe('inkDataToSvg / svgToInkData roundtrip', () => {
@@ -61,5 +69,18 @@ describe('inkDataToSvg / svgToInkData roundtrip', () => {
     expect(restored.strokes[0]?.id).toBe('s1')
     expect(restored.shapes).toHaveLength(1)
     expect(restored.shapes[0]?.id).toBe('sh1')
+  })
+
+  it('round-trips a stroke alongside an arrow without cross-contamination', () => {
+    const arrow: Shape = { ...shape, id: 'sh4', kind: 'arrow' }
+    const data: InkData = { width: 800, height: 600, strokes: [stroke], shapes: [arrow] }
+    const svg = inkDataToSvg(data)
+
+    const restored = svgToInkData(svg)
+    expect(restored.strokes).toHaveLength(1)
+    expect(restored.strokes[0]?.id).toBe('s1')
+    expect(restored.shapes).toHaveLength(1)
+    expect(restored.shapes[0]?.id).toBe('sh4')
+    expect(restored.shapes[0]?.kind).toBe('arrow')
   })
 })
