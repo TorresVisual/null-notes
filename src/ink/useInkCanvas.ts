@@ -1,6 +1,9 @@
 import { useRef, useState, useEffect, useCallback } from 'react'
 import { getStroke } from 'perfect-freehand'
 import { inkApi } from '../lib/ink'
+import { hitTestShape } from './hitTest'
+import { drawShapePreview } from './shapePreview'
+import type { PreviewShape } from './shapePreview'
 import type { InkData, Stroke, Shape, Tool, Point } from './types'
 
 export function useInkCanvas(svgPath: string, width: number, height: number) {
@@ -48,7 +51,7 @@ export function useInkCanvas(svgPath: string, width: number, height: number) {
   }, [inkData, svgPath])
 
   const redrawCanvas = useCallback(
-    (livePoints: Point[]) => {
+    (livePoints: Point[], liveShape?: PreviewShape | null) => {
       const canvas = canvasRef.current
       if (!canvas) return
       const ctx = canvas.getContext('2d')
@@ -72,26 +75,39 @@ export function useInkCanvas(svgPath: string, width: number, height: number) {
         ctx.fill()
       }
 
+      for (const shape of inkData.shapes) {
+        drawShapePreview(ctx, shape)
+      }
+
       if (livePoints.length > 1) {
         const pts = livePoints.map((p) => [p.x, p.y, p.pressure])
         const outline = getStroke(pts, { size, thinning: 0.5, smoothing: 0.5, streamline: 0.5 })
         if (outline.length > 0) {
           const first = outline[0]
-          if (!first) return
-          ctx.beginPath()
-          ctx.fillStyle = color
-          ctx.moveTo(first[0] ?? 0, first[1] ?? 0)
-          for (let i = 1; i < outline.length; i++) {
-            const p = outline[i]
-            if (p) ctx.lineTo(p[0] ?? 0, p[1] ?? 0)
+          if (first) {
+            ctx.beginPath()
+            ctx.fillStyle = color
+            ctx.moveTo(first[0] ?? 0, first[1] ?? 0)
+            for (let i = 1; i < outline.length; i++) {
+              const p = outline[i]
+              if (p) ctx.lineTo(p[0] ?? 0, p[1] ?? 0)
+            }
+            ctx.closePath()
+            ctx.fill()
           }
-          ctx.closePath()
-          ctx.fill()
         }
+      }
+
+      if (liveShape) {
+        drawShapePreview(ctx, liveShape)
       }
     },
     [inkData, color, size],
   )
+
+  useEffect(() => {
+    redrawCanvas([])
+  }, [inkData, redrawCanvas])
 
   const handlePointerDown = useCallback(
     (e: PointerEvent) => {
@@ -118,12 +134,31 @@ export function useInkCanvas(svgPath: string, width: number, height: number) {
         const rect = canvas.getBoundingClientRect()
         const x = e.clientX - rect.left
         const y = e.clientY - rect.top
-        const surviving = inkData.strokes.filter((s) =>
-          s.points.every((p) => Math.hypot(p.x - x, p.y - y) > size * 3),
+        const eraseRadius = size * 3
+        const survivingStrokes = inkData.strokes.filter((s) =>
+          s.points.every((p) => Math.hypot(p.x - x, p.y - y) > eraseRadius),
         )
-        if (surviving.length !== inkData.strokes.length) {
-          commit({ ...inkData, strokes: surviving })
+        const survivingShapes = inkData.shapes.filter((s) => !hitTestShape(s, x, y, eraseRadius))
+        if (
+          survivingStrokes.length !== inkData.strokes.length ||
+          survivingShapes.length !== inkData.shapes.length
+        ) {
+          commit({ ...inkData, strokes: survivingStrokes, shapes: survivingShapes })
         }
+        return
+      }
+
+      if (['line', 'circle', 'rect', 'arrow'].includes(activeTool)) {
+        if (!shapeStart.current) return
+        redrawCanvas([], {
+          kind: activeTool as Shape['kind'],
+          x1: shapeStart.current.x,
+          y1: shapeStart.current.y,
+          x2: e.offsetX,
+          y2: e.offsetY,
+          color,
+          size,
+        })
         return
       }
 
@@ -133,7 +168,7 @@ export function useInkCanvas(svgPath: string, width: number, height: number) {
       }
       redrawCanvas(currentStroke.current)
     },
-    [tool, inkData, size, commit, redrawCanvas],
+    [tool, inkData, size, color, commit, redrawCanvas],
   )
 
   const handlePointerUp = useCallback(
@@ -153,6 +188,7 @@ export function useInkCanvas(svgPath: string, width: number, height: number) {
           size,
         }
         shapeStart.current = null
+        currentStroke.current = []
         commit({ ...inkData, shapes: [...inkData.shapes, shape] })
         return
       }
