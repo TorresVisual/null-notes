@@ -7,11 +7,12 @@
 
 ## Goals
 
-- Fix four functional bugs found in the current ink implementation that directly undermine "does this tool feel good to use":
+- Fix five functional bugs found in the current ink implementation that directly undermine "does this tool feel good to use":
   1. The Arrow tool renders as a plain ellipse (no arrowhead) — `shapeToElement` has no dedicated `arrow` case and falls through to the `circle` branch.
   2. Shapes (line/circle/rect/arrow) can never be erased — the eraser only filters `inkData.strokes`; `inkData.shapes` is untouched.
   3. Dragging a shape tool shows an incorrect live preview — `pointermove` still pushes points into the freehand `currentStroke` buffer during a shape drag and redraws it as ink, instead of showing a proper shape ghost.
   4. That buffer leaks — after a shape commits, `currentStroke.current` is never cleared, so leftover points can corrupt the next freehand stroke drawn afterward.
+  5. The canvas never does an initial paint. `useInkCanvas` only calls `setInkData` on load/undo/redo — painting only happens as a side effect of active pointer-move handling — and `redrawCanvas` never iterates `inkData.shapes` at all. Combined, this means opening a note with existing ink shows a blank canvas until you draw something new, and committed shapes never appear on the live canvas even though they're saved correctly. Discovered while designing fix #3 (the same `redrawCanvas` function); without this fix, #2 and #3 wouldn't be observable — there'd be nothing visible to erase or preview against.
 - Add an eraser cursor: a visible ring at the actual erase radius, since erasing today is invisible until strokes vanish.
 
 ## Non-Goals
@@ -51,6 +52,10 @@ New pure module `src/ink/shapePreview.ts`:
 - `handlePointerMove` no longer pushes points into `currentStroke.current` when the active tool is a shape tool. Instead it tracks the live end point and calls `redrawCanvas` with an optional in-progress shape, which `redrawCanvas` draws via `drawShapePreview` after existing strokes/shapes.
 - `handlePointerUp` clears `currentStroke.current = []` after committing a shape (closing the leak) in addition to clearing `shapeStart.current`.
 
+### 5. Missing initial paint
+
+`src/ink/useInkCanvas.ts`'s `redrawCanvas` starts iterating `inkData.shapes` too (via `drawShapePreview`, same as the live-preview fix above), and a new `useEffect(() => { redrawCanvas([]) }, [inkData, redrawCanvas])` repaints whenever `inkData` changes — covering initial load (once `inkApi.read` resolves), undo, and redo, none of which currently trigger a repaint.
+
 ---
 
 ## Eraser Cursor
@@ -78,7 +83,7 @@ Renders an absolutely-positioned ring `<div className="ink-eraser-cursor">` over
 | `src/ink/svgSerialiser.ts` | Add `arrow` case to `shapeToElement`; update `svgToInkData` parsing to distinguish stroke paths from arrow-shape paths |
 | `src/ink/hitTest.ts` | New — pure hit-testing functions |
 | `src/ink/shapePreview.ts` | New — pure canvas-drawing function for live shape preview |
-| `src/ink/useInkCanvas.ts` | Eraser filters shapes too; shape-drag no longer pollutes `currentStroke`; buffer cleared after shape commit; `redrawCanvas` draws live shape preview |
+| `src/ink/useInkCanvas.ts` | Eraser filters shapes too; shape-drag no longer pollutes `currentStroke`; buffer cleared after shape commit; `redrawCanvas` draws committed shapes and the live shape preview; new effect repaints on any `inkData` change |
 | `src/ink/InkCanvas.tsx` | Local pointer-position state for the eraser cursor overlay |
 | `src/index.css` | New `.ink-eraser-cursor` rule |
 
@@ -92,7 +97,7 @@ No files are deleted.
 - `src/ink/svgSerialiser.test.ts` gains cases for the arrow `shapeToElement` output and a round-trip test with both a stroke and an arrow shape in the same SVG, asserting the parser doesn't cross-contaminate the two (regression test for the `data-kind` distinction).
 - The pointer-event wiring inside `useInkCanvas.ts` (eraser now also removing shapes; buffer clearing after shape commit) is **not** unit-tested with simulated `PointerEvent`s — this matches existing precedent in the codebase, where the hook's pointer-driven logic already has zero such coverage today. These two fixes are verified via manual QA instead.
 - `npm run typecheck` after each task; `npm run test` for the full suite at the end.
-- Manual QA walkthrough in `npm run tauri dev`: draw an arrow (confirm arrowhead renders and survives a save/reload round-trip), erase a placed shape of each kind, drag each shape tool and confirm the preview matches what commits, draw a shape then immediately a freehand stroke and confirm the stroke isn't corrupted, and hover the eraser tool to confirm the cursor ring appears at the correct size and position.
+- Manual QA walkthrough in `npm run tauri dev`: draw an arrow (confirm arrowhead renders and survives a save/reload round-trip), erase a placed shape of each kind, drag each shape tool and confirm the preview matches what commits, draw a shape then immediately a freehand stroke and confirm the stroke isn't corrupted, hover the eraser tool to confirm the cursor ring appears at the correct size and position, confirm a committed shape stays visible on the live canvas after drawing something else, and confirm reopening a note with existing ink shows it immediately rather than blank.
 
 ---
 
