@@ -855,3 +855,11 @@ body {
 .ink-canvas {
   background: var(--bg-base);
 }
+
+.ink-eraser-cursor {
+  position: absolute;
+  border: 1px solid var(--danger);
+  border-radius: 50%;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+}

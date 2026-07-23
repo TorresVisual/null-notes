@@ -1,3 +1,5 @@
+import { useState } from 'react'
+import type { PointerEvent as ReactPointerEvent } from 'react'
 import { PenLine, Eraser, Minus, Circle, Square, MoveUpRight, Undo2, Redo2 } from 'lucide-react'
 import { useInkCanvas } from './useInkCanvas'
 import type { Tool } from './types'
@@ -31,6 +33,23 @@ export function InkCanvas({ svgPath, width, height }: InkCanvasProps) {
     canUndo,
     canRedo,
   } = useInkCanvas(svgPath, width, height)
+
+  const [cursorPos, setCursorPos] = useState<{ x: number; y: number } | null>(null)
+
+  function handlePointerMove(e: ReactPointerEvent<HTMLDivElement>) {
+    if (e.pointerType !== 'pen' || tool !== 'eraser') {
+      if (cursorPos) setCursorPos(null)
+      return
+    }
+    const rect = e.currentTarget.getBoundingClientRect()
+    setCursorPos({ x: e.clientX - rect.left, y: e.clientY - rect.top })
+  }
+
+  function handlePointerLeave() {
+    setCursorPos(null)
+  }
+
+  const eraserDiameter = size * 6
 
   return (
     <div className="ink-canvas-wrap">
@@ -70,7 +89,11 @@ export function InkCanvas({ svgPath, width, height }: InkCanvasProps) {
           <Redo2 size={15} />
         </button>
       </div>
-      <div style={{ position: 'relative', width, height }}>
+      <div
+        style={{ position: 'relative', width, height }}
+        onPointerMove={handlePointerMove}
+        onPointerLeave={handlePointerLeave}
+      >
         <canvas
           ref={canvasRef}
           width={width}
@@ -78,6 +101,17 @@ export function InkCanvas({ svgPath, width, height }: InkCanvasProps) {
           className="ink-canvas"
           style={{ position: 'absolute', inset: 0, touchAction: 'none' }}
         />
+        {cursorPos && (
+          <div
+            className="ink-eraser-cursor"
+            style={{
+              left: cursorPos.x,
+              top: cursorPos.y,
+              width: eraserDiameter,
+              height: eraserDiameter,
+            }}
+          />
+        )}
       </div>
     </div>
   )
