@@ -117,6 +117,43 @@ const COMMANDS: Cmd[] = [
       })
     },
   },
+  {
+    title: 'Block Math',
+    description: 'LaTeX block equation',
+    run: ({ editor, range }) => {
+      const latex = window.prompt('LaTeX:')
+      if (!latex) return
+      editor.chain().focus().deleteRange(range).insertContent({ type: 'blockMath', attrs: { latex } }).run()
+    },
+  },
+  {
+    title: 'Table',
+    description: '3×3 table with header row',
+    run: ({ editor, range }) =>
+      editor.chain().focus().deleteRange(range).insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run(),
+  },
+  {
+    title: 'Info',
+    description: 'Info callout',
+    run: ({ editor, range }) =>
+      editor
+        .chain()
+        .focus()
+        .deleteRange(range)
+        .insertContent({ type: 'callout', attrs: { calloutType: 'info', title: '' }, content: [{ type: 'paragraph' }] })
+        .run(),
+  },
+  {
+    title: 'Important',
+    description: 'Important callout',
+    run: ({ editor, range }) =>
+      editor
+        .chain()
+        .focus()
+        .deleteRange(range)
+        .insertContent({ type: 'callout', attrs: { calloutType: 'important', title: '' }, content: [{ type: 'paragraph' }] })
+        .run(),
+  },
 ]
 
 // ── Menu component ────────────────────────────────────────────────────────────
