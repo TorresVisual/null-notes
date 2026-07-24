@@ -91,4 +91,23 @@ describe('useWorkspaceStore', () => {
     useWorkspaceStore.getState().setTagFilter(null)
     expect(useWorkspaceStore.getState().tagFilter).toBeNull()
   })
+
+  it('resetForNewWorkspace clears all per-workspace UI state', () => {
+    useWorkspaceStore.getState().openTab('/ws/a.md')
+    useWorkspaceStore.getState().toggleFolder('/ws/A')
+    useWorkspaceStore.getState().setSelectedFolder('/ws/A')
+    useWorkspaceStore.getState().openFolderContextMenu('/ws/A', 10, 20)
+    useWorkspaceStore.getState().setFolderError('some error')
+    useWorkspaceStore.getState().setTagFilter('cs101')
+
+    useWorkspaceStore.getState().resetForNewWorkspace()
+
+    expect(useWorkspaceStore.getState().openTabs).toEqual([])
+    expect(useWorkspaceStore.getState().activeTab).toBeNull()
+    expect(useWorkspaceStore.getState().expandedFolders).toEqual([])
+    expect(useWorkspaceStore.getState().selectedFolder).toBeNull()
+    expect(useWorkspaceStore.getState().folderContextMenu).toBeNull()
+    expect(useWorkspaceStore.getState().folderError).toBeNull()
+    expect(useWorkspaceStore.getState().tagFilter).toBeNull()
+  })
 })

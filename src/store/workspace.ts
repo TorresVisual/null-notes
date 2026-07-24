@@ -29,6 +29,7 @@ interface WorkspaceStore {
   setFolderError: (message: string | null) => void
   tagFilter: string | null
   setTagFilter: (tag: string | null) => void
+  resetForNewWorkspace: () => void
 }
 
 export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
@@ -94,4 +95,15 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
 
   setFolderError: (message) => set({ folderError: message }),
   setTagFilter: (tag) => set({ tagFilter: tag }),
+
+  resetForNewWorkspace: () =>
+    set({
+      openTabs: [],
+      activeTab: null,
+      expandedFolders: [],
+      selectedFolder: null,
+      folderContextMenu: null,
+      folderError: null,
+      tagFilter: null,
+    }),
 }))

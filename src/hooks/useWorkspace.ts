@@ -20,12 +20,21 @@ export async function refreshTags(): Promise<void> {
 }
 
 export function useWorkspace() {
-  const { setPath, openTab, setExpandedFolders } = useWorkspaceStore()
+  const { setPath, openTab, setExpandedFolders, resetForNewWorkspace } = useWorkspaceStore()
   const { setNotes, setFolders } = useNotesStore()
+
+  const saveSession = useCallback(async () => {
+    const { path, openTabs, activeTab, expandedFolders } = useWorkspaceStore.getState()
+    if (!path) return
+    await api.workspace.save(path, { openTabs, activeTab, expandedFolders })
+  }, [])
 
   const openWorkspace = useCallback(async () => {
     const selected = await open({ directory: true, multiple: false })
     if (!selected || Array.isArray(selected)) return
+
+    await saveSession()
+    resetForNewWorkspace()
 
     setPath(selected)
     const [tree, session] = await Promise.all([
@@ -39,13 +48,7 @@ export function useWorkspace() {
       openTab(tab)
     }
     await refreshTags()
-  }, [setPath, setNotes, setFolders, setExpandedFolders, openTab])
-
-  const saveSession = useCallback(async () => {
-    const { path, openTabs, activeTab, expandedFolders } = useWorkspaceStore.getState()
-    if (!path) return
-    await api.workspace.save(path, { openTabs, activeTab, expandedFolders })
-  }, [])
+  }, [setPath, setNotes, setFolders, setExpandedFolders, openTab, resetForNewWorkspace, saveSession])
 
   return { openWorkspace, saveSession }
 }
