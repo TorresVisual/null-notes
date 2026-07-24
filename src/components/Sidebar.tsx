@@ -27,7 +27,6 @@ export function Sidebar({ onSearchOpen }: SidebarProps) {
   const folderError = useWorkspaceStore((s) => s.folderError)
   const setFolderError = useWorkspaceStore((s) => s.setFolderError)
   const { openWorkspace } = useWorkspace()
-  const [search, setSearch] = useState('')
   const [tagFilteredNotes, setTagFilteredNotes] = useState<NoteMetadata[]>([])
 
   useEffect(() => {
@@ -38,11 +37,7 @@ export function Sidebar({ onSearchOpen }: SidebarProps) {
     api.notes.notesWithTag(workspacePath, tagFilter).then(setTagFilteredNotes)
   }, [tagFilter, workspacePath])
 
-  const visibleNotes = search.trim()
-    ? notes.filter((n) => n.title.toLowerCase().includes(search.toLowerCase()))
-    : notes
-
-  const tree = workspacePath ? buildFolderTree(workspacePath, folders, visibleNotes) : []
+  const tree = workspacePath ? buildFolderTree(workspacePath, folders, notes) : []
 
   async function handleCreateNote() {
     if (!workspacePath) return
@@ -97,14 +92,6 @@ export function Sidebar({ onSearchOpen }: SidebarProps) {
         </span>
         <kbd>Ctrl K</kbd>
       </button>
-      <input
-        className="search-input"
-        type="search"
-        placeholder="Filter by title…"
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        aria-label="Filter notes by title"
-      />
       {folderError && <p className="sidebar-error">{folderError}</p>}
       <TagList />
       {tagFilter ? (
