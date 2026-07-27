@@ -13,13 +13,27 @@ const TOOLS: { id: Tool; label: string; Icon: typeof PenLine }[] = [
   { id: 'arrow', label: 'Arrow', Icon: MoveUpRight },
 ]
 
+const ZOOM_LEVELS = [0.75, 1, 1.5, 2]
+// Must match the grid background-size in index.css so it scales with zoom.
+const GRID_SIZE = 24
+
 interface InkCanvasProps {
   svgPath: string
   width: number
   height: number
+  zoom?: number
+  onZoomChange?: (zoom: number) => void
+  autoGrow?: boolean
 }
 
-export function InkCanvas({ svgPath, width, height }: InkCanvasProps) {
+export function InkCanvas({
+  svgPath,
+  width,
+  height,
+  zoom = 1,
+  onZoomChange,
+  autoGrow = false,
+}: InkCanvasProps) {
   const {
     canvasRef,
     tool,
@@ -28,11 +42,12 @@ export function InkCanvas({ svgPath, width, height }: InkCanvasProps) {
     setColor,
     size,
     setSize,
+    inkData,
     undo,
     redo,
     canUndo,
     canRedo,
-  } = useInkCanvas(svgPath, width, height)
+  } = useInkCanvas(svgPath, width, height, { zoom, autoGrow })
 
   const [cursorPos, setCursorPos] = useState<{ x: number; y: number } | null>(null)
 
@@ -49,7 +64,11 @@ export function InkCanvas({ svgPath, width, height }: InkCanvasProps) {
     setCursorPos(null)
   }
 
-  const eraserDiameter = size * 6
+  // Size from the ink data, not the props — the page grows as you write, and
+  // zoom scales what you see without touching the stored coordinates.
+  const displayWidth = inkData.width * zoom
+  const displayHeight = inkData.height * zoom
+  const eraserDiameter = size * 6 * zoom
 
   return (
     <div className="ink-canvas-wrap">
@@ -88,16 +107,41 @@ export function InkCanvas({ svgPath, width, height }: InkCanvasProps) {
         <button className="ink-tool" onClick={redo} disabled={!canRedo} aria-label="Redo" title="Redo">
           <Redo2 size={15} />
         </button>
+        {onZoomChange && (
+          <>
+            <span className="ink-sep" aria-hidden />
+            {ZOOM_LEVELS.map((level) => (
+              <button
+                key={level}
+                className={`ink-tool ink-zoom${zoom === level ? ' active' : ''}`}
+                onClick={() => onZoomChange(level)}
+                aria-pressed={zoom === level}
+                aria-label={`Zoom ${level}x`}
+                title={`Zoom ${level}x`}
+              >
+                {level}×
+              </button>
+            ))}
+          </>
+        )}
       </div>
       <div
-        style={{ position: 'relative', width, height }}
+        style={{ position: 'relative', width: displayWidth, height: displayHeight }}
         onPointerMove={handlePointerMove}
         onPointerLeave={handlePointerLeave}
       >
         <canvas
           ref={canvasRef}
           className="ink-canvas"
-          style={{ position: 'absolute', top: 0, left: 0, width, height, touchAction: 'none' }}
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: displayWidth,
+            height: displayHeight,
+            backgroundSize: `${GRID_SIZE * zoom}px ${GRID_SIZE * zoom}px`,
+            touchAction: 'none',
+          }}
         />
         {cursorPos && (
           <div

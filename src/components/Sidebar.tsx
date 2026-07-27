@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { FilePlus, FolderPlus, Search } from 'lucide-react'
+import { FilePlus, FolderPlus, PenLine, Search } from 'lucide-react'
 import { useNotesStore } from '../store/notes'
 import { useWorkspaceStore } from '../store/workspace'
 import { useWorkspace, refreshTree } from '../hooks/useWorkspace'
@@ -9,7 +9,12 @@ import { FolderContextMenu } from './FolderContextMenu'
 import { TagList } from './TagList'
 import { buildFolderTree } from '../lib/folderTree'
 import { api } from '../lib/tauri'
+import { inkApi } from '../lib/ink'
+import { canvasNoteBody } from '../lib/canvasNote'
 import type { NoteMetadata } from '../types'
+import type { InkData } from '../ink/types'
+
+const EMPTY_PAGE: InkData = { width: 900, height: 1200, strokes: [], shapes: [] }
 
 interface SidebarProps {
   onSearchOpen: () => void
@@ -54,6 +59,30 @@ export function Sidebar({ onSearchOpen }: SidebarProps) {
     }
   }
 
+  // Created as a real note first, then rewritten as a canvas body, so it picks
+  // up the same naming, indexing and folder rules as any other note.
+  async function handleCreateCanvasNote() {
+    if (!workspacePath) return
+    const title = prompt('Canvas note title:')
+    if (!title) return
+    const folder = selectedFolder ?? workspacePath
+    try {
+      const meta = await api.notes.create(workspacePath, folder, title)
+      const dir = await inkApi.ensureDir(meta.path)
+      const sep = dir.includes('\\') ? '\\' : '/'
+      const svgPath = `${dir}${sep}page.svg`
+      await inkApi.write(svgPath, EMPTY_PAGE)
+      const body = canvasNoteBody(title, svgPath)
+      await api.notes.save(meta.path, body)
+      await api.notes.reindex(meta.path, workspacePath, body)
+      addNote(meta)
+      openTab(meta.path)
+      setFolderError(null)
+    } catch (e) {
+      setFolderError(e instanceof Error ? e.message : String(e))
+    }
+  }
+
   async function handleCreateFolder() {
     if (!workspacePath) return
     const name = prompt('Folder name:')
@@ -83,6 +112,9 @@ export function Sidebar({ onSearchOpen }: SidebarProps) {
         </button>
         <button onClick={() => void handleCreateFolder()} disabled={!workspacePath}>
           <FolderPlus size={14} /> New Folder
+        </button>
+        <button onClick={() => void handleCreateCanvasNote()} disabled={!workspacePath}>
+          <PenLine size={14} /> New Canvas
         </button>
       </div>
       <ImportButton />

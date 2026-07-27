@@ -15,6 +15,22 @@ const STROKE_OPTIONS = { thinning: 0.5, smoothing: 0.5, streamline: 0.5 }
 const DEFAULT_COLOR = '#e6edf3'
 const DEFAULT_SIZE = 2
 
+// A page grows when you write near its bottom edge and never shrinks on its
+// own — reclaiming space has to be deliberate, or growth could drop strokes.
+const GROW_MARGIN = 160
+const PAGE_STEP = 400
+
+interface InkOptions {
+  zoom?: number
+  autoGrow?: boolean
+}
+
+function grownHeight(height: number, points: Point[], autoGrow: boolean): number {
+  if (!autoGrow) return height
+  const lowest = points.reduce((max, p) => Math.max(max, p.y), 0)
+  return lowest > height - GROW_MARGIN ? height + PAGE_STEP : height
+}
+
 // Pointer Events reports the pen's eraser end as bit 5 of `buttons` (32) for
 // as long as it is down, but `button` only says 5 on the down and up events —
 // between them it is -1. Checking both is what makes flipping the pen over
@@ -76,7 +92,12 @@ function releasePointer(canvas: HTMLCanvasElement | null, pointerId: number): vo
   }
 }
 
-export function useInkCanvas(svgPath: string, width: number, height: number) {
+export function useInkCanvas(
+  svgPath: string,
+  width: number,
+  height: number,
+  { zoom = 1, autoGrow = false }: InkOptions = {},
+) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [tool, setTool] = useState<Tool>('pen')
   const [color, setColor] = useState(DEFAULT_COLOR)
@@ -131,16 +152,17 @@ export function useInkCanvas(svgPath: string, width: number, height: number) {
       if (!ctx) return
 
       // Back the canvas with real device pixels — at 1x on a HiDPI pen display
-      // every stroke is drawn into a half-resolution buffer and upscaled.
-      const dpr = window.devicePixelRatio || 1
-      const pixelWidth = Math.round(width * dpr)
-      const pixelHeight = Math.round(height * dpr)
+      // every stroke is drawn into a half-resolution buffer and upscaled. Zoom
+      // multiplies in here so magnified ink is redrawn, not stretched.
+      const dpr = (window.devicePixelRatio || 1) * zoom
+      const pixelWidth = Math.round(inkData.width * dpr)
+      const pixelHeight = Math.round(inkData.height * dpr)
       if (canvas.width !== pixelWidth || canvas.height !== pixelHeight) {
         canvas.width = pixelWidth
         canvas.height = pixelHeight
       }
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
-      ctx.clearRect(0, 0, width, height)
+      ctx.clearRect(0, 0, inkData.width, inkData.height)
 
       for (const stroke of inkData.strokes) {
         fillStroke(ctx, stroke.points, stroke.color, stroke.size)
@@ -155,7 +177,7 @@ export function useInkCanvas(svgPath: string, width: number, height: number) {
         drawShapePreview(ctx, liveShape)
       }
     },
-    [inkData, color, size, width, height],
+    [inkData, color, size, zoom],
   )
 
   useEffect(() => {
@@ -187,16 +209,16 @@ export function useInkCanvas(svgPath: string, width: number, height: number) {
 
       if (activeTool === 'eraser') {
         eraseSnapshot.current = inkData
-        eraseAt(e.offsetX, e.offsetY)
+        eraseAt(e.offsetX / zoom, e.offsetY / zoom)
         return
       }
       if (isShapeTool(activeTool)) {
-        shapeStart.current = { x: e.offsetX, y: e.offsetY }
+        shapeStart.current = { x: e.offsetX / zoom, y: e.offsetY / zoom }
         return
       }
-      currentStroke.current = [{ x: e.offsetX, y: e.offsetY, pressure: e.pressure }]
+      currentStroke.current = [{ x: e.offsetX / zoom, y: e.offsetY / zoom, pressure: e.pressure }]
     },
-    [tool, inkData, eraseAt],
+    [tool, inkData, eraseAt, zoom],
   )
 
   const handlePointerMove = useCallback(
@@ -206,7 +228,7 @@ export function useInkCanvas(svgPath: string, width: number, height: number) {
 
       if (activeTool === 'eraser') {
         // Only while the tip is actually down — hovering must not erase.
-        if (eraseSnapshot.current) eraseAt(e.offsetX, e.offsetY)
+        if (eraseSnapshot.current) eraseAt(e.offsetX / zoom, e.offsetY / zoom)
         return
       }
 
@@ -216,8 +238,8 @@ export function useInkCanvas(svgPath: string, width: number, height: number) {
           kind: activeTool as Shape['kind'],
           x1: shapeStart.current.x,
           y1: shapeStart.current.y,
-          x2: e.offsetX,
-          y2: e.offsetY,
+          x2: e.offsetX / zoom,
+          y2: e.offsetY / zoom,
           color,
           size,
         })
@@ -227,11 +249,15 @@ export function useInkCanvas(svgPath: string, width: number, height: number) {
       if (currentStroke.current.length === 0) return
       const events = e.getCoalescedEvents?.() ?? [e]
       for (const ce of events) {
-        currentStroke.current.push({ x: ce.offsetX, y: ce.offsetY, pressure: ce.pressure })
+        currentStroke.current.push({
+          x: ce.offsetX / zoom,
+          y: ce.offsetY / zoom,
+          pressure: ce.pressure,
+        })
       }
       redrawCanvas(currentStroke.current)
     },
-    [tool, size, color, eraseAt, redrawCanvas],
+    [tool, size, color, eraseAt, redrawCanvas, zoom],
   )
 
   const handlePointerUp = useCallback(
@@ -257,14 +283,22 @@ export function useInkCanvas(svgPath: string, width: number, height: number) {
           kind: tool as Shape['kind'],
           x1: shapeStart.current.x,
           y1: shapeStart.current.y,
-          x2: e.offsetX,
-          y2: e.offsetY,
+          x2: e.offsetX / zoom,
+          y2: e.offsetY / zoom,
           color,
           size,
         }
         shapeStart.current = null
         currentStroke.current = []
-        commit({ ...inkData, shapes: [...inkData.shapes, shape] })
+        const corners = [
+          { x: shape.x1, y: shape.y1, pressure: 0 },
+          { x: shape.x2, y: shape.y2, pressure: 0 },
+        ]
+        commit({
+          ...inkData,
+          height: grownHeight(inkData.height, corners, autoGrow),
+          shapes: [...inkData.shapes, shape],
+        })
         return
       }
 
@@ -280,9 +314,13 @@ export function useInkCanvas(svgPath: string, width: number, height: number) {
         size,
       }
       currentStroke.current = []
-      commit({ ...inkData, strokes: [...inkData.strokes, stroke] })
+      commit({
+        ...inkData,
+        height: grownHeight(inkData.height, stroke.points, autoGrow),
+        strokes: [...inkData.strokes, stroke],
+      })
     },
-    [tool, inkData, color, size, commit, svgPath],
+    [tool, inkData, color, size, commit, svgPath, zoom, autoGrow],
   )
 
   useEffect(() => {

@@ -12,6 +12,8 @@ import { useNote } from '../hooks/useNote'
 import { useWorkspace, refreshTags } from '../hooks/useWorkspace'
 import { useExternalChanges } from '../hooks/useExternalChanges'
 import { ConflictBar } from './ConflictBar'
+import { InkPage } from '../ink/InkPage'
+import { canvasSrcFrom } from '../lib/canvasNote'
 import { api } from '../lib/tauri'
 
 type ViewMode = 'wysiwyg' | 'raw'
@@ -35,6 +37,9 @@ export function Layout() {
   } = useNote(activeTab)
   const { saveSession } = useWorkspace()
   useExternalChanges()
+  // A canvas note keeps its strokes in an SVG sidecar, so the .md itself never
+  // changes while you write — only the Source view ever needs the text.
+  const canvasSrc = canvasSrcFrom(content)
   const [viewMode, setViewMode] = useState<ViewMode>('wysiwyg')
   const [searchOpen, setSearchOpen] = useState(false)
 
@@ -86,6 +91,9 @@ export function Layout() {
         />
         {conflict && <ConflictBar onKeepMine={keepMine} onReloadTheirs={reloadTheirs} />}
         <div className="editor-scroll">
+          {canvasSrc && !isLoading && activeTab && viewMode === 'wysiwyg' ? (
+            <InkPage svgPath={canvasSrc} />
+          ) : (
           <div className="editor-pane">
             {isLoading && <p className="status">Loading…</p>}
             {!isLoading && activeTab && viewMode === 'wysiwyg' && (
@@ -101,6 +109,7 @@ export function Layout() {
               <BacklinksPanel notePath={activeTab} noteTitle={currentNote.title} />
             )}
           </div>
+          )}
         </div>
       </div>
     </div>
