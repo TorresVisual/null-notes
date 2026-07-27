@@ -42,7 +42,11 @@ html {
 }
 
 body {
-  font-family: system-ui, -apple-system, sans-serif;
+  /* "Segoe UI" first, not system-ui: on some Windows/WebView2 builds
+     system-ui resolves to the variable-font "Segoe UI Variable", which has
+     a known glyph-rendering bug — text reports correct metrics/box size but
+     paints no visible glyphs in certain flex + text-overflow layouts. */
+  font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
   font-size: 15px;
   line-height: 1.6;
   background: var(--bg-base);

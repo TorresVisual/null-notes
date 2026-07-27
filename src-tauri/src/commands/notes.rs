@@ -13,14 +13,43 @@ fn now_ms() -> i64 {
         .as_millis() as i64
 }
 
+const MAX_TITLE_CHARS: usize = 60;
+
+fn truncate_title(s: &str) -> String {
+    if s.chars().count() <= MAX_TITLE_CHARS {
+        s.to_string()
+    } else {
+        let truncated: String = s.chars().take(MAX_TITLE_CHARS).collect();
+        format!("{}…", truncated.trim_end())
+    }
+}
+
+// Notes often open with a blockquote tagline or a horizontal rule before
+// their actual heading, so the title can't just be "the first line" — it
+// has to be the first ATX heading found anywhere in the document, falling
+// back to the first non-heading line only when no heading exists at all.
 pub fn title_from_content(content: &str) -> String {
-    content
-        .lines()
-        .find(|l| !l.trim().is_empty())
-        .unwrap_or("Untitled")
-        .trim_start_matches('#')
-        .trim()
-        .to_string()
+    let mut fallback: Option<&str> = None;
+    for line in content.lines() {
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+        if trimmed.starts_with('#') {
+            let heading = trimmed.trim_start_matches('#').trim();
+            if !heading.is_empty() {
+                return truncate_title(heading);
+            }
+            continue;
+        }
+        if fallback.is_none() {
+            fallback = Some(trimmed);
+        }
+    }
+    match fallback {
+        Some(line) => truncate_title(line),
+        None => "Untitled".to_string(),
+    }
 }
 
 fn strip_code(content: &str) -> String {
@@ -111,11 +140,14 @@ async fn scan_dir_recursive(
                 continue;
             }
             let path_str = path.to_string_lossy().into_owned();
-            let title = path
-                .file_stem()
-                .and_then(|s| s.to_str())
-                .unwrap_or("Untitled")
-                .to_string();
+            let title = match tokio::fs::read_to_string(&path).await {
+                Ok(content) => title_from_content(&content),
+                Err(_) => path
+                    .file_stem()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or("Untitled")
+                    .to_string(),
+            };
             let updated_at = entry
                 .metadata()
                 .await
@@ -408,8 +440,31 @@ mod tests {
     }
 
     #[test]
+    fn test_title_from_content_bare_hash_heading_falls_back_to_next_line() {
+        assert_eq!(title_from_content("#\nbody text"), "body text");
+    }
+
+    #[test]
+    fn test_title_from_content_only_bare_hash() {
+        assert_eq!(title_from_content("#\n\n"), "Untitled");
+    }
+
+    #[test]
     fn test_title_from_content_leading_blank_lines() {
         assert_eq!(title_from_content("\n\n# Deep\n"), "Deep");
+    }
+
+    #[test]
+    fn test_title_from_content_skips_blockquote_intro_for_later_heading() {
+        let content = "> **A Markdown-first note-taking application designed specifically for computer science students. It provides the best environment for writing mathematical and programming notes while integrating naturally with existing development workflows rather than replacing the IDE.**\n\n---\n\n## What the app should do\n\n### Best-in-class Markdown editing\n";
+        assert_eq!(title_from_content(content), "What the app should do");
+    }
+
+    #[test]
+    fn test_title_from_content_truncates_long_non_heading_line() {
+        let long_line = "a".repeat(120);
+        let expected: String = "a".repeat(60);
+        assert_eq!(title_from_content(&long_line), format!("{expected}…"));
     }
 
     #[test]
@@ -485,6 +540,19 @@ mod tests {
         assert_eq!(notes.len(), 2);
         assert_eq!(folders.len(), 1);
         assert!(folders[0].ends_with("Course101"));
+    }
+
+    #[tokio::test]
+    async fn test_scan_dir_recursive_uses_content_title_not_filename() {
+        let tmp = tempdir().unwrap();
+        let root = tmp.path();
+        std::fs::write(root.join("lecture-1-notes.md"), "# Lecture 1 Notes\nbody").unwrap();
+
+        let ws = root.to_string_lossy().into_owned();
+        let (notes, _) = scan_dir_recursive(root, &ws).await.unwrap();
+
+        assert_eq!(notes.len(), 1);
+        assert_eq!(notes[0].title, "Lecture 1 Notes");
     }
 
     #[tokio::test]
