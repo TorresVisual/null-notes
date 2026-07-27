@@ -14,6 +14,16 @@ const TOOLS: { id: Tool; label: string; Icon: typeof PenLine }[] = [
   { id: 'arrow', label: 'Arrow', Icon: MoveUpRight },
 ]
 
+// Dragging a finger moves the content with it, so the scroll offset goes the
+// opposite way. Vertical travel belongs to the note; horizontal only matters
+// once zoom has made the canvas wider than the column.
+function scrollAncestors(from: HTMLElement, dx: number, dy: number): void {
+  const page = from.closest('.editor-scroll')
+  if (page) page.scrollTop -= dy
+  const canvas = from.closest('.ink-canvas-wrap')
+  if (canvas) canvas.scrollLeft -= dx
+}
+
 const ZOOM_LEVELS = [0.75, 1, 1.5, 2]
 // Must match the grid background-size in index.css so it scales with zoom.
 const GRID_SIZE = 24
@@ -69,9 +79,20 @@ export function InkCanvas({
 
   function handlePointerMove(e: ReactPointerEvent<HTMLDivElement>) {
     if (e.pointerType === 'touch') {
-      if (!touches.current.has(e.pointerId)) return
+      const previous = touches.current.get(e.pointerId)
+      if (!previous) return
       touches.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
-      const [a, b] = [...touches.current.values()]
+      const points = [...touches.current.values()]
+
+      // One finger drags the page. This is done by hand rather than by letting
+      // touch-action scroll natively, because touch-action governs pen input
+      // too — allowing a native pan would make the pen scroll instead of draw.
+      if (points.length === 1) {
+        scrollAncestors(e.currentTarget, e.clientX - previous.x, e.clientY - previous.y)
+        return
+      }
+
+      const [a, b] = points
       if (!a || !b || !onZoomChange) return
       const distance = distanceBetween(a, b)
       if (!pinch.current) pinch.current = { distance, zoom }
