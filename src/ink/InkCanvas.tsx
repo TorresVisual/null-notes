@@ -1,6 +1,17 @@
 import { useRef, useState } from 'react'
 import type { PointerEvent as ReactPointerEvent } from 'react'
-import { PenLine, Eraser, Minus, Circle, Square, MoveUpRight, Undo2, Redo2 } from 'lucide-react'
+import {
+  PenLine,
+  Eraser,
+  Lasso,
+  Minus,
+  Circle,
+  Square,
+  MoveUpRight,
+  Trash2,
+  Undo2,
+  Redo2,
+} from 'lucide-react'
 import { useInkCanvas, isEraserTip } from './useInkCanvas'
 import { pinchZoom, distanceBetween } from './zoom'
 import type { Tool } from './types'
@@ -8,6 +19,7 @@ import type { Tool } from './types'
 const TOOLS: { id: Tool; label: string; Icon: typeof PenLine }[] = [
   { id: 'pen', label: 'Pen', Icon: PenLine },
   { id: 'eraser', label: 'Eraser', Icon: Eraser },
+  { id: 'lasso', label: 'Lasso select', Icon: Lasso },
   { id: 'line', label: 'Line', Icon: Minus },
   { id: 'circle', label: 'Circle', Icon: Circle },
   { id: 'rect', label: 'Rectangle', Icon: Square },
@@ -22,6 +34,12 @@ function scrollAncestors(from: HTMLElement, dx: number, dy: number): void {
   if (page) page.scrollTop -= dy
   const canvas = from.closest('.ink-canvas-wrap')
   if (canvas) canvas.scrollLeft -= dx
+}
+
+// A swatch that scaled 1:1 with pen size would make a 20px highlighter swallow
+// its button and a 2px nib vanish, so the range is compressed, not mapped.
+function swatchDiameter(size: number): number {
+  return Math.round(5 + size * 0.5)
 }
 
 const ZOOM_LEVELS = [0.75, 1, 1.5, 2]
@@ -49,6 +67,11 @@ export function InkCanvas({
     canvasRef,
     tool,
     setTool,
+    hasSelection,
+    deleteSelected,
+    pens,
+    activePenId,
+    selectPen,
     color,
     setColor,
     size,
@@ -136,20 +159,51 @@ export function InkCanvas({
             <Icon size={15} />
           </button>
         ))}
+        {hasSelection && (
+          <button
+            className="ink-tool ink-delete"
+            onClick={deleteSelected}
+            aria-label="Delete selection"
+            title="Delete selection (Del)"
+          >
+            <Trash2 size={15} />
+          </button>
+        )}
+        <span className="ink-sep" aria-hidden />
+        {pens.map((pen) => (
+          <button
+            key={pen.id}
+            className={`ink-pen${pen.id === activePenId ? ' active' : ''}`}
+            onClick={() => selectPen(pen.id)}
+            aria-pressed={pen.id === activePenId}
+            aria-label={pen.label}
+            title={pen.label}
+          >
+            <span
+              className="ink-pen-swatch"
+              style={{
+                background: pen.color,
+                opacity: pen.opacity,
+                width: swatchDiameter(pen.size),
+                height: swatchDiameter(pen.size),
+              }}
+            />
+          </button>
+        ))}
         <span className="ink-sep" aria-hidden />
         <input
           type="color"
           value={color}
           onChange={(e) => setColor(e.target.value)}
-          aria-label="Stroke color"
+          aria-label="Pen color"
         />
         <input
           type="range"
           min={1}
-          max={20}
+          max={24}
           value={size}
           onChange={(e) => setSize(Number(e.target.value))}
-          aria-label="Stroke size"
+          aria-label="Pen size"
         />
         <span className="ink-sep" aria-hidden />
         <button className="ink-tool" onClick={undo} disabled={!canUndo} aria-label="Undo" title="Undo">

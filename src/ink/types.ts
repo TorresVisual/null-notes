@@ -1,4 +1,4 @@
-export type Tool = 'pen' | 'eraser' | 'line' | 'circle' | 'rect' | 'arrow'
+export type Tool = 'pen' | 'eraser' | 'lasso' | 'line' | 'circle' | 'rect' | 'arrow'
 
 export interface Point {
   x: number
@@ -11,6 +11,17 @@ export interface Stroke {
   points: Point[]
   color: string
   size: number
+  opacity: number
+}
+
+// A pen is a saved colour/width/opacity. A highlighter is not a separate tool —
+// it is a pen that is wide and translucent, which is the whole difference.
+export interface Pen {
+  id: string
+  label: string
+  color: string
+  size: number
+  opacity: number
 }
 
 export interface Shape {

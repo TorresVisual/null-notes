@@ -11,6 +11,7 @@ const stroke: Stroke = {
   ],
   color: '#000000',
   size: 4,
+  opacity: 1,
 }
 
 const shape: Shape = {
@@ -69,6 +70,29 @@ describe('inkDataToSvg / svgToInkData roundtrip', () => {
     expect(restored.strokes[0]?.id).toBe('s1')
     expect(restored.shapes).toHaveLength(1)
     expect(restored.shapes[0]?.id).toBe('sh1')
+  })
+
+  it('round-trips a highlighter opacity', () => {
+    const highlighter: Stroke = { ...stroke, id: 's2', opacity: 0.3 }
+    const data: InkData = { width: 800, height: 600, strokes: [highlighter], shapes: [] }
+
+    const restored = svgToInkData(inkDataToSvg(data))
+    expect(restored.strokes[0]?.opacity).toBe(0.3)
+  })
+
+  it('reads a stroke written before opacity existed as fully opaque', () => {
+    const legacy = `<svg xmlns="http://www.w3.org/2000/svg" data-width="800" data-height="600">
+      <path data-id="old" data-points="${encodeURIComponent('[]')}" data-color="#000000" data-size="4" d="M 0 0" fill="#000000" />
+    </svg>`
+    expect(svgToInkData(legacy).strokes[0]?.opacity).toBe(1)
+  })
+
+  it('writes highlighters before ink so they sit underneath', () => {
+    const highlighter: Stroke = { ...stroke, id: 'hl', opacity: 0.3 }
+    const data: InkData = { width: 800, height: 600, strokes: [stroke, highlighter], shapes: [] }
+
+    const svg = inkDataToSvg(data)
+    expect(svg.indexOf('data-id="hl"')).toBeLessThan(svg.indexOf('data-id="s1"'))
   })
 
   it('round-trips a stroke alongside an arrow without cross-contamination', () => {

@@ -1,6 +1,7 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import { useInkCanvas, isEraserTip } from './useInkCanvas'
+import { DEFAULT_PENS } from './pens'
 
 vi.mock('../lib/ink', () => ({
   inkApi: {
@@ -37,6 +38,8 @@ describe('isEraserTip', () => {
 })
 
 describe('useInkCanvas', () => {
+  beforeEach(() => localStorage.clear())
+
   it('initialises with empty ink data', async () => {
     const { result } = renderHook(() => useInkCanvas('/ws/n.ink/s1.svg', 800, 600))
     await act(async () => {})
@@ -59,5 +62,88 @@ describe('useInkCanvas', () => {
     const { result } = renderHook(() => useInkCanvas('/ws/n.ink/s1.svg', 800, 600))
     act(() => result.current.setTool('eraser'))
     expect(result.current.tool).toBe('eraser')
+  })
+})
+
+describe('lasso selection', () => {
+  beforeEach(() => localStorage.clear())
+
+  const render = () => renderHook(() => useInkCanvas('/ws/n.ink/s1.svg', 800, 600))
+
+  it('starts with nothing selected', () => {
+    const { result } = render()
+    expect(result.current.hasSelection).toBe(false)
+    expect(result.current.selection).toEqual({ strokeIds: [], shapeIds: [] })
+  })
+
+  it('deleting with nothing selected is a no-op, not an empty undo entry', () => {
+    const { result } = render()
+    act(() => result.current.deleteSelected())
+    expect(result.current.canUndo).toBe(false)
+  })
+
+  // A marquee left floating after you reach for the pen is just clutter.
+  it('changing tool drops the selection', () => {
+    const { result } = render()
+    act(() => result.current.setTool('lasso'))
+    act(() => result.current.setTool('pen'))
+    expect(result.current.hasSelection).toBe(false)
+  })
+
+  it('picking a pen leaves the lasso tool', () => {
+    const { result } = render()
+    act(() => result.current.setTool('lasso'))
+    act(() => result.current.selectPen('red'))
+    expect(result.current.tool).toBe('pen')
+  })
+})
+
+describe('pen presets', () => {
+  beforeEach(() => localStorage.clear())
+
+  const render = () => renderHook(() => useInkCanvas('/ws/n.ink/s1.svg', 800, 600))
+  // pens.test.ts pins down that a translucent pen ships by default.
+  const highlighter = DEFAULT_PENS.find((p) => p.opacity < 1) ?? DEFAULT_PENS[0]
+
+  it('starts on the first pen', () => {
+    const { result } = render()
+    expect(result.current.activePenId).toBe(DEFAULT_PENS[0].id)
+    expect(result.current.color).toBe(DEFAULT_PENS[0].color)
+    expect(result.current.size).toBe(DEFAULT_PENS[0].size)
+  })
+
+  it('selecting a highlighter takes its colour, width and opacity', () => {
+    const { result } = render()
+    act(() => result.current.selectPen(highlighter.id))
+    expect(result.current.color).toBe(highlighter.color)
+    expect(result.current.size).toBe(highlighter.size)
+  })
+
+  // Picking up a pen means you want to write, even if the eraser was in hand.
+  it('selecting a pen puts the pen tool back', () => {
+    const { result } = render()
+    act(() => result.current.setTool('eraser'))
+    act(() => result.current.selectPen('red'))
+    expect(result.current.tool).toBe('pen')
+  })
+
+  it('the colour control edits the selected pen rather than a loose setting', () => {
+    const { result } = render()
+    act(() => result.current.setColor('#ff00ff'))
+
+    const edited = result.current.pens.find((p) => p.id === result.current.activePenId)
+    expect(edited?.color).toBe('#ff00ff')
+    expect(result.current.color).toBe('#ff00ff')
+  })
+
+  it('remembers an edited pen and the selection for the next note', () => {
+    const first = render()
+    act(() => first.result.current.selectPen('red'))
+    act(() => first.result.current.setSize(9))
+    first.unmount()
+
+    const second = render()
+    expect(second.result.current.activePenId).toBe('red')
+    expect(second.result.current.size).toBe(9)
   })
 })

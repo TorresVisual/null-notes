@@ -9,20 +9,27 @@ Measured against OneNote, the inline block failed on the two things that matter 
 
 ## Model
 
-A **canvas note** is an ordinary `.md` whose body is a heading plus one `ink-page` fence:
+A **canvas note** is an ordinary `.md` whose body is a heading plus one `ink` fence:
 
     # Lecture 07 — Laplace transforms
 
-    ```ink-page
-    {"src": "Lecture 07.ink/page.svg"}
+    ```ink
+    {"src":"Lecture 07.ink/page.svg","width":900,"height":1200}
     ```
+
+*As built:* the fence is the existing `ink` block, not a new `ink-page` kind. A
+canvas note is therefore not a separate document type at all — it is a normal
+note that opens with a tall, growing ink block, with room to type underneath.
+That removed the need for a distinct `InkPage` surface and a `Layout` branch:
+the canvas rides the ordinary note flow, and every editor feature keeps working
+around it.
 
 Consequences, all deliberate:
 
 - **The heading stays.** `title_from_content` keeps working, so the sidebar, tabs, search and `[[wiki-links]]` treat a canvas note like any other note.
 - **Plain `.md` remains the source of truth** (principle #1). The file is still readable, greppable and portable; the strokes live in an SVG sidecar beside it, exactly as inline blocks already do.
 - **Source view is the escape hatch.** Toggling to Source shows the fence, so nothing is trapped behind a canvas that fails to load.
-- **Page height lives in the SVG** (`data-height`), not in the fence — growth is then a property of the drawing, and the `.md` never churns while you write.
+- **Page height lives in the SVG** (`data-height`) — growth is then a property of the drawing, and the `.md` never churns while you write. The size in the fence is only the seed used before the sidecar loads; once it is read, the SVG wins.
 
 ## Surface behaviour
 
@@ -34,28 +41,47 @@ Consequences, all deliberate:
 
 Each phase is independently shippable and leaves the app working.
 
-### Phase 1 — the surface ← *current*
+### Phase 1 — the surface — **done**
 
-- [ ] `lib/canvasNote.ts`: `isCanvasNote`, `canvasSrcFrom`, `canvasNoteBody` (pure, tested)
-- [ ] `InkPage.tsx`: full-width canvas, vertical growth, zoom presets
-- [ ] `useInkCanvas`: zoom-aware pointer coordinates and backing store
-- [ ] `Layout`: render `InkPage` instead of the TipTap editor for canvas notes
-- [ ] Sidebar: "New canvas note"
+- [x] `lib/canvasNote.ts`: `canvasNoteBody` (pure, tested)
+- [x] `InkCanvas`: full-width canvas, vertical growth, zoom presets
+- [x] `useInkCanvas`: zoom-aware pointer coordinates and backing store
+- [x] ~~`Layout`: render `InkPage` instead of the TipTap editor~~ — dropped; the canvas is an ink block inside the ordinary editor, so there is no separate surface to switch to
+- [x] ~~`isCanvasNote`, `canvasSrcFrom`~~ — dropped with the `Layout` branch that would have needed them
+- [x] Sidebar: "New canvas note"
+
+Also landed here: one finger scrolls the page and two pinch to zoom, and the
+pen's eraser end erases without touching the toolbar.
 
 **Done when:** a canvas note can be created, written on with the pen past the original bottom edge, zoomed, closed and reopened with every stroke intact.
 
-### Phase 2 — pens and highlighter
+### Phase 2 — pens and highlighter — **done**
 
-- [ ] `Stroke` gains `opacity` (and the SVG a `data-opacity`) — a highlighter is a wide, transparent stroke drawn beneath the ink
-- [ ] Preset bar: configured pens (colour + width), one tap to switch, remembered across notes via the settings file (P2-1)
+- [x] `Stroke` gains `opacity` (and the SVG a `data-opacity`) — a highlighter is a wide, transparent stroke drawn beneath the ink (`paintOrder.ts`, applied to the canvas and the saved SVG alike)
+- [x] Preset bar: configured pens (colour + width + opacity), one tap to switch, remembered across notes
 
-### Phase 3 — lasso
+The selected preset *is* the pen — the colour and size controls edit it in
+place, which is what makes a pen you configured still be there in tomorrow's
+lecture. A highlighter is not a tool, only a pen that is wide and translucent.
 
-- [ ] Freeform selection, point-in-polygon against stroke points
-- [ ] Move the selection by dragging; delete the selection
-- [ ] Reuses `hitTest.ts` for shapes
+**Deviation:** presets persist to webview storage (`pens.ts`), not the settings
+file — P2-1 has not been built. Every read and write of them goes through that
+one module, so moving them into the config file is a change to four functions.
 
-### Phase 4 — erasers
+### Phase 3 — lasso — **done**
+
+- [x] Freeform selection, point-in-polygon against stroke points (`lasso.ts`, ray casting, so concave loops behave)
+- [x] Move the selection by dragging; delete the selection (toolbar button and <kbd>Del</kbd>/<kbd>Backspace</kbd>)
+- [x] ~~Reuses `hitTest.ts` for shapes~~ — shapes are judged by containment of their corners instead: `hitTest` answers "is the pen touching this?", which is the eraser's question, not the lasso's
+
+Selection is containment, not intersection — clipping the tail of a word leaves
+it where it is. Dragging from inside the marquee moves what it holds, which is
+what avoids needing a separate move tool. A move is one undo entry and one file
+write however far the pen wanders, matching the eraser. The marquee itself is
+never serialised: a selection is something you are holding, not something the
+note contains.
+
+### Phase 4 — erasers ← *current*
 
 - [ ] Point eraser: split a stroke at the erased span instead of dropping it whole
 - [ ] Eraser size independent of pen size

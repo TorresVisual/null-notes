@@ -871,6 +871,31 @@ body {
   accent-color: var(--accent);
 }
 
+.ink-delete { color: var(--danger, #ff7b72); }
+.ink-delete:hover { background: var(--danger, #ff7b72); color: var(--bg-base); }
+
+/* A pen preset shows what it draws — colour, relative width, and the wash of a
+   highlighter — so the bar is read by eye, not by label. */
+.ink-pen {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-hover);
+  border: 1px solid transparent;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.ink-pen:hover { background: var(--border-strong); }
+.ink-pen.active { border-color: var(--accent); background: var(--bg-base); }
+
+.ink-pen-swatch {
+  display: block;
+  border-radius: 50%;
+}
+
 .ink-sep {
   width: 1px;
   height: 20px;

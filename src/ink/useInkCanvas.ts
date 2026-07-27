@@ -3,22 +3,38 @@ import { getStroke } from 'perfect-freehand'
 import { inkApi } from '../lib/ink'
 import { hitTestShape } from './hitTest'
 import { drawShapePreview } from './shapePreview'
+import { paintOrder } from './paintOrder'
+import {
+  EMPTY_SELECTION,
+  isSelectionEmpty,
+  pointInPolygon,
+  selectionIn,
+  selectionBottom,
+  translatePolygon,
+  translateSelection,
+  deleteSelection as removeSelection,
+} from './lasso'
+import type { LassoPoint, Selection } from './lasso'
+import {
+  DEFAULT_PENS,
+  loadPens,
+  savePens,
+  loadActivePenId,
+  saveActivePenId,
+  withPen,
+} from './pens'
 import type { PreviewShape } from './shapePreview'
-import type { InkData, Stroke, Shape, Tool, Point } from './types'
+import type { InkData, Stroke, Shape, Tool, Point, Pen } from './types'
 
 const SHAPE_TOOLS: Tool[] = ['line', 'circle', 'rect', 'arrow']
 const STROKE_OPTIONS = { thinning: 0.5, smoothing: 0.5, streamline: 0.5 }
-
-// The canvas sits on the app's near-black background, so ink defaults to the
-// text colour — black ink here is invisible ink. A fine nib is what
-// handwritten maths needs; the slider still reaches 20 for diagrams.
-const DEFAULT_COLOR = '#e6edf3'
-const DEFAULT_SIZE = 2
 
 // A page grows when you write near its bottom edge and never shrinks on its
 // own — reclaiming space has to be deliberate, or growth could drop strokes.
 const GROW_MARGIN = 160
 const PAGE_STEP = 400
+
+const LASSO_COLOR = 'rgba(126, 231, 135, 0.9)'
 
 interface InkOptions {
   zoom?: number
@@ -56,6 +72,7 @@ function fillStroke(
   points: Point[],
   color: string,
   size: number,
+  opacity: number,
 ): void {
   const outline = getStroke(
     points.map((p) => [p.x, p.y, p.pressure]),
@@ -65,6 +82,7 @@ function fillStroke(
   if (!first) return
   ctx.beginPath()
   ctx.fillStyle = color
+  ctx.globalAlpha = opacity
   ctx.moveTo(first[0] ?? 0, first[1] ?? 0)
   for (let i = 1; i < outline.length; i++) {
     const point = outline[i]
@@ -72,6 +90,28 @@ function fillStroke(
   }
   ctx.closePath()
   ctx.fill()
+  ctx.globalAlpha = 1
+}
+
+// The lasso and the marquee it becomes are drawn the same way — a dashed loop.
+// Nothing about it is ever serialised: a selection is a thing you are holding,
+// not a thing the note contains.
+function strokeLasso(ctx: CanvasRenderingContext2D, polygon: LassoPoint[], closed: boolean): void {
+  const first = polygon[0]
+  if (!first) return
+  ctx.save()
+  ctx.beginPath()
+  ctx.setLineDash([6, 4])
+  ctx.lineWidth = 1
+  ctx.strokeStyle = LASSO_COLOR
+  ctx.moveTo(first.x, first.y)
+  for (let i = 1; i < polygon.length; i++) {
+    const p = polygon[i]
+    if (p) ctx.lineTo(p.x, p.y)
+  }
+  if (closed) ctx.closePath()
+  ctx.stroke()
+  ctx.restore()
 }
 
 // Losing a stroke because the pen crossed the canvas edge mid-drag is worse
@@ -100,15 +140,72 @@ export function useInkCanvas(
 ) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [tool, setTool] = useState<Tool>('pen')
-  const [color, setColor] = useState(DEFAULT_COLOR)
-  const [size, setSize] = useState(DEFAULT_SIZE)
+  const [pens, setPens] = useState<Pen[]>(loadPens)
+  const [activePenId, setActivePenId] = useState(() => loadActivePenId(loadPens()))
   const [inkData, setInkData] = useState<InkData>({ width, height, strokes: [], shapes: [] })
   const [history, setHistory] = useState<InkData[]>([])
   const [future, setFuture] = useState<InkData[]>([])
 
+  const [lassoPolygon, setLassoPolygon] = useState<LassoPoint[] | null>(null)
+  const [selection, setSelection] = useState<Selection>(EMPTY_SELECTION)
+
   const currentStroke = useRef<Point[]>([])
   const shapeStart = useRef<{ x: number; y: number } | null>(null)
   const eraseSnapshot = useRef<InkData | null>(null)
+  const lassoPath = useRef<LassoPoint[]>([])
+  const dragSnapshot = useRef<InkData | null>(null)
+  const dragFrom = useRef<LassoPoint | null>(null)
+
+  // The selected preset *is* the pen — colour, width and opacity all come from
+  // it, and the toolbar's colour and size controls edit it in place. That is
+  // what makes a pen you configured still be there in tomorrow's lecture.
+  const activePen = pens.find((p) => p.id === activePenId) ?? DEFAULT_PENS[0]
+  const { color, size, opacity } = activePen
+
+  const updateActivePen = useCallback(
+    (changes: Partial<Pen>) => {
+      setPens((current) => {
+        const updated = withPen(current, { ...activePen, ...changes })
+        savePens(updated)
+        return updated
+      })
+    },
+    [activePen],
+  )
+
+  const setColor = useCallback(
+    (next: string) => updateActivePen({ color: next }),
+    [updateActivePen],
+  )
+  const setSize = useCallback(
+    (next: number) => updateActivePen({ size: next }),
+    [updateActivePen],
+  )
+
+  const clearSelection = useCallback(() => {
+    lassoPath.current = []
+    setLassoPolygon(null)
+    setSelection(EMPTY_SELECTION)
+  }, [])
+
+  // Reaching for another tool means you are done with what you were holding —
+  // a marquee left floating over the page would only be in the way.
+  const selectTool = useCallback(
+    (next: Tool) => {
+      setTool(next)
+      clearSelection()
+    },
+    [clearSelection],
+  )
+
+  const selectPen = useCallback(
+    (id: string) => {
+      setActivePenId(id)
+      saveActivePenId(id)
+      selectTool('pen')
+    },
+    [selectTool],
+  )
 
   useEffect(() => {
     inkApi.read(svgPath).then((data) => {
@@ -145,7 +242,7 @@ export function useInkCanvas(
   }, [history, future, inkData, svgPath])
 
   const redrawCanvas = useCallback(
-    (livePoints: Point[], liveShape?: PreviewShape | null) => {
+    (livePoints: Point[], liveShape?: PreviewShape | null, liveLasso?: LassoPoint[] | null) => {
       const canvas = canvasRef.current
       if (!canvas) return
       const ctx = canvas.getContext('2d')
@@ -164,20 +261,25 @@ export function useInkCanvas(
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
       ctx.clearRect(0, 0, inkData.width, inkData.height)
 
-      for (const stroke of inkData.strokes) {
-        fillStroke(ctx, stroke.points, stroke.color, stroke.size)
+      for (const stroke of paintOrder(inkData.strokes)) {
+        fillStroke(ctx, stroke.points, stroke.color, stroke.size, stroke.opacity)
       }
       for (const shape of inkData.shapes) {
         drawShapePreview(ctx, shape)
       }
       if (livePoints.length > 1) {
-        fillStroke(ctx, livePoints, color, size)
+        fillStroke(ctx, livePoints, color, size, opacity)
       }
       if (liveShape) {
         drawShapePreview(ctx, liveShape)
       }
+      if (liveLasso) {
+        strokeLasso(ctx, liveLasso, false)
+      } else if (lassoPolygon) {
+        strokeLasso(ctx, lassoPolygon, true)
+      }
     },
-    [inkData, color, size, zoom],
+    [inkData, color, size, opacity, zoom, lassoPolygon],
   )
 
   useEffect(() => {
@@ -212,13 +314,32 @@ export function useInkCanvas(
         eraseAt(e.offsetX / zoom, e.offsetY / zoom)
         return
       }
+
+      if (activeTool === 'lasso') {
+        const x = e.offsetX / zoom
+        const y = e.offsetY / zoom
+
+        // Landing inside a marquee you already drew means "move this", not
+        // "start again" — which is the only way to reposition without a
+        // separate move tool.
+        if (lassoPolygon && !isSelectionEmpty(selection) && pointInPolygon(x, y, lassoPolygon)) {
+          dragSnapshot.current = inkData
+          dragFrom.current = { x, y }
+          return
+        }
+
+        clearSelection()
+        lassoPath.current = [{ x, y }]
+        return
+      }
+
       if (isShapeTool(activeTool)) {
         shapeStart.current = { x: e.offsetX / zoom, y: e.offsetY / zoom }
         return
       }
       currentStroke.current = [{ x: e.offsetX / zoom, y: e.offsetY / zoom, pressure: e.pressure }]
     },
-    [tool, inkData, eraseAt, zoom],
+    [tool, inkData, eraseAt, zoom, lassoPolygon, selection, clearSelection],
   )
 
   const handlePointerMove = useCallback(
@@ -229,6 +350,29 @@ export function useInkCanvas(
       if (activeTool === 'eraser') {
         // Only while the tip is actually down — hovering must not erase.
         if (eraseSnapshot.current) eraseAt(e.offsetX / zoom, e.offsetY / zoom)
+        return
+      }
+
+      if (activeTool === 'lasso') {
+        const x = e.offsetX / zoom
+        const y = e.offsetY / zoom
+
+        // The move is applied to the ink as it happens rather than previewed,
+        // so a released pen has nothing left to reconcile. History and the file
+        // wait for pointerup — one entry per drag, not one per sample.
+        const from = dragFrom.current
+        if (from) {
+          const dx = x - from.x
+          const dy = y - from.y
+          dragFrom.current = { x, y }
+          setInkData((data) => translateSelection(data, selection, dx, dy))
+          setLassoPolygon((polygon) => (polygon ? translatePolygon(polygon, dx, dy) : polygon))
+          return
+        }
+
+        if (lassoPath.current.length === 0) return
+        lassoPath.current = [...lassoPath.current, { x, y }]
+        redrawCanvas([], null, lassoPath.current)
         return
       }
 
@@ -257,13 +401,46 @@ export function useInkCanvas(
       }
       redrawCanvas(currentStroke.current)
     },
-    [tool, size, color, eraseAt, redrawCanvas, zoom],
+    [tool, size, color, eraseAt, redrawCanvas, zoom, selection],
   )
 
   const handlePointerUp = useCallback(
     (e: PointerEvent) => {
       if (e.pointerType !== 'pen') return
       releasePointer(canvasRef.current, e.pointerId)
+
+      // Closing the loop is what selects — the path is discarded either way and
+      // only the resulting marquee is kept, so nothing about a lasso is undoable.
+      if (lassoPath.current.length > 0) {
+        const polygon = lassoPath.current
+        lassoPath.current = []
+        const found = selectionIn(inkData, polygon)
+        setSelection(found)
+        setLassoPolygon(isSelectionEmpty(found) ? null : polygon)
+        return
+      }
+
+      // A move is one history entry and one write, however far the pen wandered.
+      const dragged = dragSnapshot.current
+      if (dragged) {
+        dragSnapshot.current = null
+        dragFrom.current = null
+        if (inkData !== dragged) {
+          setHistory((past) => [...past, dragged])
+          setFuture([])
+          const grown = {
+            ...inkData,
+            height: grownHeight(
+              inkData.height,
+              [{ x: 0, y: selectionBottom(inkData, selection), pressure: 0 }],
+              autoGrow,
+            ),
+          }
+          setInkData(grown)
+          void inkApi.write(svgPath, grown)
+        }
+        return
+      }
 
       // One history entry and one file write per erase drag, not per sample.
       const snapshot = eraseSnapshot.current
@@ -312,6 +489,7 @@ export function useInkCanvas(
         points: currentStroke.current,
         color,
         size,
+        opacity,
       }
       currentStroke.current = []
       commit({
@@ -320,8 +498,25 @@ export function useInkCanvas(
         strokes: [...inkData.strokes, stroke],
       })
     },
-    [tool, inkData, color, size, commit, svgPath, zoom, autoGrow],
+    [tool, inkData, color, size, opacity, commit, svgPath, zoom, autoGrow, selection],
   )
+
+  const deleteSelected = useCallback(() => {
+    if (isSelectionEmpty(selection)) return
+    commit(removeSelection(inkData, selection))
+    clearSelection()
+  }, [selection, inkData, commit, clearSelection])
+
+  useEffect(() => {
+    if (isSelectionEmpty(selection)) return
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key !== 'Delete' && e.key !== 'Backspace') return
+      e.preventDefault()
+      deleteSelected()
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [selection, deleteSelected])
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -341,7 +536,13 @@ export function useInkCanvas(
   return {
     canvasRef,
     tool,
-    setTool,
+    setTool: selectTool,
+    selection,
+    hasSelection: !isSelectionEmpty(selection),
+    deleteSelected,
+    pens,
+    activePenId,
+    selectPen,
     color,
     setColor,
     size,

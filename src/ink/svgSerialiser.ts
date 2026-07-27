@@ -1,4 +1,5 @@
 import { getStroke } from 'perfect-freehand'
+import { paintOrder } from './paintOrder'
 import type { InkData, Stroke, Shape } from './types'
 
 function pointsToSvgPath(points: number[][]): string {
@@ -24,7 +25,7 @@ export function strokeToPath(stroke: Stroke): string {
   })
   const d = pointsToSvgPath(outlinePoints)
   const raw = JSON.stringify(stroke.points)
-  return `<path data-id="${stroke.id}" data-points="${encodeURIComponent(raw)}" data-color="${stroke.color}" data-size="${stroke.size}" d="${d}" fill="${stroke.color}" />`
+  return `<path data-id="${stroke.id}" data-points="${encodeURIComponent(raw)}" data-color="${stroke.color}" data-size="${stroke.size}" data-opacity="${stroke.opacity}" d="${d}" fill="${stroke.color}" fill-opacity="${stroke.opacity}" />`
 }
 
 export function shapeToElement(shape: Shape): string {
@@ -62,7 +63,7 @@ export function shapeToElement(shape: Shape): string {
 }
 
 export function inkDataToSvg(data: InkData): string {
-  const paths = data.strokes.map(strokeToPath).join('\n  ')
+  const paths = paintOrder(data.strokes).map(strokeToPath).join('\n  ')
   const elements = data.shapes.map(shapeToElement).join('\n  ')
   return `<svg xmlns="http://www.w3.org/2000/svg" data-width="${data.width}" data-height="${data.height}" width="${data.width}" height="${data.height}" viewBox="0 0 ${data.width} ${data.height}">
   ${paths}
@@ -83,9 +84,10 @@ export function svgToInkData(svg: string): InkData {
     const id = el.getAttribute('data-id') ?? ''
     const color = el.getAttribute('data-color') ?? '#000000'
     const size = Number(el.getAttribute('data-size') ?? 4)
+    const opacity = Number(el.getAttribute('data-opacity') ?? 1)
     const raw = el.getAttribute('data-points') ?? '[]'
     const points = JSON.parse(decodeURIComponent(raw)) as Stroke['points']
-    strokes.push({ id, points, color, size })
+    strokes.push({ id, points, color, size, opacity })
   }
 
   const shapes: Shape[] = []
