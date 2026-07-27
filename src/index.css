@@ -341,6 +341,33 @@ body {
 
 .save-status button:hover { color: var(--text-primary); }
 
+/* External-change conflict prompt — never resolves itself */
+.conflict-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-lg);
+  background: var(--bg-hover);
+  border-bottom: 1px solid var(--border-strong);
+  color: var(--text-secondary);
+  font-size: 13px;
+  flex-shrink: 0;
+}
+
+.conflict-bar > svg { color: var(--danger); flex-shrink: 0; }
+
+.conflict-bar button {
+  padding: 3px 10px;
+  background: var(--bg-raised);
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  color: var(--text-primary);
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.conflict-bar button:hover { background: var(--border-strong); }
+
 /* Raw markdown textarea */
 .raw-editor {
   field-sizing: content;  /* grows with content so outer scroll handles scrolling */

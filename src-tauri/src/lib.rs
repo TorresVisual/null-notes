@@ -23,6 +23,7 @@ pub fn run() {
             let pool = tauri::async_runtime::block_on(db::init_db(&data_dir))
                 .expect("failed to initialise database");
             app.manage(pool);
+            app.manage(commands::watcher::WatcherState::default());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -31,6 +32,8 @@ pub fn run() {
             commands::notes::open_note,
             commands::notes::save_note,
             commands::notes::reindex_note,
+            commands::notes::reindex_from_disk,
+            commands::watcher::watch_workspace,
             commands::notes::create_note,
             commands::notes::delete_note,
             commands::notes::search_notes,

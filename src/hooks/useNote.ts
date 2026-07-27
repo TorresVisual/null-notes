@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { listen } from '@tauri-apps/api/event'
 import { api } from '../lib/tauri'
 import { useWorkspaceStore } from '../store/workspace'
 
@@ -22,10 +23,18 @@ export function useNote(path: string | null) {
   const [saveError, setSaveError] = useState<string | null>(null)
   const workspacePath = useWorkspaceStore((s) => s.path)
 
+  const [conflict, setConflict] = useState(false)
+
   const pendingWrite = useRef<PendingWrite | null>(null)
   const pendingIndex = useRef<PendingWrite | null>(null)
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const indexTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const contentRef = useRef('')
+  const incoming = useRef<string | null>(null)
+
+  useEffect(() => {
+    contentRef.current = content
+  }, [content])
 
   useEffect(() => {
     if (!path) {
@@ -35,6 +44,7 @@ export function useNote(path: string | null) {
     setIsLoading(true)
     setSaveState('clean')
     setSaveError(null)
+    setConflict(false)
     api.notes
       .open(path)
       .then(setContent)
@@ -117,6 +127,46 @@ export function useNote(path: string | null) {
     setSaveState(pendingWrite.current ? 'dirty' : 'clean')
   }, [])
 
+  // An unmodified buffer follows the disk; a modified one never gets
+  // overwritten silently — the user decides which version wins.
+  useEffect(() => {
+    if (!path) return
+    const unlisten = listen<string[]>('workspace-changed', async (event) => {
+      if (!event.payload.includes(path)) return
+      const fresh = await api.notes.open(path)
+      if (fresh === contentRef.current) return
+      if (pendingWrite.current || saveTimer.current) {
+        incoming.current = fresh
+        setConflict(true)
+        return
+      }
+      setContent(fresh)
+      setSaveState('clean')
+    })
+    return () => void unlisten.then((off) => off())
+  }, [path])
+
+  const keepMine = useCallback(() => {
+    incoming.current = null
+    setConflict(false)
+    void flushSave()
+  }, [flushSave])
+
+  const reloadTheirs = useCallback(() => {
+    const fresh = incoming.current
+    incoming.current = null
+    setConflict(false)
+    if (fresh === null) return
+    if (saveTimer.current) {
+      clearTimeout(saveTimer.current)
+      saveTimer.current = null
+    }
+    pendingWrite.current = null
+    setContent(fresh)
+    setSaveState('clean')
+    setSaveError(null)
+  }, [])
+
   useEffect(() => () => void flush(), [path, flush])
 
   useEffect(() => {
@@ -134,5 +184,8 @@ export function useNote(path: string | null) {
     flush,
     retrySave: flushSave,
     dismissError,
+    conflict,
+    keepMine,
+    reloadTheirs,
   }
 }

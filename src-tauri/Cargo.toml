@@ -32,6 +32,7 @@ regex = "1"
 image = "0.24"
 tempfile = "3"
 pdfium-render = { version = "0.9", optional = true }
+notify = "8.2.0"
 
 [features]
 pdf-native = ["pdfium-render"]

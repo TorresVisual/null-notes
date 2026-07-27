@@ -14,6 +14,16 @@ vi.mock('../lib/tauri', () => ({
   },
 }))
 
+type ChangeHandler = (event: { payload: string[] }) => void | Promise<void>
+let emitWorkspaceChanged: ChangeHandler = () => {}
+
+vi.mock('@tauri-apps/api/event', () => ({
+  listen: vi.fn((_event: string, handler: ChangeHandler) => {
+    emitWorkspaceChanged = handler
+    return Promise.resolve(() => {})
+  }),
+}))
+
 const notes = vi.mocked(api.notes)
 const PAST_SAVE = SAVE_DEBOUNCE_MS + 100
 const PAST_REINDEX = REINDEX_DEBOUNCE_MS + 100
@@ -112,6 +122,56 @@ describe('useNote', () => {
 
     expect(notes.save).toHaveBeenLastCalledWith('/ws/note.md', '# Note\nunlucky')
     expect(result.current.saveState).toBe('clean')
+  })
+
+  it('follows the disk when the note changes externally and the buffer is clean', async () => {
+    const { result } = await mountNote()
+    notes.open.mockResolvedValue('# Note\nedited in vim')
+
+    await act(async () => {
+      await emitWorkspaceChanged({ payload: ['/ws/note.md'] })
+    })
+
+    expect(result.current.content).toBe('# Note\nedited in vim')
+    expect(result.current.conflict).toBe(false)
+  })
+
+  it('prompts instead of clobbering when the buffer is dirty', async () => {
+    const { result } = await mountNote()
+
+    act(() => result.current.save('# Note\nmy unsaved work'))
+    notes.open.mockResolvedValue('# Note\ntheir version')
+    await act(async () => {
+      await emitWorkspaceChanged({ payload: ['/ws/note.md'] })
+    })
+
+    expect(result.current.conflict).toBe(true)
+    expect(result.current.content).toBe('# Note\nmy unsaved work')
+
+    act(() => result.current.reloadTheirs())
+
+    expect(result.current.conflict).toBe(false)
+    expect(result.current.content).toBe('# Note\ntheir version')
+    expect(result.current.saveState).toBe('clean')
+  })
+
+  it('keeping mine writes the local buffer over the external change', async () => {
+    const { result } = await mountNote()
+
+    act(() => result.current.save('# Note\nmine wins'))
+    notes.open.mockResolvedValue('# Note\ntheirs')
+    await act(async () => {
+      await emitWorkspaceChanged({ payload: ['/ws/note.md'] })
+    })
+    expect(result.current.conflict).toBe(true)
+
+    await act(async () => {
+      result.current.keepMine()
+      await vi.advanceTimersByTimeAsync(PAST_SAVE)
+    })
+
+    expect(notes.save).toHaveBeenLastCalledWith('/ws/note.md', '# Note\nmine wins')
+    expect(result.current.conflict).toBe(false)
   })
 
   it('dismissing a save error leaves the note marked unsaved, never saved', async () => {

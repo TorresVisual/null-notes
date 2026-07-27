@@ -37,6 +37,7 @@ export function useWorkspace() {
     resetForNewWorkspace()
 
     setPath(selected)
+    await api.workspace.watch(selected)
     const [tree, session] = await Promise.all([
       api.notes.scan(selected),
       api.workspace.load(selected),

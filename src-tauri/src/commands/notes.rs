@@ -275,6 +275,34 @@ pub async fn reindex_note(
         .map_err(|e| e.to_string())
 }
 
+// Used when a file changes underneath us: the index follows the disk, and a
+// note deleted externally drops out of search, tags and links.
+#[tauri::command]
+pub async fn reindex_from_disk(
+    path: String,
+    workspace: String,
+    db: State<'_, DbPool>,
+) -> Result<bool, String> {
+    match tokio::fs::read_to_string(&path).await {
+        Ok(content) => index_note_at(&path, &workspace, &content, &db)
+            .await
+            .map(|()| true)
+            .map_err(|e| e.to_string()),
+        Err(_) => {
+            forget_note(&path, &db).await.map_err(|e| e.to_string())?;
+            Ok(false)
+        }
+    }
+}
+
+async fn forget_note(path: &str, db: &DbPool) -> anyhow::Result<()> {
+    db::notes::remove_note(db, path).await?;
+    db::notes::remove_from_fts(db, path).await?;
+    db::notes::set_tags(db, path, &[]).await?;
+    db::notes::set_links(db, path, &[]).await?;
+    Ok(())
+}
+
 #[tauri::command]
 pub async fn create_note(
     workspace: String,

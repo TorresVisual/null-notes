@@ -13,6 +13,8 @@ export const api = {
       invoke<void>('save_note', { path, content }),
     reindex: (path: string, workspace: string, content: string) =>
       invoke<void>('reindex_note', { path, workspace, content }),
+    reindexFromDisk: (path: string, workspace: string) =>
+      invoke<boolean>('reindex_from_disk', { path, workspace }),
     create: (workspace: string, folder: string, title: string) =>
       invoke<NoteMetadata>('create_note', { workspace, folder, title }),
     delete: (path: string) =>
@@ -38,6 +40,8 @@ export const api = {
     confirmClose: () => invoke<void>('confirm_close'),
   },
   workspace: {
+    watch: (workspace: string) =>
+      invoke<void>('watch_workspace', { workspace }),
     load: (path: string) =>
       invoke<WorkspaceState>('load_workspace', { path }),
     save: (path: string, state: WorkspaceState) =>
