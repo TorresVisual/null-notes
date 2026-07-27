@@ -96,10 +96,8 @@ export function InkCanvas({ svgPath, width, height }: InkCanvasProps) {
       >
         <canvas
           ref={canvasRef}
-          width={width}
-          height={height}
           className="ink-canvas"
-          style={{ position: 'absolute', inset: 0, touchAction: 'none' }}
+          style={{ position: 'absolute', top: 0, left: 0, width, height, touchAction: 'none' }}
         />
         {cursorPos && (
           <div
