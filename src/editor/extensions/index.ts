@@ -1,6 +1,7 @@
 import StarterKit from '@tiptap/starter-kit'
 import { Code } from '@tiptap/extension-code'
-import { markInputRule, Extension } from '@tiptap/core'
+import { markInputRule, Extension, InputRule } from '@tiptap/core'
+import type { ResolvedPos } from '@tiptap/pm/model'
 import { Markdown } from 'tiptap-markdown'
 import Placeholder from '@tiptap/extension-placeholder'
 import { Table } from '@tiptap/extension-table'
@@ -62,6 +63,38 @@ const TaskBracketFix = Extension.create({
   },
 })
 
+function isInsideListItem($from: ResolvedPos): boolean {
+  for (let depth = $from.depth; depth > 0; depth--) {
+    if ($from.node(depth).type.name === 'listItem') return true
+  }
+  return false
+}
+
+// TipTap's stock "[ ] " rule wraps the paragraph in a taskItem, which the
+// schema forbids inside a bulletList — so typing "- [ ] " found no valid
+// wrapping, silently did nothing, and left literal brackets the serializer
+// then escaped to "\[ \]". Inside a list, convert the list instead.
+const TaskItemInLists = TaskItem.extend({
+  addInputRules() {
+    return [
+      ...(this.parent?.() ?? []),
+      new InputRule({
+        find: /^\s*\[([ x])\]\s$/,
+        handler: ({ state, range, match, chain }) => {
+          if (!isInsideListItem(state.selection.$from)) return null
+          const checked = match[1] === 'x'
+          chain()
+            .deleteRange(range)
+            .toggleTaskList()
+            .updateAttributes('taskItem', { checked })
+            .run()
+          return
+        },
+      }),
+    ]
+  },
+})
+
 export const coreExtensions = [
   StarterKit.configure({ code: false, codeBlock: false }),
   CodeWithRegexpRule,
@@ -71,7 +104,7 @@ export const coreExtensions = [
   TableHeader,
   TableCell,
   TaskList,
-  TaskItem.configure({ nested: true }),
+  TaskItemInLists.configure({ nested: true }),
   Link.configure({ openOnClick: false, autolink: true }),
   Markdown.configure({
     html: false,
