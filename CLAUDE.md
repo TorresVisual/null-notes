@@ -7,7 +7,7 @@ A WYSIWYG Markdown note-taking app for CS students. Desktop-primary (Tauri + Win
 - **Shell:** Tauri 2
 - **Backend:** Rust (file I/O, PDF pipeline, OCR orchestration)
 - **Frontend:** React 19 + TypeScript (strict)
-- **Editor:** TipTap 2 (ProseMirror)
+- **Editor:** TipTap 3 (ProseMirror)
 - **Ink:** Canvas API + perfect-freehand
 - **Storage:** Plain `.md` files + SQLite index
 
@@ -18,14 +18,13 @@ src-tauri/        Rust backend
   src/
     commands/     Tauri IPC commands (one file per domain)
     pdf/          PDF pipeline (render, OCR, parse)
-    ink/          SVG serialization helpers
     db/           SQLite queries
 
 src/              React frontend
   components/     Shared UI components
   editor/
     extensions/   TipTap custom node extensions
-    serializer/   TipTap JSON ↔ Markdown
+  ink/            Canvas drawing + SVG serialization
   hooks/          Custom React hooks
   store/          Global state (Zustand)
   lib/            Pure utilities (no React)
@@ -56,13 +55,6 @@ Never use `.unwrap()` or `.expect()` outside of tests. Use `?` to propagate erro
 
 Use `tokio` for all async. Long-running operations (OCR, PDF render) run in `tokio::task::spawn_blocking` to avoid blocking the async executor.
 
-### Naming
-
-- Functions and variables: `snake_case`
-- Types, structs, enums: `PascalCase`
-- Constants: `SCREAMING_SNAKE_CASE`
-- Modules: `snake_case`
-
 ### Style
 
 - Prefer `impl Trait` return types for iterators and closures
@@ -70,6 +62,17 @@ Use `tokio` for all async. Long-running operations (OCR, PDF render) run in `tok
 - Derive `Debug` on all structs
 - Keep Tauri commands thin: parse input, delegate to a domain module, return result
 - Run `cargo clippy -- -D warnings` before committing — no clippy warnings allowed
+
+---
+
+## The save path
+
+Data integrity rules. Breaking one of these silently loses or corrupts a note.
+
+- **Note writes go through `write_atomic`** (temp file → fsync → rename), never `tokio::fs::write`. A half-written `.md` is corruption.
+- **`save_note` does no database work.** It writes the file; `reindex_note` carries FTS/tags/links on a slower debounce. Keeping DB work off the keystroke path is the point — don't merge them back.
+- **The watcher reports our own writes back to us.** Before treating a `workspace-changed` event as an external edit, check the disk against both the buffer and the last content we wrote, or normal typing raises a false conflict.
+- **A dirty buffer is never overwritten from disk.** External changes to an edited note prompt; they don't auto-reload.
 
 ---
 
@@ -156,6 +159,10 @@ const { strokes, addStroke, undo } = useInkCanvas(canvasRef)
 
 Each custom node type lives in its own file under `src/editor/extensions/`. Export a configured `Extension` object, not a raw class.
 
+Markdown conversion has no central serializer — `tiptap-markdown` drives it, and each node carries its own `addStorage().markdown.serialize/parse`. A node without one serializes as escaped plain text.
+
+`@tiptap/core` and `@tiptap/pm` are pinned via `overrides` in `package.json`. Without them `starter-kit` pulls a second copy of core and every `Editor`/`Node` type becomes nominally distinct — typecheck fails with unreadable errors far from the cause.
+
 ---
 
 ## General Principles
@@ -180,7 +187,7 @@ cargo clippy -- -D warnings  # lint (must pass clean)
 npm run dev                  # Vite dev server
 npm run build                # production build
 npm run typecheck            # tsc --noEmit
-npm run lint                 # ESLint
+npm test                     # vitest run
 
 # Full app
 npm run tauri dev            # launch desktop app in dev mode
