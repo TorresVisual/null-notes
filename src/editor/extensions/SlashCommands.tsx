@@ -7,7 +7,10 @@ import { createPortal } from 'react-dom'
 import { inkApi } from '../../lib/ink'
 import type { InkData } from '../../ink/types'
 
-const EMPTY_INK: InkData = { width: 800, height: 400, strokes: [], shapes: [] }
+const INK_WIDTH = 700
+const INK_HEIGHT = 900
+
+const EMPTY_INK: InkData = { width: INK_WIDTH, height: INK_HEIGHT, strokes: [], shapes: [] }
 
 interface Cmd {
   title: string
@@ -112,7 +115,7 @@ const COMMANDS: Cmd[] = [
         const sep = dir.includes('\\') ? '\\' : '/'
         const svgPath = `${dir}${sep}sketch-${Date.now()}.svg`
         return inkApi.write(svgPath, EMPTY_INK).then(() => {
-          editor.commands.insertContent({ type: 'inkBlock', attrs: { src: svgPath, width: 800, height: 400 } })
+          editor.commands.insertContent({ type: 'inkBlock', attrs: { src: svgPath, width: INK_WIDTH, height: INK_HEIGHT } })
         })
       })
     },

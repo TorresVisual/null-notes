@@ -27,6 +27,9 @@
   /* Semantic */
   --danger: #e05050;
 
+  /* Ink */
+  --ink-grid: rgba(88, 130, 200, 0.20);
+
   /* Spacing */
   --space-xs: 4px;
   --space-sm: 8px;
@@ -875,8 +878,14 @@ body {
 
 .ink-toolbar button:disabled { opacity: 0.35; cursor: not-allowed; }
 
+/* Grid lives in CSS, not in the stroke data — it guides handwriting without
+   ever being saved into the .svg sidecar. */
 .ink-canvas {
-  background: var(--bg-base);
+  background-color: var(--bg-base);
+  background-image:
+    linear-gradient(to right, var(--ink-grid) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--ink-grid) 1px, transparent 1px);
+  background-size: 24px 24px;
 }
 
 .ink-eraser-cursor {

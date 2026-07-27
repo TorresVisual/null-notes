@@ -23,8 +23,8 @@ export const InkBlock = Node.create({
   addAttributes() {
     return {
       src: { default: null },
-      width: { default: 800 },
-      height: { default: 400 },
+      width: { default: 700 },
+      height: { default: 900 },
     }
   },
 
@@ -34,8 +34,8 @@ export const InkBlock = Node.create({
         tag: 'div[data-type="ink-block"]',
         getAttrs: (el) => ({
           src: (el as HTMLElement).getAttribute('data-src'),
-          width: parseInt((el as HTMLElement).getAttribute('data-width') ?? '800', 10),
-          height: parseInt((el as HTMLElement).getAttribute('data-height') ?? '400', 10),
+          width: parseInt((el as HTMLElement).getAttribute('data-width') ?? '700', 10),
+          height: parseInt((el as HTMLElement).getAttribute('data-height') ?? '900', 10),
         }),
       },
     ]
@@ -70,8 +70,8 @@ export const InkBlock = Node.create({
                 const div = document.createElement('div')
                 div.setAttribute('data-type', 'ink-block')
                 div.setAttribute('data-src', data.src ?? '')
-                div.setAttribute('data-width', String(data.width ?? 800))
-                div.setAttribute('data-height', String(data.height ?? 400))
+                div.setAttribute('data-width', String(data.width ?? 700))
+                div.setAttribute('data-height', String(data.height ?? 900))
                 pre.replaceWith(div)
               } catch {
                 // invalid JSON — leave as-is

@@ -19,7 +19,13 @@ function getMarkdown(storage: unknown): string {
   return ((storage as Record<string, unknown>)['markdown'] as MarkdownStorage).getMarkdown()
 }
 
-const EMPTY_INK: InkData = { width: 800, height: 400, strokes: [], shapes: [] }
+// Sized to the editor pane's content width (800px max-width less 48px padding
+// a side) so the right edge is not clipped, and tall enough for a worked
+// derivation rather than a couple of lines.
+const INK_WIDTH = 700
+const INK_HEIGHT = 900
+
+const EMPTY_INK: InkData = { width: INK_WIDTH, height: INK_HEIGHT, strokes: [], shapes: [] }
 
 export function NoteEditor({ content, notePath, onChange }: NoteEditorProps) {
   const isProgrammaticUpdate = useRef(false)
@@ -56,7 +62,7 @@ export function NoteEditor({ content, notePath, onChange }: NoteEditorProps) {
     await inkApi.write(svgPath, EMPTY_INK)
     editor.commands.insertContent({
       type: 'inkBlock',
-      attrs: { src: svgPath, width: 800, height: 400 },
+      attrs: { src: svgPath, width: INK_WIDTH, height: INK_HEIGHT },
     })
   }
 

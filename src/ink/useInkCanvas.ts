@@ -9,6 +9,12 @@ import type { InkData, Stroke, Shape, Tool, Point } from './types'
 const SHAPE_TOOLS: Tool[] = ['line', 'circle', 'rect', 'arrow']
 const STROKE_OPTIONS = { thinning: 0.5, smoothing: 0.5, streamline: 0.5 }
 
+// The canvas sits on the app's near-black background, so ink defaults to the
+// text colour — black ink here is invisible ink. A fine nib is what
+// handwritten maths needs; the slider still reaches 20 for diagrams.
+const DEFAULT_COLOR = '#e6edf3'
+const DEFAULT_SIZE = 2
+
 // Pointer Events reports the pen's eraser end as bit 5 of `buttons` (32) for
 // as long as it is down, but `button` only says 5 on the down and up events —
 // between them it is -1. Checking both is what makes flipping the pen over
@@ -73,8 +79,8 @@ function releasePointer(canvas: HTMLCanvasElement | null, pointerId: number): vo
 export function useInkCanvas(svgPath: string, width: number, height: number) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [tool, setTool] = useState<Tool>('pen')
-  const [color, setColor] = useState('#000000')
-  const [size, setSize] = useState(4)
+  const [color, setColor] = useState(DEFAULT_COLOR)
+  const [size, setSize] = useState(DEFAULT_SIZE)
   const [inkData, setInkData] = useState<InkData>({ width, height, strokes: [], shapes: [] })
   const [history, setHistory] = useState<InkData[]>([])
   const [future, setFuture] = useState<InkData[]>([])
