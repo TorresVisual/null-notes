@@ -1,6 +1,6 @@
 # null-notes — Product & Technical Roadmap
 
-**Last updated:** 2026-07-26
+**Last updated:** 2026-07-27 (Phase 0 implemented; M0 awaits its real-use soak)
 **Audience of this doc:** the maintainer (solo dev).
 **Product audience:** you — a personal, offline, daily-driver note app for CS coursework. This is **not** aimed at public distribution yet, which deliberately pushes packaging, cross-platform, auto-update, branding, and onboarding *down* the priority list. Correctness, data integrity, and the editor/ink/PDF workflow come first.
 
@@ -89,9 +89,11 @@ Given "personal daily driver," priority = **`(daily-use value) × (risk of data 
 
 **Milestone M0:** *I can use this as my only note app for a week without fear of losing or corrupting a note.*
 
+**Status (2026-07-27):** P0-1…P0-5 are implemented and their DoDs are met in code and tests — commits `beffda5` (P0-1…P0-4) and `fe22aaa` (P0-5). **M0 itself is not signed off:** its exit check requires a several-day real-use soak, which is a human activity, not a code change.
+
 Nothing else matters until M0 is true. These are all reliability/data-integrity items.
 
-### P0-1 — Debounced autosave with explicit save state — **M**
+### P0-1 — Debounced autosave with explicit save state — **M** ✅
 Decouple typing from disk/DB work and make save status visible.
 - Debounce writes (e.g. 500–800 ms idle) in `useNote`; flush pending write on tab switch, workspace switch, and `beforeunload`.
 - Track document state: `clean | dirty | saving | error`.
@@ -102,31 +104,41 @@ Decouple typing from disk/DB work and make save status visible.
   - A visible indicator reflects `dirty`/`saving`/`saved`.
   - Existing tests pass; a new `useNote` test covers "debounce coalesces rapid edits into one save" and "flush-on-unmount writes pending content."
 
-### P0-2 — Surface save failures — **S**
+*Done: `useNote` runs a `clean|dirty|saving|error` machine, coalescing edits into one write after 600 ms idle; pending writes flush on tab switch, unmount and window close (Rust vetoes `CloseRequested`, the UI flushes, then `confirm_close` destroys the window). Covered by `useNote.test.ts`.*
+
+### P0-2 — Surface save failures — **S** ✅
 Never fail a write silently again (principle #3).
 - On save rejection, set `error` state, keep the buffer dirty, and show a non-blocking, dismissible error with a retry.
 - **Dependency:** P0-1 (shares the state machine).
 - **DoD:** Simulating a rejected `save_note` (e.g. read-only path) surfaces a visible error and the in-memory edit is preserved (not discarded); a test asserts the buffer stays dirty on failure.
 
-### P0-3 — Split the "index" write off the "save" write — **M**
+*Done: a failed write keeps the buffer dirty and surfaces a tab-bar chip with retry; dismissing the message leaves the note showing "Unsaved", never "Saved".*
+
+### P0-3 — Split the "index" write off the "save" write — **M** ✅
 Typing latency must not depend on FTS/tags/links reindexing.
 - `save_note` currently does file write **and** four DB operations in one command (`notes.rs:201-236`). Make the file write the authoritative, fast path; move/allow the index update to run after (or debounce it more coarsely than the file write).
 - **Dependency:** P0-1.
 - **DoD:** The file on disk is updated on the fast debounce; search/tags/backlinks reindex may lag by design but is guaranteed to catch up before the tab is closed. A test confirms content is searchable after a save+settle cycle.
 
-### P0-4 — Crash-safe writes — **S**
+*Done: `save_note` writes only the file; `reindex_note` carries the FTS/tag/link work on a lazier 2.5 s debounce and is flushed before the tab closes.*
+
+### P0-4 — Crash-safe writes — **S** ✅
 Avoid truncated files if the app dies mid-write.
 - Write to a temp file in the same directory and atomically rename over the target (`notes.rs` `save_note`, `create_note`).
 - **Dependency:** none (can land alongside P0-1).
 - **DoD:** Killing the process during a large save never leaves a zero-byte or half-written `.md`; a Rust test writes-then-renames and asserts the target is either fully old or fully new.
 
-### P0-5 — External-change refresh — **M**
+*Done: `write_atomic` (temp file + fsync + rename) backs both `save_note` and `create_note`; tests assert the target survives a failed write and no temp files are left behind.*
+
+### P0-5 — External-change refresh — **M** ✅
 Keep the tree and index honest when files change underneath the app.
 - Watch the workspace directory (Tauri fs-watch / `notify` crate). On change: refresh the tree, re-index changed files, and reload the active note if it changed on disk and the buffer is clean. If the buffer is **dirty** and the file changed externally, surface a conflict prompt (keep mine / reload theirs) — do **not** auto-overwrite.
 - **Dependency:** P0-1/P0-2 (needs the dirty-state machine to resolve conflicts safely).
 - **DoD:** Editing a `.md` in an external editor updates the sidebar title and search within ~1 s; an external change to the open, unmodified note reloads it; an external change to a dirty note prompts instead of clobbering.
 
-**Exit check for M0:** P0-1…P0-5 DoD all met; a manual "use it for real for several days" soak with no data-loss incident.
+*Done: `watch_workspace` (notify, 300 ms debounce) emits `workspace-changed`; `reindex_from_disk` re-reads changed files and forgets externally deleted ones; a clean buffer follows the disk, a dirty one gets the conflict bar (keep mine / reload theirs).*
+
+**Exit check for M0:** P0-1…P0-5 DoD all met ✅; a manual "use it for real for several days" soak with no data-loss incident — **outstanding, and the only thing between here and M0.** Keep the "annoyances during real use" list from that soak; P2-3 clears it.
 
 ---
 
@@ -266,7 +278,7 @@ Per the mandate to remove work that doesn't earn its keep:
 - **Performance budget:** typing latency is sacred — keep DB work off the keystroke path (P0-3). Search and tree refresh should stay sub-100 ms at a few hundred notes.
 - **Observability:** add lightweight logging behind the save/index/watch paths (P0) so a future "did it save?" question is answerable. No telemetry — local logs only.
 - **Clippy/typecheck gates:** `cargo clippy -- -D warnings`, `npm run typecheck`, `npm run test` stay green on every commit (per `CLAUDE.md`). Note: there is no `npm run lint` script — don't reference one.
-- **In-flight work:** the uncommitted change to `notes.rs` (content-derived titles + truncation, with tests) is a strict improvement — land it as its own small commit before starting P0.
+- **In-flight work:** the content-derived-title change to `notes.rs` has landed. A separate hazard was found and fixed during P0: `@tiptap/starter-kit` resolved a nested `@tiptap/core@3.29.1` against the pinned `3.27.4`, making every `Editor`/`Node` type nominally distinct and leaving `npm run typecheck` red on 4 errors. `package.json` now pins `@tiptap/core` and `@tiptap/pm` via `overrides` — don't remove them without re-checking typecheck.
 
 ---
 
