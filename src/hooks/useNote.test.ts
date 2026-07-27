@@ -136,6 +136,27 @@ describe('useNote', () => {
     expect(result.current.conflict).toBe(false)
   })
 
+  // The watcher reports our own writes too, and it lags them. Typing on past a
+  // save leaves the disk holding the previous version — that is not a conflict.
+  it('does not prompt when the watcher reports our own earlier write', async () => {
+    const { result } = await mountNote()
+
+    act(() => result.current.save('# Note\nfirst'))
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(PAST_SAVE)
+    })
+    expect(notes.save).toHaveBeenLastCalledWith('/ws/note.md', '# Note\nfirst')
+
+    act(() => result.current.save('# Note\nfirst and more'))
+    notes.open.mockResolvedValue('# Note\nfirst')
+    await act(async () => {
+      await emitWorkspaceChanged({ payload: ['/ws/note.md'] })
+    })
+
+    expect(result.current.conflict).toBe(false)
+    expect(result.current.content).toBe('# Note\nfirst and more')
+  })
+
   it('prompts instead of clobbering when the buffer is dirty', async () => {
     const { result } = await mountNote()
 

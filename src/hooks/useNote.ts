@@ -31,6 +31,7 @@ export function useNote(path: string | null) {
   const indexTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const contentRef = useRef('')
   const incoming = useRef<string | null>(null)
+  const lastWritten = useRef<string | null>(null)
 
   useEffect(() => {
     contentRef.current = content
@@ -45,6 +46,7 @@ export function useNote(path: string | null) {
     setSaveState('clean')
     setSaveError(null)
     setConflict(false)
+    lastWritten.current = null
     api.notes
       .open(path)
       .then(setContent)
@@ -90,6 +92,7 @@ export function useNote(path: string | null) {
     setSaveState('saving')
     try {
       await api.notes.save(job.path, job.content)
+      lastWritten.current = job.content
       if (!pendingWrite.current) {
         setSaveState('clean')
         setSaveError(null)
@@ -134,7 +137,10 @@ export function useNote(path: string | null) {
     const unlisten = listen<string[]>('workspace-changed', async (event) => {
       if (!event.payload.includes(path)) return
       const fresh = await api.notes.open(path)
-      if (fresh === contentRef.current) return
+      // Our own save echoes back through the watcher. If the disk holds
+      // either the buffer or exactly what we last wrote, nobody else touched
+      // it — typing past a save must not read as an external edit.
+      if (fresh === contentRef.current || fresh === lastWritten.current) return
       if (pendingWrite.current || saveTimer.current) {
         incoming.current = fresh
         setConflict(true)
@@ -162,6 +168,7 @@ export function useNote(path: string | null) {
       saveTimer.current = null
     }
     pendingWrite.current = null
+    lastWritten.current = fresh
     setContent(fresh)
     setSaveState('clean')
     setSaveError(null)
