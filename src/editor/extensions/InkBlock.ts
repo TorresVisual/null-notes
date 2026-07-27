@@ -1,3 +1,4 @@
+import { createElement, useState } from 'react'
 import { Node, mergeAttributes } from '@tiptap/core'
 import { ReactNodeViewRenderer } from '@tiptap/react'
 import type { ReactNodeViewProps } from '@tiptap/react'
@@ -10,9 +11,19 @@ interface InkBlockAttrs {
 }
 
 function InkBlockView({ node }: ReactNodeViewProps) {
+  const [zoom, setZoom] = useState(1)
   const { src, width, height } = node.attrs as unknown as InkBlockAttrs
   if (!src) return null
-  return InkCanvas({ svgPath: src, width, height })
+  // Zoom is per block and lives only in the view — the file keeps unscaled
+  // coordinates, so reopening a note never inherits someone's zoom level.
+  return createElement(InkCanvas, {
+    svgPath: src,
+    width,
+    height,
+    zoom,
+    onZoomChange: setZoom,
+    autoGrow: true,
+  })
 }
 
 export const InkBlock = Node.create({
@@ -62,7 +73,10 @@ export const InkBlock = Node.create({
         },
         parse: {
           updateDOM(element: HTMLElement) {
-            element.querySelectorAll<HTMLElement>('pre > code.language-ink').forEach((code) => {
+            // `ink-page` is the short-lived full-page fence; accept it so notes
+            // written against it still open, then serialize back as `ink`.
+            const selector = 'pre > code.language-ink, pre > code.language-ink-page'
+            element.querySelectorAll<HTMLElement>(selector).forEach((code) => {
               const pre = code.parentElement
               if (!pre) return
               try {

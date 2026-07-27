@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import type { PointerEvent as ReactPointerEvent } from 'react'
 import { PenLine, Eraser, Minus, Circle, Square, MoveUpRight, Undo2, Redo2 } from 'lucide-react'
-import { useInkCanvas } from './useInkCanvas'
+import { useInkCanvas, isEraserTip } from './useInkCanvas'
+import { pinchZoom, distanceBetween } from './zoom'
 import type { Tool } from './types'
 
 const TOOLS: { id: Tool; label: string; Icon: typeof PenLine }[] = [
@@ -51,8 +52,37 @@ export function InkCanvas({
 
   const [cursorPos, setCursorPos] = useState<{ x: number; y: number } | null>(null)
 
+  // Fingers never draw — the pen owns the ink — so touch is free to mean
+  // zoom, which is how you actually work: write, then pinch to see more.
+  const touches = useRef(new Map<number, { x: number; y: number }>())
+  const pinch = useRef<{ distance: number; zoom: number } | null>(null)
+
+  function handlePointerDown(e: ReactPointerEvent<HTMLDivElement>) {
+    if (e.pointerType !== 'touch') return
+    touches.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
+  }
+
+  function handlePointerUp(e: ReactPointerEvent<HTMLDivElement>) {
+    touches.current.delete(e.pointerId)
+    if (touches.current.size < 2) pinch.current = null
+  }
+
   function handlePointerMove(e: ReactPointerEvent<HTMLDivElement>) {
-    if (e.pointerType !== 'pen' || tool !== 'eraser') {
+    if (e.pointerType === 'touch') {
+      if (!touches.current.has(e.pointerId)) return
+      touches.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
+      const [a, b] = [...touches.current.values()]
+      if (!a || !b || !onZoomChange) return
+      const distance = distanceBetween(a, b)
+      if (!pinch.current) pinch.current = { distance, zoom }
+      else onZoomChange(pinchZoom(pinch.current.zoom, pinch.current.distance, distance))
+      return
+    }
+
+    // The eraser end of the pen erases without changing the selected tool, so
+    // the cursor has to follow the hardware, not just the toolbar.
+    const erasing = e.pointerType === 'pen' && (tool === 'eraser' || isEraserTip(e))
+    if (!erasing) {
       if (cursorPos) setCursorPos(null)
       return
     }
@@ -127,7 +157,10 @@ export function InkCanvas({
       </div>
       <div
         style={{ position: 'relative', width: displayWidth, height: displayHeight }}
+        onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerUp}
         onPointerLeave={handlePointerLeave}
       >
         <canvas

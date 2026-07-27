@@ -825,7 +825,9 @@ body {
 .ink-canvas-wrap {
   border: 1px solid var(--border-strong);
   border-radius: 8px;
-  overflow: hidden;
+  /* Zooming past the note column scrolls the canvas rather than clipping it. */
+  overflow-x: auto;
+  overflow-y: hidden;
   background: var(--bg-raised);
 }
 
@@ -886,15 +888,6 @@ body {
     linear-gradient(to right, var(--ink-grid) 1px, transparent 1px),
     linear-gradient(to bottom, var(--ink-grid) 1px, transparent 1px);
   background-size: 24px 24px;
-}
-
-/* Canvas notes bypass the typed-note column: the page is as wide as it needs
-   to be and scrolls, rather than being squeezed into the reading measure. */
-.ink-page {
-  display: flex;
-  justify-content: center;
-  padding: var(--space-lg);
-  min-width: min-content;
 }
 
 .ink-eraser-cursor {

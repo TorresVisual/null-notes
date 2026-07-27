@@ -14,7 +14,9 @@ import { canvasNoteBody } from '../lib/canvasNote'
 import type { NoteMetadata } from '../types'
 import type { InkData } from '../ink/types'
 
-const EMPTY_PAGE: InkData = { width: 900, height: 1200, strokes: [], shapes: [] }
+// Fits the note column at 1x and grows downward as you write; zooming past
+// the column width scrolls horizontally rather than clipping.
+const EMPTY_PAGE: InkData = { width: 700, height: 1200, strokes: [], shapes: [] }
 
 interface SidebarProps {
   onSearchOpen: () => void
@@ -72,7 +74,7 @@ export function Sidebar({ onSearchOpen }: SidebarProps) {
       const sep = dir.includes('\\') ? '\\' : '/'
       const svgPath = `${dir}${sep}page.svg`
       await inkApi.write(svgPath, EMPTY_PAGE)
-      const body = canvasNoteBody(title, svgPath)
+      const body = canvasNoteBody(title, svgPath, EMPTY_PAGE.width, EMPTY_PAGE.height)
       await api.notes.save(meta.path, body)
       await api.notes.reindex(meta.path, workspacePath, body)
       addNote(meta)
