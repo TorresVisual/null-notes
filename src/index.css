@@ -42,11 +42,7 @@ html {
 }
 
 body {
-  /* "Segoe UI" first, not system-ui: on some Windows/WebView2 builds
-     system-ui resolves to the variable-font "Segoe UI Variable", which has
-     a known glyph-rendering bug — text reports correct metrics/box size but
-     paints no visible glyphs in certain flex + text-overflow layouts. */
-  font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+  font-family: system-ui, -apple-system, sans-serif;
   font-size: 15px;
   line-height: 1.6;
   background: var(--bg-base);
@@ -96,38 +92,7 @@ body {
 .sidebar button:hover { background: var(--border-strong); }
 .sidebar button:disabled { opacity: 0.4; cursor: not-allowed; }
 
-.sidebar ul { list-style: none; flex: 1; overflow-y: auto; }
-
-.sidebar li {
-  display: flex;
-  align-items: center;
-  border-radius: 4px;
-  margin-bottom: 2px;
-}
-
-.sidebar li:hover { background: var(--bg-hover); }
-
-.note-link {
-  flex: 1;
-  border: none !important;
-  background: transparent !important;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.note-delete {
-  flex-shrink: 0;
-  width: 24px !important;
-  padding: 0 !important;
-  text-align: center;
-  border: none !important;
-  background: transparent !important;
-  color: var(--text-tertiary);
-  font-size: 11px;
-}
-
-.note-delete:hover { color: var(--danger) !important; }
+.sidebar > .folder-tree { flex: 1; overflow-y: auto; }
 
 /* Main area */
 .main {
@@ -338,6 +303,43 @@ body {
 
 .view-toggle:hover { color: var(--text-primary); background: var(--bg-hover); }
 .view-toggle.active { color: var(--accent); }
+
+/* Save state chip — sits at the right end of the tab bar */
+.save-status {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: 0 var(--space-md);
+  font-size: 12px;
+  letter-spacing: 0.03em;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.save-status.dirty,
+.save-status.saving { color: var(--text-secondary); }
+.save-status.error { color: var(--danger); }
+
+.save-status-detail {
+  max-width: 28ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  opacity: 0.8;
+}
+
+.save-status button {
+  display: flex;
+  align-items: center;
+  padding: 2px;
+  background: none;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+}
+
+.save-status button:hover { color: var(--text-primary); }
 
 /* Raw markdown textarea */
 .raw-editor {
@@ -674,7 +676,12 @@ body {
 
 .tree-note .tree-label { padding-left: 16px; }
 
-.tree-delete {
+/* Scoped to .sidebar to outrank the generic `.sidebar button` rule, which is
+   more specific than a bare `.tree-delete` and would otherwise force the
+   button to width:100%, collapsing the flex-basis:0 label to nothing. */
+.sidebar .tree-delete {
+  width: auto;
+  flex-shrink: 0;
   padding: 2px 4px;
   background: none;
   border: none;
@@ -686,8 +693,8 @@ body {
   align-items: center;
 }
 
-.tree-row:hover .tree-delete { opacity: 1; }
-.tree-delete:hover { color: var(--danger); }
+.sidebar .tree-row:hover .tree-delete { opacity: 1; }
+.sidebar .tree-delete:hover { color: var(--danger); }
 
 .sidebar-new-actions {
   display: flex;

@@ -1,7 +1,9 @@
 use tauri::State;
+use tokio::io::AsyncWriteExt;
 use uuid::Uuid;
 use regex::Regex;
 use std::collections::HashSet;
+use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
 use crate::db::{self, DbPool};
 use crate::models::{NoteMetadata, SearchResult, WorkspaceTree};
@@ -198,39 +200,77 @@ pub async fn open_note(path: String) -> Result<String, String> {
         .map_err(|e| e.to_string())
 }
 
+// A note is only ever replaced wholesale, so a partially written file is
+// always corruption. Write a sibling temp file, fsync it, then rename over
+// the target — the reader sees either the whole old note or the whole new one.
+async fn write_atomic(path: &Path, content: &str) -> anyhow::Result<()> {
+    let dir = path
+        .parent()
+        .ok_or_else(|| anyhow::anyhow!("note path has no parent directory: {}", path.display()))?;
+    let file_name = path
+        .file_name()
+        .ok_or_else(|| anyhow::anyhow!("note path has no file name: {}", path.display()))?;
+    let tmp = dir.join(format!(
+        ".{}.{}.tmp",
+        file_name.to_string_lossy(),
+        Uuid::new_v4()
+    ));
+
+    let write = async {
+        let mut file = tokio::fs::File::create(&tmp).await?;
+        file.write_all(content.as_bytes()).await?;
+        file.sync_all().await?;
+        anyhow::Ok(())
+    };
+
+    let result = match write.await {
+        Ok(()) => tokio::fs::rename(&tmp, path).await.map_err(anyhow::Error::from),
+        Err(e) => Err(e),
+    };
+    if result.is_err() {
+        let _ = tokio::fs::remove_file(&tmp).await;
+    }
+    result
+}
+
+async fn index_note_at(
+    path: &str,
+    workspace: &str,
+    content: &str,
+    db: &DbPool,
+) -> anyhow::Result<()> {
+    let title = title_from_content(content);
+    let meta = NoteMetadata {
+        id: Uuid::new_v4().to_string(),
+        title: title.clone(),
+        path: path.to_string(),
+        workspace: workspace.to_string(),
+        updated_at: now_ms(),
+    };
+    db::notes::index_note(db, &meta).await?;
+    db::notes::index_note_content(db, path, &title, content).await?;
+    db::notes::set_tags(db, path, &extract_tags(content)).await?;
+    db::notes::set_links(db, path, &extract_links(content)).await?;
+    Ok(())
+}
+
+// Deliberately does no database work: typing latency must not depend on
+// FTS/tag/link reindexing. The caller drives `reindex_note` separately.
 #[tauri::command]
-pub async fn save_note(
+pub async fn save_note(path: String, content: String) -> Result<(), String> {
+    write_atomic(Path::new(&path), &content)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn reindex_note(
     path: String,
     workspace: String,
     content: String,
     db: State<'_, DbPool>,
 ) -> Result<(), String> {
-    tokio::fs::write(&path, &content)
-        .await
-        .map_err(|e| e.to_string())?;
-
-    let title = title_from_content(&content);
-    let meta = NoteMetadata {
-        id: Uuid::new_v4().to_string(),
-        title: title.clone(),
-        path: path.clone(),
-        workspace,
-        updated_at: now_ms(),
-    };
-    db::notes::index_note(&db, &meta)
-        .await
-        .map_err(|e| e.to_string())?;
-    db::notes::index_note_content(&db, &path, &title, &content)
-        .await
-        .map_err(|e| e.to_string())?;
-
-    let tags = extract_tags(&content);
-    db::notes::set_tags(&db, &path, &tags)
-        .await
-        .map_err(|e| e.to_string())?;
-
-    let links = extract_links(&content);
-    db::notes::set_links(&db, &path, &links)
+    index_note_at(&path, &workspace, &content, &db)
         .await
         .map_err(|e| e.to_string())
 }
@@ -247,12 +287,10 @@ pub async fn create_note(
         .map(|c| if c.is_alphanumeric() || c == ' ' { c } else { '-' })
         .collect();
     let filename = format!("{}.md", safe_name.trim());
-    let path = std::path::Path::new(&folder).join(&filename);
+    let path = Path::new(&folder).join(&filename);
     let body = format!("# {}\n", title);
 
-    tokio::fs::write(&path, &body)
-        .await
-        .map_err(|e| e.to_string())?;
+    write_atomic(&path, &body).await.map_err(|e| e.to_string())?;
 
     let meta = NoteMetadata {
         id: Uuid::new_v4().to_string(),
@@ -261,21 +299,7 @@ pub async fn create_note(
         workspace,
         updated_at: now_ms(),
     };
-    db::notes::index_note(&db, &meta)
-        .await
-        .map_err(|e| e.to_string())?;
-
-    db::notes::index_note_content(&db, &meta.path, &meta.title, &body)
-        .await
-        .map_err(|e| e.to_string())?;
-
-    let tags = extract_tags(&body);
-    db::notes::set_tags(&db, &meta.path, &tags)
-        .await
-        .map_err(|e| e.to_string())?;
-
-    let links = extract_links(&body);
-    db::notes::set_links(&db, &meta.path, &links)
+    index_note_at(&meta.path, &meta.workspace, &body, &db)
         .await
         .map_err(|e| e.to_string())?;
 
@@ -582,6 +606,85 @@ mod tests {
 
         assert!(notes.is_empty());
         assert_eq!(folders.len(), 1);
+    }
+}
+
+#[cfg(test)]
+mod save_tests {
+    use super::*;
+    use tempfile::tempdir;
+    use crate::db::schema::run_migrations;
+
+    fn temp_files_in(dir: &Path) -> Vec<String> {
+        std::fs::read_dir(dir)
+            .unwrap()
+            .filter_map(|e| e.ok())
+            .map(|e| e.file_name().to_string_lossy().into_owned())
+            .filter(|name| name.ends_with(".tmp"))
+            .collect()
+    }
+
+    #[tokio::test]
+    async fn test_write_atomic_replaces_existing_content() {
+        let tmp = tempdir().unwrap();
+        let target = tmp.path().join("note.md");
+        std::fs::write(&target, "# Old\nold body").unwrap();
+
+        write_atomic(&target, "# New\nnew body").await.unwrap();
+
+        assert_eq!(std::fs::read_to_string(&target).unwrap(), "# New\nnew body");
+        assert!(temp_files_in(tmp.path()).is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_write_atomic_creates_missing_file() {
+        let tmp = tempdir().unwrap();
+        let target = tmp.path().join("fresh.md");
+
+        write_atomic(&target, "# Fresh").await.unwrap();
+
+        assert_eq!(std::fs::read_to_string(&target).unwrap(), "# Fresh");
+        assert!(temp_files_in(tmp.path()).is_empty());
+    }
+
+    // The whole point of the temp-then-rename dance: a failed write must never
+    // leave the target truncated, and must not litter the folder with temps.
+    #[tokio::test]
+    async fn test_write_atomic_failure_leaves_target_and_folder_clean() {
+        let tmp = tempdir().unwrap();
+        let target = tmp.path().join("blocked.md");
+        std::fs::create_dir(&target).unwrap();
+
+        let result = write_atomic(&target, "# Should not land").await;
+
+        assert!(result.is_err());
+        assert!(target.is_dir());
+        assert!(temp_files_in(tmp.path()).is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_index_note_at_makes_content_searchable() {
+        let pool = DbPool::connect("sqlite::memory:").await.unwrap();
+        run_migrations(&pool).await.unwrap();
+
+        index_note_at(
+            "/ws/dijkstra.md",
+            "/ws",
+            "# Dijkstra\nShortest paths with #graphs and [[Big O Notation]].",
+            &pool,
+        )
+        .await
+        .unwrap();
+
+        let hits = db::notes::search_notes(&pool, "\"shortest\"*").await.unwrap();
+        assert_eq!(hits.len(), 1);
+        assert_eq!(hits[0].title, "Dijkstra");
+
+        let tagged = db::notes::notes_with_tag(&pool, "/ws", "graphs").await.unwrap();
+        assert_eq!(tagged.len(), 1);
+
+        let backlinks = db::notes::backlinks_for(&pool, "/ws", "Big O Notation").await.unwrap();
+        assert_eq!(backlinks.len(), 1);
     }
 }
 

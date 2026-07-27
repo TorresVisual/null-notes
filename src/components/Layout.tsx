@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { listen } from '@tauri-apps/api/event'
 import { Sidebar } from './Sidebar'
 import { TabBar } from './TabBar'
 import { NoteEditor } from '../editor/NoteEditor'
@@ -9,6 +10,7 @@ import { useWorkspaceStore } from '../store/workspace'
 import { useNotesStore } from '../store/notes'
 import { useNote } from '../hooks/useNote'
 import { useWorkspace, refreshTags } from '../hooks/useWorkspace'
+import { api } from '../lib/tauri'
 
 type ViewMode = 'wysiwyg' | 'raw'
 
@@ -16,16 +18,25 @@ export function Layout() {
   const activeTab = useWorkspaceStore((s) => s.activeTab)
   const notes = useNotesStore((s) => s.notes)
   const currentNote = notes.find((n) => n.path === activeTab)
-  const { content, save, isLoading } = useNote(activeTab)
+  const { content, save, isLoading, saveState, saveError, flush, retrySave, dismissError } =
+    useNote(activeTab)
   const { saveSession } = useWorkspace()
   const [viewMode, setViewMode] = useState<ViewMode>('wysiwyg')
   const [searchOpen, setSearchOpen] = useState(false)
 
+  // The backend vetoes the close and hands control here so a pending edit
+  // reaches disk first; the window only dies once confirmClose is called.
   useEffect(() => {
-    const handler = () => { void saveSession() }
-    window.addEventListener('beforeunload', handler)
-    return () => window.removeEventListener('beforeunload', handler)
-  }, [saveSession])
+    const unlisten = listen('close-requested', async () => {
+      try {
+        await flush()
+        await saveSession()
+      } finally {
+        await api.window.confirmClose()
+      }
+    })
+    return () => void unlisten.then((off) => off())
+  }, [flush, saveSession])
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -54,6 +65,10 @@ export function Layout() {
         <TabBar
           viewMode={viewMode}
           onToggleView={() => setViewMode((m) => (m === 'wysiwyg' ? 'raw' : 'wysiwyg'))}
+          saveState={saveState}
+          saveError={saveError}
+          onRetrySave={() => void retrySave()}
+          onDismissSaveError={dismissError}
         />
         <div className="editor-scroll">
           <div className="editor-pane">

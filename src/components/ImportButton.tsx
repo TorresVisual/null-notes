@@ -32,7 +32,8 @@ export function ImportButton() {
       if (!result) return
       const content = `# ${result.title}\n\n${exercisesToMarkdown(result.exercises)}`
       const note = await api.notes.create(workspacePath, workspacePath, result.title)
-      await api.notes.save(note.path, workspacePath, content)
+      await api.notes.save(note.path, content)
+      await api.notes.reindex(note.path, workspacePath, content)
       addNote({ ...note, title: result.title })
       openTab(note.path)
     } catch (e) {

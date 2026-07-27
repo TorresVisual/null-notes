@@ -9,8 +9,10 @@ export const api = {
       invoke<WorkspaceTree>('scan_workspace', { workspace }),
     open: (path: string) =>
       invoke<string>('open_note', { path }),
-    save: (path: string, workspace: string, content: string) =>
-      invoke<void>('save_note', { path, workspace, content }),
+    save: (path: string, content: string) =>
+      invoke<void>('save_note', { path, content }),
+    reindex: (path: string, workspace: string, content: string) =>
+      invoke<void>('reindex_note', { path, workspace, content }),
     create: (workspace: string, folder: string, title: string) =>
       invoke<NoteMetadata>('create_note', { workspace, folder, title }),
     delete: (path: string) =>
@@ -31,6 +33,9 @@ export const api = {
       invoke<void>('delete_folder', { path }),
     moveNote: (path: string, destFolder: string) =>
       invoke<string>('move_note', { path, destFolder }),
+  },
+  window: {
+    confirmClose: () => invoke<void>('confirm_close'),
   },
   workspace: {
     load: (path: string) =>
