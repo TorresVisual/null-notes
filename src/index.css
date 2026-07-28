@@ -865,6 +865,15 @@ body {
   font-size: 12px;
 }
 
+.sidebar-onboarding {
+  padding: var(--space-md) var(--space-sm);
+  color: var(--text-tertiary);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.sidebar-onboarding strong { color: var(--text-secondary); font-weight: 600; }
+
 /* Inline #tag pill */
 .tag-pill {
   color: var(--accent);

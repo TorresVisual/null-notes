@@ -104,6 +104,10 @@ export function Sidebar({ onSearchOpen, onSettingsOpen }: SidebarProps) {
             </li>
           ))}
         </ul>
+      ) : workspacePath && tree.length === 0 ? (
+        <p className="sidebar-onboarding">
+          No notes yet — click <strong>New Note</strong> above, or Ctrl N, to create your first one.
+        </p>
       ) : (
         <FolderTree entries={tree} />
       )}

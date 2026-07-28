@@ -180,7 +180,12 @@ export function Layout() {
               <RawEditor content={content} onChange={(md) => void save(md)} />
             )}
             {!activeTab && !workspacePath && <WorkspacePicker />}
-            {!activeTab && workspacePath && (
+            {!activeTab && workspacePath && notes.length === 0 && (
+              <p className="empty-state">
+                Press Ctrl N to create your first note, or press ? for shortcuts
+              </p>
+            )}
+            {!activeTab && workspacePath && notes.length > 0 && (
               <p className="empty-state">
                 Select a note, press Ctrl P to jump to one, or press ? for shortcuts
               </p>
