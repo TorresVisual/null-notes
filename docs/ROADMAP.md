@@ -162,11 +162,13 @@ Right now switching workspaces means re-picking a folder every time; there's no 
 
 *Done: the backend keeps an app-data-dir `recent-workspaces.json` (most-recent-first, capped at 8); `WorkspacePicker` replaces the empty state with that list plus a folder-dialog fallback, and filters out workspaces that no longer exist without forgetting them. `Ctrl+P` opens `QuickSwitcher`, which ranks the in-memory notes list by title-match position (prefix beats mid-title) with no backend round-trip. Covered by `workspace.rs`'s recents tests, `pathPrefix.test.ts`, `useCreateNote`-adjacent store tests, and `QuickSwitcher.test.ts`.*
 
-### P1-3 — Note rename that preserves links — **M**
+### P1-3 — Note rename that preserves links — **M** ✅
 Today "title = first heading" and there's no note rename; renaming a heading silently breaks inbound `[[links]]` (risk #5).
 - Provide an explicit rename (heading + optionally filename) that rewrites inbound wiki-link targets across the workspace, or records an alias.
 - **Dependency:** P1-1 (link machinery), P0-5 (index refresh).
 - **DoD:** Renaming a note updates every inbound `[[old]]` to `[[new]]` (or preserves resolution via alias); a backend test covers the cascade, mirroring the existing folder-rename test.
+
+*Done: `rename_note` rewrites the target note's heading (or prepends one if it had none) and walks `backlinks_for(old_title)` — already the exact case-insensitive set that resolves `[[links]]` to this note — rewriting `[[old]]` to `[[new]]` in every one of them and reindexing. Filename is deliberately left untouched (scope is heading-only, per risk #6: `path`, not title, is the real key), so a currently-open backlinking note picks up the rewrite through the existing P0-5 watcher/reload path with no special-casing needed. A pencil button next to each note's delete button in the sidebar prompts for the new title. Six backend tests cover the heading rewrite, the link rewrite, and the end-to-end cascade against an untouched third note.*
 
 ### P1-4 — Delete/close UX safety — **S** ✅
 - Confirm destructive folder/note deletes (folder delete is a recursive `remove_dir_all`, `notes.rs:376-381`). Confirm closing a tab with unsaved (should be impossible after P0-1, but guard anyway).

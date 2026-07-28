@@ -17,6 +17,8 @@ export const api = {
       invoke<boolean>('reindex_from_disk', { path, workspace }),
     create: (workspace: string, folder: string, title: string) =>
       invoke<NoteMetadata>('create_note', { workspace, folder, title }),
+    rename: (path: string, newTitle: string, workspace: string) =>
+      invoke<NoteMetadata>('rename_note', { path, newTitle, workspace }),
     delete: (path: string) =>
       invoke<void>('delete_note', { path }),
     search: (query: string) =>

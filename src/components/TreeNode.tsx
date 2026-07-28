@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ChevronRight, ChevronDown, Trash2 } from 'lucide-react'
+import { ChevronRight, ChevronDown, Pencil, Trash2 } from 'lucide-react'
 import { useWorkspaceStore } from '../store/workspace'
 import { useNotesStore } from '../store/notes'
 import { api } from '../lib/tauri'
@@ -28,6 +28,20 @@ export function TreeNode({ entry, depth }: TreeNodeProps) {
 
   if (entry.type === 'note') {
     const isActive = activeTab === entry.path
+    const workspace = entry.note.workspace
+
+    async function handleRename(e: React.MouseEvent) {
+      e.stopPropagation()
+      const newTitle = prompt('New title:', entry.name)
+      if (!newTitle || newTitle === entry.name) return
+      try {
+        await api.notes.rename(entry.path, newTitle, workspace)
+        setFolderError(null)
+        await refreshTree()
+      } catch (err) {
+        setFolderError(err instanceof Error ? err.message : String(err))
+      }
+    }
 
     async function handleDelete(e: React.MouseEvent) {
       e.stopPropagation()
@@ -46,6 +60,13 @@ export function TreeNode({ entry, depth }: TreeNodeProps) {
         onClick={() => openTab(entry.path)}
       >
         <span className="tree-label">{entry.name}</span>
+        <button
+          className="tree-rename"
+          onClick={(e) => void handleRename(e)}
+          aria-label={`Rename ${entry.name}`}
+        >
+          <Pencil size={12} />
+        </button>
         <button
           className="tree-delete"
           onClick={(e) => void handleDelete(e)}

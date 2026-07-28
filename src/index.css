@@ -821,7 +821,8 @@ body {
 /* Scoped to .sidebar to outrank the generic `.sidebar button` rule, which is
    more specific than a bare `.tree-delete` and would otherwise force the
    button to width:100%, collapsing the flex-basis:0 label to nothing. */
-.sidebar .tree-delete {
+.sidebar .tree-delete,
+.sidebar .tree-rename {
   width: auto;
   flex-shrink: 0;
   padding: 2px 4px;
@@ -835,8 +836,10 @@ body {
   align-items: center;
 }
 
-.sidebar .tree-row:hover .tree-delete { opacity: 1; }
+.sidebar .tree-row:hover .tree-delete,
+.sidebar .tree-row:hover .tree-rename { opacity: 1; }
 .sidebar .tree-delete:hover { color: var(--danger); }
+.sidebar .tree-rename:hover { color: var(--accent); }
 
 .sidebar-new-actions {
   display: flex;
