@@ -173,11 +173,13 @@ Today "title = first heading" and there's no note rename; renaming a heading sil
 - **Dependency:** P0-1.
 - **DoD:** Deleting a non-empty folder requires confirmation naming the count of affected notes; no delete path is a single misclick.
 
-### P1-5 — App identity cleanup — **S**
+### P1-5 — App identity cleanup — **S** ✅
 Cheap, removes the "unfinished template" feel.
 - Set `productName`, `identifier`, window title/size defaults, app icon; rewrite `README.md` to describe null-notes (it's currently the Tauri template readme).
 - **Dependency:** none.
 - **DoD:** Built app shows "null-notes" everywhere; README documents what the app is, how to run it, and the storage model.
+
+*Done: `productName`/`identifier`/window title are "null-notes" / `dev.nullnotes.app`, default window grew from the template's 800×600 to 1280×800; the Cargo package and lib crate are renamed (`null-notes` / `null_notes_lib`) and `package.json` follows. README rewritten to describe the app, storage model, and run/build commands. App icon left as Tauri's generic default — swapping it needs an actual icon asset, not a code change, so it's deferred rather than silently done.*
 
 **Exit check for M1:** links never dead-end, jumping around is fast, renames don't break references, and the app no longer looks like a template.
 
