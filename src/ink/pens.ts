@@ -91,8 +91,13 @@ export function saveEraserMode(mode: EraserMode): void {
   localStorage.setItem(ERASER_MODE_KEY, mode)
 }
 
+// An absent key reads back as Number(null), which is 0 — finite, and so clamped
+// to the minimum rather than falling through to the default. That left a fresh
+// install with a 4-unit eraser: a ring too small to see and a bite too small to
+// rub anything out. Nothing at all has to mean the default, not the smallest.
 export function loadEraserSize(): number {
-  return clampEraserSize(Number(localStorage.getItem(ERASER_SIZE_KEY)))
+  const stored = Number(localStorage.getItem(ERASER_SIZE_KEY))
+  return stored > 0 ? clampEraserSize(stored) : DEFAULT_ERASER_SIZE
 }
 
 export function saveEraserSize(size: number): void {

@@ -1,5 +1,13 @@
-import { describe, it, expect } from 'vitest'
-import { DEFAULT_PENS, DEFAULT_ERASER_SIZE, clampEraserSize, parsePens, withPen } from './pens'
+import { describe, it, expect, beforeEach } from 'vitest'
+import {
+  DEFAULT_PENS,
+  DEFAULT_ERASER_SIZE,
+  clampEraserSize,
+  loadEraserSize,
+  saveEraserSize,
+  parsePens,
+  withPen,
+} from './pens'
 import type { Pen } from './types'
 
 const pen: Pen = { id: 'fine', label: 'Fine', color: '#e6edf3', size: 2, opacity: 1 }
@@ -38,6 +46,28 @@ describe('withPen', () => {
     expect(updated.find((p) => p.id === 'broad')).toEqual(
       DEFAULT_PENS.find((p) => p.id === 'broad'),
     )
+  })
+})
+
+describe('loadEraserSize', () => {
+  beforeEach(() => localStorage.clear())
+
+  // Number(null) is 0, which is finite and so clamps to the minimum. Reading a
+  // missing key that way left a fresh install with an eraser too small to see.
+  it('gives the default when nothing has been stored', () => {
+    expect(loadEraserSize()).toBe(DEFAULT_ERASER_SIZE)
+  })
+
+  it('gives the default for a stored value that is not a size', () => {
+    localStorage.setItem('null-notes.ink.eraserSize', 'nonsense')
+    expect(loadEraserSize()).toBe(DEFAULT_ERASER_SIZE)
+    localStorage.setItem('null-notes.ink.eraserSize', '')
+    expect(loadEraserSize()).toBe(DEFAULT_ERASER_SIZE)
+  })
+
+  it('reads back a size that was saved', () => {
+    saveEraserSize(36)
+    expect(loadEraserSize()).toBe(36)
   })
 })
 
