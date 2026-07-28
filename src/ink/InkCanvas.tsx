@@ -88,6 +88,9 @@ export function InkCanvas({
     setEraserMode,
     ruler,
     toggleRuler,
+    grabRuler,
+    dragRuler,
+    releaseRuler,
     inkData,
     undo,
     redo,
@@ -98,22 +101,48 @@ export function InkCanvas({
   const [cursorPos, setCursorPos] = useState<{ x: number; y: number } | null>(null)
 
   // Fingers never draw — the pen owns the ink — so touch is free to mean
-  // zoom, which is how you actually work: write, then pinch to see more.
+  // everything else: hold the straightedge, drag the page, pinch to see more.
+  // That is the paper division of labour, one hand positioning and one writing.
   const touches = useRef(new Map<number, { x: number; y: number }>())
   const pinch = useRef<{ distance: number; zoom: number } | null>(null)
+  // Which finger, if any, is holding the straightedge. It is kept out of the
+  // touches map so it can neither scroll the page nor count towards a pinch.
+  const rulerTouch = useRef<number | null>(null)
+
+  function pagePoint(target: HTMLElement, clientX: number, clientY: number) {
+    const rect = target.getBoundingClientRect()
+    return { x: (clientX - rect.left) / zoom, y: (clientY - rect.top) / zoom }
+  }
 
   function handlePointerDown(e: ReactPointerEvent<HTMLDivElement>) {
     if (e.pointerType !== 'touch') return
+
+    const { x, y } = pagePoint(e.currentTarget, e.clientX, e.clientY)
+    if (rulerTouch.current === null && grabRuler(x, y)) {
+      rulerTouch.current = e.pointerId
+      return
+    }
+
     touches.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
   }
 
   function handlePointerUp(e: ReactPointerEvent<HTMLDivElement>) {
+    if (rulerTouch.current === e.pointerId) {
+      rulerTouch.current = null
+      releaseRuler()
+    }
     touches.current.delete(e.pointerId)
     if (touches.current.size < 2) pinch.current = null
   }
 
   function handlePointerMove(e: ReactPointerEvent<HTMLDivElement>) {
     if (e.pointerType === 'touch') {
+      if (rulerTouch.current === e.pointerId) {
+        const { x, y } = pagePoint(e.currentTarget, e.clientX, e.clientY)
+        dragRuler(x, y)
+        return
+      }
+
       const previous = touches.current.get(e.pointerId)
       if (!previous) return
       touches.current.set(e.pointerId, { x: e.clientX, y: e.clientY })

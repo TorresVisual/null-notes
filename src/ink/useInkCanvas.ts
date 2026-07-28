@@ -371,6 +371,37 @@ export function useInkCanvas(
     redrawCanvas([])
   }, [inkData, redrawCanvas])
 
+  // Positioning the straightedge is a hand job, not a pen one — you hold it
+  // with a finger and draw against it with the pen, the way you would on paper.
+  // The pen can grab it too, but touch is why these are callable from outside.
+  const grabRuler = useCallback(
+    (x: number, y: number): boolean => {
+      if (!ruler) return false
+      const kind = grabKind(x, y, ruler)
+      if (!kind) return false
+      rulerGrab.current = { kind, x, y }
+      return true
+    },
+    [ruler],
+  )
+
+  const dragRuler = useCallback((x: number, y: number) => {
+    const grab = rulerGrab.current
+    if (!grab) return
+    if (grab.kind === 'move') {
+      const dx = x - grab.x
+      const dy = y - grab.y
+      rulerGrab.current = { ...grab, x, y }
+      setRuler((current) => (current ? moveRuler(current, dx, dy) : current))
+      return
+    }
+    setRuler((current) => (current ? rotateRulerTowards(current, x, y) : current))
+  }, [])
+
+  const releaseRuler = useCallback(() => {
+    rulerGrab.current = null
+  }, [])
+
   const snappedPoints = useCallback(
     (points: Point[]) => (snapping.current && ruler ? snapStroke(points, ruler) : points),
     [ruler],
@@ -392,15 +423,7 @@ export function useInkCanvas(
 
       // The straightedge is grabbed before any tool gets a look in — landing on
       // it always means "put it somewhere else", whatever is in your hand.
-      if (ruler && !isEraserTip(e)) {
-        const x = e.offsetX / zoom
-        const y = e.offsetY / zoom
-        const kind = grabKind(x, y, ruler)
-        if (kind) {
-          rulerGrab.current = { kind, x, y }
-          return
-        }
-      }
+      if (!isEraserTip(e) && grabRuler(e.offsetX / zoom, e.offsetY / zoom)) return
 
       if (activeTool === 'eraser') {
         eraseSnapshot.current = inkData
@@ -436,7 +459,7 @@ export function useInkCanvas(
       snapping.current = ruler !== null && shouldSnap(start, ruler)
       currentStroke.current = [start]
     },
-    [tool, inkData, eraseAt, zoom, lassoPolygon, selection, clearSelection, ruler],
+    [tool, inkData, eraseAt, zoom, lassoPolygon, selection, clearSelection, ruler, grabRuler],
   )
 
   const handlePointerMove = useCallback(
@@ -444,18 +467,8 @@ export function useInkCanvas(
       if (e.pointerType !== 'pen') return
       const activeTool = isEraserTip(e) ? 'eraser' : tool
 
-      const grab = rulerGrab.current
-      if (grab) {
-        const x = e.offsetX / zoom
-        const y = e.offsetY / zoom
-        if (grab.kind === 'move') {
-          const dx = x - grab.x
-          const dy = y - grab.y
-          rulerGrab.current = { ...grab, x, y }
-          setRuler((current) => (current ? moveRuler(current, dx, dy) : current))
-        } else {
-          setRuler((current) => (current ? rotateRulerTowards(current, x, y) : current))
-        }
+      if (rulerGrab.current) {
+        dragRuler(e.offsetX / zoom, e.offsetY / zoom)
         return
       }
 
@@ -513,7 +526,7 @@ export function useInkCanvas(
       }
       redrawCanvas(snappedPoints(currentStroke.current))
     },
-    [tool, size, color, eraseAt, redrawCanvas, zoom, selection, snappedPoints],
+    [tool, size, color, eraseAt, redrawCanvas, zoom, selection, snappedPoints, dragRuler],
   )
 
   const handlePointerUp = useCallback(
@@ -524,7 +537,7 @@ export function useInkCanvas(
       // Where the ruler ends up is not an edit to the note, so it costs no
       // history entry and no write.
       if (rulerGrab.current) {
-        rulerGrab.current = null
+        releaseRuler()
         return
       }
 
@@ -618,7 +631,10 @@ export function useInkCanvas(
         strokes: [...inkData.strokes, stroke],
       })
     },
-    [tool, inkData, color, size, opacity, commit, svgPath, zoom, autoGrow, selection, snappedPoints],
+    [
+      tool, inkData, color, size, opacity, commit, svgPath, zoom, autoGrow, selection,
+      snappedPoints, releaseRuler,
+    ],
   )
 
   const deleteSelected = useCallback(() => {
@@ -673,6 +689,9 @@ export function useInkCanvas(
     setEraserMode,
     ruler,
     toggleRuler,
+    grabRuler,
+    dragRuler,
+    releaseRuler,
     inkData,
     undo,
     redo,

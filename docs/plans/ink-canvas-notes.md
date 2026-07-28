@@ -104,10 +104,16 @@ a diameter in page units — what you see under the cursor is what it takes.
 
 - [x] On-screen straightedge, rotatable, strokes snap to its edge (`ruler.ts`)
 
-Drag the middle to slide it, either end to swing it about its centre. Landing on
-the band grabs the ruler whatever tool is in hand — reaching for a straightedge
-is never ambiguous. The eraser end of the pen is the exception, so you can still
-rub out what you just ruled without putting the ruler away.
+**A finger positions it and the pen draws against it** — the paper division of
+labour, one hand holding and one writing. Touch already meant "everything that
+is not ink" (scroll, pinch), and holding the straightedge belongs in that hand.
+A finger on the ruler neither scrolls the page nor counts towards a pinch.
+
+Drag the middle to slide it, either end to swing it about its centre, with
+finger or pen alike. Landing on the band grabs the ruler whatever tool is in
+hand — reaching for a straightedge is never ambiguous. The eraser end of the pen
+is the exception, so you can still rub out what you just ruled without putting
+the ruler away.
 
 Snapping is decided once, from where the stroke began: judging per point would
 let a line drift on and off the edge partway through, which is worse than either

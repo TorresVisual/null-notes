@@ -128,6 +128,57 @@ describe('ruler', () => {
     act(() => result.current.toggleRuler())
     expect(result.current.canUndo).toBe(false)
   })
+
+  // A finger holds the straightedge while the pen draws against it, so the grab
+  // has to be callable from the touch handlers, not just the pen ones.
+  it('is not grabbable while it is put away', () => {
+    const { result } = render()
+    expect(result.current.grabRuler(400, 300)).toBe(false)
+  })
+
+  it('is grabbed by a touch landing on it', () => {
+    const { result } = render()
+    act(() => result.current.toggleRuler())
+    expect(result.current.grabRuler(400, 300)).toBe(true)
+  })
+
+  it('ignores a touch nowhere near it', () => {
+    const { result } = render()
+    act(() => result.current.toggleRuler())
+    expect(result.current.grabRuler(400, 30)).toBe(false)
+  })
+
+  it('slides when a finger dragging its middle moves', () => {
+    const { result } = render()
+    act(() => result.current.toggleRuler())
+    act(() => {
+      result.current.grabRuler(400, 300)
+      result.current.dragRuler(460, 340)
+    })
+    expect(result.current.ruler).toMatchObject({ x: 460, y: 340, angle: 0 })
+  })
+
+  it('swings when a finger dragging an end moves', () => {
+    const { result } = render()
+    act(() => result.current.toggleRuler())
+    act(() => {
+      result.current.grabRuler(660, 300)
+      result.current.dragRuler(400, 560)
+    })
+    expect(result.current.ruler?.angle).toBeCloseTo(Math.PI / 2)
+    expect(result.current.ruler).toMatchObject({ x: 400, y: 300 })
+  })
+
+  it('lets go, so the next drag does not keep moving it', () => {
+    const { result } = render()
+    act(() => result.current.toggleRuler())
+    act(() => {
+      result.current.grabRuler(400, 300)
+      result.current.releaseRuler()
+      result.current.dragRuler(700, 500)
+    })
+    expect(result.current.ruler).toMatchObject({ x: 400, y: 300 })
+  })
 })
 
 describe('eraser mode', () => {
