@@ -14,7 +14,7 @@ import {
 } from 'lucide-react'
 import { useInkCanvas, isEraserTip } from './useInkCanvas'
 import { pinchZoom, distanceBetween } from './zoom'
-import type { Tool } from './types'
+import type { EraserMode, Tool } from './types'
 
 const TOOLS: { id: Tool; label: string; Icon: typeof PenLine }[] = [
   { id: 'pen', label: 'Pen', Icon: PenLine },
@@ -41,6 +41,11 @@ function scrollAncestors(from: HTMLElement, dx: number, dy: number): void {
 function swatchDiameter(size: number): number {
   return Math.round(5 + size * 0.5)
 }
+
+const ERASER_MODES: { id: EraserMode; label: string; hint: string }[] = [
+  { id: 'point', label: 'Point', hint: 'Point eraser — rubs out only what it passes over' },
+  { id: 'stroke', label: 'Stroke', hint: 'Stroke eraser — removes a whole stroke on contact' },
+]
 
 const ZOOM_LEVELS = [0.75, 1, 1.5, 2]
 // Must match the grid background-size in index.css so it scales with zoom.
@@ -78,6 +83,8 @@ export function InkCanvas({
     setSize,
     eraserSize,
     setEraserSize,
+    eraserMode,
+    setEraserMode,
     inkData,
     undo,
     redo,
@@ -202,14 +209,28 @@ export function InkCanvas({
         {/* One slider, sized for whichever tool is in hand — you write fine and
             rub out broadly, so the two sizes are remembered separately. */}
         {tool === 'eraser' ? (
-          <input
-            type="range"
-            min={4}
-            max={80}
-            value={eraserSize}
-            onChange={(e) => setEraserSize(Number(e.target.value))}
-            aria-label="Eraser size"
-          />
+          <>
+            {ERASER_MODES.map(({ id, label, hint }) => (
+              <button
+                key={id}
+                className={`ink-tool ink-mode${eraserMode === id ? ' active' : ''}`}
+                onClick={() => setEraserMode(id)}
+                aria-pressed={eraserMode === id}
+                aria-label={hint}
+                title={hint}
+              >
+                {label}
+              </button>
+            ))}
+            <input
+              type="range"
+              min={4}
+              max={80}
+              value={eraserSize}
+              onChange={(e) => setEraserSize(Number(e.target.value))}
+              aria-label="Eraser size"
+            />
+          </>
         ) : (
           <input
             type="range"

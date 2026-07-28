@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { splitStrokePoints, eraseFromStroke, erasePoint } from './pointEraser'
+import { splitStrokePoints, eraseFromStroke, erasePoint, eraseWholeStrokes, erase } from './pointEraser'
 import type { InkData, Point, Shape, Stroke } from './types'
 
 function points(...xs: number[]): Point[] {
@@ -108,5 +108,51 @@ describe('erasePoint', () => {
   // object should cost a redraw or a file write.
   it('returns the very same object when the eraser touched nothing', () => {
     expect(erasePoint(data, 700, 500, 15, idFactory())).toBe(data)
+  })
+})
+
+describe('eraseWholeStrokes', () => {
+  const rect: Shape = {
+    id: 'r1', kind: 'rect', x1: 200, y1: 200, x2: 300, y2: 300, color: '#e6edf3', size: 2,
+  }
+
+  const data: InkData = {
+    width: 800,
+    height: 600,
+    strokes: [stroke('a', points(0, 10, 50, 90, 100)), stroke('b', points(400, 410))],
+    shapes: [rect],
+  }
+
+  // The difference from the point eraser: touching the middle takes all of it,
+  // leaving no crumbs either side.
+  it('takes the whole stroke on contact', () => {
+    const next = eraseWholeStrokes(data, 50, 0, 15)
+    expect(next.strokes.map((s) => s.id)).toEqual(['b'])
+  })
+
+  it('leaves strokes it never touched', () => {
+    expect(eraseWholeStrokes(data, 700, 500, 15).strokes).toHaveLength(2)
+  })
+
+  it('still erases shapes whole', () => {
+    expect(eraseWholeStrokes(data, 200, 200, 15).shapes).toHaveLength(0)
+  })
+
+  it('returns the very same object when nothing was touched', () => {
+    expect(eraseWholeStrokes(data, 700, 500, 15)).toBe(data)
+  })
+})
+
+describe('erase', () => {
+  const data: InkData = {
+    width: 800,
+    height: 600,
+    strokes: [stroke('a', points(0, 10, 50, 90, 100))],
+    shapes: [],
+  }
+
+  it('splits in point mode and removes whole in stroke mode', () => {
+    expect(erase(data, 50, 0, 15, 'point', idFactory()).strokes).toHaveLength(2)
+    expect(erase(data, 50, 0, 15, 'stroke', idFactory()).strokes).toHaveLength(0)
   })
 })

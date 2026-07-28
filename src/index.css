@@ -871,6 +871,13 @@ body {
   accent-color: var(--accent);
 }
 
+.ink-mode {
+  width: auto;
+  padding: 0 8px;
+  font-size: 11px;
+  letter-spacing: 0.02em;
+}
+
 .ink-delete { color: var(--danger, #ff7b72); }
 .ink-delete:hover { background: var(--danger, #ff7b72); color: var(--bg-base); }
 

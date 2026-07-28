@@ -1,4 +1,4 @@
-import type { Pen } from './types'
+import type { EraserMode, Pen } from './types'
 
 // Two nibs, two colours, two highlighters — enough to take a lecture without
 // opening a picker. The ink colours suit the near-black page; the highlighters
@@ -49,6 +49,7 @@ export function withPen(pens: Pen[], updated: Pen): Pen[] {
 const PENS_KEY = 'null-notes.ink.pens'
 const ACTIVE_PEN_KEY = 'null-notes.ink.activePen'
 const ERASER_SIZE_KEY = 'null-notes.ink.eraserSize'
+const ERASER_MODE_KEY = 'null-notes.ink.eraserMode'
 
 // The eraser is sized in page units, as a diameter — what you see under the
 // cursor is what it takes. It is deliberately not tied to the pen: you write
@@ -78,6 +79,16 @@ export function loadActivePenId(pens: Pen[]): string {
 
 export function saveActivePenId(id: string): void {
   localStorage.setItem(ACTIVE_PEN_KEY, id)
+}
+
+// Point is the default because it is the one that cannot lose work you meant to
+// keep; the stroke eraser is a deliberate choice you make and we then remember.
+export function loadEraserMode(): EraserMode {
+  return localStorage.getItem(ERASER_MODE_KEY) === 'stroke' ? 'stroke' : 'point'
+}
+
+export function saveEraserMode(mode: EraserMode): void {
+  localStorage.setItem(ERASER_MODE_KEY, mode)
 }
 
 export function loadEraserSize(): number {

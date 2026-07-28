@@ -1,5 +1,10 @@
 export type Tool = 'pen' | 'eraser' | 'lasso' | 'line' | 'circle' | 'rect' | 'arrow'
 
+// Two ways to rub out: take only what the eraser passes over, or take the whole
+// stroke it touches. Scratching out a word wants the second; fixing one letter
+// of it wants the first.
+export type EraserMode = 'point' | 'stroke'
+
 export interface Point {
   x: number
   y: number

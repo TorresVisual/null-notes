@@ -85,10 +85,15 @@ note contains.
 
 - [x] Point eraser: split a stroke at the erased span instead of dropping it whole (`pointEraser.ts`)
 - [x] Eraser size independent of pen size, remembered alongside the pens
+- [x] Point/stroke eraser is a choice, not a replacement
 
-The point eraser replaces whole-stroke deletion rather than joining it as a
-second mode — the plan said "instead of", and a mistake is one undo away
-anyway. Shapes are still erased whole: a rectangle cut in half is not a
+Both erasers are kept and you pick between them, which is a change from the
+plan's "instead of": the stroke eraser is still the faster way to scratch out a
+word, and the only way to be rid of a stroke without leaving crumbs of it.
+Point is the default, being the mode that cannot take work you meant to keep,
+and the choice is remembered.
+
+Shapes are erased whole in either mode: a rectangle cut in half is not a
 rectangle, so there is nothing to split. Fragments after the first get fresh
 ids, because a derived id would collide the second time the same stroke is cut.
 

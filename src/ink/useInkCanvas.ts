@@ -1,7 +1,7 @@
 import { useRef, useState, useEffect, useCallback } from 'react'
 import { getStroke } from 'perfect-freehand'
 import { inkApi } from '../lib/ink'
-import { erasePoint } from './pointEraser'
+import { erase } from './pointEraser'
 import { drawShapePreview } from './shapePreview'
 import { paintOrder } from './paintOrder'
 import {
@@ -24,10 +24,12 @@ import {
   loadEraserSize,
   saveEraserSize,
   clampEraserSize,
+  loadEraserMode,
+  saveEraserMode,
   withPen,
 } from './pens'
 import type { PreviewShape } from './shapePreview'
-import type { InkData, Stroke, Shape, Tool, Point, Pen } from './types'
+import type { InkData, Stroke, Shape, Tool, Point, Pen, EraserMode } from './types'
 
 const SHAPE_TOOLS: Tool[] = ['line', 'circle', 'rect', 'arrow']
 const STROKE_OPTIONS = { thinning: 0.5, smoothing: 0.5, streamline: 0.5 }
@@ -150,6 +152,7 @@ export function useInkCanvas(
   const [future, setFuture] = useState<InkData[]>([])
 
   const [eraserSize, setEraserSizeState] = useState(loadEraserSize)
+  const [eraserMode, setEraserModeState] = useState<EraserMode>(loadEraserMode)
   const [lassoPolygon, setLassoPolygon] = useState<LassoPoint[] | null>(null)
   const [selection, setSelection] = useState<Selection>(EMPTY_SELECTION)
 
@@ -190,6 +193,11 @@ export function useInkCanvas(
     const clamped = clampEraserSize(next)
     setEraserSizeState(clamped)
     saveEraserSize(clamped)
+  }, [])
+
+  const setEraserMode = useCallback((next: EraserMode) => {
+    setEraserModeState(next)
+    saveEraserMode(next)
   }, [])
 
   const clearSelection = useCallback(() => {
@@ -299,9 +307,9 @@ export function useInkCanvas(
   const eraseAt = useCallback(
     (x: number, y: number) => {
       const radius = eraserSize / 2
-      setInkData((data) => erasePoint(data, x, y, radius, () => crypto.randomUUID()))
+      setInkData((data) => erase(data, x, y, radius, eraserMode, () => crypto.randomUUID()))
     },
-    [eraserSize],
+    [eraserSize, eraserMode],
   )
 
   const handlePointerDown = useCallback(
@@ -550,6 +558,8 @@ export function useInkCanvas(
     setSize,
     eraserSize,
     setEraserSize,
+    eraserMode,
+    setEraserMode,
     inkData,
     undo,
     redo,

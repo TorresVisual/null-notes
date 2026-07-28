@@ -100,6 +100,31 @@ describe('eraser size', () => {
   })
 })
 
+describe('eraser mode', () => {
+  beforeEach(() => localStorage.clear())
+
+  const render = () => renderHook(() => useInkCanvas('/ws/n.ink/s1.svg', 800, 600))
+
+  // Point is the default: it is the mode that cannot take work you meant to keep.
+  it('starts on the point eraser', () => {
+    expect(render().result.current.eraserMode).toBe('point')
+  })
+
+  it('switches to the stroke eraser', () => {
+    const { result } = render()
+    act(() => result.current.setEraserMode('stroke'))
+    expect(result.current.eraserMode).toBe('stroke')
+  })
+
+  it('remembers the choice for the next note', () => {
+    const first = render()
+    act(() => first.result.current.setEraserMode('stroke'))
+    first.unmount()
+
+    expect(render().result.current.eraserMode).toBe('stroke')
+  })
+})
+
 describe('lasso selection', () => {
   beforeEach(() => localStorage.clear())
 

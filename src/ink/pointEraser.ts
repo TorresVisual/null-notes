@@ -1,5 +1,5 @@
 import { hitTestShape } from './hitTest'
-import type { InkData, Point, Stroke } from './types'
+import type { EraserMode, InkData, Point, Stroke } from './types'
 
 // A stroke is a run of points, so erasing part of it is a split, not a delete:
 // drop the points under the eraser and every surviving run becomes a stroke of
@@ -44,6 +44,35 @@ export function eraseFromStroke(
     id: i === 0 ? stroke.id : nextId(),
     points,
   }))
+}
+
+function touchesStroke(stroke: Stroke, x: number, y: number, radius: number): boolean {
+  return stroke.points.some((p) => Math.hypot(p.x - x, p.y - y) <= radius)
+}
+
+// The stroke eraser: touch any part of a stroke and the whole thing goes. It is
+// the faster way to scratch out a word, and the only way to be rid of a stroke
+// without leaving crumbs of it behind.
+export function eraseWholeStrokes(data: InkData, x: number, y: number, radius: number): InkData {
+  const strokes = data.strokes.filter((s) => !touchesStroke(s, x, y, radius))
+  const shapes = data.shapes.filter((s) => !hitTestShape(s, x, y, radius))
+  if (strokes.length === data.strokes.length && shapes.length === data.shapes.length) {
+    return data
+  }
+  return { ...data, strokes, shapes }
+}
+
+export function erase(
+  data: InkData,
+  x: number,
+  y: number,
+  radius: number,
+  mode: EraserMode,
+  nextId: () => string,
+): InkData {
+  return mode === 'stroke'
+    ? eraseWholeStrokes(data, x, y, radius)
+    : erasePoint(data, x, y, radius, nextId)
 }
 
 // Shapes have no points to split — a rectangle cut in half is not a rectangle —
