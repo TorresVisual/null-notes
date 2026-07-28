@@ -33,3 +33,21 @@ pub struct WorkspaceTree {
     pub notes: Vec<NoteMetadata>,
     pub folders: Vec<String>,
 }
+
+// App-wide preferences, not per-workspace state — lives in the app data dir
+// alongside recent-workspaces.json, not inside any one workspace folder.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AppSettings {
+    pub autosave_debounce_ms: u64,
+    pub editor_max_width_px: u32,
+}
+
+impl Default for AppSettings {
+    fn default() -> Self {
+        Self {
+            autosave_debounce_ms: 600,
+            editor_max_width_px: 800,
+        }
+    }
+}

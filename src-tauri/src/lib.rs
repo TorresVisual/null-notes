@@ -49,6 +49,8 @@ pub fn run() {
             commands::workspace::save_workspace,
             commands::workspace::recent_workspaces,
             commands::workspace::remember_workspace,
+            commands::settings::load_settings,
+            commands::settings::save_settings,
             commands::ink::ensure_ink_dir,
             commands::ink::read_ink,
             commands::ink::write_ink,
