@@ -168,10 +168,12 @@ Today "title = first heading" and there's no note rename; renaming a heading sil
 - **Dependency:** P1-1 (link machinery), P0-5 (index refresh).
 - **DoD:** Renaming a note updates every inbound `[[old]]` to `[[new]]` (or preserves resolution via alias); a backend test covers the cascade, mirroring the existing folder-rename test.
 
-### P1-4 — Delete/close UX safety — **S**
+### P1-4 — Delete/close UX safety — **S** ✅
 - Confirm destructive folder/note deletes (folder delete is a recursive `remove_dir_all`, `notes.rs:376-381`). Confirm closing a tab with unsaved (should be impossible after P0-1, but guard anyway).
 - **Dependency:** P0-1.
 - **DoD:** Deleting a non-empty folder requires confirmation naming the count of affected notes; no delete path is a single misclick.
+
+*Done: already satisfied by existing code, found true on audit rather than newly built. `TreeNode.tsx`'s note delete and `FolderContextMenu.tsx`'s folder delete (which names the affected note count) both guard with `confirm()`. Closing a tab was already impossible to lose data on: `useNote`'s `useEffect(() => () => void flush(), [path, flush])` flushes any pending write the instant `activeTab` changes away from a note, so a background tab never carries an unflushed edit by the time its tab is closed.*
 
 ### P1-5 — App identity cleanup — **S** ✅
 Cheap, removes the "unfinished template" feel.
