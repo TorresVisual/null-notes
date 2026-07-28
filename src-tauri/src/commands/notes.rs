@@ -3,7 +3,7 @@ use tokio::io::AsyncWriteExt;
 use uuid::Uuid;
 use regex::Regex;
 use std::collections::HashSet;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 use crate::db::{self, DbPool};
 use crate::models::{NoteMetadata, SearchResult, WorkspaceTree};
@@ -310,15 +310,8 @@ pub async fn create_note(
     title: String,
     db: State<'_, DbPool>,
 ) -> Result<NoteMetadata, String> {
-    let safe_name: String = title
-        .chars()
-        .map(|c| if c.is_alphanumeric() || c == ' ' { c } else { '-' })
-        .collect();
-    let filename = format!("{}.md", safe_name.trim());
-    let path = Path::new(&folder).join(&filename);
+    let path = create_note_file(&folder, &title).await.map_err(|e| e.to_string())?;
     let body = format!("# {}\n", title);
-
-    write_atomic(&path, &body).await.map_err(|e| e.to_string())?;
 
     let meta = NoteMetadata {
         id: Uuid::new_v4().to_string(),
@@ -409,6 +402,27 @@ pub async fn backlinks_for(
     db::notes::backlinks_for(&db, &workspace, &title)
         .await
         .map_err(|e| e.to_string())
+}
+
+fn note_filename(title: &str) -> String {
+    let safe_name: String = title
+        .chars()
+        .map(|c| if c.is_alphanumeric() || c == ' ' { c } else { '-' })
+        .collect();
+    format!("{}.md", safe_name.trim())
+}
+
+// Filenames are derived from titles, so two different notes can want the same
+// one. Creating over an existing file would silently destroy it, so refuse and
+// let the caller report the collision.
+async fn create_note_file(folder: &str, title: &str) -> anyhow::Result<PathBuf> {
+    let filename = note_filename(title);
+    let path = Path::new(folder).join(&filename);
+    if tokio::fs::try_exists(&path).await? {
+        anyhow::bail!("a note named \"{filename}\" already exists here");
+    }
+    write_atomic(&path, &format!("# {title}\n")).await?;
+    Ok(path)
 }
 
 async fn create_folder_at(parent: &str, name: &str) -> anyhow::Result<String> {
@@ -688,6 +702,45 @@ mod save_tests {
         assert!(result.is_err());
         assert!(target.is_dir());
         assert!(temp_files_in(tmp.path()).is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_create_note_file_seeds_a_heading() {
+        let tmp = tempdir().unwrap();
+
+        let path = create_note_file(&tmp.path().to_string_lossy(), "Missing").await.unwrap();
+
+        assert_eq!(path, tmp.path().join("Missing.md"));
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), "# Missing\n");
+    }
+
+    #[tokio::test]
+    async fn test_create_note_file_replaces_path_characters_in_the_filename() {
+        let tmp = tempdir().unwrap();
+
+        let path = create_note_file(&tmp.path().to_string_lossy(), "CS/101: Week 1")
+            .await
+            .unwrap();
+
+        assert_eq!(path, tmp.path().join("CS-101- Week 1.md"));
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), "# CS/101: Week 1\n");
+    }
+
+    // Clicking an unresolved [[link]] creates a note from a title alone, so a
+    // collision must fail loudly rather than overwrite whatever holds the name.
+    #[tokio::test]
+    async fn test_create_note_file_refuses_to_overwrite_an_existing_note() {
+        let tmp = tempdir().unwrap();
+        let existing = tmp.path().join("Missing.md");
+        std::fs::write(&existing, "# Something else\nreal content").unwrap();
+
+        let result = create_note_file(&tmp.path().to_string_lossy(), "Missing").await;
+
+        assert!(result.is_err());
+        assert_eq!(
+            std::fs::read_to_string(&existing).unwrap(),
+            "# Something else\nreal content"
+        );
     }
 
     #[tokio::test]

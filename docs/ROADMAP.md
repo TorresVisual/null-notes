@@ -146,10 +146,12 @@ Keep the tree and index honest when files change underneath the app.
 
 **Milestone M1:** *The small gaps that make me switch back to another app are gone.*
 
-### P1-1 — Create-note-from-unresolved-wiki-link — **S**
+### P1-1 — Create-note-from-unresolved-wiki-link — **S** ✅
 - Clicking a `[[missing]]` link creates the note (in the active/selected folder), opens it, and resolves the link. Style resolved vs. missing already exists (`wiki-link-missing`).
 - **Dependency:** none.
 - **DoD:** Clicking an unresolved link creates `Missing.md` seeded with `# Missing`, opens it in a tab, and the link renders as resolved without a manual refresh.
+
+*Done: a `useCreateNote` hook (shared with the sidebar's new-note button) creates the note in the selected folder, adds it to the store — which re-resolves the link on the next render — and opens it. Filenames are derived from titles, so `create_note` now refuses to write over an existing file rather than silently destroying it; the collision surfaces in the error banner. Covered by `useCreateNote.test.ts` and three `create_note_file` tests.*
 
 ### P1-2 — Quick-switcher / recent workspaces — **M**
 Right now switching workspaces means re-picking a folder every time; there's no jump-to-note.

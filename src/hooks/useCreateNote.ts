@@ -1,0 +1,38 @@
+import { useCallback, useRef } from 'react'
+import { useNotesStore } from '../store/notes'
+import { useWorkspaceStore } from '../store/workspace'
+import { api } from '../lib/tauri'
+import type { NoteMetadata } from '../types'
+
+// Creates a note in the selected folder, adds it to the store and opens it.
+// Returns null when there is no workspace or the write failed — a failure is
+// reported through the workspace error banner rather than thrown, since both
+// call sites (sidebar button, unresolved wiki-link) are fire-and-forget clicks.
+export function useCreateNote() {
+  const addNote = useNotesStore((s) => s.addNote)
+  const workspacePath = useWorkspaceStore((s) => s.path)
+  const selectedFolder = useWorkspaceStore((s) => s.selectedFolder)
+  const openTab = useWorkspaceStore((s) => s.openTab)
+  const setFolderError = useWorkspaceStore((s) => s.setFolderError)
+  const inFlight = useRef(false)
+
+  return useCallback(
+    async (title: string): Promise<NoteMetadata | null> => {
+      if (!workspacePath || inFlight.current) return null
+      inFlight.current = true
+      try {
+        const meta = await api.notes.create(workspacePath, selectedFolder ?? workspacePath, title)
+        addNote(meta)
+        openTab(meta.path)
+        setFolderError(null)
+        return meta
+      } catch (e) {
+        setFolderError(e instanceof Error ? e.message : String(e))
+        return null
+      } finally {
+        inFlight.current = false
+      }
+    },
+    [workspacePath, selectedFolder, addNote, openTab, setFolderError],
+  )
+}

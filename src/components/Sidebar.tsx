@@ -3,6 +3,7 @@ import { FilePlus, FolderPlus, PenLine, Search } from 'lucide-react'
 import { useNotesStore } from '../store/notes'
 import { useWorkspaceStore } from '../store/workspace'
 import { useWorkspace, refreshTree } from '../hooks/useWorkspace'
+import { useCreateNote } from '../hooks/useCreateNote'
 import { ImportButton } from './ImportButton'
 import { FolderTree } from './FolderTree'
 import { FolderContextMenu } from './FolderContextMenu'
@@ -34,6 +35,7 @@ export function Sidebar({ onSearchOpen }: SidebarProps) {
   const folderError = useWorkspaceStore((s) => s.folderError)
   const setFolderError = useWorkspaceStore((s) => s.setFolderError)
   const { openWorkspace } = useWorkspace()
+  const createNote = useCreateNote()
   const [tagFilteredNotes, setTagFilteredNotes] = useState<NoteMetadata[]>([])
 
   useEffect(() => {
@@ -47,18 +49,9 @@ export function Sidebar({ onSearchOpen }: SidebarProps) {
   const tree = workspacePath ? buildFolderTree(workspacePath, folders, notes) : []
 
   async function handleCreateNote() {
-    if (!workspacePath) return
     const title = prompt('Note title:')
     if (!title) return
-    const folder = selectedFolder ?? workspacePath
-    try {
-      const meta = await api.notes.create(workspacePath, folder, title)
-      addNote(meta)
-      openTab(meta.path)
-      setFolderError(null)
-    } catch (e) {
-      setFolderError(e instanceof Error ? e.message : String(e))
-    }
+    await createNote(title)
   }
 
   // Created as a real note first, then rewritten as a canvas body, so it picks

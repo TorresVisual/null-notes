@@ -3,6 +3,7 @@ import { ReactNodeViewRenderer, NodeViewWrapper } from '@tiptap/react'
 import type { ReactNodeViewProps } from '@tiptap/react'
 import { useNotesStore } from '../../store/notes'
 import { useWorkspaceStore } from '../../store/workspace'
+import { useCreateNote } from '../../hooks/useCreateNote'
 
 interface WikiLinkAttrs {
   title: string
@@ -12,11 +13,18 @@ function WikiLinkView({ node }: ReactNodeViewProps) {
   const { title } = node.attrs as unknown as WikiLinkAttrs
   const notes = useNotesStore((s) => s.notes)
   const openTab = useWorkspaceStore((s) => s.openTab)
+  const createNote = useCreateNote()
 
   const target = notes.find((n) => n.title.toLowerCase() === title.toLowerCase())
 
+  // Creating the missing note is what resolves the link: the new note lands in
+  // the store, this view re-renders, and `target` is found on the next pass.
   function handleClick() {
-    if (target) openTab(target.path)
+    if (target) {
+      openTab(target.path)
+      return
+    }
+    void createNote(title)
   }
 
   return (
@@ -24,7 +32,7 @@ function WikiLinkView({ node }: ReactNodeViewProps) {
       as="span"
       className={`wiki-link${target ? '' : ' wiki-link-missing'}`}
       onClick={handleClick}
-      title={target ? target.path : `Note "${title}" not found`}
+      title={target ? target.path : `Create note "${title}"`}
     >
       {title}
     </NodeViewWrapper>
