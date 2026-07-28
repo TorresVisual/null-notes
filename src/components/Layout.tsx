@@ -5,6 +5,7 @@ import { TabBar } from './TabBar'
 import { NoteEditor } from '../editor/NoteEditor'
 import { RawEditor } from '../editor/RawEditor'
 import { SearchModal } from './SearchModal'
+import { QuickSwitcher } from './QuickSwitcher'
 import { BacklinksPanel } from './BacklinksPanel'
 import { WorkspacePicker } from './WorkspacePicker'
 import { useWorkspaceStore } from '../store/workspace'
@@ -39,6 +40,7 @@ export function Layout() {
   useExternalChanges()
   const [viewMode, setViewMode] = useState<ViewMode>('wysiwyg')
   const [searchOpen, setSearchOpen] = useState(false)
+  const [switcherOpen, setSwitcherOpen] = useState(false)
 
   // The backend vetoes the close and hands control here so a pending edit
   // reaches disk first; the window only dies once confirmClose is called.
@@ -59,6 +61,9 @@ export function Layout() {
       if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
         e.preventDefault()
         setSearchOpen(true)
+      } else if ((e.ctrlKey || e.metaKey) && e.key === 'p') {
+        e.preventDefault()
+        setSwitcherOpen(true)
       }
     }
     window.addEventListener('keydown', onKey)
@@ -80,6 +85,7 @@ export function Layout() {
   return (
     <div className="layout">
       {searchOpen && <SearchModal onClose={() => setSearchOpen(false)} />}
+      {switcherOpen && <QuickSwitcher onClose={() => setSwitcherOpen(false)} />}
       <Sidebar onSearchOpen={() => setSearchOpen(true)} />
       <div className="main">
         <TabBar

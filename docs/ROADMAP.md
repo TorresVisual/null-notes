@@ -153,12 +153,14 @@ Keep the tree and index honest when files change underneath the app.
 
 *Done: a `useCreateNote` hook (shared with the sidebar's new-note button) creates the note in the selected folder, adds it to the store — which re-resolves the link on the next render — and opens it. Filenames are derived from titles, so `create_note` now refuses to write over an existing file rather than silently destroying it; the collision surfaces in the error banner. Covered by `useCreateNote.test.ts` and three `create_note_file` tests.*
 
-### P1-2 — Quick-switcher / recent workspaces — **M**
+### P1-2 — Quick-switcher / recent workspaces — **M** ✅
 Right now switching workspaces means re-picking a folder every time; there's no jump-to-note.
 - Persist a **recent workspaces** list; offer a picker instead of only the OS folder dialog.
 - Extend `Ctrl+K` (or add `Ctrl+P`) to jump to a note by title across the current workspace, keyboard-navigable.
 - **Dependency:** none.
 - **DoD:** Reopening the app offers the last workspaces without a folder dialog; `Ctrl+P` opens any note by fuzzy title in ≤3 keystrokes for a typical name.
+
+*Done: the backend keeps an app-data-dir `recent-workspaces.json` (most-recent-first, capped at 8); `WorkspacePicker` replaces the empty state with that list plus a folder-dialog fallback, and filters out workspaces that no longer exist without forgetting them. `Ctrl+P` opens `QuickSwitcher`, which ranks the in-memory notes list by title-match position (prefix beats mid-title) with no backend round-trip. Covered by `workspace.rs`'s recents tests, `pathPrefix.test.ts`, `useCreateNote`-adjacent store tests, and `QuickSwitcher.test.ts`.*
 
 ### P1-3 — Note rename that preserves links — **M**
 Today "title = first heading" and there's no note rename; renaming a heading silently breaks inbound `[[links]]` (risk #5).
