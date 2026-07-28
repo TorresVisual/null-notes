@@ -200,10 +200,12 @@ The visual-design and editor-feel passes are already done (`docs/plans/visual-de
 - **Dependency:** P0-1 (autosave interval becomes a setting).
 - **DoD:** Changing a setting persists across restarts and takes effect without a reload where feasible.
 
-### P2-2 — Keyboard-shortcut layer + native menu — **M**
+### P2-2 — Keyboard-shortcut layer + native menu — **M** ✅
 - A native app menu (File/Edit/View) and a discoverable shortcut sheet. Wire the actions that already exist (new note, new folder, search, toggle raw/WYSIWYG, insert ink).
 - **Dependency:** P1-2 (quick-switcher shortcut should be registered here too).
 - **DoD:** Every primary action has a keyboard path; a `?`/shortcut overlay lists them; menu items work.
+
+*Done: a native File/Edit/View menu (`build_menu` in `lib.rs`) carries every primary action with its accelerator (New Note, New Folder, New Canvas Note, Open Workspace, Settings in File; clipboard actions in Edit; Search, Quick Switcher, Toggle Source/Preview, Insert Ink Block, Keyboard Shortcuts in View). `on_menu_event` emits one `menu-action` event; `Layout.tsx`'s `runCommand` is the single dispatcher both the menu and (for `?`, which has no natural accelerator) a narrow DOM listener call into — deliberately one source of truth per action so a native accelerator and a DOM keydown handler can't double-fire the same command. `useCreateFolder`/`useCreateCanvasNote` were extracted from Sidebar (mirroring `useCreateNote`) so the sidebar buttons and the menu share logic instead of duplicating it. "Insert ink" reaches the focused note via a plain `command:insert-ink` window event rather than lifting the TipTap editor instance up to `Layout`. `ShortcutsOverlay` lists all nine shortcuts.*
 
 ### P2-3 — Editor niceties audit — **S/M**
 - Spellcheck toggle, drag-to-reorder or at least stable list behavior, paste-image-into-note handling, and a pass on focus/scroll restoration when switching tabs.

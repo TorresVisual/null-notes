@@ -83,6 +83,17 @@ export function NoteEditor({ content, notePath, onChange }: NoteEditorProps) {
     })
   }
 
+  // Lets the native menu's "Insert Ink Block" item (and its accelerator)
+  // reach the currently-focused note without lifting the editor instance
+  // up to Layout — Layout just dispatches a plain window event.
+  useEffect(() => {
+    function onInsertInk() {
+      void insertInkBlock()
+    }
+    window.addEventListener('command:insert-ink', onInsertInk)
+    return () => window.removeEventListener('command:insert-ink', onInsertInk)
+  }, [editor, notePath])
+
   const codeLanguage = editor?.getAttributes('codeBlock')['language']
   const selectedCodeLanguage = typeof codeLanguage === 'string' ? codeLanguage : ''
 

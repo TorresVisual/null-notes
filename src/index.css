@@ -1150,3 +1150,29 @@ body {
 }
 
 .settings-reset:hover { color: var(--text-primary); border-color: var(--text-tertiary); }
+
+/* Shortcuts overlay — reuses .settings-panel for the card chrome */
+.shortcuts-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.shortcuts-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
+.shortcuts-row kbd {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  background: var(--bg-base);
+  border: 1px solid var(--border-strong);
+  border-radius: 3px;
+  padding: 2px 6px;
+  font-family: inherit;
+}
