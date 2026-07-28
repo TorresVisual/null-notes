@@ -98,7 +98,7 @@ const TaskItemInLists = TaskItem.extend({
 export const coreExtensions = [
   StarterKit.configure({ code: false, codeBlock: false }),
   CodeWithRegexpRule,
-  CodeBlockLowlight.configure({ lowlight }),
+  CodeBlockLowlight.configure({ lowlight, enableTabIndentation: true, tabSize: 2 }),
   Table.configure({ resizable: false }),
   TableRow,
   TableHeader,

@@ -295,6 +295,97 @@ pub async fn reindex_from_disk(
     }
 }
 
+// Replaces the same heading `title_from_content` would have read the title
+// from, preserving its `#` depth. A note with no heading at all (the
+// fallback-first-line case) gets one prepended, matching `create_note`'s shape.
+fn rewrite_title(content: &str, new_title: &str) -> String {
+    let mut replaced = false;
+    let mut lines: Vec<String> = Vec::new();
+    for line in content.lines() {
+        let trimmed = line.trim();
+        if !replaced && !trimmed.is_empty() && trimmed.starts_with('#') {
+            let heading = trimmed.trim_start_matches('#').trim();
+            if !heading.is_empty() {
+                let hashes: String = trimmed.chars().take_while(|c| *c == '#').collect();
+                lines.push(format!("{hashes} {new_title}"));
+                replaced = true;
+                continue;
+            }
+        }
+        lines.push(line.to_string());
+    }
+    let mut rewritten = lines.join("\n");
+    if content.ends_with('\n') {
+        rewritten.push('\n');
+    }
+    if !replaced {
+        rewritten = format!("# {new_title}\n\n{rewritten}");
+    }
+    rewritten
+}
+
+// Wiki-links resolve by title case-insensitively (`backlinks_for`), and
+// `extract_links` trims whitespace inside the brackets, so the rewrite must
+// tolerate both rather than only matching an exact `[[Old]]`.
+fn rewrite_links(content: &str, old_title: &str, new_title: &str) -> anyhow::Result<String> {
+    let pattern = format!(r"(?i)\[\[\s*{}\s*\]\]", regex::escape(old_title));
+    let re = Regex::new(&pattern)?;
+    Ok(re
+        .replace_all(content, |_: &regex::Captures| format!("[[{new_title}]]"))
+        .into_owned())
+}
+
+async fn rename_note_at(
+    path: &str,
+    new_title: &str,
+    workspace: &str,
+    db: &DbPool,
+) -> anyhow::Result<NoteMetadata> {
+    let old_content = tokio::fs::read_to_string(path).await?;
+    let old_title = title_from_content(&old_content);
+
+    let mut new_content = rewrite_title(&old_content, new_title);
+    if old_title != new_title {
+        new_content = rewrite_links(&new_content, &old_title, new_title)?;
+    }
+    write_atomic(Path::new(path), &new_content).await?;
+    index_note_at(path, workspace, &new_content, db).await?;
+
+    if old_title != new_title {
+        for backlinker in db::notes::backlinks_for(db, workspace, &old_title).await? {
+            if backlinker.path == path {
+                continue;
+            }
+            let content = tokio::fs::read_to_string(&backlinker.path).await?;
+            let rewritten = rewrite_links(&content, &old_title, new_title)?;
+            if rewritten != content {
+                write_atomic(Path::new(&backlinker.path), &rewritten).await?;
+                index_note_at(&backlinker.path, workspace, &rewritten, db).await?;
+            }
+        }
+    }
+
+    Ok(NoteMetadata {
+        id: Uuid::new_v4().to_string(),
+        title: new_title.to_string(),
+        path: path.to_string(),
+        workspace: workspace.to_string(),
+        updated_at: now_ms(),
+    })
+}
+
+#[tauri::command]
+pub async fn rename_note(
+    path: String,
+    new_title: String,
+    workspace: String,
+    db: State<'_, DbPool>,
+) -> Result<NoteMetadata, String> {
+    rename_note_at(&path, &new_title, &workspace, &db)
+        .await
+        .map_err(|e| e.to_string())
+}
+
 async fn forget_note(path: &str, db: &DbPool) -> anyhow::Result<()> {
     db::notes::remove_note(db, path).await?;
     db::notes::remove_from_fts(db, path).await?;
@@ -766,6 +857,123 @@ mod save_tests {
 
         let backlinks = db::notes::backlinks_for(&pool, "/ws", "Big O Notation").await.unwrap();
         assert_eq!(backlinks.len(), 1);
+    }
+
+    #[test]
+    fn test_rewrite_title_replaces_the_first_heading_and_keeps_its_depth() {
+        let content = "intro line\n## Old Title\nbody text\n## Old Title again\n";
+        assert_eq!(
+            rewrite_title(content, "New Title"),
+            "intro line\n## New Title\nbody text\n## Old Title again\n"
+        );
+    }
+
+    #[test]
+    fn test_rewrite_title_prepends_a_heading_when_none_exists() {
+        assert_eq!(
+            rewrite_title("just a line of text", "New Title"),
+            "# New Title\n\njust a line of text"
+        );
+    }
+
+    #[test]
+    fn test_rewrite_links_matches_case_insensitively_and_tolerates_inner_whitespace() {
+        let content = "See [[big o notation]] and [[ Big O Notation ]] again.";
+        assert_eq!(
+            rewrite_links(content, "Big O Notation", "Asymptotic Notation").unwrap(),
+            "See [[Asymptotic Notation]] and [[Asymptotic Notation]] again."
+        );
+    }
+
+    #[test]
+    fn test_rewrite_links_leaves_a_different_title_untouched() {
+        let content = "See [[Dijkstra]].";
+        assert_eq!(
+            rewrite_links(content, "Big O Notation", "Asymptotic Notation").unwrap(),
+            content
+        );
+    }
+
+    #[tokio::test]
+    async fn test_rename_note_at_rewrites_inbound_links_and_reindexes_both_notes() {
+        let tmp = tempdir().unwrap();
+        let ws = tmp.path().to_string_lossy().into_owned();
+        let target = tmp.path().join("target.md");
+        let source = tmp.path().join("source.md");
+        std::fs::write(&target, "# Big O Notation\nWhat it means.\n").unwrap();
+        std::fs::write(&source, "# Source\nSee [[Big O Notation]] for details.\n").unwrap();
+
+        let pool = DbPool::connect("sqlite::memory:").await.unwrap();
+        run_migrations(&pool).await.unwrap();
+        index_note_at(
+            &target.to_string_lossy(),
+            &ws,
+            "# Big O Notation\nWhat it means.\n",
+            &pool,
+        )
+        .await
+        .unwrap();
+        index_note_at(
+            &source.to_string_lossy(),
+            &ws,
+            "# Source\nSee [[Big O Notation]] for details.\n",
+            &pool,
+        )
+        .await
+        .unwrap();
+
+        let meta = rename_note_at(&target.to_string_lossy(), "Asymptotic Notation", &ws, &pool)
+            .await
+            .unwrap();
+
+        assert_eq!(meta.title, "Asymptotic Notation");
+        assert_eq!(
+            std::fs::read_to_string(&target).unwrap(),
+            "# Asymptotic Notation\nWhat it means.\n"
+        );
+        assert_eq!(
+            std::fs::read_to_string(&source).unwrap(),
+            "# Source\nSee [[Asymptotic Notation]] for details.\n"
+        );
+
+        let old_backlinks = db::notes::backlinks_for(&pool, &ws, "Big O Notation").await.unwrap();
+        assert!(old_backlinks.is_empty());
+        let new_backlinks = db::notes::backlinks_for(&pool, &ws, "Asymptotic Notation").await.unwrap();
+        assert_eq!(new_backlinks.len(), 1);
+        assert_eq!(new_backlinks[0].path, source.to_string_lossy());
+    }
+
+    #[tokio::test]
+    async fn test_rename_note_at_leaves_an_unrelated_note_untouched() {
+        let tmp = tempdir().unwrap();
+        let ws = tmp.path().to_string_lossy().into_owned();
+        let target = tmp.path().join("target.md");
+        let other = tmp.path().join("other.md");
+        std::fs::write(&target, "# Old Title\nbody\n").unwrap();
+        std::fs::write(&other, "# Other\nSee [[Something Else]].\n").unwrap();
+
+        let pool = DbPool::connect("sqlite::memory:").await.unwrap();
+        run_migrations(&pool).await.unwrap();
+        index_note_at(&target.to_string_lossy(), &ws, "# Old Title\nbody\n", &pool)
+            .await
+            .unwrap();
+        index_note_at(
+            &other.to_string_lossy(),
+            &ws,
+            "# Other\nSee [[Something Else]].\n",
+            &pool,
+        )
+        .await
+        .unwrap();
+
+        rename_note_at(&target.to_string_lossy(), "New Title", &ws, &pool)
+            .await
+            .unwrap();
+
+        assert_eq!(
+            std::fs::read_to_string(&other).unwrap(),
+            "# Other\nSee [[Something Else]].\n"
+        );
     }
 }
 

@@ -1,9 +1,10 @@
 import { useEditor, EditorContent } from '@tiptap/react'
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { PenLine } from 'lucide-react'
 import { coreExtensions } from './extensions'
 import { inkApi } from '../lib/ink'
 import type { InkData } from '../ink/types'
+import { EditorStatusBar } from './EditorStatusBar'
 
 interface NoteEditorProps {
   content: string
@@ -29,6 +30,7 @@ const EMPTY_INK: InkData = { width: INK_WIDTH, height: INK_HEIGHT, strokes: [], 
 
 export function NoteEditor({ content, notePath, onChange }: NoteEditorProps) {
   const isProgrammaticUpdate = useRef(false)
+  const [, setEditorVersion] = useState(0)
 
   const editor = useEditor({
     extensions: coreExtensions,
@@ -54,6 +56,16 @@ export function NoteEditor({ content, notePath, onChange }: NoteEditorProps) {
     editor.storage.noteContext.notePath = notePath
   }, [editor, notePath])
 
+  useEffect(() => {
+    if (!editor) return
+    const refreshToolbar = () => setEditorVersion((version) => version + 1)
+    editor.on('selectionUpdate', refreshToolbar)
+
+    return () => {
+      editor.off('selectionUpdate', refreshToolbar)
+    }
+  }, [editor])
+
   async function insertInkBlock() {
     if (!editor) return
     const dir = await inkApi.ensureDir(notePath)
@@ -66,12 +78,40 @@ export function NoteEditor({ content, notePath, onChange }: NoteEditorProps) {
     })
   }
 
+  const codeLanguage = editor?.getAttributes('codeBlock')['language']
+  const selectedCodeLanguage = typeof codeLanguage === 'string' ? codeLanguage : ''
+
   return (
     <div className="note-editor-wrap">
       <div className="editor-toolbar" role="toolbar" aria-label="Insert">
         <button onClick={() => void insertInkBlock()} aria-label="Insert ink block" title="Insert ink block">
           <PenLine size={14} /> Ink
         </button>
+        {editor?.isActive('codeBlock') && (
+          <label className="code-language-control">
+            <span>Language</span>
+            <select
+              aria-label="Code block language"
+              value={selectedCodeLanguage}
+              onChange={(event) => {
+                editor.chain().focus().updateAttributes('codeBlock', { language: event.target.value }).run()
+                setEditorVersion((version) => version + 1)
+              }}
+            >
+              <option value="">Plain text</option>
+              <option value="bash">Bash</option>
+              <option value="css">CSS</option>
+              <option value="html">HTML</option>
+              <option value="java">Java</option>
+              <option value="javascript">JavaScript</option>
+              <option value="json">JSON</option>
+              <option value="python">Python</option>
+              <option value="rust">Rust</option>
+              <option value="sql">SQL</option>
+              <option value="typescript">TypeScript</option>
+            </select>
+          </label>
+        )}
       </div>
       <EditorContent
         editor={editor}
@@ -79,6 +119,7 @@ export function NoteEditor({ content, notePath, onChange }: NoteEditorProps) {
         aria-multiline="true"
         className="note-editor"
       />
+      {editor && <EditorStatusBar editor={editor} />}
     </div>
   )
 }

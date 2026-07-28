@@ -35,6 +35,7 @@ pub fn run() {
             commands::notes::reindex_from_disk,
             commands::watcher::watch_workspace,
             commands::notes::create_note,
+            commands::notes::rename_note,
             commands::notes::delete_note,
             commands::notes::search_notes,
             commands::notes::list_tags,
