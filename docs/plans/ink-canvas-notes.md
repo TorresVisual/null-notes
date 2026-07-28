@@ -81,12 +81,21 @@ write however far the pen wanders, matching the eraser. The marquee itself is
 never serialised: a selection is something you are holding, not something the
 note contains.
 
-### Phase 4 — erasers ← *current*
+### Phase 4 — erasers — **done**
 
-- [ ] Point eraser: split a stroke at the erased span instead of dropping it whole
-- [ ] Eraser size independent of pen size
+- [x] Point eraser: split a stroke at the erased span instead of dropping it whole (`pointEraser.ts`)
+- [x] Eraser size independent of pen size, remembered alongside the pens
 
-### Phase 5 — ruler
+The point eraser replaces whole-stroke deletion rather than joining it as a
+second mode — the plan said "instead of", and a mistake is one undo away
+anyway. Shapes are still erased whole: a rectangle cut in half is not a
+rectangle, so there is nothing to split. Fragments after the first get fresh
+ids, because a derived id would collide the second time the same stroke is cut.
+
+The size slider follows whichever tool is in hand, and the eraser is measured as
+a diameter in page units — what you see under the cursor is what it takes.
+
+### Phase 5 — ruler ← *current*
 
 - [ ] On-screen straightedge, rotatable, strokes snap to its edge
 

@@ -65,6 +65,41 @@ describe('useInkCanvas', () => {
   })
 })
 
+describe('eraser size', () => {
+  beforeEach(() => localStorage.clear())
+
+  const render = () => renderHook(() => useInkCanvas('/ws/n.ink/s1.svg', 800, 600))
+
+  // The whole point of Phase 4's second half: a fine nib and a broad eraser.
+  it('is independent of the pen size', () => {
+    const { result } = render()
+    act(() => result.current.setEraserSize(40))
+    expect(result.current.eraserSize).toBe(40)
+    expect(result.current.size).toBe(DEFAULT_PENS[0].size)
+  })
+
+  it('is not disturbed by changing the pen', () => {
+    const { result } = render()
+    act(() => result.current.setEraserSize(40))
+    act(() => result.current.setSize(9))
+    expect(result.current.eraserSize).toBe(40)
+  })
+
+  it('is remembered for the next note', () => {
+    const first = render()
+    act(() => first.result.current.setEraserSize(36))
+    first.unmount()
+
+    expect(render().result.current.eraserSize).toBe(36)
+  })
+
+  it('refuses a size that would make the eraser unusable', () => {
+    const { result } = render()
+    act(() => result.current.setEraserSize(0))
+    expect(result.current.eraserSize).toBe(4)
+  })
+})
+
 describe('lasso selection', () => {
   beforeEach(() => localStorage.clear())
 

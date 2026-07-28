@@ -1,7 +1,7 @@
 import { useRef, useState, useEffect, useCallback } from 'react'
 import { getStroke } from 'perfect-freehand'
 import { inkApi } from '../lib/ink'
-import { hitTestShape } from './hitTest'
+import { erasePoint } from './pointEraser'
 import { drawShapePreview } from './shapePreview'
 import { paintOrder } from './paintOrder'
 import {
@@ -21,6 +21,9 @@ import {
   savePens,
   loadActivePenId,
   saveActivePenId,
+  loadEraserSize,
+  saveEraserSize,
+  clampEraserSize,
   withPen,
 } from './pens'
 import type { PreviewShape } from './shapePreview'
@@ -146,6 +149,7 @@ export function useInkCanvas(
   const [history, setHistory] = useState<InkData[]>([])
   const [future, setFuture] = useState<InkData[]>([])
 
+  const [eraserSize, setEraserSizeState] = useState(loadEraserSize)
   const [lassoPolygon, setLassoPolygon] = useState<LassoPoint[] | null>(null)
   const [selection, setSelection] = useState<Selection>(EMPTY_SELECTION)
 
@@ -181,6 +185,12 @@ export function useInkCanvas(
     (next: number) => updateActivePen({ size: next }),
     [updateActivePen],
   )
+
+  const setEraserSize = useCallback((next: number) => {
+    const clamped = clampEraserSize(next)
+    setEraserSizeState(clamped)
+    saveEraserSize(clamped)
+  }, [])
 
   const clearSelection = useCallback(() => {
     lassoPath.current = []
@@ -288,19 +298,10 @@ export function useInkCanvas(
 
   const eraseAt = useCallback(
     (x: number, y: number) => {
-      const radius = size * 3
-      setInkData((data) => {
-        const strokes = data.strokes.filter((s) =>
-          s.points.every((p) => Math.hypot(p.x - x, p.y - y) > radius),
-        )
-        const shapes = data.shapes.filter((s) => !hitTestShape(s, x, y, radius))
-        if (strokes.length === data.strokes.length && shapes.length === data.shapes.length) {
-          return data
-        }
-        return { ...data, strokes, shapes }
-      })
+      const radius = eraserSize / 2
+      setInkData((data) => erasePoint(data, x, y, radius, () => crypto.randomUUID()))
     },
-    [size],
+    [eraserSize],
   )
 
   const handlePointerDown = useCallback(
@@ -547,6 +548,8 @@ export function useInkCanvas(
     setColor,
     size,
     setSize,
+    eraserSize,
+    setEraserSize,
     inkData,
     undo,
     redo,

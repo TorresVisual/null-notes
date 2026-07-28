@@ -76,6 +76,8 @@ export function InkCanvas({
     setColor,
     size,
     setSize,
+    eraserSize,
+    setEraserSize,
     inkData,
     undo,
     redo,
@@ -142,7 +144,7 @@ export function InkCanvas({
   // zoom scales what you see without touching the stored coordinates.
   const displayWidth = inkData.width * zoom
   const displayHeight = inkData.height * zoom
-  const eraserDiameter = size * 6 * zoom
+  const eraserDiameter = eraserSize * zoom
 
   return (
     <div className="ink-canvas-wrap">
@@ -197,14 +199,27 @@ export function InkCanvas({
           onChange={(e) => setColor(e.target.value)}
           aria-label="Pen color"
         />
-        <input
-          type="range"
-          min={1}
-          max={24}
-          value={size}
-          onChange={(e) => setSize(Number(e.target.value))}
-          aria-label="Pen size"
-        />
+        {/* One slider, sized for whichever tool is in hand — you write fine and
+            rub out broadly, so the two sizes are remembered separately. */}
+        {tool === 'eraser' ? (
+          <input
+            type="range"
+            min={4}
+            max={80}
+            value={eraserSize}
+            onChange={(e) => setEraserSize(Number(e.target.value))}
+            aria-label="Eraser size"
+          />
+        ) : (
+          <input
+            type="range"
+            min={1}
+            max={24}
+            value={size}
+            onChange={(e) => setSize(Number(e.target.value))}
+            aria-label="Pen size"
+          />
+        )}
         <span className="ink-sep" aria-hidden />
         <button className="ink-tool" onClick={undo} disabled={!canUndo} aria-label="Undo" title="Undo">
           <Undo2 size={15} />

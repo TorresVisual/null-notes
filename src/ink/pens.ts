@@ -48,6 +48,19 @@ export function withPen(pens: Pen[], updated: Pen): Pen[] {
 // moving them to the config file later is a change to these four functions.
 const PENS_KEY = 'null-notes.ink.pens'
 const ACTIVE_PEN_KEY = 'null-notes.ink.activePen'
+const ERASER_SIZE_KEY = 'null-notes.ink.eraserSize'
+
+// The eraser is sized in page units, as a diameter — what you see under the
+// cursor is what it takes. It is deliberately not tied to the pen: you write
+// fine and rub out broadly, and one slider for both made that impossible.
+export const DEFAULT_ERASER_SIZE = 12
+const MIN_ERASER_SIZE = 4
+const MAX_ERASER_SIZE = 80
+
+export function clampEraserSize(size: number): number {
+  if (!Number.isFinite(size)) return DEFAULT_ERASER_SIZE
+  return Math.min(MAX_ERASER_SIZE, Math.max(MIN_ERASER_SIZE, size))
+}
 
 export function loadPens(): Pen[] {
   return parsePens(localStorage.getItem(PENS_KEY)) ?? DEFAULT_PENS
@@ -65,4 +78,12 @@ export function loadActivePenId(pens: Pen[]): string {
 
 export function saveActivePenId(id: string): void {
   localStorage.setItem(ACTIVE_PEN_KEY, id)
+}
+
+export function loadEraserSize(): number {
+  return clampEraserSize(Number(localStorage.getItem(ERASER_SIZE_KEY)))
+}
+
+export function saveEraserSize(size: number): void {
+  localStorage.setItem(ERASER_SIZE_KEY, String(clampEraserSize(size)))
 }

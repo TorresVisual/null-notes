@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { DEFAULT_PENS, parsePens, withPen } from './pens'
+import { DEFAULT_PENS, DEFAULT_ERASER_SIZE, clampEraserSize, parsePens, withPen } from './pens'
 import type { Pen } from './types'
 
 const pen: Pen = { id: 'fine', label: 'Fine', color: '#e6edf3', size: 2, opacity: 1 }
@@ -38,6 +38,23 @@ describe('withPen', () => {
     expect(updated.find((p) => p.id === 'broad')).toEqual(
       DEFAULT_PENS.find((p) => p.id === 'broad'),
     )
+  })
+})
+
+describe('clampEraserSize', () => {
+  it('leaves a sensible size alone', () => {
+    expect(clampEraserSize(30)).toBe(30)
+  })
+
+  it('holds the eraser within a usable range', () => {
+    expect(clampEraserSize(0)).toBe(4)
+    expect(clampEraserSize(500)).toBe(80)
+  })
+
+  // An absent key reads back as NaN through Number(null), which must not
+  // become an eraser of size NaN.
+  it('falls back to the default for a value that is not a number', () => {
+    expect(clampEraserSize(Number('nonsense'))).toBe(DEFAULT_ERASER_SIZE)
   })
 })
 
