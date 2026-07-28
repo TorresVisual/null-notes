@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core'
-import type { NoteMetadata, WorkspaceState, WorkspaceTree, SearchResult } from '../types'
+import type { NoteMetadata, WorkspaceState, WorkspaceTree, SearchResult, AppSettings } from '../types'
 
 export const api = {
   notes: {
@@ -52,5 +52,11 @@ export const api = {
       invoke<string[]>('recent_workspaces'),
     remember: (path: string) =>
       invoke<string[]>('remember_workspace', { path }),
+  },
+  settings: {
+    load: () =>
+      invoke<AppSettings>('load_settings'),
+    save: (settings: AppSettings) =>
+      invoke<void>('save_settings', { settings }),
   },
 }

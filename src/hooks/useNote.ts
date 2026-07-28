@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { listen } from '@tauri-apps/api/event'
 import { api } from '../lib/tauri'
 import { useWorkspaceStore } from '../store/workspace'
+import { useSettingsStore } from '../store/settings'
 
 export type SaveState = 'clean' | 'dirty' | 'saving' | 'error'
 
@@ -22,6 +23,7 @@ export function useNote(path: string | null) {
   const [saveState, setSaveState] = useState<SaveState>('clean')
   const [saveError, setSaveError] = useState<string | null>(null)
   const workspacePath = useWorkspaceStore((s) => s.path)
+  const saveDebounceMs = useSettingsStore((s) => s.settings.autosaveDebounceMs)
 
   const [conflict, setConflict] = useState(false)
 
@@ -118,9 +120,9 @@ export function useNote(path: string | null) {
       pendingWrite.current = { path, workspace: workspacePath, content: markdown }
       setSaveState('dirty')
       if (saveTimer.current) clearTimeout(saveTimer.current)
-      saveTimer.current = setTimeout(() => void flushSave(), SAVE_DEBOUNCE_MS)
+      saveTimer.current = setTimeout(() => void flushSave(), saveDebounceMs)
     },
-    [path, workspacePath, flushSave],
+    [path, workspacePath, flushSave, saveDebounceMs],
   )
 
   // Dismissing only hides the message — the buffer stays dirty and will retry

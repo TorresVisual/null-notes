@@ -22,3 +22,8 @@ export interface WorkspaceState {
   activeTab: string | null
   expandedFolders: string[]
 }
+
+export interface AppSettings {
+  autosaveDebounceMs: number
+  editorMaxWidthPx: number
+}

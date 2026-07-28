@@ -142,7 +142,7 @@ body {
 
 /* Editor pane — centers the content column */
 .editor-pane {
-  max-width: 800px;
+  max-width: var(--editor-max-width, 800px);
   margin: 0 auto;
   padding: 32px 48px;
   min-height: 100%;
@@ -151,6 +151,7 @@ body {
 .note-editor { outline: none; min-height: 100%; }
 
 .note-editor .ProseMirror { outline: none; }
+.note-editor .ProseMirror p { white-space: pre-wrap; }
 
 .note-editor .ProseMirror p.is-editor-empty:first-child::before {
   content: attr(data-placeholder);
@@ -1051,4 +1052,101 @@ body {
   pointer-events: none;
   transform: translate(-50%, -50%);
 }
-.note-editor .ProseMirror p { white-space: pre-wrap; }
+
+/* Settings panel */
+.settings-panel {
+  background: var(--bg-raised);
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  width: 440px;
+  max-width: calc(100vw - 40px);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6);
+  padding: var(--space-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+.settings-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.settings-panel-header h2 {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.settings-panel-close {
+  background: none;
+  border: none;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+}
+
+.settings-panel-close:hover { color: var(--text-primary); }
+
+.settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+}
+
+.settings-row > span:first-child {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
+.settings-row small {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  font-weight: 400;
+}
+
+.settings-row-control {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.settings-row-control input {
+  width: 72px;
+  padding: 5px 8px;
+  background: var(--bg-hover);
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.settings-unit {
+  font-size: 11px;
+  color: var(--text-tertiary);
+}
+
+.settings-error {
+  font-size: 12px;
+  color: var(--danger);
+}
+
+.settings-reset {
+  align-self: flex-start;
+  background: none;
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  padding: 5px 10px;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.settings-reset:hover { color: var(--text-primary); border-color: var(--text-tertiary); }

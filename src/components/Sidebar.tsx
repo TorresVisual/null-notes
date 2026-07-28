@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { FilePlus, FolderPlus, PenLine, Search } from 'lucide-react'
+import { FilePlus, FolderPlus, PenLine, Search, Settings } from 'lucide-react'
 import { useNotesStore } from '../store/notes'
 import { useWorkspaceStore } from '../store/workspace'
 import { useWorkspace, refreshTree } from '../hooks/useWorkspace'
@@ -22,9 +22,10 @@ const EMPTY_PAGE: InkData = { width: 700, height: 1200, strokes: [], shapes: [] 
 
 interface SidebarProps {
   onSearchOpen: () => void
+  onSettingsOpen: () => void
 }
 
-export function Sidebar({ onSearchOpen }: SidebarProps) {
+export function Sidebar({ onSearchOpen, onSettingsOpen }: SidebarProps) {
   const notes = useNotesStore((s) => s.notes)
   const folders = useNotesStore((s) => s.folders)
   const addNote = useNotesStore((s) => s.addNote)
@@ -117,6 +118,11 @@ export function Sidebar({ onSearchOpen }: SidebarProps) {
           <Search size={13} /> Search
         </span>
         <kbd>Ctrl K</kbd>
+      </button>
+      <button className="search-open-btn" onClick={onSettingsOpen}>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <Settings size={13} /> Settings
+        </span>
       </button>
       {folderError && <p className="sidebar-error">{folderError}</p>}
       <TagList />

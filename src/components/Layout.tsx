@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import type { CSSProperties } from 'react'
 import { listen } from '@tauri-apps/api/event'
 import { Sidebar } from './Sidebar'
 import { TabBar } from './TabBar'
@@ -8,8 +9,10 @@ import { SearchModal } from './SearchModal'
 import { QuickSwitcher } from './QuickSwitcher'
 import { BacklinksPanel } from './BacklinksPanel'
 import { WorkspacePicker } from './WorkspacePicker'
+import { SettingsPanel } from './SettingsPanel'
 import { useWorkspaceStore } from '../store/workspace'
 import { useNotesStore } from '../store/notes'
+import { useSettingsStore } from '../store/settings'
 import { useNote } from '../hooks/useNote'
 import { useWorkspace, refreshTags, refreshRecents } from '../hooks/useWorkspace'
 import { useExternalChanges } from '../hooks/useExternalChanges'
@@ -41,6 +44,9 @@ export function Layout() {
   const [viewMode, setViewMode] = useState<ViewMode>('wysiwyg')
   const [searchOpen, setSearchOpen] = useState(false)
   const [switcherOpen, setSwitcherOpen] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const settings = useSettingsStore((s) => s.settings)
+  const setSettings = useSettingsStore((s) => s.setSettings)
 
   // The backend vetoes the close and hands control here so a pending edit
   // reaches disk first; the window only dies once confirmClose is called.
@@ -72,7 +78,8 @@ export function Layout() {
 
   useEffect(() => {
     void refreshRecents()
-  }, [])
+    void api.settings.load().then(setSettings)
+  }, [setSettings])
 
   useEffect(() => {
     setViewMode('wysiwyg')
@@ -86,7 +93,8 @@ export function Layout() {
     <div className="layout">
       {searchOpen && <SearchModal onClose={() => setSearchOpen(false)} />}
       {switcherOpen && <QuickSwitcher onClose={() => setSwitcherOpen(false)} />}
-      <Sidebar onSearchOpen={() => setSearchOpen(true)} />
+      {settingsOpen && <SettingsPanel onClose={() => setSettingsOpen(false)} />}
+      <Sidebar onSearchOpen={() => setSearchOpen(true)} onSettingsOpen={() => setSettingsOpen(true)} />
       <div className="main">
         <TabBar
           viewMode={viewMode}
@@ -98,7 +106,10 @@ export function Layout() {
         />
         {conflict && <ConflictBar onKeepMine={keepMine} onReloadTheirs={reloadTheirs} />}
         <div className="editor-scroll">
-          <div className="editor-pane">
+          <div
+            className="editor-pane"
+            style={{ '--editor-max-width': `${settings.editorMaxWidthPx}px` } as CSSProperties}
+          >
             {isLoading && <p className="status">Loading…</p>}
             {!isLoading && activeTab && viewMode === 'wysiwyg' && (
               <NoteEditor content={content} notePath={activeTab} onChange={(md) => void save(md)} />
