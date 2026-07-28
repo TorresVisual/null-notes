@@ -142,9 +142,9 @@ Keep the tree and index honest when files change underneath the app.
 
 ---
 
-## Phase 1 — Everyday-Use Completeness (P1)
+## Phase 1 — Everyday-Use Completeness (P1) ✅
 
-**Milestone M1:** *The small gaps that make me switch back to another app are gone.*
+**Milestone M1 reached:** *The small gaps that make me switch back to another app are gone.* P1-1…P1-5 all done — links never dead-end (P1-1), recent workspaces plus `Ctrl+P` quick-switching (P1-2), deletes and tab-close were already safe on audit (P1-4), the app has its own identity (P1-5), and renaming a note now carries its inbound `[[links]]` with it (P1-3).
 
 ### P1-1 — Create-note-from-unresolved-wiki-link — **S** ✅
 - Clicking a `[[missing]]` link creates the note (in the active/selected folder), opens it, and resolves the link. Style resolved vs. missing already exists (`wiki-link-missing`).
