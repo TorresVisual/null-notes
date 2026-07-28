@@ -9,6 +9,7 @@ import { FolderTree } from './FolderTree'
 import { FolderContextMenu } from './FolderContextMenu'
 import { TagList } from './TagList'
 import { buildFolderTree } from '../lib/folderTree'
+import { folderName } from '../lib/pathPrefix'
 import { api } from '../lib/tauri'
 import { inkApi } from '../lib/ink'
 import { canvasNoteBody } from '../lib/canvasNote'
@@ -93,9 +94,7 @@ export function Sidebar({ onSearchOpen }: SidebarProps) {
     }
   }
 
-  const workspaceName = workspacePath
-    ? workspacePath.split(/[\\/]/).filter(Boolean).pop() ?? workspacePath
-    : null
+  const workspaceName = workspacePath ? folderName(workspacePath) : null
 
   return (
     <aside className="sidebar">

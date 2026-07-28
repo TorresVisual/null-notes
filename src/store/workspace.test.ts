@@ -11,6 +11,7 @@ const reset = () =>
     folderContextMenu: null,
     folderError: null,
     tagFilter: null,
+    recentWorkspaces: [],
   })
 
 describe('useWorkspaceStore', () => {
@@ -109,5 +110,18 @@ describe('useWorkspaceStore', () => {
     expect(useWorkspaceStore.getState().folderContextMenu).toBeNull()
     expect(useWorkspaceStore.getState().folderError).toBeNull()
     expect(useWorkspaceStore.getState().tagFilter).toBeNull()
+  })
+
+  it('sets the recent workspaces list', () => {
+    useWorkspaceStore.getState().setRecentWorkspaces(['/ws/a', '/ws/b'])
+    expect(useWorkspaceStore.getState().recentWorkspaces).toEqual(['/ws/a', '/ws/b'])
+  })
+
+  // The recent-workspaces list is global, not per-workspace UI state — it
+  // must survive switching to a new workspace, unlike everything else here.
+  it('resetForNewWorkspace does not clear the recent workspaces list', () => {
+    useWorkspaceStore.getState().setRecentWorkspaces(['/ws/a'])
+    useWorkspaceStore.getState().resetForNewWorkspace()
+    expect(useWorkspaceStore.getState().recentWorkspaces).toEqual(['/ws/a'])
   })
 })

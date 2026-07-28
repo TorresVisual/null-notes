@@ -1,6 +1,10 @@
+use std::path::Path;
+use tauri::{AppHandle, Manager};
 use crate::models::WorkspaceState;
 
 const STATE_FILE: &str = ".workspace.json";
+const RECENTS_FILE: &str = "recent-workspaces.json";
+const MAX_RECENTS: usize = 8;
 
 pub async fn load_workspace_from_dir(path: &str) -> anyhow::Result<WorkspaceState> {
     let state_path = std::path::Path::new(path).join(STATE_FILE);
@@ -16,6 +20,50 @@ pub async fn save_workspace_to_dir(path: &str, state: &WorkspaceState) -> anyhow
     let json = serde_json::to_string_pretty(state)?;
     tokio::fs::write(&state_path, json).await?;
     Ok(())
+}
+
+async fn read_recents(dir: &Path) -> anyhow::Result<Vec<String>> {
+    let file = dir.join(RECENTS_FILE);
+    if !file.exists() {
+        return Ok(Vec::new());
+    }
+    let raw = tokio::fs::read_to_string(&file).await?;
+    Ok(serde_json::from_str(&raw)?)
+}
+
+// A workspace on an unplugged drive is hidden from the picker but kept in the
+// file, so it comes back on its own rather than being forgotten.
+async fn present_recents(dir: &Path) -> anyhow::Result<Vec<String>> {
+    let mut present = Vec::new();
+    for path in read_recents(dir).await? {
+        if tokio::fs::try_exists(&path).await.unwrap_or(false) {
+            present.push(path);
+        }
+    }
+    Ok(present)
+}
+
+async fn push_recent(dir: &Path, workspace: &str) -> anyhow::Result<Vec<String>> {
+    let mut recents = read_recents(dir).await?;
+    recents.retain(|p| p != workspace);
+    recents.insert(0, workspace.to_string());
+    recents.truncate(MAX_RECENTS);
+
+    tokio::fs::create_dir_all(dir).await?;
+    tokio::fs::write(dir.join(RECENTS_FILE), serde_json::to_string_pretty(&recents)?).await?;
+    Ok(recents)
+}
+
+#[tauri::command]
+pub async fn recent_workspaces(app: AppHandle) -> Result<Vec<String>, String> {
+    let dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    present_recents(&dir).await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn remember_workspace(app: AppHandle, path: String) -> Result<Vec<String>, String> {
+    let dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    push_recent(&dir, &path).await.map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -57,6 +105,48 @@ mod tests {
         assert_eq!(loaded.open_tabs, original.open_tabs);
         assert_eq!(loaded.active_tab, original.active_tab);
         assert_eq!(loaded.expanded_folders, original.expanded_folders);
+    }
+
+    #[tokio::test]
+    async fn test_push_recent_moves_a_repeat_visit_to_the_front() {
+        let dir = tempdir().unwrap();
+        push_recent(dir.path(), "/ws/a").await.unwrap();
+        push_recent(dir.path(), "/ws/b").await.unwrap();
+
+        let recents = push_recent(dir.path(), "/ws/a").await.unwrap();
+
+        assert_eq!(recents, vec!["/ws/a".to_string(), "/ws/b".to_string()]);
+    }
+
+    #[tokio::test]
+    async fn test_push_recent_keeps_only_the_most_recent_entries() {
+        let dir = tempdir().unwrap();
+        for i in 0..MAX_RECENTS + 3 {
+            push_recent(dir.path(), &format!("/ws/{i}")).await.unwrap();
+        }
+
+        let recents = read_recents(dir.path()).await.unwrap();
+
+        assert_eq!(recents.len(), MAX_RECENTS);
+        assert_eq!(recents[0], format!("/ws/{}", MAX_RECENTS + 2));
+    }
+
+    #[tokio::test]
+    async fn test_present_recents_hides_folders_that_are_gone_without_forgetting_them() {
+        let config = tempdir().unwrap();
+        let workspace = tempdir().unwrap();
+        let live = workspace.path().to_string_lossy().into_owned();
+        push_recent(config.path(), "/ws/vanished").await.unwrap();
+        push_recent(config.path(), &live).await.unwrap();
+
+        assert_eq!(present_recents(config.path()).await.unwrap(), vec![live]);
+        assert_eq!(read_recents(config.path()).await.unwrap().len(), 2);
+    }
+
+    #[tokio::test]
+    async fn test_recents_are_empty_before_any_workspace_is_opened() {
+        let dir = tempdir().unwrap();
+        assert!(present_recents(dir.path()).await.unwrap().is_empty());
     }
 
     #[tokio::test]

@@ -6,10 +6,11 @@ import { NoteEditor } from '../editor/NoteEditor'
 import { RawEditor } from '../editor/RawEditor'
 import { SearchModal } from './SearchModal'
 import { BacklinksPanel } from './BacklinksPanel'
+import { WorkspacePicker } from './WorkspacePicker'
 import { useWorkspaceStore } from '../store/workspace'
 import { useNotesStore } from '../store/notes'
 import { useNote } from '../hooks/useNote'
-import { useWorkspace, refreshTags } from '../hooks/useWorkspace'
+import { useWorkspace, refreshTags, refreshRecents } from '../hooks/useWorkspace'
 import { useExternalChanges } from '../hooks/useExternalChanges'
 import { ConflictBar } from './ConflictBar'
 import { api } from '../lib/tauri'
@@ -18,6 +19,7 @@ type ViewMode = 'wysiwyg' | 'raw'
 
 export function Layout() {
   const activeTab = useWorkspaceStore((s) => s.activeTab)
+  const workspacePath = useWorkspaceStore((s) => s.path)
   const notes = useNotesStore((s) => s.notes)
   const currentNote = notes.find((n) => n.path === activeTab)
   const {
@@ -64,6 +66,10 @@ export function Layout() {
   }, [])
 
   useEffect(() => {
+    void refreshRecents()
+  }, [])
+
+  useEffect(() => {
     setViewMode('wysiwyg')
   }, [activeTab])
 
@@ -94,8 +100,9 @@ export function Layout() {
             {!isLoading && activeTab && viewMode === 'raw' && (
               <RawEditor content={content} onChange={(md) => void save(md)} />
             )}
-            {!activeTab && (
-              <p className="empty-state">Open a workspace and select a note</p>
+            {!activeTab && !workspacePath && <WorkspacePicker />}
+            {!activeTab && workspacePath && (
+              <p className="empty-state">Select a note, or press Ctrl P to jump to one</p>
             )}
             {!isLoading && activeTab && currentNote && (
               <BacklinksPanel notePath={activeTab} noteTitle={currentNote.title} />

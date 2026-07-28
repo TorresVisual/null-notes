@@ -29,6 +29,8 @@ interface WorkspaceStore {
   setFolderError: (message: string | null) => void
   tagFilter: string | null
   setTagFilter: (tag: string | null) => void
+  recentWorkspaces: string[]
+  setRecentWorkspaces: (paths: string[]) => void
   resetForNewWorkspace: () => void
 }
 
@@ -41,6 +43,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   folderContextMenu: null,
   folderError: null,
   tagFilter: null,
+  recentWorkspaces: [],
 
   setPath: (path) => set({ path, selectedFolder: path }),
 
@@ -95,6 +98,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
 
   setFolderError: (message) => set({ folderError: message }),
   setTagFilter: (tag) => set({ tagFilter: tag }),
+  setRecentWorkspaces: (paths) => set({ recentWorkspaces: paths }),
 
   resetForNewWorkspace: () =>
     set({

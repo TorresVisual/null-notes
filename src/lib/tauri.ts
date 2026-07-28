@@ -46,5 +46,9 @@ export const api = {
       invoke<WorkspaceState>('load_workspace', { path }),
     save: (path: string, state: WorkspaceState) =>
       invoke<void>('save_workspace', { path, state }),
+    recents: () =>
+      invoke<string[]>('recent_workspaces'),
+    remember: (path: string) =>
+      invoke<string[]>('remember_workspace', { path }),
   },
 }

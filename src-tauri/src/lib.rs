@@ -46,6 +46,8 @@ pub fn run() {
             commands::notes::move_note,
             commands::workspace::load_workspace,
             commands::workspace::save_workspace,
+            commands::workspace::recent_workspaces,
+            commands::workspace::remember_workspace,
             commands::ink::ensure_ink_dir,
             commands::ink::read_ink,
             commands::ink::write_ink,

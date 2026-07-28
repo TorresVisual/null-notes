@@ -1,5 +1,23 @@
 import { describe, it, expect } from 'vitest'
-import { isUnderPath, replacePathPrefix } from './pathPrefix'
+import { folderName, isUnderPath, replacePathPrefix } from './pathPrefix'
+
+describe('folderName', () => {
+  it('takes the last segment of a Windows path', () => {
+    expect(folderName('D:\\Uni\\CS101')).toBe('CS101')
+  })
+
+  it('takes the last segment of a posix path', () => {
+    expect(folderName('/home/me/notes')).toBe('notes')
+  })
+
+  it('ignores a trailing separator', () => {
+    expect(folderName('D:\\Uni\\CS101\\')).toBe('CS101')
+  })
+
+  it('falls back to the whole path for a drive root', () => {
+    expect(folderName('/')).toBe('/')
+  })
+})
 
 describe('isUnderPath', () => {
   it('matches an exact path', () => {
