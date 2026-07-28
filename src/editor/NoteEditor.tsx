@@ -2,6 +2,7 @@ import { useEditor, EditorContent } from '@tiptap/react'
 import { useEffect, useRef, useState } from 'react'
 import { PenLine } from 'lucide-react'
 import { coreExtensions } from './extensions'
+import { handleEditorKeyDown, handleEditorTextInput } from './extensions/CodeBlockEditor'
 import { inkApi } from '../lib/ink'
 import type { InkData } from '../ink/types'
 import { EditorStatusBar } from './EditorStatusBar'
@@ -35,6 +36,10 @@ export function NoteEditor({ content, notePath, onChange }: NoteEditorProps) {
   const editor = useEditor({
     extensions: coreExtensions,
     content,
+    editorProps: {
+      handleKeyDown: handleEditorKeyDown,
+      handleTextInput: handleEditorTextInput,
+    },
     onUpdate({ editor }) {
       if (isProgrammaticUpdate.current) return
       onChange(getMarkdown(editor.storage))
@@ -99,16 +104,41 @@ export function NoteEditor({ content, notePath, onChange }: NoteEditorProps) {
               }}
             >
               <option value="">Plain text</option>
+              <option value="arduino">Arduino</option>
               <option value="bash">Bash</option>
+              <option value="c">C</option>
+              <option value="cpp">C++</option>
+              <option value="csharp">C#</option>
               <option value="css">CSS</option>
+              <option value="diff">Diff</option>
+              <option value="go">Go</option>
+              <option value="graphql">GraphQL</option>
               <option value="html">HTML</option>
+              <option value="ini">INI</option>
               <option value="java">Java</option>
               <option value="javascript">JavaScript</option>
               <option value="json">JSON</option>
+              <option value="kotlin">Kotlin</option>
+              <option value="less">Less</option>
+              <option value="lua">Lua</option>
+              <option value="makefile">Makefile</option>
+              <option value="markdown">Markdown</option>
+              <option value="objectivec">Objective-C</option>
+              <option value="perl">Perl</option>
+              <option value="php">PHP</option>
               <option value="python">Python</option>
+              <option value="r">R</option>
+              <option value="ruby">Ruby</option>
               <option value="rust">Rust</option>
+              <option value="scss">SCSS</option>
+              <option value="shell">Shell</option>
               <option value="sql">SQL</option>
+              <option value="swift">Swift</option>
               <option value="typescript">TypeScript</option>
+              <option value="vbnet">Visual Basic .NET</option>
+              <option value="wasm">WebAssembly</option>
+              <option value="xml">XML</option>
+              <option value="yaml">YAML</option>
             </select>
           </label>
         )}

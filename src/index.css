@@ -1051,3 +1051,4 @@ body {
   pointer-events: none;
   transform: translate(-50%, -50%);
 }
+.note-editor .ProseMirror p { white-space: pre-wrap; }
