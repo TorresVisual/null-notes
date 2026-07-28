@@ -189,9 +189,9 @@ Cheap, removes the "unfinished template" feel.
 
 ---
 
-## Phase 2 — Feel & Ergonomics (P2)
+## Phase 2 — Feel & Ergonomics (P2) — 3/4 done, P2-3 blocked
 
-**Milestone M2:** *Long editing sessions feel good; nothing fights me.*
+**Milestone M2 (not yet reached):** *Long editing sessions feel good; nothing fights me.* P2-1, P2-2, P2-4 are done; P2-3 is blocked on the M0 soak producing a real checklist, so M2 can't be called reached until that lands and gets cleared.
 
 The visual-design and editor-feel passes are already done (`docs/plans/visual-design-system.md`, `editor-feel.md`). This phase is the remaining ergonomics layer.
 
