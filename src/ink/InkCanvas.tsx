@@ -8,6 +8,7 @@ import {
   Circle,
   Square,
   MoveUpRight,
+  Ruler as RulerIcon,
   Trash2,
   Undo2,
   Redo2,
@@ -85,6 +86,8 @@ export function InkCanvas({
     setEraserSize,
     eraserMode,
     setEraserMode,
+    ruler,
+    toggleRuler,
     inkData,
     undo,
     redo,
@@ -168,6 +171,15 @@ export function InkCanvas({
             <Icon size={15} />
           </button>
         ))}
+        <button
+          className={`ink-tool${ruler ? ' active' : ''}`}
+          onClick={toggleRuler}
+          aria-pressed={ruler !== null}
+          aria-label="Ruler"
+          title="Ruler — draw along its edge; drag the middle to slide it, an end to swing it"
+        >
+          <RulerIcon size={15} />
+        </button>
         {hasSelection && (
           <button
             className="ink-tool ink-delete"

@@ -2,6 +2,16 @@ import { useRef, useState, useEffect, useCallback } from 'react'
 import { getStroke } from 'perfect-freehand'
 import { inkApi } from '../lib/ink'
 import { erase } from './pointEraser'
+import {
+  centredRuler,
+  grabKind,
+  moveRuler,
+  rotateRulerTowards,
+  shouldSnap,
+  snapStroke,
+  RULER_BAND,
+} from './ruler'
+import type { Ruler, RulerGrab } from './ruler'
 import { drawShapePreview } from './shapePreview'
 import { paintOrder } from './paintOrder'
 import {
@@ -40,6 +50,51 @@ const GROW_MARGIN = 160
 const PAGE_STEP = 400
 
 const LASSO_COLOR = 'rgba(126, 231, 135, 0.9)'
+
+const RULER_FILL = 'rgba(121, 192, 255, 0.10)'
+const RULER_EDGE = 'rgba(121, 192, 255, 0.8)'
+const RULER_TICK = 24
+
+// The ruler is drawn, never stored — like the lasso marquee, it is a thing you
+// are holding rather than a thing the note contains. Ticks come every grid
+// square so the straightedge measures in the same units the page is ruled in.
+function drawRuler(ctx: CanvasRenderingContext2D, ruler: Ruler): void {
+  const half = ruler.length / 2
+  ctx.save()
+  ctx.translate(ruler.x, ruler.y)
+  ctx.rotate(ruler.angle)
+
+  ctx.fillStyle = RULER_FILL
+  ctx.fillRect(-half, -RULER_BAND / 2, ruler.length, RULER_BAND)
+
+  ctx.strokeStyle = RULER_EDGE
+  ctx.lineWidth = 1.5
+  ctx.beginPath()
+  ctx.moveTo(-half, 0)
+  ctx.lineTo(half, 0)
+  ctx.stroke()
+
+  ctx.lineWidth = 1
+  ctx.beginPath()
+  for (let d = 0; d <= half; d += RULER_TICK) {
+    const long = d % (RULER_TICK * 4) === 0
+    const tick = long ? RULER_BAND / 2 : RULER_BAND / 4
+    for (const x of [d, -d]) {
+      ctx.moveTo(x, 0)
+      ctx.lineTo(x, tick)
+    }
+  }
+  ctx.stroke()
+
+  // The ends are the handles that swing it, so they are drawn as handles.
+  ctx.fillStyle = RULER_EDGE
+  for (const x of [-half, half]) {
+    ctx.beginPath()
+    ctx.arc(x, 0, 5, 0, Math.PI * 2)
+    ctx.fill()
+  }
+  ctx.restore()
+}
 
 interface InkOptions {
   zoom?: number
@@ -153,6 +208,7 @@ export function useInkCanvas(
 
   const [eraserSize, setEraserSizeState] = useState(loadEraserSize)
   const [eraserMode, setEraserModeState] = useState<EraserMode>(loadEraserMode)
+  const [ruler, setRuler] = useState<Ruler | null>(null)
   const [lassoPolygon, setLassoPolygon] = useState<LassoPoint[] | null>(null)
   const [selection, setSelection] = useState<Selection>(EMPTY_SELECTION)
 
@@ -160,6 +216,8 @@ export function useInkCanvas(
   const shapeStart = useRef<{ x: number; y: number } | null>(null)
   const eraseSnapshot = useRef<InkData | null>(null)
   const lassoPath = useRef<LassoPoint[]>([])
+  const rulerGrab = useRef<{ kind: RulerGrab; x: number; y: number } | null>(null)
+  const snapping = useRef(false)
   const dragSnapshot = useRef<InkData | null>(null)
   const dragFrom = useRef<LassoPoint | null>(null)
 
@@ -194,6 +252,12 @@ export function useInkCanvas(
     setEraserSizeState(clamped)
     saveEraserSize(clamped)
   }, [])
+
+  // The ruler arrives lying across the middle of the page you are looking at,
+  // not the middle of a page that has grown to twice the screen.
+  const toggleRuler = useCallback(() => {
+    setRuler((current) => (current ? null : centredRuler(inkData.width, height)))
+  }, [inkData.width, height])
 
   const setEraserMode = useCallback((next: EraserMode) => {
     setEraserModeState(next)
@@ -296,13 +360,21 @@ export function useInkCanvas(
       } else if (lassoPolygon) {
         strokeLasso(ctx, lassoPolygon, true)
       }
+      if (ruler) {
+        drawRuler(ctx, ruler)
+      }
     },
-    [inkData, color, size, opacity, zoom, lassoPolygon],
+    [inkData, color, size, opacity, zoom, lassoPolygon, ruler],
   )
 
   useEffect(() => {
     redrawCanvas([])
   }, [inkData, redrawCanvas])
+
+  const snappedPoints = useCallback(
+    (points: Point[]) => (snapping.current && ruler ? snapStroke(points, ruler) : points),
+    [ruler],
+  )
 
   const eraseAt = useCallback(
     (x: number, y: number) => {
@@ -317,6 +389,18 @@ export function useInkCanvas(
       if (e.pointerType !== 'pen') return
       capturePointer(canvasRef.current, e.pointerId)
       const activeTool = isEraserTip(e) ? 'eraser' : tool
+
+      // The straightedge is grabbed before any tool gets a look in — landing on
+      // it always means "put it somewhere else", whatever is in your hand.
+      if (ruler && !isEraserTip(e)) {
+        const x = e.offsetX / zoom
+        const y = e.offsetY / zoom
+        const kind = grabKind(x, y, ruler)
+        if (kind) {
+          rulerGrab.current = { kind, x, y }
+          return
+        }
+      }
 
       if (activeTool === 'eraser') {
         eraseSnapshot.current = inkData
@@ -346,15 +430,34 @@ export function useInkCanvas(
         shapeStart.current = { x: e.offsetX / zoom, y: e.offsetY / zoom }
         return
       }
-      currentStroke.current = [{ x: e.offsetX / zoom, y: e.offsetY / zoom, pressure: e.pressure }]
+      const start = { x: e.offsetX / zoom, y: e.offsetY / zoom, pressure: e.pressure }
+      // Judged once, at the start: a stroke that drifted on and off the edge
+      // partway through would be worse than one that never snapped at all.
+      snapping.current = ruler !== null && shouldSnap(start, ruler)
+      currentStroke.current = [start]
     },
-    [tool, inkData, eraseAt, zoom, lassoPolygon, selection, clearSelection],
+    [tool, inkData, eraseAt, zoom, lassoPolygon, selection, clearSelection, ruler],
   )
 
   const handlePointerMove = useCallback(
     (e: PointerEvent) => {
       if (e.pointerType !== 'pen') return
       const activeTool = isEraserTip(e) ? 'eraser' : tool
+
+      const grab = rulerGrab.current
+      if (grab) {
+        const x = e.offsetX / zoom
+        const y = e.offsetY / zoom
+        if (grab.kind === 'move') {
+          const dx = x - grab.x
+          const dy = y - grab.y
+          rulerGrab.current = { ...grab, x, y }
+          setRuler((current) => (current ? moveRuler(current, dx, dy) : current))
+        } else {
+          setRuler((current) => (current ? rotateRulerTowards(current, x, y) : current))
+        }
+        return
+      }
 
       if (activeTool === 'eraser') {
         // Only while the tip is actually down — hovering must not erase.
@@ -408,15 +511,22 @@ export function useInkCanvas(
           pressure: ce.pressure,
         })
       }
-      redrawCanvas(currentStroke.current)
+      redrawCanvas(snappedPoints(currentStroke.current))
     },
-    [tool, size, color, eraseAt, redrawCanvas, zoom, selection],
+    [tool, size, color, eraseAt, redrawCanvas, zoom, selection, snappedPoints],
   )
 
   const handlePointerUp = useCallback(
     (e: PointerEvent) => {
       if (e.pointerType !== 'pen') return
       releasePointer(canvasRef.current, e.pointerId)
+
+      // Where the ruler ends up is not an edit to the note, so it costs no
+      // history entry and no write.
+      if (rulerGrab.current) {
+        rulerGrab.current = null
+        return
+      }
 
       // Closing the loop is what selects — the path is discarded either way and
       // only the resulting marquee is kept, so nothing about a lasso is undoable.
@@ -495,19 +605,20 @@ export function useInkCanvas(
 
       const stroke: Stroke = {
         id: crypto.randomUUID(),
-        points: currentStroke.current,
+        points: snappedPoints(currentStroke.current),
         color,
         size,
         opacity,
       }
       currentStroke.current = []
+      snapping.current = false
       commit({
         ...inkData,
         height: grownHeight(inkData.height, stroke.points, autoGrow),
         strokes: [...inkData.strokes, stroke],
       })
     },
-    [tool, inkData, color, size, opacity, commit, svgPath, zoom, autoGrow, selection],
+    [tool, inkData, color, size, opacity, commit, svgPath, zoom, autoGrow, selection, snappedPoints],
   )
 
   const deleteSelected = useCallback(() => {
@@ -560,6 +671,8 @@ export function useInkCanvas(
     setEraserSize,
     eraserMode,
     setEraserMode,
+    ruler,
+    toggleRuler,
     inkData,
     undo,
     redo,

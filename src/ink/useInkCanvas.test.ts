@@ -100,6 +100,36 @@ describe('eraser size', () => {
   })
 })
 
+describe('ruler', () => {
+  beforeEach(() => localStorage.clear())
+
+  const render = () => renderHook(() => useInkCanvas('/ws/n.ink/s1.svg', 800, 600))
+
+  it('is out of the way until asked for', () => {
+    expect(render().result.current.ruler).toBeNull()
+  })
+
+  it('arrives lying across the middle of the page', () => {
+    const { result } = render()
+    act(() => result.current.toggleRuler())
+    expect(result.current.ruler).toMatchObject({ x: 400, y: 300, angle: 0 })
+  })
+
+  it('puts it away again', () => {
+    const { result } = render()
+    act(() => result.current.toggleRuler())
+    act(() => result.current.toggleRuler())
+    expect(result.current.ruler).toBeNull()
+  })
+
+  // It is a working aid, not part of the note — nothing about it is saved.
+  it('costs no undo history', () => {
+    const { result } = render()
+    act(() => result.current.toggleRuler())
+    expect(result.current.canUndo).toBe(false)
+  })
+})
+
 describe('eraser mode', () => {
   beforeEach(() => localStorage.clear())
 

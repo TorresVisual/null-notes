@@ -100,9 +100,32 @@ ids, because a derived id would collide the second time the same stroke is cut.
 The size slider follows whichever tool is in hand, and the eraser is measured as
 a diameter in page units — what you see under the cursor is what it takes.
 
-### Phase 5 — ruler ← *current*
+### Phase 5 — ruler — **done**
 
-- [ ] On-screen straightedge, rotatable, strokes snap to its edge
+- [x] On-screen straightedge, rotatable, strokes snap to its edge (`ruler.ts`)
+
+Drag the middle to slide it, either end to swing it about its centre. Landing on
+the band grabs the ruler whatever tool is in hand — reaching for a straightedge
+is never ambiguous. The eraser end of the pen is the exception, so you can still
+rub out what you just ruled without putting the ruler away.
+
+Snapping is decided once, from where the stroke began: judging per point would
+let a line drift on and off the edge partway through, which is worse than either
+snapping or not. The band you can grab and the margin that snaps are deliberately
+different sizes — a pen landing on the band moves the ruler rather than drawing,
+so if snapping stopped where the band did there would be nowhere left to draw
+against it. Points project onto the line extended past the ends, so running off
+the edge keeps the line straight instead of bunching every remaining point onto
+the last inch.
+
+Like the lasso marquee, the ruler is never serialised and costs no undo entry —
+it is a thing you are holding, not a thing the note contains.
+
+---
+
+**All five phases are done.** What the plan set out to build — a page you can
+write on that grows as you fill it, pens and a highlighter, lasso, erasers and a
+ruler — is in place.
 
 ## Explicitly not building
 
