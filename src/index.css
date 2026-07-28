@@ -831,14 +831,20 @@ body {
   background: var(--bg-raised);
 }
 
+/* The toolbar wraps rather than squeezing. Left to shrink, the text buttons go
+   first — they size to their label, so "Point" and "Stroke" collapse to nothing
+   while the fixed-width icon buttons hold their ground. */
 .ink-toolbar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 4px;
   padding: 6px 8px;
   background: var(--bg-raised);
   border-bottom: 1px solid var(--border);
 }
+
+.ink-toolbar > * { flex: none; }
 
 .ink-tool {
   width: 28px;
@@ -876,6 +882,7 @@ body {
   padding: 0 8px;
   font-size: 11px;
   letter-spacing: 0.02em;
+  white-space: nowrap;
 }
 
 .ink-delete { color: var(--danger, #ff7b72); }
