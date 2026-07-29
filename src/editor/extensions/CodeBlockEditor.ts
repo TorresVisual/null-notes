@@ -1,6 +1,7 @@
 import { CodeBlockLowlight } from '@tiptap/extension-code-block-lowlight'
 import { Plugin, TextSelection } from '@tiptap/pm/state'
 import { liftListItem, sinkListItem } from '@tiptap/pm/schema-list'
+import { joinTextblockBackward } from '@tiptap/pm/commands'
 import type { NodeType } from '@tiptap/pm/model'
 import type { EditorView } from '@tiptap/pm/view'
 
@@ -84,6 +85,27 @@ export function handleCodeBlockKeyDown(view: EditorView, event: KeyboardEvent): 
   return true
 }
 
+// TipTap's ListKeymap answers Backspace-at-item-start with liftListItem
+// unconditionally, so backspacing at the start of the *second* item tears the
+// list in half and leaves a paragraph wedged between the pieces. Every other
+// editor joins into the previous item there, and lifts only from the first
+// item — which ListKeymap still handles, so this only claims the join case.
+function shouldJoinIntoPreviousListItem(view: EditorView): boolean {
+  const { $from, empty } = view.state.selection
+  if (!empty || $from.parentOffset !== 0) return false
+
+  for (let depth = $from.depth; depth > 0; depth -= 1) {
+    const name = $from.node(depth).type.name
+    if (name !== 'listItem' && name !== 'taskItem') continue
+    // A later block inside the same item always has a textblock above it to
+    // merge into; only the item's *first* block needs a preceding item.
+    if ($from.index(depth) > 0) return true
+    return $from.index(depth - 1) > 0
+  }
+
+  return false
+}
+
 function findListItemType(view: EditorView): NodeType | null {
   const { $from } = view.state.selection
 
@@ -101,6 +123,13 @@ export function handleEditorKeyDown(view: EditorView, event: KeyboardEvent): boo
   if (event.key === 'Backspace') {
     const { $from, empty, from } = view.state.selection
     if (!empty || from === 0) return false
+
+    if (shouldJoinIntoPreviousListItem(view)) {
+      event.preventDefault()
+      // joinTextblockBackward, not joinBackward: the latter moves the item's
+      // whole content in as a sibling block, which just relocates the mess.
+      return joinTextblockBackward(view.state, view.dispatch, view)
+    }
 
     const opening = view.state.doc.textBetween(from - 1, from)
     const closing = OPENING_PAIRS[opening]

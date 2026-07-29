@@ -96,7 +96,9 @@ const TaskItemInLists = TaskItem.extend({
 })
 
 export const coreExtensions = [
-  StarterKit.configure({ code: false, codeBlock: false }),
+  // StarterKit 3 bundles its own Link; leaving it on registered the name twice
+  // and the app's own openOnClick/autolink config was the one that lost.
+  StarterKit.configure({ code: false, codeBlock: false, link: false }),
   CodeWithRegexpRule,
   CodeBlockEditor.configure({ lowlight }),
   Table.configure({ resizable: false }),
