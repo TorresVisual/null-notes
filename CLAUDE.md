@@ -91,6 +91,14 @@ Sidecar directories are named after the note (`Lecture 7.assets/`), so their pat
 
 ---
 
+## The PDF pipeline
+
+No OCR. A typeset PDF carries its own text layer, and reading it is exact where recognising pixels would only ever be a guess.
+
+`pdf/layout.rs` reconstructs document structure (lines, blocks, headings, code, lists, emphasis) from plain `CharBox` values and **must not gain a pdfium dependency**. Nothing in CI has the pdfium native library — the render tests are `#[ignore]`d for that reason — so a pdfium-free module is the only part of this pipeline that can actually be tested. `pdf/extract.rs` is the translation layer: it turns pdfium types into `CharBox` and makes no decisions. Put judgement in `layout`, plumbing in `extract`.
+
+Use `loose_bounds()`, not `tight_bounds()` — tight bounds cover a glyph's inked extent, so gap-based space detection fires after every comma. pdfium is synchronous, so page work belongs in `spawn_blocking`.
+
 ## TypeScript Guidelines
 
 ### Config

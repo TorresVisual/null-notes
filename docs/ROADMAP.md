@@ -1,6 +1,6 @@
 # null-notes — Product & Technical Roadmap
 
-**Last updated:** 2026-07-29 (**M0–M3 all reached** — P2-3 closed M2; re-scoped against `notes/Plan.md`; **Phases 5 "Versioned Workspaces" and 9 "Study & Revision" added** — the first features that go beyond the original brief. **Next: P4-1.**)
+**Last updated:** 2026-07-29 (**M0–M3 all reached** — P2-3 closed M2; **P4-1 done** — PDF→Markdown converts from the embedded text layer, no OCR; re-scoped against `notes/Plan.md`; **Phases 5 "Versioned Workspaces" and 9 "Study & Revision" added** — the first features that go beyond the original brief. **Next: P4-2.**)
 **Audience of this doc:** the maintainer (solo dev).
 **Product audience:** you — a personal, offline, daily-driver note app for CS coursework. This is **not** aimed at public distribution yet, which deliberately pushes packaging, cross-platform, auto-update, branding, and onboarding *down* the priority list. Correctness, data integrity, and the editor/ink/PDF workflow come first.
 
@@ -131,7 +131,7 @@ Given "personal daily driver," priority = **`(daily-use value) × (risk of data 
 | **P1** | Everyday-use completeness | **M1:** I don't reach for another app | ✅ | Small gaps that break flow (links, refresh, quick-switch) |
 | **P2** | Feel & ergonomics | **M2:** it's a pleasure to use for hours | ✅ | Compounding daily quality-of-life |
 | **P3** | Headline features & power tools | **M3:** the CS-specific superpowers land | ✅ | PDF-as-reference, export, graph |
-| **P4** | PDF→Markdown & exercise sheets | **M4:** an exercise sheet becomes a workable note in one step | ▶ next | The brief's own flagship; the biggest single time-saver |
+| **P4** | PDF→Markdown & exercise sheets | **M4:** an exercise sheet becomes a workable note in one step | 1/3 | The brief's own flagship; the biggest single time-saver |
 | **P5** | Versioned workspaces (Git automation) | **M5:** my notes commit themselves, in both kinds of repo | | The next tier of P0's data safety — a commit is a recoverable backup |
 | **P6** | STEM authoring | **M6:** writing maths/algorithms is faster here than anywhere else | | Compounds on every note; cheap, since the infra exists |
 | **P7** | IDE integration | **M7:** notes and code are one workflow, not two | | The brief's second pillar — "integrate, don't replace" |
@@ -345,7 +345,7 @@ Sync is out of scope as a *feature* (principle #2), but since files are plain `.
 
 ---
 
-## Phase 4 — PDF → Markdown & the Exercise-Sheet Workflow (P4) ▶ next
+## Phase 4 — PDF → Markdown & the Exercise-Sheet Workflow (P4) — P4-1 done, P4-2 next
 
 **Milestone M4:** *I can drop an exercise sheet into the app and immediately start writing solutions into it — as text I can edit, not a picture.*
 
@@ -355,7 +355,7 @@ P3-1 shipped **PDF as reference image** and cut the OCR pipeline. That decision 
 
 This is why P3-1's audit conclusion ("OCR is unsalvageable") and this phase are not in conflict: **the old pipeline was rasterising a PDF and then trying to read the pixels back, throwing away a text layer that was sitting right there.**
 
-### P4-1 — Import mode picker + text-layer extraction — **L**
+### P4-1 — Import mode picker + text-layer extraction — **L** ✅
 - At import, ask: **Pages** (current P3-1 behaviour) or **Markdown**. Remember the last choice.
 - Extract the text layer and reconstruct structure from geometry:
   - **Lines** — group chars by baseline y; **blocks** — group lines by vertical gap relative to median line height.
@@ -365,6 +365,23 @@ This is why P3-1's audit conclusion ("OCR is unsalvageable") and this phase are 
   - **Emphasis** — bold/italic font variants → `**`/`*`.
 - **Dependency:** P3-1 (rendering, sidecar directory, IPC shape).
 - **DoD:** A typeset exercise sheet imports into a `.md` note whose headings, paragraphs, lists and code blocks match the source's visual structure; the note is a normal editable note (not a viewer), and its text is returned by `Ctrl+K` search immediately — which also closes the brief's "search should include PDFs" gap for free. No `tesseract`/pix2tex dependency; works in a default `cargo build`.
+
+*Done. The import dialog asks Pages or Markdown per import and remembers the answer in `settings.json` (app-wide machine-local preference, same home as the autosave delay). The converted note is created through the ordinary `create_note`/`save_note`/`reindex_note` path, so it is editable and `Ctrl+K`-searchable with no special casing — the brief's "search should include PDFs" gap closes as a side effect, exactly as predicted.*
+
+***The structural decision: `pdf/layout.rs` takes plain `CharBox` values, not pdfium types.*** *That is what makes the algorithm testable at all — the test machine has no pdfium, and the two pre-existing render tests are `#[ignore]`d for exactly that reason. Keeping the judgement in a pdfium-free module bought 22 real tests driven through a small typesetter that lays glyphs out the way a PDF does; `pdf/extract.rs` is the thin translation layer and carries no decisions.*
+
+*The pdfium API turned out **better than this phase assumed**: `font_is_fixed_pitch()` gives code-block detection with no font-name list, and `font_weight()`/`font_is_italic()` give emphasis directly. Font-name matching is only still needed for P4-2's maths detection.*
+
+*Three things the tests forced, each a real bug rather than a tuning preference:*
+- *Baseline tolerance scales by the **larger** of the two font sizes. A superscript sorts above the line it belongs to, so anchoring to the row's first character let it set the tolerance from its own tiny size and reject its own line.*
+- *The line-gap median is the **lower** one. Line gaps outnumber paragraph gaps, so with only a couple of gaps to judge from, rounding toward the smaller is what keeps a paragraph break detectable.*
+- *Emphasis padding sits **outside** the markers — `**word ** after` is not emphasis in Markdown.*
+
+*Also: `loose_bounds()` rather than `tight_bounds()`, because tight bounds cover a glyph's inked extent and a comma would then leave a gap wide enough to fake a space after every one. Conversion runs in `spawn_blocking` (pdfium is synchronous) and **before** the note is created, so a failed conversion leaves no empty note behind.*
+
+*Scanned-PDF detection landed here rather than in P4-2 because it was five lines and P4-1 must not produce a garbage note. What is **not** done is P4-2's half: the message says "import it as pages instead" but does not yet offer the button that does so.*
+
+*Not verified against a real PDF — pdfium is not present on this machine, so the whole pdfium-facing path (`extract_pages_native`) is compile-checked only. The geometry it feeds is thoroughly tested; the translation into it is not.*
 
 ### P4-2 — Honest degradation: maths regions and scanned PDFs — **M**
 The two ways P4-1 can produce garbage. Both must fail visibly, never silently.
