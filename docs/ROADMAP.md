@@ -28,6 +28,25 @@
 3. **The file on disk is always safe.** No edit path may silently lose or corrupt a note.
 4. **Small, sharp feature set.** Three similar things is not a pattern; don't scaffold half-features.
 
+### The storage boundary
+
+Consistently honored by the code but never written down until now (2026-07-29), which is how invariants get broken by accident. **Where a file lives decides whether it syncs, and that is the entire contract between storage and sync.**
+
+| Inside the workspace folder → **travels with the notes** | In the OS app-data dir → **stays on this machine** |
+|---|---|
+| `.md` notes — the source of truth | `index.db` (`db/mod.rs`) |
+| `NoteName.ink/` sidecars (`ink.rs`) | `settings.json` (`settings.rs`) |
+| `NoteName.pdf/` page sidecars (`pdf.rs`) | `recent-workspaces.json` (`workspace.rs`) |
+| `.workspace.json` — UI state, gitignored | |
+
+Both sides are load-bearing:
+
+- **`index.db` is outside** because syncing a binary SQLite file produces conflicts nothing can merge — and it is *safe* to exclude only because principle #1 makes it rebuildable. The two rules hold each other up.
+- **Settings are outside** so machine-specific preferences don't fight across machines.
+- **Ink and PDF sidecars are inside** because a note whose drawings didn't travel with it is a broken note.
+
+**The rule for new state:** decide which column it belongs in *before* choosing a file format, because that choice determines whether the format must also be a merge format. P5 makes this concrete — anything inside the workspace is now committed and pushed automatically — and P9-3 is the first feature where getting it wrong would be expensive. Anything that is neither note content nor rebuildable from note content needs an explicit decision recorded here.
+
 ---
 
 ## 2. Current-state audit
@@ -531,7 +550,13 @@ The highest-value study feature and the one with a real architectural catch, so 
 - **Option B — sidecar file in the workspace.** A `.review.json` synced alongside the notes. Notes stay pristine and reviews never touch them. Cost: cards must be keyed by note path plus card identity, which reintroduces exactly the stable-identity problem the app has so far avoided by never needing one. Editing a card's text or moving its note can orphan its schedule silently.
 - **Option C — frontmatter.** Rejected on inspection: cards are per-*card*, not per-note, so a note with twelve cards needs a keyed list in its header — all of Option B's identity problem with none of Option A's locality.
 
-**Recommendation: Option A.** The write cost is affordable precisely because P0 was done properly — writes are atomic, debounced and conflict-aware, and reviews happen tens of times a day, not per keystroke. It is also the only option that keeps the `.md` file genuinely self-contained, which is principle #1 applied to a new kind of state.
+**The sync argument, which is decisive.** The options above were first weighed on rename-survival, but P5 makes a second consequence concrete: **review schedules will be committed and pushed automatically**, so the storage format is also a merge format.
+
+- **Option A** merges as text. Review on two machines and Git reconciles line-by-line; a genuine conflict is human-readable, sitting next to the card it belongs to.
+- **Option B** is a single JSON blob. Review on your laptop and your desktop the same day and Git sees one file rewritten on both sides — **a conflict no one can resolve by hand**, in a file whose whole purpose is to be invisible. That is a bad day waiting to happen, and P5-4's fast-forward-only rule doesn't save you: it correctly refuses to merge, so you're left resolving the blob manually anyway.
+- **`index.db`** wouldn't sync at all — schedules would diverge silently per machine, which is the worst outcome of the four and the reason principle #1 forbids it regardless.
+
+**Recommendation: Option A**, on three independent grounds. It survives renames and moves with no key tracking, in an app whose note `id` is deliberately non-stable (risk #6). It merges as text under P5's automation. And it keeps the `.md` genuinely self-contained, which is principle #1 applied to a new kind of state. The one real cost — every review writes a note file — is affordable precisely because P0 was done properly: writes are atomic, debounced and conflict-aware, and reviews happen tens of times a day, not per keystroke.
 
 Then, once decided:
 - Card syntax over existing notes — cloze deletion for hiding part of a definition, and a `Question :: Answer` form. **P6-1's theorem/proof blocks are natural cards for free** ("state this theorem" / "prove it"), which is the real argument for P6 preceding P9.

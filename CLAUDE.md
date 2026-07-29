@@ -76,6 +76,19 @@ Data integrity rules. Breaking one of these silently loses or corrupts a note.
 
 ---
 
+## The storage boundary
+
+Where a file lives decides whether it syncs. That is the whole contract between storage and sync, so it's a decision to make deliberately, not a side effect of picking a path.
+
+- **Inside the workspace folder** — travels with the notes: `.md` files, `NoteName.ink/` and `NoteName.pdf/` sidecars, and `.workspace.json` (UI state, gitignored).
+- **In the OS app-data dir** — stays on this machine: `index.db`, `settings.json`, `recent-workspaces.json`.
+
+`index.db` is outside because a binary SQLite file cannot be merged across machines, and it's safe to exclude only because it's rebuildable — those two facts hold each other up. Ink and PDF sidecars are inside because a note whose drawings didn't travel with it is a broken note.
+
+**Adding new state?** Pick the column before picking a file format. Anything inside the workspace is content that other machines will merge, so its format has to survive that. Anything that is neither note content nor rebuildable from note content needs the decision recorded in `docs/ROADMAP.md` §1.
+
+---
+
 ## TypeScript Guidelines
 
 ### Config
