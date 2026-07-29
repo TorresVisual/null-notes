@@ -18,6 +18,39 @@ pub async fn render_pages(
     }
 }
 
+// pdfium-render is a pure binding crate — the actual pdfium binary is a
+// separate download that has to sit somewhere findable at runtime. The
+// current working directory (what "./" resolves against) is reliable for
+// `cargo run`/`tauri dev` but not guaranteed for however a packaged build
+// gets launched, so this also tries next to the running executable before
+// falling back to whatever the OS considers a system library.
+#[cfg(feature = "pdf-native")]
+fn bind_pdfium() -> Result<pdfium_render::prelude::Pdfium> {
+    use pdfium_render::prelude::Pdfium;
+
+    let exe_dir_candidate = std::env::current_exe()
+        .ok()
+        .and_then(|p| p.parent().map(|p| p.to_path_buf()));
+
+    let bindings = Pdfium::bind_to_library(Pdfium::pdfium_platform_library_name_at_path("./"))
+        .or_else(|_| {
+            exe_dir_candidate
+                .map(|dir| Pdfium::bind_to_library(Pdfium::pdfium_platform_library_name_at_path(&dir)))
+                .unwrap_or_else(|| Pdfium::bind_to_system_library())
+        })
+        .or_else(|_| Pdfium::bind_to_system_library())
+        .map_err(|e| {
+            anyhow::anyhow!(
+                "pdfium ({}) not found — download a prebuilt release for this platform from \
+                 https://github.com/bblanchon/pdfium-binaries and place it next to null-notes.exe \
+                 (original error: {e})",
+                Pdfium::pdfium_platform_library_name().to_string_lossy(),
+            )
+        })?;
+
+    Ok(Pdfium::new(bindings))
+}
+
 // Pages render straight into the note's sidecar directory rather than a temp
 // dir — a note's PDF pages are meant to persist alongside it like ink
 // sketches do, not vanish with the next reboot.
@@ -27,12 +60,9 @@ async fn render_pages_native(
     out_dir: &Path,
     progress: impl Fn(usize, usize),
 ) -> Result<Vec<PdfPage>> {
-    use pdfium_render::prelude::{Pdfium, PdfRenderConfig};
+    use pdfium_render::prelude::PdfRenderConfig;
 
-    let pdfium = Pdfium::new(
-        Pdfium::bind_to_library(Pdfium::pdfium_platform_library_name_at_path("./"))
-            .or_else(|_| Pdfium::bind_to_system_library())?,
-    );
+    let pdfium = bind_pdfium()?;
 
     let doc = pdfium.load_pdf_from_file(pdf_path, None)?;
     let total = doc.pages().len() as usize;
