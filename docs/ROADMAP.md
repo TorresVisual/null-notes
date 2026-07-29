@@ -1,6 +1,6 @@
 # null-notes — Product & Technical Roadmap
 
-**Last updated:** 2026-07-27 (Phase 0 implemented; M0 awaits its real-use soak)
+**Last updated:** 2026-07-29 (M0–M3 reached; roadmap re-scoped against `notes/Plan.md` — Phases 4–8 are new)
 **Audience of this doc:** the maintainer (solo dev).
 **Product audience:** you — a personal, offline, daily-driver note app for CS coursework. This is **not** aimed at public distribution yet, which deliberately pushes packaging, cross-platform, auto-update, branding, and onboarding *down* the priority list. Correctness, data integrity, and the editor/ink/PDF workflow come first.
 
@@ -60,14 +60,43 @@ The editor and ink subsystems are the mature heart of the app. **They do not nee
 
 ### Confirmed risks / defects (independently verified in code)
 
-1. **Autosave writes on every keystroke with no debounce.** `NoteEditor.onUpdate` → `onChange` → `useNote.save` fires on each edit (`NoteEditor.tsx:30-33`, `useNote.ts:18-25`). Every keystroke = a full file write **plus** a full SQLite reindex of content (FTS), tags, and links (`save_note`, `notes.rs:201-236`). This is a latency and disk-churn problem that will get worse with long notes, and it couples typing latency to DB work.
-2. **Save failures are silent.** `save()` awaits `api.notes.save` and discards errors; there is no dirty indicator, no "unsaved"/"save failed" state, no retry. A failed write (disk full, permission, path moved) is invisible → **perceived data loss**. Violates principle #3.
-3. **No external-change awareness.** The workspace is scanned only on open. Editing a `.md` in another editor, a `git pull`, or Syncthing landing a change will not refresh the tree, and the FTS index silently goes stale. For a plain-files app this is a correctness gap.
-4. **Unresolved wiki-links are dead ends.** Clicking `[[Note That Doesn't Exist]]` does nothing (`WikiLink.tsx:18-20`). The classic "click to create the note" affordance is missing — a real friction point for note-linking workflows.
-5. **Wiki-link/backlink resolution is by title string only.** Two notes sharing a title are ambiguous; renaming a note's heading silently breaks inbound links. Acceptable for now, but a known sharp edge.
-6. **Note `id` is non-stable.** A fresh `Uuid::new_v4()` is minted on every scan/save (`notes.rs:159`, `213`, `257`). `path` is the real key; `id` is effectively decorative. Fine today, but don't build anything on `id`.
-7. **App identity is boilerplate.** `productName: "tauri-app"`, `identifier: com.moritz.tauri-app`, default 800×600 window, template README (`tauri.conf.json`, `README.md`). Cosmetic for personal use, but trivially fixable and currently makes the app feel unfinished.
-8. **No settings/preferences surface** and **no native app menu** — every capability lives behind an in-app button or a single hardcoded shortcut (`Ctrl+K`).
+> **Status as of 2026-07-29 — this list is historical.** Risks 1–5, 7 and 8 have been resolved by P0/P1/P2 (see each item's tag below). Risk 6 stands by choice. Kept verbatim rather than deleted because the reasoning is what justifies the save-path rules now codified in `CLAUDE.md`.
+
+1. **Autosave writes on every keystroke with no debounce.** `NoteEditor.onUpdate` → `onChange` → `useNote.save` fires on each edit (`NoteEditor.tsx:30-33`, `useNote.ts:18-25`). Every keystroke = a full file write **plus** a full SQLite reindex of content (FTS), tags, and links (`save_note`, `notes.rs:201-236`). This is a latency and disk-churn problem that will get worse with long notes, and it couples typing latency to DB work. — **✅ fixed, P0-1 + P0-3.**
+2. **Save failures are silent.** `save()` awaits `api.notes.save` and discards errors; there is no dirty indicator, no "unsaved"/"save failed" state, no retry. A failed write (disk full, permission, path moved) is invisible → **perceived data loss**. Violates principle #3. — **✅ fixed, P0-2.**
+3. **No external-change awareness.** The workspace is scanned only on open. Editing a `.md` in another editor, a `git pull`, or Syncthing landing a change will not refresh the tree, and the FTS index silently goes stale. For a plain-files app this is a correctness gap. — **✅ fixed, P0-5.**
+4. **Unresolved wiki-links are dead ends.** Clicking `[[Note That Doesn't Exist]]` does nothing (`WikiLink.tsx:18-20`). The classic "click to create the note" affordance is missing — a real friction point for note-linking workflows. — **✅ fixed, P1-1.**
+5. **Wiki-link/backlink resolution is by title string only.** Two notes sharing a title are ambiguous; renaming a note's heading silently breaks inbound links. Acceptable for now, but a known sharp edge. — **⚠️ half fixed, P1-3.** Rename now carries inbound links. Duplicate titles across folders are still ambiguous — unchanged, and still acceptable.
+6. **Note `id` is non-stable.** A fresh `Uuid::new_v4()` is minted on every scan/save (`notes.rs:159`, `213`, `257`). `path` is the real key; `id` is effectively decorative. Fine today, but don't build anything on `id`. — **🔵 stands, by choice.** See the de-scope table. Re-examine only if P6 (IDE integration) ends up needing a durable handle for deep links.
+7. **App identity is boilerplate.** `productName: "tauri-app"`, `identifier: com.moritz.tauri-app`, default 800×600 window, template README (`tauri.conf.json`, `README.md`). Cosmetic for personal use, but trivially fixable and currently makes the app feel unfinished. — **✅ fixed, P1-5**, except the app icon, which is still Tauri's default (needs an asset, not a code change).
+8. **No settings/preferences surface** and **no native app menu** — every capability lives behind an in-app button or a single hardcoded shortcut (`Ctrl+K`). — **✅ fixed, P2-1 + P2-2.**
+
+### Capability gap vs. the original brief (`notes/Plan.md`)
+
+M0–M3 cleared the *reliability* backlog, so the question is no longer "is it safe?" but "is it the app the brief describes?" Auditing `notes/Plan.md` line by line against the code, the answer is: the **editing core is complete**, and three of the brief's pillars were never on this roadmap at all.
+
+| Brief capability | State | Where it lands |
+|---|---|---|
+| Live preview, `.md`-only, GFM, KaTeX, Mermaid, code highlighting, callouts, tables, task lists, wiki-links/backlinks | ✅ Complete | — |
+| **Collapsible sections** | ❌ Missing | P5-1 |
+| **Templates** | ❌ Missing | P5-3 |
+| Vector ink blocks inline in the note | ✅ Complete | — |
+| PDF import **as reference image** | ✅ Complete | P3-1 |
+| **PDF import → Markdown** (the brief's flagship: OCR → equations → split into exercises) | ❌ Missing; OCR path cut in P3-1 | **P4** — rebuilt without OCR |
+| **Exercise/solution structure + "add next task"** | ❌ Missing | P4-3 |
+| **Proof blocks** (Theorem/Proof/Lemma/Corollary/Example) | ❌ Missing | P5-1 |
+| **Algorithm blocks** (Complexity/Pseudocode/Implementation/References) | ❌ Missing | P5-2 |
+| **Equation snippets** (`/gradient` → `\nabla f(x)`) | ❌ Missing (slash-command infra exists) | P5-4 |
+| **Terminal running `claude` against the open note** | ❌ Missing | **P7** |
+| **IDE integration**: open project docs, "Open in IDE" on code blocks, `src/main.cpp:58` deep links, per-project `notes/` | ❌ Missing — *entire pillar absent from this roadmap* | **P6** |
+| Search over equations + code | ✅ Effectively complete — FTS indexes the raw `.md`, so LaTeX source and code text are already searchable | — |
+| Search over PDFs | ❌ Missing — pages are images today | Falls out of P4 for free |
+| Search over handwriting | ❌ Missing — needs ink OCR | Cut (see §4) |
+| Graphviz, TikZ export | ❌ Missing | Challenged (see §4) |
+| Workspace remembers open notes + expanded folders | ✅ Complete | — |
+| Workspace remembers split panes, recent searches | ❌ Missing | Deferred (see §4) |
+
+**The re-scope this implies.** Phases 4–8 below are new; the old Phase 4 (AI assistant, code execution) is renumbered into **P8**. Ordering reflects the brief's own emphasis — it calls the PDF/exercise-sheet workflow "a flagship feature" worth "hours every semester," so that goes first, ahead of authoring polish.
 
 ---
 
@@ -75,23 +104,27 @@ The editor and ink subsystems are the mature heart of the app. **They do not nee
 
 Given "personal daily driver," priority = **`(daily-use value) × (risk of data loss or friction) ÷ effort`**. Reliability beats new features; new features beat polish; polish beats distribution; distribution is out of scope for now.
 
-| Phase | Theme | Milestone | Why it's here |
-|---|---|---|---|
-| **P0** | Trustworthy daily driver | **M0:** I trust it with my real notes | Data-integrity + save-path risks block everything |
-| **P1** | Everyday-use completeness | **M1:** I don't reach for another app | Small gaps that break flow (links, refresh, quick-switch) |
-| **P2** | Feel & ergonomics | **M2:** it's a pleasure to use for hours | Compounding daily quality-of-life |
-| **P3** | Headline features & power tools | **M3:** the CS-specific superpowers land | PDF decision, export, graph — high value, higher effort |
-| **P4** | Future / stretch | **M4:** AI + code execution (gated) | Explicitly deferred; do not let it pull focus |
+| Phase | Theme | Milestone | Status | Why it's here |
+|---|---|---|---|---|
+| **P0** | Trustworthy daily driver | **M0:** I trust it with my real notes | ✅ | Data-integrity + save-path risks block everything |
+| **P1** | Everyday-use completeness | **M1:** I don't reach for another app | ✅ | Small gaps that break flow (links, refresh, quick-switch) |
+| **P2** | Feel & ergonomics | **M2:** it's a pleasure to use for hours | 3/4 | Compounding daily quality-of-life |
+| **P3** | Headline features & power tools | **M3:** the CS-specific superpowers land | ✅ | PDF-as-reference, export, graph |
+| **P4** | PDF→Markdown & exercise sheets | **M4:** an exercise sheet becomes a workable note in one step | ▶ next | The brief's own flagship; the biggest single time-saver |
+| **P5** | STEM authoring | **M5:** writing maths/algorithms is faster here than anywhere else | | Compounds on every note; cheap, since the infra exists |
+| **P6** | IDE integration | **M6:** notes and code are one workflow, not two | | The brief's second pillar — "integrate, don't replace" |
+| **P7** | Embedded terminal | **M7:** `claude` runs against the open note without leaving the app | | Small effort; delivers the brief's AI ask without AI code |
+| **P8** | Gated stretch | **M8:** in-app AI + code execution | gated | Explicitly deferred; do not let it pull focus |
+
+Priority within the new phases follows the same formula (**daily value × friction ÷ effort**), which is why P5 (many small wins on infra that already exists) outranks P6 (a whole new integration surface) despite P6 being the more distinctive feature.
 
 ---
 
-## Phase 0 — Trustworthy Daily Driver (P0) 🔴 blocking
+## Phase 0 — Trustworthy Daily Driver (P0) ✅
 
-**Milestone M0:** *I can use this as my only note app for a week without fear of losing or corrupting a note.*
+**Milestone M0 reached (2026-07-29):** *I can use this as my only note app for a week without fear of losing or corrupting a note.* P0-1…P0-5 are implemented and their DoDs are met in code and tests — commits `beffda5` (P0-1…P0-4) and `fe22aaa` (P0-5) — and the real-use soak has now happened with **no data-loss incident**. The save path is trusted.
 
-**Status (2026-07-27):** P0-1…P0-5 are implemented and their DoDs are met in code and tests — commits `beffda5` (P0-1…P0-4) and `fe22aaa` (P0-5). **M0 itself is not signed off:** its exit check requires a several-day real-use soak, which is a human activity, not a code change.
-
-Nothing else matters until M0 is true. These are all reliability/data-integrity items.
+These were all reliability/data-integrity items, and they gated everything else. The rules they established are now codified in `CLAUDE.md`'s "The save path" section — **that section, not this phase, is the living contract**; every later phase that touches a note write is bound by it.
 
 ### P0-1 — Debounced autosave with explicit save state — **M** ✅
 Decouple typing from disk/DB work and make save status visible.
@@ -138,7 +171,7 @@ Keep the tree and index honest when files change underneath the app.
 
 *Done: `watch_workspace` (notify, 300 ms debounce) emits `workspace-changed`; `reindex_from_disk` re-reads changed files and forgets externally deleted ones; a clean buffer follows the disk, a dirty one gets the conflict bar (keep mine / reload theirs).*
 
-**Exit check for M0:** P0-1…P0-5 DoD all met ✅; a manual "use it for real for several days" soak with no data-loss incident — **outstanding, and the only thing between here and M0.** Keep the "annoyances during real use" list from that soak; P2-3 clears it.
+**Exit check for M0:** P0-1…P0-5 DoD all met ✅; real-use soak completed with no data-loss incident ✅. The soak did **not** produce a written annoyances list, so P2-3 is seeded from the items already named there rather than from a soak log — see P2-3.
 
 ---
 
@@ -189,16 +222,18 @@ Cheap, removes the "unfinished template" feel.
 
 ---
 
-## Phase 2 — Feel & Ergonomics (P2) — 3/4 done, P2-3 blocked
+## Phase 2 — Feel & Ergonomics (P2) — 3/4 done, P2-3 open
 
-**Milestone M2 (not yet reached):** *Long editing sessions feel good; nothing fights me.* P2-1, P2-2, P2-4 are done; P2-3 is blocked on the M0 soak producing a real checklist, so M2 can't be called reached until that lands and gets cleared.
+**Milestone M2 (not yet reached):** *Long editing sessions feel good; nothing fights me.* P2-1, P2-2, P2-4 are done. P2-3 is no longer blocked (the M0 soak is done) but is also no longer DoD-satisfiable as written — the soak produced no written annoyances list — so it has been re-specified against the concrete items it already named.
 
 The visual-design and editor-feel passes are already done (`docs/plans/visual-design-system.md`, `editor-feel.md`). This phase is the remaining ergonomics layer.
 
-### P2-1 — Settings / preferences surface — **M**
+### P2-1 — Settings / preferences surface — **M** ✅
 - A minimal settings panel: theme (if more than one), editor max-width/typography, autosave debounce interval, default workspace, spellcheck toggle. Persist to a config file (not SQLite — SQLite is a rebuildable index).
 - **Dependency:** P0-1 (autosave interval becomes a setting).
 - **DoD:** Changing a setting persists across restarts and takes effect without a reload where feasible.
+
+*Done (commits `6c21c5f`, `0b42917`) — this was shipped but never ticked here. `AppSettings` (autosave debounce, editor max width) persists to `settings.json` in the app data dir, deliberately **not** in SQLite (rebuildable index) and **not** in the workspace (app-wide preference, not per-workspace state) — same home as `recent-workspaces.json`. `SettingsPanel` writes through a Zustand store so changes apply live with no reload. Two of the bulleted settings are **not** built: theme (there is only one theme, so the control would be a no-op — deliberately not scaffolded) and the spellcheck toggle, which moves to P2-3 where the rest of the editor-niceties work lives.*
 
 ### P2-2 — Keyboard-shortcut layer + native menu — **M** ✅
 - A native app menu (File/Edit/View) and a discoverable shortcut sheet. Wire the actions that already exist (new note, new folder, search, toggle raw/WYSIWYG, insert ink).
@@ -207,12 +242,18 @@ The visual-design and editor-feel passes are already done (`docs/plans/visual-de
 
 *Done: a native File/Edit/View menu (`build_menu` in `lib.rs`) carries every primary action with its accelerator (New Note, New Folder, New Canvas Note, Open Workspace, Settings in File; clipboard actions in Edit; Search, Quick Switcher, Toggle Source/Preview, Insert Ink Block, Keyboard Shortcuts in View). `on_menu_event` emits one `menu-action` event; `Layout.tsx`'s `runCommand` is the single dispatcher both the menu and (for `?`, which has no natural accelerator) a narrow DOM listener call into — deliberately one source of truth per action so a native accelerator and a DOM keydown handler can't double-fire the same command. `useCreateFolder`/`useCreateCanvasNote` were extracted from Sidebar (mirroring `useCreateNote`) so the sidebar buttons and the menu share logic instead of duplicating it. "Insert ink" reaches the focused note via a plain `command:insert-ink` window event rather than lifting the TipTap editor instance up to `Layout`. `ShortcutsOverlay` lists all nine shortcuts.*
 
-### P2-3 — Editor niceties audit — **S/M** ⏸ blocked
-- Spellcheck toggle, drag-to-reorder or at least stable list behavior, paste-image-into-note handling, and a pass on focus/scroll restoration when switching tabs.
-- **Dependency:** none.
-- **DoD:** A short checklist of "annoyances during real use" (maintained during the M0 soak) is cleared.
+### P2-3 — Editor niceties audit — **S/M** — open, re-specified
+The M0 soak is done but produced no written annoyances list, so the original DoD ("clear the checklist from the soak") can never be satisfied as written. Rather than leave the task blocked forever on a log that doesn't exist, it is re-specified against the four items it already named — each independently verified as genuinely missing today:
 
-*Blocked, not skipped: the DoD is "clear the checklist from the M0 soak," and M0's soak is still outstanding (Phase 0's exit check) — there is no checklist yet to clear. Cherry-picking the bullet items without the checklist that motivates them would be exactly the kind of unrequested scaffolding the project principles warn against. Revisit once the soak has actually produced a list of real annoyances.*
+- [ ] **Spellcheck toggle.** `RawEditor.tsx:12` hardcodes `spellCheck={false}` and the WYSIWYG editor sets nothing at all. Wire both to a setting (the one P2-1 deliberately left out).
+- [ ] **Paste/drop an image into a note.** No paste or drop handler exists anywhere in `src/editor/` — the only `handleDrop` in the codebase is `TreeNode.tsx`'s file-move. Should store the image beside the note (the `NoteName.ink/` / `NoteName.pdf/` sidecar pattern already established) and insert a standard Markdown image.
+- [ ] **Focus/scroll restoration across tab switches.** Switching tabs and returning drops you at the top with no cursor.
+- [ ] **Stable list behavior** on Enter/Tab/Backspace at list boundaries.
+
+- **Dependency:** none (P2-1 for the spellcheck setting's home).
+- **DoD (revised):** All four boxes above are ticked, or explicitly struck with a reason. Any *new* annoyance found in ongoing daily use gets appended here rather than opening a fresh task.
+
+**Exit check for M2:** P2-3 cleared. P2-1, P2-2, P2-4 already done.
 
 ### P2-4 — Empty/onboarding states — **S** ✅
 - The current empty state is one line ("Open a workspace and select a note"). Add a friendly first-run: pick/create a workspace, create your first note, a hint at `Ctrl+K`/`Ctrl+P`.
@@ -265,15 +306,131 @@ Sync is out of scope as a *feature* (principle #2), but since files are plain `.
 
 ---
 
-## Phase 4 — Future / Stretch (P4) — explicitly gated
+## Phase 4 — PDF → Markdown & the Exercise-Sheet Workflow (P4) ▶ next
 
-**Milestone M4:** *Only after M0–M3 are solid.* These are the v2 vision from `docs/specs/tech-stack-design.md`, kept as a future phase per the maintainer's decision. **Do not let these influence P0–P3 design.**
+**Milestone M4:** *I can drop an exercise sheet into the app and immediately start writing solutions into it — as text I can edit, not a picture.*
 
-### P4-1 — AI assistance over the open note (Claude) — **L**
+P3-1 shipped **PDF as reference image** and cut the OCR pipeline. That decision stands and is not being reopened — but it only delivered half the brief. The app needs **both import modes**, the way Notion does: keep the page as an image *or* convert it to editable Markdown, chosen at import time.
+
+**The key insight that makes this cheap: exercise sheets don't need OCR.** They are LaTeX/Word-typeset PDFs that carry a real embedded text layer. `pdfium-render` 0.9 — already a default dependency since P3-1 — exposes `page.text()` → `PdfPageText` with `.chars()`, per-character loose bounding boxes, `chars_for_object()`, and `inside_rect()`, plus font name and size per text object. That is exact glyph geometry, for free, offline, with no `tesseract`, no pix2tex, no 500 MB model, and no new dependency. Structure reconstruction becomes deterministic geometry, not machine learning.
+
+This is why P3-1's audit conclusion ("OCR is unsalvageable") and this phase are not in conflict: **the old pipeline was rasterising a PDF and then trying to read the pixels back, throwing away a text layer that was sitting right there.**
+
+### P4-1 — Import mode picker + text-layer extraction — **L**
+- At import, ask: **Pages** (current P3-1 behaviour) or **Markdown**. Remember the last choice.
+- Extract the text layer and reconstruct structure from geometry:
+  - **Lines** — group chars by baseline y; **blocks** — group lines by vertical gap relative to median line height.
+  - **Headings** — font size significantly above the body-text median.
+  - **Code blocks** — runs in a monospace font family.
+  - **Lists** — leading bullet/number glyph plus a consistent indent.
+  - **Emphasis** — bold/italic font variants → `**`/`*`.
+- **Dependency:** P3-1 (rendering, sidecar directory, IPC shape).
+- **DoD:** A typeset exercise sheet imports into a `.md` note whose headings, paragraphs, lists and code blocks match the source's visual structure; the note is a normal editable note (not a viewer), and its text is returned by `Ctrl+K` search immediately — which also closes the brief's "search should include PDFs" gap for free. No `tesseract`/pix2tex dependency; works in a default `cargo build`.
+
+### P4-2 — Honest degradation: maths regions and scanned PDFs — **M**
+The two ways P4-1 can produce garbage. Both must fail visibly, never silently.
+- **Maths.** LaTeX-rendered equations have no LaTeX in the PDF — they are glyph runs in maths fonts (CMMI/CMSY/MSAM/STIX). Extracting them as text yields mangled nonsense. Detect maths-font runs and, instead of emitting text, **crop that region from the rendered page** (P3-1 already renders pages) and insert it as an inline image. Visually exact, zero ML, and honest about what it doesn't know.
+- **Scanned PDFs.** A near-empty text layer means there is nothing to convert. Detect it up front, say so plainly, and offer Pages mode instead of producing an empty or garbled note.
+- **Dependency:** P4-1.
+- **DoD:** A sheet with display and inline maths imports with every equation visually intact (as crops, not as corrupted text). A scanned PDF is detected before conversion and routed to Pages mode with an explanatory message — it never produces a garbage note.
+
+### P4-3 — Exercise splitting, solution scaffold, and "add next task" — **M**
+The part the brief says "would save students hours every semester."
+- Split the converted sheet on an exercise-heading pattern (`Aufgabe 3`, `Task 3`, `Exercise 3`, `Problem 3`, `3.`) into `## Task N` sections, each followed by a `### Solution` block.
+- **"Add next task"** — a command/button that appends the next correctly-numbered Task/Solution pair, so space per task is never something to plan in advance (the brief's explicit ask).
+- **Dependency:** P4-1. Independent of P4-2.
+- **DoD:** A sheet with 5 exercises converts to 5 `## Task N` + `### Solution` pairs; "add next task" appends a correctly-numbered sixth. Where the heading pattern doesn't match, the note converts as one unsplit document — a miss degrades to plain conversion, never to dropped content.
+
+**Exit check for M4:** both import modes work and are chosen at import; a real exercise sheet from a real course converts into a note that is genuinely faster to work in than transcribing by hand.
+
+---
+
+## Phase 5 — STEM Authoring (P5)
+
+**Milestone M5:** *Writing maths, proofs and algorithms is faster in this app than in any general note app.*
+
+Cheap phase with a high hit rate: the callout node, the slash-command menu, and the markdown-serialisation pattern all already exist, so most of these are configuration and a serializer rather than new subsystems. **Every new node must carry its own `addStorage().markdown.serialize/parse`** — per `CLAUDE.md`, a node without one silently serialises as escaped plain text, which is data loss in slow motion.
+
+### P5-1 — Proof blocks + collapsible sections — **M**
+- Theorem / Lemma / Corollary / Proof / Definition / Example blocks with optional numbering and a title.
+- Collapsible sections (`<details>`-equivalent) — a brief item never built, and the natural way to hide a long proof.
+- Build both on the existing `Callout` node's pattern rather than inventing a second block mechanism.
+- **DoD:** Each block type inserts from `/`, round-trips through save→reload with its type and title intact, and prints correctly in the P3-2 PDF export. Collapse state is presentation-only — it never changes the `.md` content.
+
+### P5-2 — Algorithm blocks — **M**
+- A block with Complexity / Pseudocode / Implementation / References slots, per the brief.
+- **Dependency:** P5-1 (same node pattern; build it second and reuse the machinery).
+- **DoD:** Round-trips to readable Markdown that still makes sense opened in any other editor — the plain-`.md` principle applies here more than anywhere, since this is the most structured node in the app.
+
+### P5-3 — Templates — **S/M**
+- A `templates/` folder in the workspace; "New from template" in the sidebar and File menu. Minimal placeholder substitution (date, title) and nothing more.
+- The exercise-sheet layout from P4-3 becomes the first real template.
+- **DoD:** Creating a note from a template produces the template's content with placeholders filled; templates are plain `.md` files, editable as normal notes.
+
+### P5-4 — Equation snippets — **S**
+- `/gradient` → `\nabla f(x)`, and a table of the common ones. The `SlashCommands` extension already provides the menu, so this is a data table plus a maths-mode filter.
+- **DoD:** Typing `/` inside a maths context offers snippets and inserts valid KaTeX; the list is one editable table, not code scattered per snippet.
+
+### P5-5 — Search refinement — **S**
+The brief asks search to cover "equations, code, handwritten notes, PDFs." Equations and code already work (FTS indexes the raw `.md`); PDFs arrive with P4-1; handwriting is cut (§4). What's actually missing is **scoping**.
+- Filter results by folder and by tag; keep a short recent-searches list (a brief workspace-memory item).
+- **DoD:** Search can be narrowed to a folder or tag without leaving the keyboard; recent searches persist per workspace.
+
+---
+
+## Phase 6 — IDE Integration (P6)
+
+**Milestone M6:** *Notes and code are one workflow. I never manually hunt for the file a note is talking about.*
+
+The brief's second pillar — **"IDE integration instead of IDE replacement"** — and the thing that most distinguishes this from Obsidian. It was entirely absent from this roadmap before 2026-07-29. It sits after P4/P5 because it opens a genuinely new surface (launching external processes) rather than building on existing infra.
+
+**Design constraint:** the note stays plain `.md`. A deep link is ordinary Markdown that degrades to readable text in any other editor — never a proprietary token.
+
+### P6-1 — Code deep links — **M**
+- Recognise `src/main.cpp:58` (and `path/file.rs#L20-L30`) in note text and make it clickable; clicking opens the configured editor at that file and line.
+- Resolve paths relative to the workspace root, or to a project root if the workspace is inside one.
+- **Security:** this executes an external process using text taken from a note. The launcher must pass the path as an argument to a configured command, never through a shell, and must refuse paths that escape the workspace/project root. Do not build the naive version.
+- **DoD:** Clicking a `file:line` reference opens the right file at the right line in the configured editor; an unresolvable path renders as inert text with a clear "not found" affordance, exactly like an unresolved wiki-link; a path containing shell metacharacters cannot cause command execution, and a test covers that.
+
+### P6-2 — "Open in IDE" on code blocks — **S**
+- A code block that carries a source path gets an "Open in IDE" action.
+- **Dependency:** P6-1 (same launcher, same path resolution, same guardrails).
+- **DoD:** The action appears only on blocks that actually have a resolvable path — never a dead button.
+
+### P6-3 — Project awareness & project notes — **M**
+- Open a code project as a workspace and surface its existing `README.md` / `docs/` / `notes/` directly, with no import step (the brief: "No importing").
+- Optionally scaffold a `notes/` folder (Architecture / Meeting / Research / Todo) on request — **on request only**, never automatically, and never writing into source folders.
+- **DoD:** Pointing the app at a code repo shows its Markdown immediately and correctly; scaffolding is opt-in and creates only inside `notes/`.
+
+### P6-4 — Editor command setting — **S**
+- A configurable launch command template (VS Code, JetBrains, Neovim…) in the P2-1 settings panel, with sensible detection of what's installed.
+- **Dependency:** P2-1. Land this **with** P6-1 — a hardcoded editor path would be an immediate rewrite.
+- **DoD:** Switching the configured editor changes where deep links open, with no code change.
+
+---
+
+## Phase 7 — Embedded Terminal (P7)
+
+**Milestone M7:** *I can run `claude` (or any CLI) against the note I'm looking at without leaving the app.*
+
+The brief's actual AI ask is *"a terminal in which I can do `claude` and work with the opened `.md` file"* — which is a **terminal feature, not an AI feature**. It is roughly an order of magnitude cheaper than the in-app assistant (P8-1), ships no AI code, adds no API key handling, and works with any CLI tool. Crucially, **the hard part is already built**: P0-5's watcher means a file edited by an external process is already detected, reloaded when clean, and conflict-prompted when dirty. The terminal is a client of infrastructure that exists.
+
+### P7-1 — Terminal pane — **M/L**
+- A terminal pane (PTY-backed) rooted at the workspace, with the active note's path readily available — an env var and a one-key insert.
+- **Dependency:** P0-5 (external-change handling is what makes CLI edits safe). Benefits from P2-2's command dispatcher for the toggle shortcut.
+- **DoD:** Running `claude` in the pane and having it edit the open note updates the editor through the existing watcher path, with no new reload logic and no conflict-handling special case. Closing the pane leaves no orphaned process.
+
+---
+
+## Phase 8 — Gated Stretch (P8) — explicitly gated
+
+**Milestone M8:** *Only after M0–M7 are solid.* The v2 vision from `docs/specs/tech-stack-design.md`. **Do not let these influence P0–P7 design.** *(These were P4-1 and P4-2 before the 2026-07-29 re-scope.)*
+
+### P8-1 — AI assistance over the open note (Claude) — **L**
 - An in-app assistant that reads/edits the active `.md` (summarize, explain, generate practice problems, tidy notes). Design it as an *optional* layer over the file — the note stays plain `.md`, and the app remains fully usable with the feature off.
-- **Gate:** requires M0 (safe writes) and a settled save-state machine so AI edits go through the same conflict-safe path as human edits.
+- **Gate:** requires M0 (safe writes) and a settled save-state machine so AI edits go through the same conflict-safe path as human edits. **Also gated on P7 proving insufficient** — if the terminal covers the need, this may never need building at all.
 
-### P4-2 — In-editor code execution (Python / C++) — **L**
+### P8-2 — In-editor code execution (Python / C++) — **L**
 - Run fenced code blocks and show output inline. Real sandboxing, toolchain detection, and security review required before this is more than a toy.
 - **Gate:** significant security surface; do not start without a dedicated design+security pass.
 
@@ -285,14 +442,19 @@ Per the mandate to remove work that doesn't earn its keep:
 
 | Feature | Verdict | Reasoning |
 |---|---|---|
-| **Automated OCR→LaTeX PDF pipeline (as spec'd)** | **De-scope to a spike (P3-1 Option B)**; ship "PDF as reference" instead | Broken skeleton, ~500 MB model + external binaries, degenerate bounding boxes, accuracy ceiling. Low value-per-effort for one user vs. the manual-reference alternative. |
+| **Automated OCR→LaTeX PDF pipeline (as spec'd)** | **Cut permanently** — superseded by P4, not revived | Broken skeleton, ~500 MB model + external binaries, degenerate bounding boxes, accuracy ceiling. P4 gets the same *outcome* (a sheet becomes editable Markdown) from the embedded text layer, so the OCR path has no remaining justification. The one thing OCR would still buy — scanned, image-only sheets — is handled by falling back to Pages mode (P4-2), which is the honest answer. |
+| **Handwriting search (ink OCR)** | **Cut** | The brief asks search to cover handwritten notes. That needs handwriting recognition — a harder problem than the print OCR just cut, for a much smaller payoff. Ink is for working through a proof, not for archival retrieval; tag or title the note instead. |
+| **Graphviz rendering** | **Challenged — not scheduled** | Mermaid already covers flowcharts, sequence, state and class diagrams. Graphviz means shipping a wasm build for the narrow gap (fine-grained graph layout). Revisit only if a real note actually needs DOT. |
+| **TikZ export** | **Challenged — not scheduled** | Niche even for this audience, and only useful when handing work to LaTeX. P3-2's PDF export already covers submission. |
+| **CodeMirror 6 as the editor** | **Superseded** | The brief named CodeMirror; the app is built on TipTap/ProseMirror, which is what makes WYSIWYG-with-inline-ink possible at all. Recorded so the brief's stack list isn't mistaken for a pending migration. |
 | **Cloud sync** | **Cut (stays out of scope)** | Violates local-first principle; plain `.md` + Git/Syncthing already covers it. Invest in *making manual sync painless* (P3-4), not building sync. |
 | **Mobile / tablet app** | **Cut** | Desktop + stylus is the whole point; a second platform is a different product. |
 | **Collaboration / multiplayer** | **Cut** | Single-user tool; enormous complexity for zero personal value. |
 | **Segment-level eraser, hold-to-snap shape recognition** | **Defer indefinitely** | Ink is already a daily-usable subsystem; these are diminishing-returns polish. Only revisit if real use demands it. |
 | **Distribution: installers, auto-update, code-signing, cross-platform** | **Out of scope now** | Personal tool. Revisit only if the audience decision changes to "ship to students." |
 | **Stable note `id` scheme** | **Defer** | `path` is the working key; don't invest until something actually needs stable IDs (e.g. an external integration). |
-| **Multi-window / split-pane editing** | **Defer** | Nice, but not blocking daily use; reconsider after M2. |
+| **Multi-window / split-pane editing** | **Defer — reconsider at P4** | Not blocking daily use. But the brief wants the workspace to remember split panes, and P4's "sheet on one side, solution on the other" is the first case with a concrete argument for it. Decide during P4 rather than in the abstract. |
+| **Workspace remembers AI conversations** | **Cut** | A brief workspace-memory item that presumes the in-app assistant. With P7 (terminal), conversation history belongs to the CLI tool, not to this app. |
 
 ---
 
@@ -302,24 +464,32 @@ Per the mandate to remove work that doesn't earn its keep:
 - **Performance budget:** typing latency is sacred — keep DB work off the keystroke path (P0-3). Search and tree refresh should stay sub-100 ms at a few hundred notes.
 - **Observability:** add lightweight logging behind the save/index/watch paths (P0) so a future "did it save?" question is answerable. No telemetry — local logs only.
 - **Clippy/typecheck gates:** `cargo clippy -- -D warnings`, `npm run typecheck`, `npm run test` stay green on every commit (per `CLAUDE.md`). Note: there is no `npm run lint` script — don't reference one.
+- **Markdown serialization (new, P5-critical):** every custom node must define `addStorage().markdown.serialize/parse`. A node without one serializes as escaped plain text — silent data loss. P5 adds more node types than any previous phase, so this is the phase where that rule gets tested.
+- **External process launching (new, P6/P7-critical):** P6 and P7 are the first features that run external programs, and P6-1 does so using text taken from note content. Pass paths as arguments to a configured command, never through a shell; refuse paths escaping the workspace/project root. This is the one genuinely new security surface on the roadmap.
 - **In-flight work:** the content-derived-title change to `notes.rs` has landed. A separate hazard was found and fixed during P0: `@tiptap/starter-kit` resolved a nested `@tiptap/core@3.29.1` against the pinned `3.27.4`, making every `Editor`/`Node` type nominally distinct and leaving `npm run typecheck` red on 4 errors. `package.json` now pins `@tiptap/core` and `@tiptap/pm` via `overrides` — don't remove them without re-checking typecheck.
 
 ---
 
 ## 6. Dependency map (critical path)
 
+Completed phases (P0–P3) are collapsed to their outbound edges; the live critical path is P2-3 onward.
+
 ```
-P0-1 debounced autosave ──┬─> P0-2 error surfacing
-                          ├─> P0-3 split index write
-                          └─> P0-5 external-change refresh ──> P1-3 link-preserving rename
-P0-4 atomic writes (parallel)                              └─> P3-3 graph, P3-4 sync
-P1-1 create-from-link ──> P1-3 rename ──────────────────────> P3-3 graph
-P1-2 quick-switcher ──> P2-2 shortcuts/menu ──> P2-4 onboarding
-P3-1 PDF decision (independent) ; P3-2 export (independent)
-P4-* gated behind M0
+[M0–M3 done] ──> P0-5 watcher ────────────────> P7-1 terminal
+             └─> P3-1 pdf render + sidecar ──> P4-1 text extraction ──┬─> P4-2 maths crops / scanned fallback
+             └─> P2-1 settings ─────────────> P6-4 editor command      └─> P4-3 exercise split + add-next-task
+                                                                              └─> P5-3 templates
+P2-3 editor niceties (independent, closes M2)
+P5-1 proof blocks + collapsible ──> P5-2 algorithm blocks
+P5-4 equation snippets (independent) ; P5-5 search refinement (independent)
+P6-1 deep links ──> P6-2 open-in-IDE ;  P6-4 lands *with* P6-1, not after
+P6-3 project awareness (independent)
+P8-* gated behind M7
 ```
 
-**Suggested execution order:** land the in-flight title change → P0-1 → P0-2 → P0-4 → P0-3 → P0-5 → **soak to M0** → P1-1 → P1-2 → P1-5 → P1-3 → P1-4 → **M1** → P2-* → **M2** → P3-1 decision → P3-2 → P3-3 → P3-4 → **M3** → (only then) P4.
+**Suggested execution order:** P2-3 → **M2** → P4-1 → P4-2 → P4-3 → **M4** → P5-1 → P5-2 → P5-3 → P5-4 → P5-5 → **M5** → P6-1 + P6-4 together → P6-2 → P6-3 → **M6** → P7-1 → **M7** → (only then) P8.
+
+Two orderings are deliberate and worth not reshuffling: **P4-2 before P4-3**, because splitting a sheet whose equations are garbage produces confidently-wrong output; and **P6-4 alongside P6-1**, because a hardcoded editor path would be an immediate rewrite.
 
 ---
 
@@ -335,4 +505,5 @@ The following are **intentionally not on this roadmap**. Adding any of them is a
 - Plugin system / third-party extension API.
 - Encryption-at-rest / DRM (plain `.md` is the point).
 - Any feature that makes the `.md` file on disk no longer the plain, portable source of truth.
+- **Becoming an IDE.** P6 integrates with your editor; it does not grow into one. No project-wide code navigation, no refactoring, no debugger, no language servers. The moment a P6 task starts wanting a language server, it is out of scope.
 ```
