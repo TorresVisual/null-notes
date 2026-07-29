@@ -6,6 +6,8 @@ Effort: **S** ≈ hours · **M** ≈ a day or two · **L** ≈ several days.
 
 **Now:** finish P2-3 to close M2, then start P4-1.
 
+**Two decisions owed before their phase starts:** split-pane editing (during P4) and spaced-repetition storage (before any P8-3 code).
+
 ---
 
 ## Progress
@@ -20,7 +22,8 @@ Effort: **S** ≈ hours · **M** ≈ a day or two · **L** ≈ several days.
 | P5 STEM authoring | M5 — fastest place to write maths | |
 | P6 IDE integration | M6 — notes and code are one workflow | |
 | P7 Embedded terminal | M7 — `claude` runs against the open note | |
-| P8 Gated stretch | M8 — in-app AI + code execution | gated |
+| P8 Study & revision | M8 — the app helps me *revise*, not just capture | |
+| P9 Gated stretch | M9 — in-app AI + code execution | gated |
 
 ---
 
@@ -91,6 +94,14 @@ Both import modes, chosen at import time, the way Notion does it. **No OCR** —
 - [ ] Filter results by folder and by tag, without leaving the keyboard
 - [ ] Recent-searches list, persisted per workspace
 
+### P5-6 Outline / TOC panel — **S**
+- [ ] Current note's headings in the right rail, click to jump
+- [ ] Highlight the heading currently in view
+- [ ] Share the rail with the backlinks panel — no third permanent column
+- [ ] Toggle on the P2-2 shortcut layer
+
+> No backend work — heading data is already in the ProseMirror doc. Proposed with the P8 study features but moved here: it's **S** and serves any long note, so parking it behind three phases would waste it.
+
 ---
 
 ## ▸ P6 — IDE integration (M6)
@@ -133,12 +144,48 @@ The brief's AI ask is a *terminal* feature, not an AI feature: no AI code, no AP
 
 ---
 
-## ▸ P8 — Gated stretch (M8)
+## ▸ P8 — Study & revision (M8)
 
-Do not let these influence P0–P7 design.
+The only phase not from the brief. Everything before it is *capture*; this is *retrieval* — what happens at exam time.
 
-- [ ] **P8-1 In-app AI assistant** — **L**. Gated on M0 *and* on P7 proving insufficient; if the terminal covers the need, this may never need building.
-- [ ] **P8-2 In-editor code execution** (Python / C++) — **L**. Gated on a dedicated design + security pass.
+> ⚠️ Study state is **data, not index.** Deleting `index.db` must lose nothing, so nothing here may keep its only copy in SQLite. Source of truth in the `.md`, derived table rebuilt by `reindex_note` — same shape as `note_tags`. **Test for every task: delete `index.db`, reopen, is anything gone?**
+
+### P8-1 Workspace-wide task view — **S/M** — *start here*
+- [ ] Extract `- [ ]` / `- [x]` into a `note_tasks` table (path, text, done, position), mirroring `note_tags`
+- [ ] Build it in the existing `reindex_note` path — inherits the P0-3 debounce and P0-5 watcher for free
+- [ ] View of open tasks grouped by note/folder; click jumps to the task
+- [ ] Ticking from the view writes through the normal save path
+- [ ] Delete `index.db`, reopen → identical list
+
+### P8-2 Formula sheet generation — **M**
+- [ ] Collect all block math across a scope (folder / tag / workspace)
+- [ ] Output a **generated note** — plain `.md`, editable afterwards, printable via P3-2
+- [ ] Deduplicate identical formulas
+- [ ] Optional caption: source note + heading
+- [ ] Generate on demand — **no live-updating magic file** that rewrites itself behind your back
+
+### P8-3 Spaced repetition — **decision, then L**
+- [ ] **Decide storage before writing any code** — not refactorable later; it determines what happens to every existing card when a note is renamed
+  - **A — inline HTML comment beside each card** *(recommended)*: `<!-- sr due=… ease=… interval=… -->`. Survives renames/moves/Git with no key tracking — which matters because note `id` is non-stable and `path` is the real key. Cost: reviews write note files and churn Git history.
+  - **B — `.review.json` sidecar**: notes stay pristine, but cards need stable keys — reintroduces the identity problem the app has avoided by never needing one. Editing a card or moving its note can silently orphan its schedule.
+  - **C — frontmatter**: rejected on inspection. Cards are per-*card*, not per-note, so it's all of B's identity problem with none of A's locality.
+- [ ] Card syntax: cloze deletion + `Question :: Answer`
+- [ ] **P5-1 theorem/proof blocks become cards for free** — the real reason P5 precedes P8
+- [ ] SM-2 scheduling + review session UI
+- [ ] Derived `review_cards` table for "what's due", rebuildable from the notes
+- [ ] Cards stay readable as plain Markdown in any other editor
+- [ ] Renaming/moving a note does not orphan its cards
+
+> This is the named trigger for the **frontmatter** decision deferred in the roadmap. If Option A wins, frontmatter may never be needed at all.
+
+---
+
+## ▸ P9 — Gated stretch (M9)
+
+Do not let these influence P0–P8 design.
+
+- [ ] **P9-1 In-app AI assistant** — **L**. Gated on M0 *and* on P7 proving insufficient; if the terminal covers the need, this may never need building.
+- [ ] **P9-2 In-editor code execution** (Python / C++) — **L**. Gated on a dedicated design + security pass.
 
 ---
 
@@ -210,6 +257,11 @@ Cut with reasoning in [ROADMAP §4](docs/ROADMAP.md#4-challenged--cut--de-scoped
 |---|---|
 | ~~OCR→LaTeX pipeline~~ | Cut permanently — P4 reaches the same outcome from the text layer |
 | ~~Handwriting search~~ | Needs handwriting recognition; ink is for working through a proof, not for retrieval |
+| ~~Version history / snapshots~~ | Challenged — Git already does this and P3-4 assumes a Git-synced workspace. If ever wanted, it's a thin read-only wrapper over `git log`, not a second storage system |
+| ~~Query blocks / Dataview-lite~~ | Challenged — a query language has no natural end, and it would pull frontmatter design forward speculatively. P5-5 filters + P8-1 task view cover the realistic 90% |
+| ~~Lecture audio + timestamped notes~~ | A different product surface bolted onto an app whose value is plain-text portability. An audio file is not a `.md` |
+| ~~Citations / BibTeX~~ | A thesis need, not a coursework one; Zotero exists |
+| ~~Presentation / slides mode~~ | Niche — P3-2's PDF export already covers sharing with a study group |
 | ~~Graphviz, TikZ export~~ | Challenged — Mermaid + PDF export already cover the real need |
 | ~~Cloud sync, mobile, collaboration~~ | Local-first, desktop, single-user — all three are a different product |
 | ~~Workspace remembers AI conversations~~ | Belongs to the CLI tool once P7 lands, not to this app |
