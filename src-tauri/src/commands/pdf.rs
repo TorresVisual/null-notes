@@ -45,6 +45,34 @@ pub async fn import_pdf_pages(
     .map_err(|e| e.to_string())
 }
 
+/// Converts a PDF's embedded text layer to Markdown. No OCR: a typeset sheet
+/// already carries its own text, and reading it is exact where recognising it
+/// would only ever be a guess.
+///
+/// Errors when the document has no usable text layer, which is the honest
+/// answer for a scan — the caller offers Pages mode instead of writing a note
+/// full of nothing.
+#[tauri::command]
+pub async fn import_pdf_markdown(pdf_path: String) -> Result<String, String> {
+    // pdfium is synchronous and a long sheet is real work, so it must not run
+    // on the async executor.
+    tokio::task::spawn_blocking(move || {
+        let pages = crate::pdf::extract::extract_pages(Path::new(&pdf_path))
+            .map_err(|e| e.to_string())?;
+
+        if pages.iter().all(|page| page.is_effectively_empty()) {
+            return Err(
+                "This PDF has no text layer — it looks like a scan. Import it as pages instead."
+                    .to_string(),
+            );
+        }
+
+        Ok(crate::pdf::extract::pages_to_markdown(&pages))
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
 #[tauri::command]
 pub async fn read_pdf_page(path: String) -> Result<String, String> {
     let bytes = tokio::fs::read(&path).await.map_err(|e| e.to_string())?;

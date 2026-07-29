@@ -25,7 +25,7 @@ pub async fn render_pages(
 // gets launched, so this also tries next to the running executable before
 // falling back to whatever the OS considers a system library.
 #[cfg(feature = "pdf-native")]
-fn bind_pdfium() -> Result<pdfium_render::prelude::Pdfium> {
+pub fn bind_pdfium() -> Result<pdfium_render::prelude::Pdfium> {
     use pdfium_render::prelude::Pdfium;
 
     let exe_dir_candidate = std::env::current_exe()

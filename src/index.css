@@ -1215,6 +1215,82 @@ body {
   display: block;
 }
 
+/* PDF import: pages-vs-markdown choice, asked once per import */
+.import-mode-dialog {
+  background: var(--bg-raised);
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  padding: var(--space-lg);
+  width: min(460px, 90vw);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.import-mode-dialog h2 {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
+  margin-bottom: var(--space-xs);
+}
+
+.import-mode-option {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-md);
+  padding: var(--space-md);
+  background: var(--bg-hover);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-primary);
+  text-align: left;
+  cursor: pointer;
+}
+
+.import-mode-option:hover,
+.import-mode-option:focus-visible {
+  border-color: var(--accent);
+}
+
+.import-mode-option.preferred {
+  border-color: var(--border-strong);
+}
+
+.import-mode-option svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--accent);
+}
+
+.import-mode-option span {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.import-mode-option strong {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.import-mode-option small {
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--text-tertiary);
+}
+
+.import-mode-cancel {
+  align-self: flex-end;
+  margin-top: var(--space-xs);
+  padding: 5px 12px;
+  background: none;
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+}
+
 /* Pasted/dropped images, stored in the note's .assets sidecar */
 .note-image {
   display: inline-block;

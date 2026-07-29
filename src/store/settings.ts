@@ -5,6 +5,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   autosaveDebounceMs: 600,
   editorMaxWidthPx: 800,
   spellcheck: false,
+  pdfImportMode: 'pages',
 }
 
 interface SettingsStore {

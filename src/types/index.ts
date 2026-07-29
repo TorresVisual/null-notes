@@ -23,10 +23,13 @@ export interface WorkspaceState {
   expandedFolders: string[]
 }
 
+export type PdfImportMode = 'pages' | 'markdown'
+
 export interface AppSettings {
   autosaveDebounceMs: number
   editorMaxWidthPx: number
   spellcheck: boolean
+  pdfImportMode: PdfImportMode
 }
 
 export interface GraphLink {

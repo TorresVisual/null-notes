@@ -13,11 +13,13 @@ describe('useSettingsStore', () => {
       autosaveDebounceMs: 1200,
       editorMaxWidthPx: 960,
       spellcheck: true,
+      pdfImportMode: 'markdown',
     })
     expect(useSettingsStore.getState().settings).toEqual({
       autosaveDebounceMs: 1200,
       editorMaxWidthPx: 960,
       spellcheck: true,
+      pdfImportMode: 'markdown',
     })
   })
 })

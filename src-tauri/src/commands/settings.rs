@@ -52,12 +52,14 @@ mod tests {
             autosave_debounce_ms: 1200,
             editor_max_width_px: 960,
             spellcheck: true,
+            pdf_import_mode: crate::models::PdfImportMode::Markdown,
         };
         save_settings_to_dir(dir.path(), &original).await.unwrap();
         let loaded = load_settings_from_dir(dir.path()).await.unwrap();
         assert_eq!(loaded.autosave_debounce_ms, 1200);
         assert_eq!(loaded.editor_max_width_px, 960);
         assert!(loaded.spellcheck);
+        assert_eq!(loaded.pdf_import_mode, crate::models::PdfImportMode::Markdown);
     }
 
     // A settings.json written before spellcheck existed must still load, or
@@ -76,6 +78,7 @@ mod tests {
 
         assert_eq!(loaded.autosave_debounce_ms, 900);
         assert!(!loaded.spellcheck);
+        assert_eq!(loaded.pdf_import_mode, crate::models::PdfImportMode::Pages);
     }
 
     #[tokio::test]
