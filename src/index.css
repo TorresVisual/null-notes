@@ -1137,6 +1137,18 @@ body {
   font-size: 13px;
 }
 
+/* The rule above is written for the number inputs; a checkbox inherits it as
+   a 72px-wide dark box with no visible tick. */
+.settings-row-control input[type='checkbox'] {
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  background: none;
+  border: none;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
 .settings-unit {
   font-size: 11px;
   color: var(--text-tertiary);
