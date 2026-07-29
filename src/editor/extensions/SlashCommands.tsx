@@ -121,6 +121,17 @@ const COMMANDS: Cmd[] = [
     },
   },
   {
+    title: 'Inline Equation',
+    description: 'LaTeX inside a line of text',
+    run: ({ editor, range }) =>
+      editor
+        .chain()
+        .focus()
+        .deleteRange(range)
+        .insertContent({ type: 'inlineMath', attrs: { latex: '' } })
+        .run(),
+  },
+  {
     title: 'Block Math',
     description: 'LaTeX block equation',
     run: ({ editor, range }) => {
