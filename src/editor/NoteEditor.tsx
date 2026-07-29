@@ -1,7 +1,9 @@
 import { useEditor, EditorContent } from '@tiptap/react'
 import { useEffect, useRef, useState } from 'react'
 import { PenLine } from 'lucide-react'
+import { TextSelection } from '@tiptap/pm/state'
 import { coreExtensions } from './extensions'
+import { rememberPosition, recallPosition } from '../lib/notePositions'
 import { handleEditorKeyDown, handleEditorTextInput } from './extensions/CodeBlockEditor'
 import { inkApi } from '../lib/ink'
 import type { InkData } from '../ink/types'
@@ -75,15 +77,43 @@ export function NoteEditor({ content, notePath, spellcheck, onChange }: NoteEdit
     editor.storage.noteContext.notePath = notePath
   }, [editor, notePath])
 
+  // Recording on selectionUpdate rather than on unmount: the editor is already
+  // destroyed by the time an unmount cleanup could read its state.
   useEffect(() => {
     if (!editor) return
-    const refreshToolbar = () => setEditorVersion((version) => version + 1)
-    editor.on('selectionUpdate', refreshToolbar)
+    const onSelectionUpdate = () => {
+      setEditorVersion((version) => version + 1)
+      rememberPosition(notePath, { selection: editor.state.selection.anchor })
+    }
+    editor.on('selectionUpdate', onSelectionUpdate)
 
     return () => {
-      editor.off('selectionUpdate', refreshToolbar)
+      editor.off('selectionUpdate', onSelectionUpdate)
     }
-  }, [editor])
+  }, [editor, notePath])
+
+  // Runs once per note. The remembered offset came from a document that may
+  // since have changed on disk, so TextSelection.near resolves to the closest
+  // valid place instead of throwing on a position that is no longer a
+  // text position.
+  const restoredFor = useRef<string | null>(null)
+  useEffect(() => {
+    if (!editor || restoredFor.current === notePath) return
+    restoredFor.current = notePath
+    const remembered = recallPosition(notePath)
+    if (!remembered) return
+
+    editor.commands.command(({ tr, dispatch }) => {
+      const position = Math.min(remembered.selection, tr.doc.content.size)
+      dispatch?.(tr.setSelection(TextSelection.near(tr.doc.resolve(position))))
+      return true
+    })
+    // scrollIntoView off: focus() otherwise scrolls the cursor into view from
+    // inside a rAF, landing after the scroll restore and overriding it. When
+    // the two disagree, what the user was looking at wins over where the
+    // cursor happened to be.
+    editor.commands.focus(null, { scrollIntoView: false })
+  }, [editor, notePath, content])
 
   async function insertInkBlock() {
     if (!editor) return

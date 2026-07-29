@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import type { NoteMetadata } from '../types'
+import { forgetPosition } from '../lib/notePositions'
 
 interface NotesStore {
   notes: NoteMetadata[]
@@ -20,6 +21,10 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
   setFolders: (folders) => set({ folders }),
   setTags: (tags) => set({ tags }),
   addNote: (note) => set({ notes: [note, ...get().notes] }),
-  removeNote: (path) =>
-    set({ notes: get().notes.filter((n) => n.path !== path) }),
+  removeNote: (path) => {
+    // Path is the key everywhere, so a remembered cursor/scroll offset would
+    // otherwise be handed to whatever note next takes this path.
+    forgetPosition(path)
+    set({ notes: get().notes.filter((n) => n.path !== path) })
+  },
 }))

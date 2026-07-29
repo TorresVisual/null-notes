@@ -21,6 +21,7 @@ import { useExternalChanges } from '../hooks/useExternalChanges'
 import { useCreateNote } from '../hooks/useCreateNote'
 import { useCreateFolder } from '../hooks/useCreateFolder'
 import { useCreateCanvasNote } from '../hooks/useCreateCanvasNote'
+import { useScrollRestoration } from '../hooks/useScrollRestoration'
 import { ConflictBar } from './ConflictBar'
 import { api } from '../lib/tauri'
 
@@ -57,6 +58,7 @@ export function Layout() {
   const [graphOpen, setGraphOpen] = useState(false)
   const settings = useSettingsStore((s) => s.settings)
   const setSettings = useSettingsStore((s) => s.setSettings)
+  const scrollRef = useScrollRestoration(activeTab, isLoading)
 
   // The backend vetoes the close and hands control here so a pending edit
   // reaches disk first; the window only dies once confirmClose is called.
@@ -185,7 +187,7 @@ export function Layout() {
           onDismissSaveError={dismissError}
         />
         {conflict && <ConflictBar onKeepMine={keepMine} onReloadTheirs={reloadTheirs} />}
-        <div className="editor-scroll">
+        <div className="editor-scroll" ref={scrollRef}>
           <div
             className="editor-pane"
             style={{ '--editor-max-width': `${settings.editorMaxWidthPx}px` } as CSSProperties}
