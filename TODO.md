@@ -4,7 +4,7 @@ Feature checklist. **The [roadmap](docs/ROADMAP.md) holds the reasoning and the 
 
 Effort: **S** ≈ hours · **M** ≈ a day or two · **L** ≈ several days.
 
-**Now:** finish P2-3 to close M2, then start P4-1.
+**Now:** M2 is closed. Start P4-1.
 
 **Two decisions owed before their phase starts:** split-pane editing (during P4) and spaced-repetition storage (before any P9-3 code).
 
@@ -16,7 +16,7 @@ Effort: **S** ≈ hours · **M** ≈ a day or two · **L** ≈ several days.
 |---|---|---|
 | P0 Trustworthy daily driver | M0 — I trust it with my real notes | ✅ |
 | P1 Everyday-use completeness | M1 — I don't reach for another app | ✅ |
-| P2 Feel & ergonomics | M2 — a pleasure to use for hours | 3/4 |
+| P2 Feel & ergonomics | M2 — a pleasure to use for hours | ✅ |
 | P3 Headline features | M3 — the CS superpowers land | ✅ |
 | P4 PDF→Markdown & exercise sheets | M4 — a sheet becomes a workable note | ▶ next |
 | P5 Versioned workspaces (Git) | M5 — my notes commit themselves | |
@@ -25,18 +25,6 @@ Effort: **S** ≈ hours · **M** ≈ a day or two · **L** ≈ several days.
 | P8 Embedded terminal | M8 — `claude` runs against the open note | |
 | P9 Study & revision | M9 — the app helps me *revise*, not just capture | |
 | P10 Gated stretch | M10 — in-app AI + code execution | gated |
-
----
-
-## ▸ P2 — Feel & ergonomics (closes M2)
-
-### P2-3 Editor niceties — **S/M**
-- [ ] Spellcheck toggle — `RawEditor.tsx:12` hardcodes `spellCheck={false}`, WYSIWYG sets nothing; wire both to a setting
-- [ ] Paste/drop an image into a note — no handler exists in `src/editor/`; store beside the note like `NoteName.ink/`, insert standard Markdown image
-- [ ] Focus/scroll restoration when switching tabs
-- [ ] Stable list behaviour on Enter/Tab/Backspace at list boundaries
-
-> Append any new annoyance found in daily use here rather than opening a fresh task.
 
 ---
 
@@ -264,12 +252,18 @@ Do not let these influence P0–P9 design.
 </details>
 
 <details>
-<summary><strong>P2 — Feel & ergonomics (3/4)</strong></summary>
+<summary><strong>P2 — Feel & ergonomics (M2 ✅)</strong></summary>
 
 - [x] P2-1 Settings panel — autosave delay, editor width; persists to `settings.json` in the app data dir
 - [x] P2-2 Native File/Edit/View menu + shortcuts overlay, one command dispatcher
 - [x] P2-4 Onboarding empty states
-- [ ] P2-3 — see above
+- [x] P2-3 Editor niceties — all four boxes:
+  - [x] Spellcheck toggle driving both editors, off by default; `#[serde(default)]` so a pre-existing `settings.json` still loads
+  - [x] Paste/drop images into a `NoteName.assets/` sidecar as ordinary `![alt](path)` Markdown *(paths are URL-encoded only at the Markdown boundary — sidecar names contain spaces, and a bare space ends a link destination)*
+  - [x] Cursor + scroll restored per note across tab switches
+  - [x] Backspace at the start of a non-first list item joins into the previous item instead of tearing the list in half
+
+> Append any new annoyance found in daily use to a fresh P2-3 box here rather than opening a new task.
 
 </details>
 

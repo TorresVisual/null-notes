@@ -9,9 +9,10 @@ Desktop-primary (Tauri + Windows), local-first, and offline.
 Notes are plain `.md` files on disk — that's the source of truth. A SQLite
 index (full-text search, tags, backlinks) lives in the OS app-data
 directory, not inside the workspace, and is fully rebuildable from the files
-at any time; deleting it loses nothing. Ink drawings and imported PDF pages
-are stored as sidecar files next to their note (`NoteName.ink/`,
-`NoteName.pdf/`).
+at any time; deleting it loses nothing. Ink drawings, imported PDF pages and
+pasted images are stored as sidecar files next to their note
+(`NoteName.ink/`, `NoteName.pdf/`, `NoteName.assets/`) — inside the
+workspace, so they travel with the notes they belong to.
 
 ## Syncing a workspace
 

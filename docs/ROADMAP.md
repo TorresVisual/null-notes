@@ -1,6 +1,6 @@
 # null-notes — Product & Technical Roadmap
 
-**Last updated:** 2026-07-29 (M0–M3 reached; re-scoped against `notes/Plan.md`; **Phases 5 "Versioned Workspaces" and 9 "Study & Revision" added** — the first features that go beyond the original brief)
+**Last updated:** 2026-07-29 (**M0–M3 all reached** — P2-3 closed M2; re-scoped against `notes/Plan.md`; **Phases 5 "Versioned Workspaces" and 9 "Study & Revision" added** — the first features that go beyond the original brief. **Next: P4-1.**)
 **Audience of this doc:** the maintainer (solo dev).
 **Product audience:** you — a personal, offline, daily-driver note app for CS coursework. This is **not** aimed at public distribution yet, which deliberately pushes packaging, cross-platform, auto-update, branding, and onboarding *down* the priority list. Correctness, data integrity, and the editor/ink/PDF workflow come first.
 
@@ -37,13 +37,14 @@ Consistently honored by the code but never written down until now (2026-07-29), 
 | `.md` notes — the source of truth | `index.db` (`db/mod.rs`) |
 | `NoteName.ink/` sidecars (`ink.rs`) | `settings.json` (`settings.rs`) |
 | `NoteName.pdf/` page sidecars (`pdf.rs`) | `recent-workspaces.json` (`workspace.rs`) |
+| `NoteName.assets/` pasted images (`assets.rs`) | |
 | `.workspace.json` — UI state, gitignored | |
 
 Both sides are load-bearing:
 
 - **`index.db` is outside** because syncing a binary SQLite file produces conflicts nothing can merge — and it is *safe* to exclude only because principle #1 makes it rebuildable. The two rules hold each other up.
 - **Settings are outside** so machine-specific preferences don't fight across machines.
-- **Ink and PDF sidecars are inside** because a note whose drawings didn't travel with it is a broken note.
+- **Ink, PDF and image sidecars are inside** because a note whose drawings or figures didn't travel with it is a broken note. `NoteName.assets/` (P2-3) is the third of the same shape and needed no new argument — which is the point of having written the rule down.
 
 **The rule for new state:** decide which column it belongs in *before* choosing a file format, because that choice determines whether the format must also be a merge format. P5 makes this concrete — anything inside the workspace is now committed and pushed automatically — and P9-3 is the first feature where getting it wrong would be expensive. Anything that is neither note content nor rebuildable from note content needs an explicit decision recorded here.
 
@@ -128,7 +129,7 @@ Given "personal daily driver," priority = **`(daily-use value) × (risk of data 
 |---|---|---|---|---|
 | **P0** | Trustworthy daily driver | **M0:** I trust it with my real notes | ✅ | Data-integrity + save-path risks block everything |
 | **P1** | Everyday-use completeness | **M1:** I don't reach for another app | ✅ | Small gaps that break flow (links, refresh, quick-switch) |
-| **P2** | Feel & ergonomics | **M2:** it's a pleasure to use for hours | 3/4 | Compounding daily quality-of-life |
+| **P2** | Feel & ergonomics | **M2:** it's a pleasure to use for hours | ✅ | Compounding daily quality-of-life |
 | **P3** | Headline features & power tools | **M3:** the CS-specific superpowers land | ✅ | PDF-as-reference, export, graph |
 | **P4** | PDF→Markdown & exercise sheets | **M4:** an exercise sheet becomes a workable note in one step | ▶ next | The brief's own flagship; the biggest single time-saver |
 | **P5** | Versioned workspaces (Git automation) | **M5:** my notes commit themselves, in both kinds of repo | | The next tier of P0's data safety — a commit is a recoverable backup |
@@ -246,9 +247,9 @@ Cheap, removes the "unfinished template" feel.
 
 ---
 
-## Phase 2 — Feel & Ergonomics (P2) — 3/4 done, P2-3 open
+## Phase 2 — Feel & Ergonomics (P2) ✅
 
-**Milestone M2 (not yet reached):** *Long editing sessions feel good; nothing fights me.* P2-1, P2-2, P2-4 are done. P2-3 is no longer blocked (the M0 soak is done) but is also no longer DoD-satisfiable as written — the soak produced no written annoyances list — so it has been re-specified against the concrete items it already named.
+**Milestone M2 reached (2026-07-29):** *Long editing sessions feel good; nothing fights me.* P2-1, P2-2 and P2-4 were already done; P2-3 was the last box and is now cleared. It was no longer DoD-satisfiable as originally written — the M0 soak produced no annoyances list — so it was re-specified against the four concrete items it already named, all four of which shipped.
 
 The visual-design and editor-feel passes are already done (`docs/plans/visual-design-system.md`, `editor-feel.md`). This phase is the remaining ergonomics layer.
 
@@ -266,18 +267,28 @@ The visual-design and editor-feel passes are already done (`docs/plans/visual-de
 
 *Done: a native File/Edit/View menu (`build_menu` in `lib.rs`) carries every primary action with its accelerator (New Note, New Folder, New Canvas Note, Open Workspace, Settings in File; clipboard actions in Edit; Search, Quick Switcher, Toggle Source/Preview, Insert Ink Block, Keyboard Shortcuts in View). `on_menu_event` emits one `menu-action` event; `Layout.tsx`'s `runCommand` is the single dispatcher both the menu and (for `?`, which has no natural accelerator) a narrow DOM listener call into — deliberately one source of truth per action so a native accelerator and a DOM keydown handler can't double-fire the same command. `useCreateFolder`/`useCreateCanvasNote` were extracted from Sidebar (mirroring `useCreateNote`) so the sidebar buttons and the menu share logic instead of duplicating it. "Insert ink" reaches the focused note via a plain `command:insert-ink` window event rather than lifting the TipTap editor instance up to `Layout`. `ShortcutsOverlay` lists all nine shortcuts.*
 
-### P2-3 — Editor niceties audit — **S/M** — open, re-specified
-The M0 soak is done but produced no written annoyances list, so the original DoD ("clear the checklist from the soak") can never be satisfied as written. Rather than leave the task blocked forever on a log that doesn't exist, it is re-specified against the four items it already named — each independently verified as genuinely missing today:
+### P2-3 — Editor niceties audit — **S/M** ✅
+The M0 soak is done but produced no written annoyances list, so the original DoD ("clear the checklist from the soak") could never be satisfied as written. Rather than leave the task blocked forever on a log that doesn't exist, it was re-specified against the four items it already named — each independently verified as genuinely missing at the time:
 
-- [ ] **Spellcheck toggle.** `RawEditor.tsx:12` hardcodes `spellCheck={false}` and the WYSIWYG editor sets nothing at all. Wire both to a setting (the one P2-1 deliberately left out).
-- [ ] **Paste/drop an image into a note.** No paste or drop handler exists anywhere in `src/editor/` — the only `handleDrop` in the codebase is `TreeNode.tsx`'s file-move. Should store the image beside the note (the `NoteName.ink/` / `NoteName.pdf/` sidecar pattern already established) and insert a standard Markdown image.
-- [ ] **Focus/scroll restoration across tab switches.** Switching tabs and returning drops you at the top with no cursor.
-- [ ] **Stable list behavior** on Enter/Tab/Backspace at list boundaries.
+- [x] **Spellcheck toggle.** `RawEditor.tsx:12` hardcoded `spellCheck={false}` and the WYSIWYG editor set nothing at all. Wired both to a setting (the one P2-1 deliberately left out).
+- [x] **Paste/drop an image into a note.** No paste or drop handler existed anywhere in `src/editor/` — the only `handleDrop` in the codebase was `TreeNode.tsx`'s file-move. Now stores the image beside the note (the `NoteName.ink/` / `NoteName.pdf/` sidecar pattern) and inserts a standard Markdown image.
+- [x] **Focus/scroll restoration across tab switches.** Switching tabs and returning dropped you at the top with no cursor.
+- [x] **Stable list behavior** on Enter/Tab/Backspace at list boundaries.
 
 - **Dependency:** none (P2-1 for the spellcheck setting's home).
 - **DoD (revised):** All four boxes above are ticked, or explicitly struck with a reason. Any *new* annoyance found in ongoing daily use gets appended here rather than opening a fresh task.
 
-**Exit check for M2:** P2-3 cleared. P2-1, P2-2, P2-4 already done.
+*Done. **Spellcheck** is one `AppSettings` field driving both editors, defaulting **off** — the raw editor had already made that choice deliberately, and squiggles under every identifier and LaTeX token are noise in a maths-and-code notebook. The field is `#[serde(default)]` because `settings.json` had already shipped without it; a file written by an older build must keep loading rather than dropping the user back to defaults. The toggle goes through `setOptions` because ProseMirror re-applies `editorProps.attributes` on every state update, so setting the DOM attribute directly would be undone on the next keystroke.*
+
+***Images** land in a `NoteName.assets/` sidecar — the third of the same shape, inside the workspace per §1's storage boundary, because a note whose figures didn't travel with it is a broken note. The note itself gets an ordinary `![alt](path)`. Two things only the round-trip tests would have caught: sidecar directories are named after the note and so routinely contain spaces (`Lecture 7.assets/`), and a bare space ends a Markdown link destination — the image silently stopped being an image on the next reload. The attribute now holds the raw filesystem path and encoding happens only at the Markdown boundary; storing the encoded form would need an idempotent encoder and `encodeURI` is not one (it escapes `%`, so every save grew `%20` into `%2520`). `read_note_asset` resolves a path taken from hand-editable note content, so anything but a plain forward-relative path is refused rather than normalised — the §5 "external process / untrusted path" rule applied to file reads.*
+
+***Cursor and scroll** are remembered per note path in a session-scoped module map — the editor unmounts while the next note loads, so neither can live in component state. Deliberately not persisted: where the cursor sat is not note content. The cursor is recorded on `selectionUpdate`, not on unmount, where the editor is already destroyed by the time a cleanup could read it. `focus()` had to be called with `scrollIntoView: false`: it scrolls from inside a `requestAnimationFrame` that lands after the scroll restore and overrode it — when the two disagree, what the user was looking at wins over where the cursor was.*
+
+***Lists** had one real defect, found by writing the boundary cases out as tests: TipTap's `ListKeymap` answers Backspace-at-item-start with `liftListItem` unconditionally, so backspacing at the start of the second item tore the list in half and left a paragraph wedged between the pieces. That case is now claimed ahead of `ListKeymap` and joined into the previous textblock; lifting stays correct for the first item, which `ListKeymap` still handles. The other three behaviours (Enter-exits, Enter-outdents-nested, Tab/Shift-Tab) were already correct and now have tests. Two incidental findings: StarterKit 3 bundles its own `Link`, so the app was registering the name twice and its own `openOnClick`/`autolink` config was the one that lost — now disabled in StarterKit. And the serializer emits a blank line before a nested **task** list but not a nested bullet list; it round-trips to the same structure, so it is left alone and recorded here rather than chased.*
+
+*One methodological note worth keeping: the first version of the list tests mounted the editor without `NoteEditor`'s `editorProps`, so the handlers under test were not installed at all and the tests passed against an editor the app never builds. Any test of key handling has to mount the real configuration.*
+
+**Exit check for M2:** P2-3 cleared ✅. P2-1, P2-2, P2-4 already done ✅. **M2 reached (2026-07-29).**
 
 ### P2-4 — Empty/onboarding states — **S** ✅
 - The current empty state is one line ("Open a workspace and select a note"). Add a friendly first-run: pick/create a workspace, create your first note, a hint at `Ctrl+K`/`Ctrl+P`.
@@ -355,7 +366,7 @@ This is why P3-1's audit conclusion ("OCR is unsalvageable") and this phase are 
 The two ways P4-1 can produce garbage. Both must fail visibly, never silently.
 - **Maths.** LaTeX-rendered equations have no LaTeX in the PDF — they are glyph runs in maths fonts (CMMI/CMSY/MSAM/STIX). Extracting them as text yields mangled nonsense. Detect maths-font runs and, instead of emitting text, **crop that region from the rendered page** (P3-1 already renders pages) and insert it as an inline image. Visually exact, zero ML, and honest about what it doesn't know.
 - **Scanned PDFs.** A near-empty text layer means there is nothing to convert. Detect it up front, say so plainly, and offer Pages mode instead of producing an empty or garbled note.
-- **Dependency:** P4-1.
+- **Dependency:** P4-1. The crop mechanism already exists: P2-3 added the `NoteName.assets/` sidecar and an inline `image` node that renders a stored file, so this needs the region geometry and the crop, not new plumbing.
 - **DoD:** A sheet with display and inline maths imports with every equation visually intact (as crops, not as corrupted text). A scanned PDF is detected before conversion and routed to Pages mode with an explanatory message — it never produces a garbage note.
 
 ### P4-3 — Exercise splitting, solution scaffold, and "add next task" — **M**
@@ -626,14 +637,13 @@ Per the mandate to remove work that doesn't earn its keep:
 
 ## 6. Dependency map (critical path)
 
-Completed phases (P0–P3) are collapsed to their outbound edges; the live critical path is P2-3 onward.
+Completed phases (P0–P3) are collapsed to their outbound edges; the live critical path is P4-1 onward.
 
 ```
 [M0–M3 done] ──> P0-5 watcher ────────────────> P8-1 terminal
              └─> P3-1 pdf render + sidecar ──> P4-1 text extraction ──┬─> P4-2 maths crops / scanned fallback
              └─> P2-1 settings ─────────────> P7-4 editor command      └─> P4-3 exercise split + add-next-task
-                                                                              └─> P6-3 templates
-P2-3 editor niceties (independent, closes M2)
+             └─> P2-3 .assets sidecar ──────> P4-2 maths region crops   └─> P6-3 templates
 P6-1 proof blocks + collapsible ──┬─> P6-2 algorithm blocks
                                   └─> P9-3 spaced repetition (theorem blocks = cards)
 P6-4 equation snippets (independent) ; P6-5 search refinement (independent)
@@ -649,7 +659,7 @@ P9-3 storage fork ──> P9-3 implementation ──> (frontmatter decision reso
 P10-* gated behind M9
 ```
 
-**Suggested execution order:** P2-3 → **M2** → P4-1 → P4-2 → P4-3 → **M4** → P5-1 → P5-2 → P5-3 → P5-4 → P5-5 → **M5** → P6-1 → P6-2 → P6-3 → P6-4 → P6-5 → P6-6 → **M6** → P7-1 + P7-4 together → P7-2 → P7-3 → **M7** → P8-1 → **M8** → P9-1 → P9-2 → P9-3 fork → P9-3 → **M9** → (only then) P10.
+**Suggested execution order:** ~~P2-3 → **M2**~~ (done) → P4-1 → P4-2 → P4-3 → **M4** → P5-1 → P5-2 → P5-3 → P5-4 → P5-5 → **M5** → P6-1 → P6-2 → P6-3 → P6-4 → P6-5 → P6-6 → **M6** → P7-1 + P7-4 together → P7-2 → P7-3 → **M7** → P8-1 → **M8** → P9-1 → P9-2 → P9-3 fork → P9-3 → **M9** → (only then) P10.
 
 Four orderings are deliberate and worth not reshuffling:
 - **P4-2 before P4-3** — splitting a sheet whose equations are garbage produces confidently-wrong output.

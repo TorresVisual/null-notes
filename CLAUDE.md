@@ -80,10 +80,12 @@ Data integrity rules. Breaking one of these silently loses or corrupts a note.
 
 Where a file lives decides whether it syncs. That is the whole contract between storage and sync, so it's a decision to make deliberately, not a side effect of picking a path.
 
-- **Inside the workspace folder** — travels with the notes: `.md` files, `NoteName.ink/` and `NoteName.pdf/` sidecars, and `.workspace.json` (UI state, gitignored).
+- **Inside the workspace folder** — travels with the notes: `.md` files, `NoteName.ink/`, `NoteName.pdf/` and `NoteName.assets/` sidecars, and `.workspace.json` (UI state, gitignored).
 - **In the OS app-data dir** — stays on this machine: `index.db`, `settings.json`, `recent-workspaces.json`.
 
-`index.db` is outside because a binary SQLite file cannot be merged across machines, and it's safe to exclude only because it's rebuildable — those two facts hold each other up. Ink and PDF sidecars are inside because a note whose drawings didn't travel with it is a broken note.
+`index.db` is outside because a binary SQLite file cannot be merged across machines, and it's safe to exclude only because it's rebuildable — those two facts hold each other up. Ink, PDF and image sidecars are inside because a note whose drawings or figures didn't travel with it is a broken note.
+
+Sidecar directories are named after the note (`Lecture 7.assets/`), so their paths routinely contain spaces. A path that reaches a `.md` file has to be URL-encoded, because a bare space ends a Markdown link destination. Encode at the Markdown boundary only — the in-memory attribute holds the raw path, since `encodeURI` escapes `%` and so is not idempotent.
 
 **Adding new state?** Pick the column before picking a file format. Anything inside the workspace is content that other machines will merge, so its format has to survive that. Anything that is neither note content nor rebuildable from note content needs the decision recorded in `docs/ROADMAP.md` §1.
 
@@ -173,6 +175,8 @@ const { strokes, addStroke, undo } = useInkCanvas(canvasRef)
 Each custom node type lives in its own file under `src/editor/extensions/`. Export a configured `Extension` object, not a raw class.
 
 Markdown conversion has no central serializer — `tiptap-markdown` drives it, and each node carries its own `addStorage().markdown.serialize/parse`. A node without one serializes as escaped plain text.
+
+Key handling that must run *before* the keymap plugins (and so before StarterKit's `ListKeymap`) lives in `NoteEditor`'s `editorProps`, not in an extension — ProseMirror checks direct props first. Any test of key behaviour has to mount with those same `editorProps`, or it exercises an editor the app never builds.
 
 `@tiptap/core` and `@tiptap/pm` are pinned via `overrides` in `package.json`. Without them `starter-kit` pulls a second copy of core and every `Editor`/`Node` type becomes nominally distinct — typecheck fails with unreadable errors far from the cause.
 
