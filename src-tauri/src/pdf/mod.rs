@@ -4,4 +4,6 @@ pub mod models;
 pub mod renderer;
 
 #[cfg(test)]
+mod dump;
+#[cfg(test)]
 mod layout_tests;

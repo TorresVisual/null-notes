@@ -9,6 +9,8 @@
 //! keeps the entire algorithm unit-testable without the native library — the
 //! test suite has no pdfium, so anything that touched it would be untestable.
 
+use unicode_normalization::UnicodeNormalization;
+
 /// One character as the PDF places it. PDF user space puts the origin at the
 /// bottom-left, so a **larger `y` is higher up the page**.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -57,7 +59,12 @@ pub enum Block {
     Heading { level: u8, spans: Vec<Span> },
     Paragraph { spans: Vec<Span> },
     Code { text: String },
-    ListItem { ordered: bool, depth: usize, spans: Vec<Span> },
+    ListItem {
+        ordered: bool,
+        number: Option<u32>,
+        depth: usize,
+        spans: Vec<Span>,
+    },
 }
 
 // Chars on one line share a baseline, but superscripts, subscripts and inline
@@ -79,6 +86,27 @@ const LIST_INDENT_EMS: f32 = 2.0;
 /// Lower median. Deliberately not the upper one: line gaps outnumber
 /// paragraph gaps, so when a document has only a couple of gaps to judge from,
 /// rounding towards the smaller keeps the paragraph break detectable.
+/// The standalone accent glyphs LaTeX's Computer Modern fonts emit, mapped to
+/// their combining forms. CM has no precomposed "ü": it prints a `u` and then
+/// a diaeresis positioned over it, so the text layer hands back "fu¨r" where
+/// the document plainly says "für". Rewriting the accent as combining and
+/// normalising puts the word back together.
+fn combining_form(c: char) -> Option<char> {
+    Some(match c {
+        '\u{00A8}' => '\u{0308}', // diaeresis
+        '\u{00B4}' => '\u{0301}', // acute
+        '\u{0060}' => '\u{0300}', // grave
+        '\u{005E}' => '\u{0302}', // circumflex
+        '\u{007E}' => '\u{0303}', // tilde
+        '\u{00AF}' => '\u{0304}', // macron
+        '\u{02C7}' => '\u{030C}', // caron
+        '\u{02D8}' => '\u{0306}', // breve
+        '\u{02DA}' => '\u{030A}', // ring
+        '\u{00B8}' => '\u{0327}', // cedilla
+        _ => return None,
+    })
+}
+
 fn median(values: &mut [f32]) -> f32 {
     if values.is_empty() {
         return 0.0;
@@ -102,17 +130,32 @@ pub fn group_lines(chars: &[CharBox]) -> Vec<Line> {
     });
 
     let mut rows: Vec<Vec<CharBox>> = Vec::new();
+    // The row's reference baseline, taken from the largest character in it so
+    // far. Anchoring to the row's *first* character instead is wrong twice
+    // over: a row opened by a raised footnote marker keeps measuring from that
+    // marker's baseline, which shifts the whole tolerance window up and drops
+    // a diacritic sitting at the bottom of it — the umlaut of "abzuschätzen"
+    // ends up stranded on a line of its own. Body text is the largest thing on
+    // a line, so it is what the line should be measured from.
+    let mut anchor: Option<CharBox> = None;
+
     for ch in sorted {
-        // Scaled by the larger of the two sizes, not the row's first character.
-        // A superscript sorts above the line it belongs to and would otherwise
-        // set the tolerance from its own tiny size and reject its own line.
-        let same_line = rows.last().and_then(|row| row.first()).is_some_and(|first| {
-            let scale = first.font_size.max(ch.font_size).max(1.0);
-            (first.y - ch.y).abs() <= scale * BASELINE_TOLERANCE
+        let same_line = anchor.is_some_and(|a| {
+            let scale = a.font_size.max(ch.font_size).max(1.0);
+            (a.y - ch.y).abs() <= scale * BASELINE_TOLERANCE
         });
+
         match rows.last_mut() {
-            Some(row) if same_line => row.push(ch),
-            _ => rows.push(vec![ch]),
+            Some(row) if same_line => {
+                if ch.font_size > anchor.map(|a| a.font_size).unwrap_or(0.0) {
+                    anchor = Some(ch);
+                }
+                row.push(ch);
+            }
+            _ => {
+                anchor = Some(ch);
+                rows.push(vec![ch]);
+            }
         }
     }
 
@@ -120,7 +163,19 @@ pub fn group_lines(chars: &[CharBox]) -> Vec<Line> {
 }
 
 fn build_line(mut row: Vec<CharBox>) -> Line {
-    row.sort_by(|a, b| a.x.partial_cmp(&b.x).unwrap_or(std::cmp::Ordering::Equal));
+    row.sort_by(|a, b| {
+        a.x.partial_cmp(&b.x)
+            .unwrap_or(std::cmp::Ordering::Equal)
+            // An accent is placed at its letter's own x, so the two tie. It has
+            // to land after the letter to combine with it, and which side of
+            // the tie it fell on was otherwise decided by the order pdfium
+            // happened to emit them in.
+            .then_with(|| {
+                combining_form(a.ch)
+                    .is_some()
+                    .cmp(&combining_form(b.ch).is_some())
+            })
+    });
 
     let mut sizes: Vec<f32> = row.iter().map(|c| c.font_size).collect();
     let font_size = median(&mut sizes);
@@ -136,17 +191,53 @@ fn build_line(mut row: Vec<CharBox>) -> Line {
     let mut previous_end: Option<f32> = None;
 
     for ch in &row {
+        let after_space = spans
+            .last()
+            .is_some_and(|s| s.text.ends_with(char::is_whitespace));
+
+        // Word separation is decided by geometry, so a run of space glyphs
+        // (PDFs emit plenty, several of them zero-width) must not become a run
+        // of spaces. Leading whitespace is the exception: it is indentation,
+        // and a code block's indentation is the only structure it has.
+        // previous_end is set by printing characters alone, so its absence
+        // means the run being collapsed is still the leading one.
+        if ch.ch.is_whitespace() {
+            if previous_end.is_none() || !after_space {
+                push_char(&mut spans, ' ', false, false);
+            }
+            continue;
+        }
+
+        // An accent glyph sorts to just after the letter it sits above, so it
+        // attaches to whatever was last emitted. With nothing before it there
+        // is nothing to combine with, and it stays the standalone character.
+        if let Some(combining) = combining_form(ch.ch) {
+            if !after_space && !spans.is_empty() {
+                push_char(&mut spans, combining, ch.bold, ch.italic);
+                // Still advance the cursor. An accent usually overlays its
+                // letter and takes no width, but where it does occupy a slot,
+                // leaving the cursor behind makes the next letter look like it
+                // sits across a word gap.
+                previous_end = Some(previous_end.unwrap_or(ch.x).max(ch.x + ch.width));
+                continue;
+            }
+        }
+
         // A cursor jump wide enough to be a word break, with no space glyph.
         let gap_is_a_space = previous_end
             .is_some_and(|end| ch.x - end > font_size.max(1.0) * SPACE_GAP)
-            && !ch.ch.is_whitespace()
-            && !spans.last().is_some_and(|s| s.text.ends_with(' '));
+            && !after_space;
 
         if gap_is_a_space {
             push_char(&mut spans, ' ', false, false);
         }
         push_char(&mut spans, ch.ch, ch.bold, ch.italic);
         previous_end = Some(ch.x + ch.width);
+    }
+
+    // Composes each "u + combining diaeresis" back into a single "ü".
+    for span in &mut spans {
+        span.text = span.text.nfc().collect();
     }
 
     Line {
@@ -215,10 +306,20 @@ fn heading_level(font_size: f32, body: f32) -> Option<u8> {
     })
 }
 
-/// A leading list marker, if the line has one: `(ordered, marker_len_in_chars)`.
-/// Counted in `char`s throughout, because the caller strips the prefix from
-/// spans by character and a bullet glyph is multi-byte.
-fn list_marker(text: &str) -> Option<(bool, usize)> {
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Marker {
+    pub ordered: bool,
+    /// The source's own number, kept so "Aufgabe 3" stays 3. Markdown would
+    /// renumber from 1, which on an exercise sheet silently renames the
+    /// exercises.
+    pub number: Option<u32>,
+    /// Length in `char`s — the caller strips the prefix by character, and a
+    /// bullet glyph is multi-byte.
+    pub len: usize,
+}
+
+/// A leading list marker, if the line has one.
+fn list_marker(text: &str) -> Option<Marker> {
     let chars: Vec<char> = text.chars().collect();
     let leading = chars.iter().take_while(|c| c.is_whitespace()).count();
     let rest = &chars[leading..];
@@ -227,18 +328,46 @@ fn list_marker(text: &str) -> Option<(bool, usize)> {
     if matches!(first, '•' | '●' | '▪' | '◦' | '‣' | '·' | '−' | '–' | '-' | '*') {
         // A bullet is only a bullet when something separates it from the text,
         // or "-3 degrees" and "*emphasis*" become list items.
-        return rest
-            .get(1)
-            .filter(|c| c.is_whitespace())
-            .map(|_| (false, leading + 2));
+        return rest.get(1).filter(|c| c.is_whitespace()).map(|_| Marker {
+            ordered: false,
+            number: None,
+            len: leading + 2,
+        });
     }
 
+    // "1." / "1)"
     if first.is_ascii_digit() {
         let digits = rest.iter().take_while(|c| c.is_ascii_digit()).count();
         if matches!(rest.get(digits), Some('.') | Some(')'))
             && rest.get(digits + 1).is_some_and(|c| c.is_whitespace())
         {
-            return Some((true, leading + digits + 2));
+            let number: String = rest[..digits].iter().collect();
+            return Some(Marker {
+                ordered: true,
+                number: number.parse().ok(),
+                len: leading + digits + 2,
+            });
+        }
+    }
+
+    // "(a)" / "(iv)" — how exercise sheets label sub-parts, and common enough
+    // in this document class to be worth recognising.
+    if first == '(' {
+        let inner = rest
+            .iter()
+            .skip(1)
+            .take_while(|c| c.is_ascii_alphanumeric())
+            .count();
+        if inner > 0
+            && inner <= 4
+            && rest.get(inner + 1) == Some(&')')
+            && rest.get(inner + 2).is_some_and(|c| c.is_whitespace())
+        {
+            return Some(Marker {
+                ordered: true,
+                number: None,
+                len: leading + inner + 3,
+            });
         }
     }
 
@@ -311,12 +440,12 @@ fn classify(line: &Line, body: f32, left_margin: f32) -> LineKind {
     if let Some(level) = heading_level(line.font_size, body) {
         return LineKind::Heading(level);
     }
-    if let Some((ordered, _)) = list_marker(&line.text()) {
+    if let Some(marker) = list_marker(&line.text()) {
         // Indent past the page's left margin, in ems, is a stable proxy for
         // nesting depth across font sizes.
         let ems = (line.x - left_margin) / body.max(1.0);
         let depth = (ems / LIST_INDENT_EMS).round().max(0.0) as usize;
-        return LineKind::List(ordered, depth);
+        return LineKind::List(marker.ordered, depth);
     }
     LineKind::Prose
 }
@@ -392,18 +521,20 @@ fn finish_block(lines: &[&Line], kind: LineKind) -> Block {
                 .join("\n"),
         },
         LineKind::List(ordered, depth) => {
-            let marker_len = list_marker(&lines[0].text())
-                .map(|(_, len)| len)
-                .unwrap_or(0);
+            let marker = list_marker(&lines[0].text());
             // Declared before `refs` so it outlives the reference to it.
             let first = Line {
-                spans: strip_leading_chars(&lines[0].spans, marker_len),
+                spans: strip_leading_chars(
+                    &lines[0].spans,
+                    marker.map(|m| m.len).unwrap_or(0),
+                ),
                 ..lines[0].clone()
             };
             let mut refs: Vec<&Line> = vec![&first];
             refs.extend(lines.iter().skip(1).copied());
             Block::ListItem {
                 ordered,
+                number: marker.and_then(|m| m.number),
                 depth,
                 spans: join_lines(&refs),
             }
@@ -453,11 +584,16 @@ pub fn blocks_to_markdown(blocks: &[Block]) -> String {
             Block::Code { text } => parts.push(format!("```\n{text}\n```")),
             Block::ListItem {
                 ordered,
+                number,
                 depth,
                 spans,
             } => {
                 let indent = "  ".repeat(*depth);
-                let marker = if *ordered { "1." } else { "-" };
+                let marker = match (ordered, number) {
+                    (true, Some(n)) => format!("{n}."),
+                    (true, None) => "1.".to_string(),
+                    (false, _) => "-".to_string(),
+                };
                 parts.push(format!("{indent}{marker} {}", render_spans(spans)));
             }
         }

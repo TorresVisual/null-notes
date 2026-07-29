@@ -77,6 +77,19 @@ fn extract_pages_native(pdf_path: &Path) -> Result<Vec<ExtractedPage>> {
             let Some(value) = ch.unicode_char() else {
                 continue;
             };
+            // pdfium injects synthetic characters that describe the text
+            // layer's own structure — CR/LF at every line end, plus spacing
+            // markers. They report a font size of 1.0 and zero bounds, and
+            // every one of them has an empty font name, which real glyphs
+            // never do.
+            //
+            // They are not merely useless here (lines are grouped by
+            // geometry, not by markers): a row that picks one up has its
+            // median font size dragged to 1.0, which collapses the baseline
+            // tolerance to 0.4pt and stops the row grouping anything at all.
+            if ch.font_name().is_empty() || value.is_control() {
+                continue;
+            }
             // loose_bounds covers the glyph's advance box rather than its inked
             // extent, which is what the space-detection gap logic needs — a
             // comma's tight bounds would leave a gap wide enough to fake a

@@ -225,8 +225,54 @@ fn numbered_lines_become_an_ordered_list() {
 
     let markdown = chars_to_markdown(&chars);
 
+    // The source's own numbers, not a renumbering from 1 — on an exercise
+    // sheet that would quietly rename the exercises.
     assert!(markdown.contains("1. first part"), "got: {markdown}");
-    assert!(markdown.contains("1. second part"), "got: {markdown}");
+    assert!(markdown.contains("2. second part"), "got: {markdown}");
+}
+
+#[test]
+fn a_sub_part_label_becomes_a_list_item() {
+    let mut chars = page(&["Answer each of the parts below in turn."]);
+    chars.extend(set("(a) the first part", 72.0, 660.0, Style::default()));
+    chars.extend(set("(b) the second part", 72.0, 648.0, Style::default()));
+
+    let markdown = chars_to_markdown(&chars);
+
+    assert!(markdown.contains("1. the first part"), "got: {markdown}");
+    assert!(markdown.contains("1. the second part"), "got: {markdown}");
+}
+
+#[test]
+fn a_standalone_accent_glyph_recomposes_with_its_letter() {
+    // Computer Modern prints "für" as u + a separate diaeresis positioned
+    // over it, which arrives as "fu¨r" unless it is put back together.
+    let markdown = chars_to_markdown(&page(&["fu\u{00A8}r Informatikstudien"]));
+    assert!(markdown.starts_with("für"), "got: {markdown}");
+}
+
+// Found against a real sheet: the footnote marker sorts first because it is
+// raised, and anchoring the row's tolerance to it shifted the whole window up
+// far enough to drop the umlaut of "abzuschätzen" onto a line of its own.
+#[test]
+fn a_raised_footnote_marker_does_not_push_a_diacritic_off_the_line() {
+    let mut chars = set("abzuschatzen", 111.7, 495.73, Style { size: 12.0, ..Style::default() });
+    chars.extend(set("1", 179.1, 500.0, Style { size: 8.0, ..Style::default() }));
+    // The umlaut, at exactly the x of the second "a" it sits over — an accent
+    // shares its letter's position rather than following it.
+    let second_a = 111.7 + 7.0 * 12.0 * ADVANCE;
+    chars.extend(set("\u{00A8}", second_a, 495.26, Style { size: 12.0, ..Style::default() }));
+
+    let lines = group_lines(&chars);
+
+    assert_eq!(lines.len(), 1, "expected one line, got {lines:?}");
+    assert!(lines[0].text().contains("abzuschätzen"), "got: {}", lines[0].text());
+}
+
+#[test]
+fn an_accent_with_no_letter_before_it_is_left_alone() {
+    let markdown = chars_to_markdown(&page(&["\u{00A8} alone on the line"]));
+    assert!(markdown.contains('\u{00A8}'), "got: {markdown}");
 }
 
 #[test]
