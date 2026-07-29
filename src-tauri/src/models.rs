@@ -34,6 +34,22 @@ pub struct WorkspaceTree {
     pub folders: Vec<String>,
 }
 
+// The connections graph's raw edges — link/tag resolution into an actual
+// node graph happens on the frontend, which already holds the notes list.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GraphLink {
+    pub source_path: String,
+    pub target_title: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GraphTag {
+    pub note_path: String,
+    pub tag: String,
+}
+
 // App-wide preferences, not per-workspace state — lives in the app data dir
 // alongside recent-workspaces.json, not inside any one workspace folder.
 #[derive(Debug, Clone, Serialize, Deserialize)]

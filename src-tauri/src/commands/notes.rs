@@ -6,7 +6,7 @@ use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 use crate::db::{self, DbPool};
-use crate::models::{NoteMetadata, SearchResult, WorkspaceTree};
+use crate::models::{GraphLink, GraphTag, NoteMetadata, SearchResult, WorkspaceTree};
 
 fn now_ms() -> i64 {
     SystemTime::now()
@@ -493,6 +493,21 @@ pub async fn backlinks_for(
     db::notes::backlinks_for(&db, &workspace, &title)
         .await
         .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn graph_links(workspace: String, db: State<'_, DbPool>) -> Result<Vec<GraphLink>, String> {
+    let rows = db::notes::all_links(&db, &workspace).await.map_err(|e| e.to_string())?;
+    Ok(rows
+        .into_iter()
+        .map(|(source_path, target_title)| GraphLink { source_path, target_title })
+        .collect())
+}
+
+#[tauri::command]
+pub async fn graph_tags(workspace: String, db: State<'_, DbPool>) -> Result<Vec<GraphTag>, String> {
+    let rows = db::notes::all_note_tags(&db, &workspace).await.map_err(|e| e.to_string())?;
+    Ok(rows.into_iter().map(|(note_path, tag)| GraphTag { note_path, tag }).collect())
 }
 
 fn note_filename(title: &str) -> String {

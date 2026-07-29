@@ -104,6 +104,8 @@ pub fn run() {
             commands::notes::list_tags,
             commands::notes::notes_with_tag,
             commands::notes::backlinks_for,
+            commands::notes::graph_links,
+            commands::notes::graph_tags,
             commands::notes::create_folder,
             commands::notes::rename_folder,
             commands::notes::delete_folder,

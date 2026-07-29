@@ -207,6 +207,35 @@ pub async fn backlinks_for(pool: &SqlitePool, workspace: &str, title: &str) -> R
     Ok(rows)
 }
 
+// Every link/tag in the workspace at once, for the connections graph — link
+// resolution (title -> path, which may be ambiguous or unresolved) and tag
+// grouping happen on the frontend, which already holds the full notes list.
+pub async fn all_links(pool: &SqlitePool, workspace: &str) -> Result<Vec<(String, String)>> {
+    sqlx::query_as(
+        "SELECT nl.source_path, nl.target_title
+         FROM note_links nl
+         JOIN notes n ON n.path = nl.source_path
+         WHERE n.workspace = ?",
+    )
+    .bind(workspace)
+    .fetch_all(pool)
+    .await
+    .map_err(Into::into)
+}
+
+pub async fn all_note_tags(pool: &SqlitePool, workspace: &str) -> Result<Vec<(String, String)>> {
+    sqlx::query_as(
+        "SELECT nt.note_path, nt.tag
+         FROM note_tags nt
+         JOIN notes n ON n.path = nt.note_path
+         WHERE n.workspace = ?",
+    )
+    .bind(workspace)
+    .fetch_all(pool)
+    .await
+    .map_err(Into::into)
+}
+
 pub async fn list_by_workspace(pool: &SqlitePool, workspace: &str) -> Result<Vec<NoteMetadata>> {
     let rows = sqlx::query_as::<_, NoteMetadata>(
         "SELECT id, title, path, workspace, updated_at
@@ -413,5 +442,60 @@ mod tests {
         assert_eq!(all_tags, vec!["cs102".to_string()]);
         let backlinks = backlinks_for(&pool, "/ws", "Target").await.unwrap();
         assert!(backlinks.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_all_links_returns_every_link_in_the_workspace() {
+        let pool = make_pool().await;
+        index_note(&pool, &note("a", "A", "/ws/a.md", "/ws")).await.unwrap();
+        index_note(&pool, &note("b", "B", "/ws/b.md", "/ws")).await.unwrap();
+        set_links(&pool, "/ws/a.md", &["B".to_string(), "Missing".to_string()]).await.unwrap();
+        set_links(&pool, "/ws/b.md", &["A".to_string()]).await.unwrap();
+
+        let mut links = all_links(&pool, "/ws").await.unwrap();
+        links.sort();
+
+        assert_eq!(
+            links,
+            vec![
+                ("/ws/a.md".to_string(), "B".to_string()),
+                ("/ws/a.md".to_string(), "Missing".to_string()),
+                ("/ws/b.md".to_string(), "A".to_string()),
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn test_all_links_excludes_other_workspaces() {
+        let pool = make_pool().await;
+        index_note(&pool, &note("a", "A", "/ws/a.md", "/ws")).await.unwrap();
+        index_note(&pool, &note("c", "C", "/other/c.md", "/other")).await.unwrap();
+        set_links(&pool, "/ws/a.md", &["X".to_string()]).await.unwrap();
+        set_links(&pool, "/other/c.md", &["Y".to_string()]).await.unwrap();
+
+        let links = all_links(&pool, "/ws").await.unwrap();
+
+        assert_eq!(links, vec![("/ws/a.md".to_string(), "X".to_string())]);
+    }
+
+    #[tokio::test]
+    async fn test_all_note_tags_returns_every_tag_in_the_workspace() {
+        let pool = make_pool().await;
+        index_note(&pool, &note("a", "A", "/ws/a.md", "/ws")).await.unwrap();
+        index_note(&pool, &note("b", "B", "/ws/b.md", "/ws")).await.unwrap();
+        set_tags(&pool, "/ws/a.md", &["cs101".to_string(), "exam".to_string()]).await.unwrap();
+        set_tags(&pool, "/ws/b.md", &["cs101".to_string()]).await.unwrap();
+
+        let mut tags = all_note_tags(&pool, "/ws").await.unwrap();
+        tags.sort();
+
+        assert_eq!(
+            tags,
+            vec![
+                ("/ws/a.md".to_string(), "cs101".to_string()),
+                ("/ws/a.md".to_string(), "exam".to_string()),
+                ("/ws/b.md".to_string(), "cs101".to_string()),
+            ]
+        );
     }
 }
