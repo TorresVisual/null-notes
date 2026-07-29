@@ -176,6 +176,8 @@ Each custom node type lives in its own file under `src/editor/extensions/`. Expo
 
 Markdown conversion has no central serializer — `tiptap-markdown` drives it, and each node carries its own `addStorage().markdown.serialize/parse`. A node without one serializes as escaped plain text.
 
+Spellcheck is one editor-wide setting on the ProseMirror root; non-prose nodes (code, maths, mermaid, tags, wiki-links) set `spellcheck="false"` and rely on attribute inheritance to opt out. A new node that renders non-prose text needs the same, or it gets underlined.
+
 Key handling that must run *before* the keymap plugins (and so before StarterKit's `ListKeymap`) lives in `NoteEditor`'s `editorProps`, not in an extension — ProseMirror checks direct props first. Any test of key behaviour has to mount with those same `editorProps`, or it exercises an editor the app never builds.
 
 `@tiptap/core` and `@tiptap/pm` are pinned via `overrides` in `package.json`. Without them `starter-kit` pulls a second copy of core and every `Editor`/`Node` type becomes nominally distinct — typecheck fails with unreadable errors far from the cause.

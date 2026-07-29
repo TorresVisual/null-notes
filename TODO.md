@@ -258,7 +258,7 @@ Do not let these influence P0–P9 design.
 - [x] P2-2 Native File/Edit/View menu + shortcuts overlay, one command dispatcher
 - [x] P2-4 Onboarding empty states
 - [x] P2-3 Editor niceties — all four boxes:
-  - [x] Spellcheck toggle driving both editors, off by default; `#[serde(default)]` so a pre-existing `settings.json` still loads
+  - [x] Spellcheck toggle driving both editors, off by default; `#[serde(default)]` so a pre-existing `settings.json` still loads. Checks **prose only** — code, maths, mermaid, tags and wiki-link targets set `spellcheck="false"` and inherit out of it *(whether squiggles render at all is a WebView2/OS capability, not ours)*
   - [x] Paste/drop images into a `NoteName.assets/` sidecar as ordinary `![alt](path)` Markdown *(paths are URL-encoded only at the Markdown boundary — sidecar names contain spaces, and a bare space ends a link destination)*
   - [x] Cursor + scroll restored per note across tab switches
   - [x] Backspace at the start of a non-first list item joins into the previous item instead of tearing the list in half
