@@ -7,12 +7,35 @@ Desktop-primary (Tauri + Windows), local-first, and offline.
 ## Storage model
 
 Notes are plain `.md` files on disk — that's the source of truth. A SQLite
-index (full-text search, tags, backlinks) sits alongside the workspace folder
-and is fully rebuildable from the files at any time; deleting it loses
-nothing. Ink drawings are stored as SVG sidecar files next to their note.
+index (full-text search, tags, backlinks) lives in the OS app-data
+directory, not inside the workspace, and is fully rebuildable from the files
+at any time; deleting it loses nothing. Ink drawings and imported PDF pages
+are stored as sidecar files next to their note (`NoteName.ink/`,
+`NoteName.pdf/`).
 
-Because everything is plain files, syncing a workspace with Git or Syncthing
-works without any app-specific setup.
+## Syncing a workspace
+
+Because the index lives outside the workspace and everything inside it is
+plain files, a workspace folder is safe to sync with Git, Syncthing, or
+similar — there's nothing app-specific to configure. The app watches the
+workspace directory and reindexes anything a sync client changes
+automatically (add, edit, or delete), so pulling changes on one machine
+never needs a manual rescan on another.
+
+The one workspace-local file worth excluding from Git if you use it, since
+it's UI state rather than note content, is `.workspace.json` (which tabs
+were open, which folders were expanded) — syncing it just means one
+machine's open tabs override another's, which is harmless but can be mildly
+confusing. A minimal workspace `.gitignore`:
+
+```gitignore
+.workspace.json
+.*.tmp
+```
+
+(`.*.tmp` covers the sibling temp file a crash mid-save could leave behind —
+normally renamed away or cleaned up automatically, per the save path in
+[CLAUDE.md](CLAUDE.md).)
 
 ## Running it
 

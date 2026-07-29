@@ -223,9 +223,9 @@ The visual-design and editor-feel passes are already done (`docs/plans/visual-de
 
 ---
 
-## Phase 3 — Headline Features & Power Tools (P3)
+## Phase 3 — Headline Features & Power Tools (P3) ✅
 
-**Milestone M3:** *The CS-specific superpowers that justify a custom app are real.*
+**Milestone M3 reached:** *The CS-specific superpowers that justify a custom app are real.* P3-1…P3-4 all done: PDF import as a reference image (no broken OCR pipeline), export to PDF via the WebView's print pipeline, a force-directed connections graph, and sync guidance that turned out to already be true by construction.
 
 ### P3-1 — PDF import: **decision fork** (do this first in P3) — **decision, then L** ✅ Option A shipped
 
@@ -255,11 +255,13 @@ The data already exists (`note_links`, backlinks). A local graph of notes↔link
 
 *Done: `graph_links`/`graph_tags` hand over every link/tag row in the workspace at once (new, alongside the existing per-title/per-tag `backlinks_for`/`notes_with_tag`); `buildGraph` (pure, tested) resolves them into deduplicated nodes/edges — link resolution matches how `[[links]]` resolve everywhere else (case-insensitive title match, unresolved links dropped rather than shown as dangling nodes), notes sharing a tag get a pairwise edge. Layout uses `d3-force`, run to convergence synchronously via manual `.tick()` calls rather than an animated `.on('tick')` loop, so the graph renders once, fully settled — no per-frame re-renders regardless of note count. `View > Connections Graph` (`Ctrl+G`) opens it; clicking a node opens the note. Viewbox auto-fits to the settled layout's bounding box so the graph is never clipped at any size.*
 
-### P3-4 — Manual sync guidance, done well — **S**
+### P3-4 — Manual sync guidance, done well — **S** ✅
 Sync is out of scope as a *feature* (principle #2), but since files are plain `.md`, make Git/Syncthing painless.
 - A sensible `.gitignore` (index.db, tmp, ink temp), docs on the recommended sync setup, and — after P0-5 — graceful handling of files appearing/changing from a sync client.
 - **Dependency:** P0-5.
 - **DoD:** A documented Git-based sync round-trip (edit on machine A, pull on machine B) works without index corruption or manual re-scan.
+
+*Done: mostly already true by construction, this was a documentation + verification pass rather than new code. `index.db` was never inside the workspace to begin with (it lives in the OS app-data dir — the README's "sits alongside the workspace folder" was actually wrong, fixed while here), so there's nothing workspace-side to gitignore for it. Traced the actual round-trip: `watch_workspace`'s debounce already batches a burst of changes (exactly what a `git pull` touching many files produces) into one `workspace-changed` event; `useExternalChanges` reindexes every changed path in parallel and refreshes the tree once, and `reindex_from_disk`'s existing not-found fallback (`forget_note`) already handles a file a pull deleted. README documents the setup and a minimal workspace `.gitignore` (`.workspace.json` — UI state, not content — and stray crash-temp files). Not literally tested across two physical machines; verified by tracing the code path rather than an end-to-end run.*
 
 ---
 
