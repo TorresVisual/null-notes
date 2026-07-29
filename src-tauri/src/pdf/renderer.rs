@@ -96,6 +96,12 @@ async fn render_pages_native(
 mod tests {
     use super::*;
 
+    #[test]
+    #[ignore = "requires pdfium native library"]
+    fn test_bind_pdfium_finds_the_native_library() {
+        bind_pdfium().unwrap();
+    }
+
     #[tokio::test]
     #[ignore = "requires pdfium native library and test fixture"]
     async fn test_render_returns_pages() {
