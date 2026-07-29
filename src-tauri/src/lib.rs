@@ -20,6 +20,8 @@ fn build_menu(handle: &tauri::AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
             &PredefinedMenuItem::separator(handle)?,
             &MenuItem::with_id(handle, "open-workspace", "Open Workspace…", true, Some("CmdOrCtrl+O"))?,
             &PredefinedMenuItem::separator(handle)?,
+            &MenuItem::with_id(handle, "export-pdf", "Export to PDF…", true, None::<&str>)?,
+            &PredefinedMenuItem::separator(handle)?,
             &MenuItem::with_id(handle, "settings", "Settings…", true, Some("CmdOrCtrl+,"))?,
             &PredefinedMenuItem::separator(handle)?,
             &PredefinedMenuItem::quit(handle, None)?,

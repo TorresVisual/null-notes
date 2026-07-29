@@ -1202,3 +1202,51 @@ body {
   height: auto;
   display: block;
 }
+
+/* Export to PDF (File > Export to PDF, or the OS print dialog directly)
+   leans on the WebView's own print pipeline rather than a custom renderer —
+   math, Mermaid, ink and code all print exactly as they're already shown on
+   screen. This block only swaps the dark UI palette for a printable light
+   one and hides app chrome; it changes nothing about screen rendering. */
+@media print {
+  :root {
+    --bg-base: #ffffff;
+    --bg-raised: #ffffff;
+    --bg-sunken: #f5f5f5;
+    --bg-hover: #f0f0f0;
+    --border: #d8d8d8;
+    --border-strong: #b8b8b8;
+    --text-primary: #111111;
+    --text-secondary: #3a3a3a;
+    --text-tertiary: #666666;
+    --text-disabled: #999999;
+    --accent: #1a7f37;
+    --accent-hover: #1a7f37;
+    --accent-bg: rgba(26, 127, 55, 0.08);
+    --accent-bg-hover: rgba(26, 127, 55, 0.08);
+    --accent-contrast: #ffffff;
+    --danger: #b3261e;
+  }
+
+  .callout-note, .callout-info { --callout-color: #1c5fa8; --callout-bg: #eaf2fb; }
+  .callout-tip { --callout-color: #0f7a68; --callout-bg: #e7f6f3; }
+  .callout-warning { --callout-color: #8a5a10; --callout-bg: #fbf1e0; }
+  .callout-danger { --callout-color: #b3261e; --callout-bg: #fbeaea; }
+  .callout-important { --callout-color: #6b3fa0; --callout-bg: #f2ebf9; }
+
+  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
+  html, body { background: #fff; height: auto; overflow: visible; }
+
+  .sidebar, .tab-bar, .editor-toolbar, .editor-status, .backlinks-panel,
+  .search-overlay { display: none !important; }
+
+  .layout, .main { display: block; height: auto; }
+  .editor-scroll { overflow: visible; height: auto; }
+  .editor-pane { max-width: none; margin: 0; padding: 0; }
+
+  .note-editor h1, .note-editor h2, .note-editor h3 { break-after: avoid; }
+  .note-editor pre, .pdf-page-block, .ink-block-wrapper, .note-editor table {
+    break-inside: avoid;
+  }
+}

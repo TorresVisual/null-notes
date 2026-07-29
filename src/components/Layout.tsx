@@ -111,12 +111,24 @@ export function Layout() {
         case 'insert-ink':
           window.dispatchEvent(new Event('command:insert-ink'))
           break
+        case 'export-pdf':
+          if (!activeTab) break
+          // The print stylesheet only styles the rendered view; printing raw
+          // markdown text wouldn't match the editor, so switch first and let
+          // that render before the OS print dialog captures the page.
+          if (viewMode === 'raw') {
+            setViewMode('wysiwyg')
+            requestAnimationFrame(() => window.print())
+          } else {
+            window.print()
+          }
+          break
         case 'shortcuts-help':
           setShortcutsOpen(true)
           break
       }
     },
-    [activeTab, createNote, createFolder, createCanvasNote, openWorkspace],
+    [activeTab, viewMode, createNote, createFolder, createCanvasNote, openWorkspace],
   )
 
   useEffect(() => {
