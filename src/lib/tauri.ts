@@ -64,6 +64,12 @@ export const api = {
     save: (settings: AppSettings) =>
       invoke<void>('save_settings', { settings }),
   },
+  assets: {
+    write: (notePath: string, mime: string, data: number[]) =>
+      invoke<string>('write_note_asset', { notePath, mime, data }),
+    read: (notePath: string, relative: string) =>
+      invoke<string>('read_note_asset', { notePath, relative }),
+  },
   pdf: {
     ensureDir: (notePath: string) =>
       invoke<string>('ensure_pdf_dir', { notePath }),

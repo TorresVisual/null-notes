@@ -13,6 +13,7 @@ import { TaskItem } from '@tiptap/extension-task-item'
 import { Link } from '@tiptap/extension-link'
 import { createLowlight, common } from 'lowlight'
 import { InkBlock } from './InkBlock'
+import { NoteImage } from './NoteImage'
 import { PdfPageBlock } from './PdfPageBlock'
 import { InlineMath } from './InlineMath'
 import { BlockMath } from './BlockMath'
@@ -116,6 +117,7 @@ export const coreExtensions = [
   Placeholder.configure({ placeholder: 'Start writing…' }),
   TaskBracketFix,
   InkBlock,
+  NoteImage,
   PdfPageBlock,
   InlineMath,
   BlockMath,

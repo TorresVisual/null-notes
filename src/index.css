@@ -1203,6 +1203,29 @@ body {
   display: block;
 }
 
+/* Pasted/dropped images, stored in the note's .assets sidecar */
+.note-image {
+  display: inline-block;
+  max-width: 100%;
+  vertical-align: bottom;
+}
+
+.note-image img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  border-radius: 4px;
+}
+
+.note-image-missing {
+  font-family: 'Cascadia Code', 'Fira Code', monospace;
+  font-size: 12px;
+  color: var(--text-tertiary);
+  border: 1px dashed var(--border-strong);
+  border-radius: 4px;
+  padding: 2px 6px;
+}
+
 /* Connections graph */
 .graph-view {
   background: var(--bg-raised);
@@ -1288,7 +1311,8 @@ body {
   .editor-pane { max-width: none; margin: 0; padding: 0; }
 
   .note-editor h1, .note-editor h2, .note-editor h3 { break-after: avoid; }
-  .note-editor pre, .pdf-page-block, .ink-block-wrapper, .note-editor table {
+  .note-editor pre, .pdf-page-block, .ink-block-wrapper, .note-editor table,
+  .note-image {
     break-inside: avoid;
   }
 }

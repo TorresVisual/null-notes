@@ -123,6 +123,8 @@ pub fn run() {
             commands::pdf::ensure_pdf_dir,
             commands::pdf::import_pdf_pages,
             commands::pdf::read_pdf_page,
+            commands::assets::write_note_asset,
+            commands::assets::read_note_asset,
             commands::window::confirm_close,
         ])
         .run(tauri::generate_context!())
