@@ -77,10 +77,20 @@ async fn render_pages_native(
                 .set_maximum_height(2200),
         )?;
 
-        let img_path = out_dir.join(format!("page-{index}.png"));
-        bitmap.as_image()?.save(&img_path)?;
-
+        // Building the PNG from raw RGBA bytes through our own `image` crate
+        // rather than `bitmap.as_image()` sidesteps pdfium-render's internal,
+        // separately-versioned `image` dependency, whose PNG encoder isn't
+        // compiled in by default (fails at runtime: "format Png is not
+        // supported" — a build-time-invisible mismatch, not a code bug here).
         let (width, height) = (bitmap.width() as u32, bitmap.height() as u32);
+        let rgba = bitmap.as_rgba_bytes();
+        let img = image::RgbaImage::from_raw(width, height, rgba).ok_or_else(|| {
+            anyhow::anyhow!("rendered page {index} had a mismatched pixel buffer size")
+        })?;
+
+        let img_path = out_dir.join(format!("page-{index}.png"));
+        img.save(&img_path)?;
+
         records.push(PdfPage {
             index,
             path: img_path.to_string_lossy().into_owned(),
