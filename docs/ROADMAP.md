@@ -8,6 +8,7 @@
 
 ## How to read this
 
+- **For the actionable checklist, see [`TODO.md`](../TODO.md).** That file holds the boxes; this one holds the reasoning and the Definitions of Done. If they disagree, this file wins and `TODO.md` gets corrected.
 - Phases are **ordered by dependency and value**, not by calendar. As a solo project the useful unit is "what unblocks the next thing," so tasks carry an effort size (**S** ≈ hours, **M** ≈ a day or two, **L** ≈ several days) instead of dates.
 - Each phase has a **milestone (Mn)** with a one-line "you can now…" definition. Ship a phase only when its milestone is true.
 - Every task has a **Definition of Done (DoD)** — objective and checkable. If the DoD isn't met, the task isn't done.
