@@ -227,7 +227,7 @@ The visual-design and editor-feel passes are already done (`docs/plans/visual-de
 
 **Milestone M3:** *The CS-specific superpowers that justify a custom app are real.*
 
-### P3-1 — PDF import: **decision fork** (do this first in P3) — **decision, then L**
+### P3-1 — PDF import: **decision fork** (do this first in P3) — **decision, then L** ✅ Option A shipped
 
 The current pipeline is a broken skeleton with heavy external dependencies (audit §2). Per the brief's mandate to challenge low-value work, **do not "finish" it by default.** Choose one:
 
@@ -237,6 +237,8 @@ The current pipeline is a broken skeleton with heavy external dependencies (audi
   - **DoD (B):** A 20-page typeset sheet imports in <10 s (spec target) into `ExerciseBlock`s with editable extracted text and best-effort LaTeX, on a machine set up by a documented one-command installer; failure modes degrade to plain text, never crash.
 
 **Recommendation:** Ship **Option A** now; keep **Option B** as an optional spike behind a feature flag. Don't block M3 on B.
+
+*Done (Option A): `pdf-native` is now a default feature — `pdfium-render` is a pure-Rust binding crate with no native-binary requirement at compile time, so a default `cargo build` still succeeds; only an actual import at runtime needs the pdfium library present, and that fails with a clean error rather than a crash if it's missing. `ocr.rs`, `equations.rs`, `parser.rs`, and the dead `ExerciseBlock` node (no markdown serialize, never actually inserted by the old pipeline) are deleted rather than kept as a "spike behind a flag" — the audit already established the OCR code was broken (degenerate bounding boxes) and unsalvageable without a rewrite, so there was nothing worth preserving. Pages render straight into a `NoteName.pdf/` sidecar directory next to the note (mirroring `NoteName.ink/`) instead of the old code's leaked temp directory — fixes a real unbounded-disk-growth bug as a side effect. A new `PdfPageBlock` node (mirroring `InkBlock`'s markdown fenced-block pattern) displays each page as an image, loaded via a `read_pdf_page` → base64 IPC call rather than the Tauri asset protocol, keeping the same "binary data over IPC" shape `read_ink` already established rather than introducing a new capability/permission surface.*
 
 ### P3-2 — Export (print / PDF / HTML) — **M**
 High daily value for a student (submitting or sharing notes) and currently absent.

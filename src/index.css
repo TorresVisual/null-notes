@@ -1185,3 +1185,20 @@ body {
   padding: 2px 6px;
   font-family: inherit;
 }
+
+/* Imported PDF pages — reference images, not editable content */
+.pdf-page-block {
+  margin: 8px 0;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  overflow: hidden;
+  display: flex;
+  justify-content: center;
+  background: var(--bg-sunken);
+}
+
+.pdf-page-block img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}

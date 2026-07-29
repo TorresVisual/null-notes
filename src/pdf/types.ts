@@ -1,26 +1,11 @@
-export interface TextBox {
-  text: string
-  x: number
-  y: number
-  w: number
-  h: number
-  isEquation: boolean
-  latex: string | null
-}
-
-export interface Exercise {
+export interface PdfPage {
   index: number
-  title: string
-  contentBlocks: TextBox[]
+  path: string
+  width: number
+  height: number
 }
 
-export interface PipelineProgress {
-  stage: string
+export interface PdfImportProgress {
   page: number
   totalPages: number
-}
-
-export interface ImportResult {
-  title: string
-  exercises: Exercise[]
 }

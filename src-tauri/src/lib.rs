@@ -115,7 +115,9 @@ pub fn run() {
             commands::ink::ensure_ink_dir,
             commands::ink::read_ink,
             commands::ink::write_ink,
-            commands::pdf::import_pdf,
+            commands::pdf::ensure_pdf_dir,
+            commands::pdf::import_pdf_pages,
+            commands::pdf::read_pdf_page,
             commands::window::confirm_close,
         ])
         .run(tauri::generate_context!())

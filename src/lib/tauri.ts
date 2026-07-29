@@ -1,5 +1,6 @@
 import { invoke } from '@tauri-apps/api/core'
 import type { NoteMetadata, WorkspaceState, WorkspaceTree, SearchResult, AppSettings } from '../types'
+import type { PdfPage } from '../pdf/types'
 
 export const api = {
   notes: {
@@ -58,5 +59,13 @@ export const api = {
       invoke<AppSettings>('load_settings'),
     save: (settings: AppSettings) =>
       invoke<void>('save_settings', { settings }),
+  },
+  pdf: {
+    ensureDir: (notePath: string) =>
+      invoke<string>('ensure_pdf_dir', { notePath }),
+    importPages: (pdfPath: string, notePath: string) =>
+      invoke<PdfPage[]>('import_pdf_pages', { pdfPath, notePath }),
+    readPage: (path: string) =>
+      invoke<string>('read_pdf_page', { path }),
   },
 }
