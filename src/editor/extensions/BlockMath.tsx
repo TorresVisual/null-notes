@@ -11,7 +11,7 @@ function BlockMathView({ node }: ReactNodeViewProps) {
   const { latex } = node.attrs as unknown as BlockMathAttrs
   const html = katex.renderToString(latex, { throwOnError: false, displayMode: true })
   return (
-    <NodeViewWrapper className="block-math">
+    <NodeViewWrapper className="block-math" spellCheck={false}>
       <div dangerouslySetInnerHTML={{ __html: html }} />
     </NodeViewWrapper>
   )

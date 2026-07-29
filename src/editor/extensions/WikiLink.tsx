@@ -33,6 +33,7 @@ function WikiLinkView({ node }: ReactNodeViewProps) {
       className={`wiki-link${target ? '' : ' wiki-link-missing'}`}
       onClick={handleClick}
       title={target ? target.path : `Create note "${title}"`}
+      spellCheck={false}
     >
       {title}
     </NodeViewWrapper>

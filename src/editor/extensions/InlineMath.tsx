@@ -11,7 +11,7 @@ function InlineMathView({ node }: ReactNodeViewProps) {
   const { latex } = node.attrs as unknown as InlineMathAttrs
   const html = katex.renderToString(latex, { throwOnError: false, displayMode: false })
   return (
-    <NodeViewWrapper as="span" className="inline-math">
+    <NodeViewWrapper as="span" className="inline-math" spellCheck={false}>
       <span dangerouslySetInnerHTML={{ __html: html }} />
     </NodeViewWrapper>
   )

@@ -22,6 +22,7 @@ function TagView({ node }: ReactNodeViewProps) {
       as="span"
       className={`tag-pill${isActive ? ' active' : ''}`}
       onClick={handleClick}
+      spellCheck={false}
     >
       #{name}
     </NodeViewWrapper>

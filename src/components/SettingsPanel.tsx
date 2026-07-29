@@ -72,7 +72,7 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
         <label className="settings-row">
           <span>
             Spellcheck
-            <small>Underline misspelled words. Off by default — code and maths spell badly.</small>
+            <small>Underline misspelled words in prose. Code, maths, diagrams, tags and link targets are never checked.</small>
           </span>
           <span className="settings-row-control">
             <input

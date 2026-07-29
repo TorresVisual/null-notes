@@ -30,6 +30,12 @@ const lowlight = createLowlight(common)
 // TipTap 3's Code mark uses a function-based find for its input rule.
 // Negative lookbehind regex matches markInputRule's expectation: last capture
 // group is the content, full match covers only the delimiters + content.
+// The spellcheck attribute is inherited by descendants, so marking the
+// non-prose nodes false carves them out of the editor-wide setting: prose gets
+// checked, code, maths, diagrams, tags and link targets don't. Without this a
+// spellchecked note is a wall of red under every identifier and \alpha.
+const NO_SPELLCHECK = { spellcheck: 'false' }
+
 const CodeWithRegexpRule = Code.extend({
   addInputRules() {
     return [
@@ -100,8 +106,8 @@ export const coreExtensions = [
   // StarterKit 3 bundles its own Link; leaving it on registered the name twice
   // and the app's own openOnClick/autolink config was the one that lost.
   StarterKit.configure({ code: false, codeBlock: false, link: false }),
-  CodeWithRegexpRule,
-  CodeBlockEditor.configure({ lowlight }),
+  CodeWithRegexpRule.configure({ HTMLAttributes: NO_SPELLCHECK }),
+  CodeBlockEditor.configure({ lowlight, HTMLAttributes: NO_SPELLCHECK }),
   Table.configure({ resizable: false }),
   TableRow,
   TableHeader,

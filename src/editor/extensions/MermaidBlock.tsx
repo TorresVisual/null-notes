@@ -25,7 +25,7 @@ function MermaidView({ node }: ReactNodeViewProps) {
   }, [code, id])
 
   return (
-    <NodeViewWrapper className="mermaid-block">
+    <NodeViewWrapper className="mermaid-block" spellCheck={false}>
       <div dangerouslySetInnerHTML={{ __html: svg || `<pre>${code}</pre>` }} />
     </NodeViewWrapper>
   )
