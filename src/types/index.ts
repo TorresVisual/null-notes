@@ -27,3 +27,13 @@ export interface AppSettings {
   autosaveDebounceMs: number
   editorMaxWidthPx: number
 }
+
+export interface GraphLink {
+  sourcePath: string
+  targetTitle: string
+}
+
+export interface GraphTag {
+  notePath: string
+  tag: string
+}

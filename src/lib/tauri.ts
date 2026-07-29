@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core'
-import type { NoteMetadata, WorkspaceState, WorkspaceTree, SearchResult, AppSettings } from '../types'
+import type { NoteMetadata, WorkspaceState, WorkspaceTree, SearchResult, AppSettings, GraphLink, GraphTag } from '../types'
 import type { PdfPage } from '../pdf/types'
 
 export const api = {
@@ -38,6 +38,10 @@ export const api = {
       invoke<void>('delete_folder', { path }),
     moveNote: (path: string, destFolder: string) =>
       invoke<string>('move_note', { path, destFolder }),
+    graphLinks: (workspace: string) =>
+      invoke<GraphLink[]>('graph_links', { workspace }),
+    graphTags: (workspace: string) =>
+      invoke<GraphTag[]>('graph_tags', { workspace }),
   },
   window: {
     confirmClose: () => invoke<void>('confirm_close'),
