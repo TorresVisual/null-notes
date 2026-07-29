@@ -1,6 +1,6 @@
 # null-notes — Product & Technical Roadmap
 
-**Last updated:** 2026-07-29 (M0–M3 reached; re-scoped against `notes/Plan.md`; **Phase 8 "Study & Revision" added** — the first features that go beyond the original brief)
+**Last updated:** 2026-07-29 (M0–M3 reached; re-scoped against `notes/Plan.md`; **Phases 5 "Versioned Workspaces" and 9 "Study & Revision" added** — the first features that go beyond the original brief)
 **Audience of this doc:** the maintainer (solo dev).
 **Product audience:** you — a personal, offline, daily-driver note app for CS coursework. This is **not** aimed at public distribution yet, which deliberately pushes packaging, cross-platform, auto-update, branding, and onboarding *down* the priority list. Correctness, data integrity, and the editor/ink/PDF workflow come first.
 
@@ -68,7 +68,7 @@ The editor and ink subsystems are the mature heart of the app. **They do not nee
 3. **No external-change awareness.** The workspace is scanned only on open. Editing a `.md` in another editor, a `git pull`, or Syncthing landing a change will not refresh the tree, and the FTS index silently goes stale. For a plain-files app this is a correctness gap. — **✅ fixed, P0-5.**
 4. **Unresolved wiki-links are dead ends.** Clicking `[[Note That Doesn't Exist]]` does nothing (`WikiLink.tsx:18-20`). The classic "click to create the note" affordance is missing — a real friction point for note-linking workflows. — **✅ fixed, P1-1.**
 5. **Wiki-link/backlink resolution is by title string only.** Two notes sharing a title are ambiguous; renaming a note's heading silently breaks inbound links. Acceptable for now, but a known sharp edge. — **⚠️ half fixed, P1-3.** Rename now carries inbound links. Duplicate titles across folders are still ambiguous — unchanged, and still acceptable.
-6. **Note `id` is non-stable.** A fresh `Uuid::new_v4()` is minted on every scan/save (`notes.rs:159`, `213`, `257`). `path` is the real key; `id` is effectively decorative. Fine today, but don't build anything on `id`. — **🔵 stands, by choice.** See the de-scope table. Re-examine only if P6 (IDE integration) ends up needing a durable handle for deep links.
+6. **Note `id` is non-stable.** A fresh `Uuid::new_v4()` is minted on every scan/save (`notes.rs:159`, `213`, `257`). `path` is the real key; `id` is effectively decorative. Fine today, but don't build anything on `id`. — **🔵 stands, by choice.** See the de-scope table. Re-examine only if P7 (IDE integration) ends up needing a durable handle for deep links.
 7. **App identity is boilerplate.** `productName: "tauri-app"`, `identifier: com.moritz.tauri-app`, default 800×600 window, template README (`tauri.conf.json`, `README.md`). Cosmetic for personal use, but trivially fixable and currently makes the app feel unfinished. — **✅ fixed, P1-5**, except the app icon, which is still Tauri's default (needs an asset, not a code change).
 8. **No settings/preferences surface** and **no native app menu** — every capability lives behind an in-app button or a single hardcoded shortcut (`Ctrl+K`). — **✅ fixed, P2-1 + P2-2.**
 
@@ -79,17 +79,17 @@ M0–M3 cleared the *reliability* backlog, so the question is no longer "is it s
 | Brief capability | State | Where it lands |
 |---|---|---|
 | Live preview, `.md`-only, GFM, KaTeX, Mermaid, code highlighting, callouts, tables, task lists, wiki-links/backlinks | ✅ Complete | — |
-| **Collapsible sections** | ❌ Missing | P5-1 |
-| **Templates** | ❌ Missing | P5-3 |
+| **Collapsible sections** | ❌ Missing | P6-1 |
+| **Templates** | ❌ Missing | P6-3 |
 | Vector ink blocks inline in the note | ✅ Complete | — |
 | PDF import **as reference image** | ✅ Complete | P3-1 |
 | **PDF import → Markdown** (the brief's flagship: OCR → equations → split into exercises) | ❌ Missing; OCR path cut in P3-1 | **P4** — rebuilt without OCR |
 | **Exercise/solution structure + "add next task"** | ❌ Missing | P4-3 |
-| **Proof blocks** (Theorem/Proof/Lemma/Corollary/Example) | ❌ Missing | P5-1 |
-| **Algorithm blocks** (Complexity/Pseudocode/Implementation/References) | ❌ Missing | P5-2 |
-| **Equation snippets** (`/gradient` → `\nabla f(x)`) | ❌ Missing (slash-command infra exists) | P5-4 |
-| **Terminal running `claude` against the open note** | ❌ Missing | **P7** |
-| **IDE integration**: open project docs, "Open in IDE" on code blocks, `src/main.cpp:58` deep links, per-project `notes/` | ❌ Missing — *entire pillar absent from this roadmap* | **P6** |
+| **Proof blocks** (Theorem/Proof/Lemma/Corollary/Example) | ❌ Missing | P6-1 |
+| **Algorithm blocks** (Complexity/Pseudocode/Implementation/References) | ❌ Missing | P6-2 |
+| **Equation snippets** (`/gradient` → `\nabla f(x)`) | ❌ Missing (slash-command infra exists) | P6-4 |
+| **Terminal running `claude` against the open note** | ❌ Missing | **P8** |
+| **IDE integration**: open project docs, "Open in IDE" on code blocks, `src/main.cpp:58` deep links, per-project `notes/` | ❌ Missing — *entire pillar absent from this roadmap* | **P7** |
 | Search over equations + code | ✅ Effectively complete — FTS indexes the raw `.md`, so LaTeX source and code text are already searchable | — |
 | Search over PDFs | ❌ Missing — pages are images today | Falls out of P4 for free |
 | Search over handwriting | ❌ Missing — needs ink OCR | Cut (see §4) |
@@ -97,7 +97,7 @@ M0–M3 cleared the *reliability* backlog, so the question is no longer "is it s
 | Workspace remembers open notes + expanded folders | ✅ Complete | — |
 | Workspace remembers split panes, recent searches | ❌ Missing | Deferred (see §4) |
 
-**The re-scope this implies.** Phases 4–9 below are new; the old Phase 4 (AI assistant, code execution) is renumbered into **P9**. **P8 (Study & Revision) is the one phase with no line in this table** — it answers a gap in the brief rather than in the implementation; see §3. Ordering reflects the brief's own emphasis — it calls the PDF/exercise-sheet workflow "a flagship feature" worth "hours every semester," so that goes first, ahead of authoring polish.
+**The re-scope this implies.** Phases 4–9 below are new; the old Phase 4 (AI assistant, code execution) is renumbered into **P10**. **P9 (Study & Revision) is the one phase with no line in this table** — it answers a gap in the brief rather than in the implementation; see §3. Ordering reflects the brief's own emphasis — it calls the PDF/exercise-sheet workflow "a flagship feature" worth "hours every semester," so that goes first, ahead of authoring polish.
 
 ---
 
@@ -112,15 +112,16 @@ Given "personal daily driver," priority = **`(daily-use value) × (risk of data 
 | **P2** | Feel & ergonomics | **M2:** it's a pleasure to use for hours | 3/4 | Compounding daily quality-of-life |
 | **P3** | Headline features & power tools | **M3:** the CS-specific superpowers land | ✅ | PDF-as-reference, export, graph |
 | **P4** | PDF→Markdown & exercise sheets | **M4:** an exercise sheet becomes a workable note in one step | ▶ next | The brief's own flagship; the biggest single time-saver |
-| **P5** | STEM authoring | **M5:** writing maths/algorithms is faster here than anywhere else | | Compounds on every note; cheap, since the infra exists |
-| **P6** | IDE integration | **M6:** notes and code are one workflow, not two | | The brief's second pillar — "integrate, don't replace" |
-| **P7** | Embedded terminal | **M7:** `claude` runs against the open note without leaving the app | | Small effort; delivers the brief's AI ask without AI code |
-| **P8** | Study & revision | **M8:** the app helps me *revise*, not just capture | | The only phase not derived from the brief — see below |
-| **P9** | Gated stretch | **M9:** in-app AI + code execution | gated | Explicitly deferred; do not let it pull focus |
+| **P5** | Versioned workspaces (Git automation) | **M5:** my notes commit themselves, in both kinds of repo | | The next tier of P0's data safety — a commit is a recoverable backup |
+| **P6** | STEM authoring | **M6:** writing maths/algorithms is faster here than anywhere else | | Compounds on every note; cheap, since the infra exists |
+| **P7** | IDE integration | **M7:** notes and code are one workflow, not two | | The brief's second pillar — "integrate, don't replace" |
+| **P8** | Embedded terminal | **M8:** `claude` runs against the open note without leaving the app | | Small effort; delivers the brief's AI ask without AI code |
+| **P9** | Study & revision | **M9:** the app helps me *revise*, not just capture | | The only phase not derived from the brief — see below |
+| **P10** | Gated stretch | **M10:** in-app AI + code execution | gated | Explicitly deferred; do not let it pull focus |
 
-Priority within the new phases follows the same formula (**daily value × friction ÷ effort**), which is why P5 (many small wins on infra that already exists) outranks P6 (a whole new integration surface) despite P6 being the more distinctive feature.
+Priority within the new phases follows the same formula (**daily value × friction ÷ effort**), which is why P6 (many small wins on infra that already exists) outranks P7 (a whole new integration surface) despite P7 being the more distinctive feature.
 
-**Why P8 exists (2026-07-29).** Every other phase traces to `notes/Plan.md`. P8 does not, and was added because reviewing the brief exposed a gap in the brief itself: **it is a capture roadmap.** Everything — editing, ink, PDF import, links, graph — helps get material *into* the app. Nothing helps a student get it back *out* at exam time, which is when a study tool either earns its keep or doesn't. It sits at P8 rather than earlier because capture has to be excellent before revision has anything worth revising.
+**Why P9 exists (2026-07-29).** Every other phase traces to `notes/Plan.md`. P9 does not, and was added because reviewing the brief exposed a gap in the brief itself: **it is a capture roadmap.** Everything — editing, ink, PDF import, links, graph — helps get material *into* the app. Nothing helps a student get it back *out* at exam time, which is when a study tool either earns its keep or doesn't. It sits at P9 rather than earlier because capture has to be excellent before revision has anything worth revising.
 
 ---
 
@@ -349,116 +350,180 @@ The part the brief says "would save students hours every semester."
 
 ---
 
-## Phase 5 — STEM Authoring (P5)
+## Phase 5 — Versioned Workspaces / Git Automation (P5)
 
-**Milestone M5:** *Writing maths, proofs and algorithms is faster in this app than in any general note app.*
+**Milestone M5:** *My notes commit themselves. A paragraph I deleted yesterday is recoverable, and I never think about it.*
+
+**This is not the cloud sync that was cut.** That cut was about the app building accounts, a server, and a sync protocol — it stands. This is P3-4's mandate ("make Git painless") taken from documentation to automation: the app drives the user's own Git, with the user's own remote. Local-first is untouched; nothing here is required to open a note.
+
+**Why it sits right after P4:** it is the next tier of P0's work. P0 guaranteed the file on disk is never corrupt. This guarantees *yesterday's version still exists*. A commit is a recoverable backup, which makes this a data-safety feature that happens to look like convenience.
+
+### The two modes, and why they get different defaults
+
+Everything in this phase follows from one distinction:
+
+| | **Notes-only workspace** (lecture notes) | **Notes inside a code repo** (`notes/`, `docs/`) |
+|---|---|---|
+| Whose history is it? | Yours alone | Shared; other people read the log |
+| Commit noise | Harmless | A real cost |
+| Auto-push | Yes | **Never** |
+| Risk of touching unrelated work | None | High — your source lives there |
+
+The code-repo case is the dangerous one, and the guardrails below exist because of it.
+
+### P5-1 — Repo detection + per-workspace Git config — **S/M**
+- On opening a workspace, detect whether it is inside a Git repo and which mode applies: repo root ≈ workspace (**notes-only**) vs. workspace is a subtree of a repo containing source (**code repo**).
+- **Shell out to `git`, don't link `git2`/`gix`.** Shelling out inherits the user's credential helpers, SSH agent, commit signing and `.gitconfig` for free — all of which are painful to reimplement and impossible to get exactly right. Requires `git` on `PATH`, a safe assumption for this audience.
+- Config is **per-workspace and machine-local** (autocommit on/off, cadence, push policy). "Should this machine autocommit" is a fact about the machine, not about the notes, so it belongs beside `.workspace.json` — which P3-4 already gitignores — not in a synced file.
+- **Opt-in.** Detecting a repo prompts once; it never starts committing on its own.
+- **DoD:** Both modes are correctly identified on open; no Git command runs against any workspace that hasn't been explicitly opted in.
+
+### P5-2 — Batched auto-commit — **M**
+The core of the phase, and where every safety property lives.
+- **Coarse cadence:** one commit per editing session, or after N minutes idle — deliberately far coarser than the 600 ms save debounce and the 2.5 s reindex debounce. Never per-save. Message summarizes what changed (`notes: update Analysis II Lecture 7, Lecture 8`).
+- **Always pathspec-scoped.** `git add -- <note paths>` and `git commit -- <paths>`. Never `git add -A`; never a bare `git commit`, which would sweep in whatever the user has staged. In a code repo this is the difference between a useful feature and one that silently commits half-finished source.
+- **Back off, never repair.** Skip the commit entirely if the repo is mid-rebase/merge/cherry-pick, on a detached HEAD, or already carries conflict markers. Report it quietly in the status bar. The app must never attempt to fix a repo state it didn't create.
+- **Hooks: run them, and abort on failure.** A note commit in a code repo will trigger that project's `pre-commit`. Silently passing `--no-verify` in someone's repo is exactly the kind of decision that shouldn't be made on their behalf, so the default is to run hooks and abandon the auto-commit if one fails, surfacing why. A per-workspace "skip hooks for note commits" toggle exists for the case where the user knows their hooks don't cover `notes/` — opt-in, never assumed.
+- **Dependency:** P5-1.
+- **DoD:** An editing session produces exactly one commit touching only note paths. **Critically:** in a repo with staged source changes and unstaged source edits, both are still exactly as they were after an auto-commit runs — covered by a test, because this is the property whose violation would be unforgivable.
+
+### P5-3 — Push policy — **S**
+- **Notes-only workspace:** push after commit (configurable, on by default).
+- **Code repo: never auto-push, at any setting.** Notes ride along with your next real push. Auto-pushing into a shared repo can trigger CI and put commits on a branch someone else is working from — outward-facing, hard to undo, and not worth the convenience.
+- Handle no-remote, auth failure, and non-fast-forward rejection by surfacing the error; never retry blindly, never force.
+- **Dependency:** P5-2.
+- **DoD:** No sequence of UI actions causes a push from a code-repo workspace. A notes-only workspace pushes after commit and reports failures visibly rather than silently falling behind.
+
+### P5-4 — Fast-forward-only auto-pull — **M**
+The laptop→desktop case, and **the most dangerous task on the roadmap** — a bad merge writes `<<<<<<< HEAD` into a `.md`, which the editor will faithfully render as content.
+- On workspace open (and optionally on an interval): fetch, then compare.
+- **Local has no divergent commits → fast-forward silently.** The resulting burst of file changes is already handled: P0-5's watcher debounces it and P3-4 traced exactly this path for `git pull`.
+- **Histories have diverged → stop.** Show a bar reusing the P0-5 conflict-bar pattern ("remote is ahead by 3, you're ahead by 1") and let the user resolve it in the terminal (P8) or their Git tool.
+- **Never auto-merge, never auto-rebase, never write a conflict marker into a note.**
+- A dirty buffer is never overwritten by a pull — this extends `CLAUDE.md`'s existing "a dirty buffer is never overwritten from disk" rule to cover the pull path, which is new.
+- **Dependency:** P5-1. Independent of P5-2/P5-3.
+- **DoD:** A laptop→desktop round trip fast-forwards with no prompt and no conflict. A deliberately diverged history produces a prompt and **zero** conflict markers in any `.md`. A dirty buffer survives a pull that would have changed its file.
+
+### P5-5 — Repo creation for a notes-only workspace — **S**
+- A workspace that isn't a repo offers: `git init`, the `.gitignore` P3-4 already documents, and optionally a GitHub remote via `gh repo create`.
+- **Private by default** — lecture notes must not become public by accident.
+- If `gh` is absent, initialize locally and print the exact remote command to run. Never a hard dependency on `gh`.
+- **DoD:** A plain notes folder becomes a private GitHub-backed repo in one action, or degrades to a working local repo with clear next steps when `gh` isn't installed.
+
+**Exit check for M5:** notes commit themselves in both modes; a code repo's staged work, unstaged work, branch and history are provably untouched outside note paths; a laptop→desktop round trip completes without a single conflict marker.
+
+---
+
+## Phase 6 — STEM Authoring (P6)
+
+**Milestone M6:** *Writing maths, proofs and algorithms is faster in this app than in any general note app.*
 
 Cheap phase with a high hit rate: the callout node, the slash-command menu, and the markdown-serialisation pattern all already exist, so most of these are configuration and a serializer rather than new subsystems. **Every new node must carry its own `addStorage().markdown.serialize/parse`** — per `CLAUDE.md`, a node without one silently serialises as escaped plain text, which is data loss in slow motion.
 
-### P5-1 — Proof blocks + collapsible sections — **M**
+### P6-1 — Proof blocks + collapsible sections — **M**
 - Theorem / Lemma / Corollary / Proof / Definition / Example blocks with optional numbering and a title.
 - Collapsible sections (`<details>`-equivalent) — a brief item never built, and the natural way to hide a long proof.
 - Build both on the existing `Callout` node's pattern rather than inventing a second block mechanism.
 - **DoD:** Each block type inserts from `/`, round-trips through save→reload with its type and title intact, and prints correctly in the P3-2 PDF export. Collapse state is presentation-only — it never changes the `.md` content.
 
-### P5-2 — Algorithm blocks — **M**
+### P6-2 — Algorithm blocks — **M**
 - A block with Complexity / Pseudocode / Implementation / References slots, per the brief.
-- **Dependency:** P5-1 (same node pattern; build it second and reuse the machinery).
+- **Dependency:** P6-1 (same node pattern; build it second and reuse the machinery).
 - **DoD:** Round-trips to readable Markdown that still makes sense opened in any other editor — the plain-`.md` principle applies here more than anywhere, since this is the most structured node in the app.
 
-### P5-3 — Templates — **S/M**
+### P6-3 — Templates — **S/M**
 - A `templates/` folder in the workspace; "New from template" in the sidebar and File menu. Minimal placeholder substitution (date, title) and nothing more.
 - The exercise-sheet layout from P4-3 becomes the first real template.
 - **DoD:** Creating a note from a template produces the template's content with placeholders filled; templates are plain `.md` files, editable as normal notes.
 
-### P5-4 — Equation snippets — **S**
+### P6-4 — Equation snippets — **S**
 - `/gradient` → `\nabla f(x)`, and a table of the common ones. The `SlashCommands` extension already provides the menu, so this is a data table plus a maths-mode filter.
 - **DoD:** Typing `/` inside a maths context offers snippets and inserts valid KaTeX; the list is one editable table, not code scattered per snippet.
 
-### P5-6 — Outline / table-of-contents panel — **S**
-Long lecture notes are hard to move around in, and P5 is the phase that makes notes longer and more structured.
+### P6-6 — Outline / table-of-contents panel — **S**
+Long lecture notes are hard to move around in, and P6 is the phase that makes notes longer and more structured.
 - Headings of the current note in the right rail, click to jump; highlight the heading currently in view.
 - Share the rail with `BacklinksPanel` rather than adding a third permanent column.
 - **Dependency:** none — the heading data is already in the ProseMirror document, so this needs no backend work at all.
 - **DoD:** A long note's headings are listed and clickable; the list tracks the current scroll position; toggling the panel is on the P2-2 shortcut layer.
 
-*Placement note: this was proposed alongside the P8 study features, but it is an **S**-effort navigation aid that serves any long note — parking it behind three phases would waste it. Moved here deliberately.*
+*Placement note: this was proposed alongside the P9 study features, but it is an **S**-effort navigation aid that serves any long note — parking it behind three phases would waste it. Moved here deliberately.*
 
-### P5-5 — Search refinement — **S**
+### P6-5 — Search refinement — **S**
 The brief asks search to cover "equations, code, handwritten notes, PDFs." Equations and code already work (FTS indexes the raw `.md`); PDFs arrive with P4-1; handwriting is cut (§4). What's actually missing is **scoping**.
 - Filter results by folder and by tag; keep a short recent-searches list (a brief workspace-memory item).
 - **DoD:** Search can be narrowed to a folder or tag without leaving the keyboard; recent searches persist per workspace.
 
 ---
 
-## Phase 6 — IDE Integration (P6)
+## Phase 7 — IDE Integration (P7)
 
-**Milestone M6:** *Notes and code are one workflow. I never manually hunt for the file a note is talking about.*
+**Milestone M7:** *Notes and code are one workflow. I never manually hunt for the file a note is talking about.*
 
-The brief's second pillar — **"IDE integration instead of IDE replacement"** — and the thing that most distinguishes this from Obsidian. It was entirely absent from this roadmap before 2026-07-29. It sits after P4/P5 because it opens a genuinely new surface (launching external processes) rather than building on existing infra.
+The brief's second pillar — **"IDE integration instead of IDE replacement"** — and the thing that most distinguishes this from Obsidian. It was entirely absent from this roadmap before 2026-07-29. It sits after P4/P6 because it opens a genuinely new surface (launching external processes) rather than building on existing infra.
 
 **Design constraint:** the note stays plain `.md`. A deep link is ordinary Markdown that degrades to readable text in any other editor — never a proprietary token.
 
-### P6-1 — Code deep links — **M**
+### P7-1 — Code deep links — **M**
 - Recognise `src/main.cpp:58` (and `path/file.rs#L20-L30`) in note text and make it clickable; clicking opens the configured editor at that file and line.
 - Resolve paths relative to the workspace root, or to a project root if the workspace is inside one.
 - **Security:** this executes an external process using text taken from a note. The launcher must pass the path as an argument to a configured command, never through a shell, and must refuse paths that escape the workspace/project root. Do not build the naive version.
 - **DoD:** Clicking a `file:line` reference opens the right file at the right line in the configured editor; an unresolvable path renders as inert text with a clear "not found" affordance, exactly like an unresolved wiki-link; a path containing shell metacharacters cannot cause command execution, and a test covers that.
 
-### P6-2 — "Open in IDE" on code blocks — **S**
+### P7-2 — "Open in IDE" on code blocks — **S**
 - A code block that carries a source path gets an "Open in IDE" action.
-- **Dependency:** P6-1 (same launcher, same path resolution, same guardrails).
+- **Dependency:** P7-1 (same launcher, same path resolution, same guardrails).
 - **DoD:** The action appears only on blocks that actually have a resolvable path — never a dead button.
 
-### P6-3 — Project awareness & project notes — **M**
+### P7-3 — Project awareness & project notes — **M**
 - Open a code project as a workspace and surface its existing `README.md` / `docs/` / `notes/` directly, with no import step (the brief: "No importing").
 - Optionally scaffold a `notes/` folder (Architecture / Meeting / Research / Todo) on request — **on request only**, never automatically, and never writing into source folders.
 - **DoD:** Pointing the app at a code repo shows its Markdown immediately and correctly; scaffolding is opt-in and creates only inside `notes/`.
 
-### P6-4 — Editor command setting — **S**
+### P7-4 — Editor command setting — **S**
 - A configurable launch command template (VS Code, JetBrains, Neovim…) in the P2-1 settings panel, with sensible detection of what's installed.
-- **Dependency:** P2-1. Land this **with** P6-1 — a hardcoded editor path would be an immediate rewrite.
+- **Dependency:** P2-1. Land this **with** P7-1 — a hardcoded editor path would be an immediate rewrite.
 - **DoD:** Switching the configured editor changes where deep links open, with no code change.
 
 ---
 
-## Phase 7 — Embedded Terminal (P7)
+## Phase 8 — Embedded Terminal (P8)
 
-**Milestone M7:** *I can run `claude` (or any CLI) against the note I'm looking at without leaving the app.*
+**Milestone M8:** *I can run `claude` (or any CLI) against the note I'm looking at without leaving the app.*
 
-The brief's actual AI ask is *"a terminal in which I can do `claude` and work with the opened `.md` file"* — which is a **terminal feature, not an AI feature**. It is roughly an order of magnitude cheaper than the in-app assistant (P9-1), ships no AI code, adds no API key handling, and works with any CLI tool. Crucially, **the hard part is already built**: P0-5's watcher means a file edited by an external process is already detected, reloaded when clean, and conflict-prompted when dirty. The terminal is a client of infrastructure that exists.
+The brief's actual AI ask is *"a terminal in which I can do `claude` and work with the opened `.md` file"* — which is a **terminal feature, not an AI feature**. It is roughly an order of magnitude cheaper than the in-app assistant (P10-1), ships no AI code, adds no API key handling, and works with any CLI tool. Crucially, **the hard part is already built**: P0-5's watcher means a file edited by an external process is already detected, reloaded when clean, and conflict-prompted when dirty. The terminal is a client of infrastructure that exists.
 
-### P7-1 — Terminal pane — **M/L**
+### P8-1 — Terminal pane — **M/L**
 - A terminal pane (PTY-backed) rooted at the workspace, with the active note's path readily available — an env var and a one-key insert.
 - **Dependency:** P0-5 (external-change handling is what makes CLI edits safe). Benefits from P2-2's command dispatcher for the toggle shortcut.
 - **DoD:** Running `claude` in the pane and having it edit the open note updates the editor through the existing watcher path, with no new reload logic and no conflict-handling special case. Closing the pane leaves no orphaned process.
 
 ---
 
-## Phase 8 — Study & Revision (P8)
+## Phase 9 — Study & Revision (P9)
 
-**Milestone M8:** *At exam time the app is where I revise, not just where my notes happen to live.*
+**Milestone M9:** *At exam time the app is where I revise, not just where my notes happen to live.*
 
-The one phase not derived from `notes/Plan.md`. Everything before it is capture; this is retrieval. Ordered cheapest-first, because P8-1 is small enough to ship in a sitting and P8-3 needs a decision made before any code.
+The one phase not derived from `notes/Plan.md`. Everything before it is capture; this is retrieval. Ordered cheapest-first, because P9-1 is small enough to ship in a sitting and P9-3 needs a decision made before any code.
 
 **Architectural rule for this whole phase:** study state is **data**, not index. Principle #1 says deleting `index.db` loses nothing — so nothing here may keep its only copy in SQLite. The established pattern applies exactly: source of truth in the `.md`, a derived table in `index.db` rebuilt by the same reindex path that already carries `note_tags` and `note_links`.
 
-### P8-1 — Workspace-wide task view — **S/M**
+### P9-1 — Workspace-wide task view — **S/M**
 Coursework tasks live scattered across notes (`- [ ] finish exercise 3`) with no way to see them together.
 - Extract `- [ ]` / `- [x]` into a `note_tasks` table (note path, text, done, position) — a direct mirror of `note_tags`, built in the existing `reindex_note` path, so it inherits the P0-3 debounce and the P0-5 watcher for free.
 - A view listing open tasks grouped by note/folder; click jumps to the task in its note; ticking from the view writes through the normal save path.
 - **Dependency:** none. Best value-per-effort in the phase — start here.
 - **DoD:** Every unchecked task in the workspace appears in one place within one reindex cycle of being typed; ticking it from the view updates the `.md`; deleting `index.db` and reopening rebuilds the list identically.
 
-### P8-2 — Formula sheet generation — **M**
+### P9-2 — Formula sheet generation — **M**
 Many exams allow one A4 formula sheet. Building it by hand is hours of copy-paste from a semester of notes.
 - Collect every block-math node across a chosen scope (folder, tag, or workspace) into a **generated note** — plain `.md`, editable afterwards like any other note, printable through P3-2's existing PDF export.
 - Deduplicate identical formulas; optionally caption each with the note and heading it came from.
 - Generate on demand into a real file. **No live-updating magic file** — a note that rewrites itself behind your back is exactly the kind of thing the plain-`.md` principle exists to prevent.
-- **Dependency:** P3-2 (export path). Benefits from P5-1 if theorem blocks exist by then, but doesn't need them.
+- **Dependency:** P3-2 (export path). Benefits from P6-1 if theorem blocks exist by then, but doesn't need them.
 - **DoD:** Pointing it at a course folder produces one note containing that course's block math, deduplicated, in source order; it exports to a clean printable PDF; editing the result afterwards is ordinary note editing with no regeneration surprises.
 
-### P8-3 — Spaced repetition: **decision fork first** — **decision, then L**
+### P9-3 — Spaced repetition: **decision fork first** — **decision, then L**
 
 The highest-value study feature and the one with a real architectural catch, so **do not start coding until the storage question is settled.** Review scheduling is data that cannot be rebuilt from the notes, so `index.db` is not an option (principle #1). Three candidates:
 
@@ -469,24 +534,24 @@ The highest-value study feature and the one with a real architectural catch, so 
 **Recommendation: Option A.** The write cost is affordable precisely because P0 was done properly — writes are atomic, debounced and conflict-aware, and reviews happen tens of times a day, not per keystroke. It is also the only option that keeps the `.md` file genuinely self-contained, which is principle #1 applied to a new kind of state.
 
 Then, once decided:
-- Card syntax over existing notes — cloze deletion for hiding part of a definition, and a `Question :: Answer` form. **P5-1's theorem/proof blocks are natural cards for free** ("state this theorem" / "prove it"), which is the real argument for P5 preceding P8.
+- Card syntax over existing notes — cloze deletion for hiding part of a definition, and a `Question :: Answer` form. **P6-1's theorem/proof blocks are natural cards for free** ("state this theorem" / "prove it"), which is the real argument for P6 preceding P9.
 - SM-2 scheduling; a review session UI; a derived `review_cards` table in `index.db` for "what's due" queries, rebuildable from the notes.
-- **Dependency:** the fork above; P5-1 for theorem-block cards; **this is the concrete trigger for the frontmatter decision** deferred in §5 — if Option A wins, frontmatter may never be needed at all.
+- **Dependency:** the fork above; P6-1 for theorem-block cards; **this is the concrete trigger for the frontmatter decision** deferred in §5 — if Option A wins, frontmatter may never be needed at all.
 - **DoD:** Cards are authored inside normal notes and remain readable as plain Markdown in any other editor; a review session schedules correctly across restarts; deleting `index.db` and reopening loses no scheduling state; moving or renaming a note does not orphan its cards.
 
-**Exit check for M8:** a real course folder yields a usable formula sheet, its open tasks are visible in one place, and a revision session runs off the semester's own notes without any content having been re-entered by hand.
+**Exit check for M9:** a real course folder yields a usable formula sheet, its open tasks are visible in one place, and a revision session runs off the semester's own notes without any content having been re-entered by hand.
 
 ---
 
-## Phase 9 — Gated Stretch (P9) — explicitly gated
+## Phase 10 — Gated Stretch (P10) — explicitly gated
 
-**Milestone M9:** *Only after M0–M8 are solid.* The v2 vision from `docs/specs/tech-stack-design.md`. **Do not let these influence P0–P8 design.** *(These were P4-1 and P4-2 before the 2026-07-29 re-scope, then P8-* briefly.)*
+**Milestone M10:** *Only after M0–M9 are solid.* The v2 vision from `docs/specs/tech-stack-design.md`. **Do not let these influence P0–P9 design.** *(These were P4-1 and P4-2 before the 2026-07-29 re-scope, then P9-* briefly.)*
 
-### P9-1 — AI assistance over the open note (Claude) — **L**
+### P10-1 — AI assistance over the open note (Claude) — **L**
 - An in-app assistant that reads/edits the active `.md` (summarize, explain, generate practice problems, tidy notes). Design it as an *optional* layer over the file — the note stays plain `.md`, and the app remains fully usable with the feature off.
-- **Gate:** requires M0 (safe writes) and a settled save-state machine so AI edits go through the same conflict-safe path as human edits. **Also gated on P7 proving insufficient** — if the terminal covers the need, this may never need building at all.
+- **Gate:** requires M0 (safe writes) and a settled save-state machine so AI edits go through the same conflict-safe path as human edits. **Also gated on P8 proving insufficient** — if the terminal covers the need, this may never need building at all.
 
-### P9-2 — In-editor code execution (Python / C++) — **L**
+### P10-2 — In-editor code execution (Python / C++) — **L**
 - Run fenced code blocks and show output inline. Real sandboxing, toolchain detection, and security review required before this is more than a toy.
 - **Gate:** significant security surface; do not start without a dedicated design+security pass.
 
@@ -503,16 +568,16 @@ Per the mandate to remove work that doesn't earn its keep:
 | **Graphviz rendering** | **Challenged — not scheduled** | Mermaid already covers flowcharts, sequence, state and class diagrams. Graphviz means shipping a wasm build for the narrow gap (fine-grained graph layout). Revisit only if a real note actually needs DOT. |
 | **TikZ export** | **Challenged — not scheduled** | Niche even for this audience, and only useful when handing work to LaTeX. P3-2's PDF export already covers submission. |
 | **CodeMirror 6 as the editor** | **Superseded** | The brief named CodeMirror; the app is built on TipTap/ProseMirror, which is what makes WYSIWYG-with-inline-ink possible at all. Recorded so the brief's stack list isn't mistaken for a pending migration. |
-| **Cloud sync** | **Cut (stays out of scope)** | Violates local-first principle; plain `.md` + Git/Syncthing already covers it. Invest in *making manual sync painless* (P3-4), not building sync. |
+| **Cloud sync** | **Cut (stays out of scope)** | Violates local-first principle; plain `.md` + Git/Syncthing already covers it. Invest in *making manual sync painless* (P3-4), not building sync. **Note (2026-07-29):** P5 automates the user's *own* Git against the user's *own* remote. That is this row's remedy taken further, not a reversal of it — the app still builds no accounts, no server, and no sync protocol, and still needs no network to open a note. |
 | **Mobile / tablet app** | **Cut** | Desktop + stylus is the whole point; a second platform is a different product. |
 | **Collaboration / multiplayer** | **Cut** | Single-user tool; enormous complexity for zero personal value. |
 | **Segment-level eraser, hold-to-snap shape recognition** | **Defer indefinitely** | Ink is already a daily-usable subsystem; these are diminishing-returns polish. Only revisit if real use demands it. |
 | **Distribution: installers, auto-update, code-signing, cross-platform** | **Out of scope now** | Personal tool. Revisit only if the audience decision changes to "ship to students." |
 | **Stable note `id` scheme** | **Defer** | `path` is the working key; don't invest until something actually needs stable IDs (e.g. an external integration). |
 | **Multi-window / split-pane editing** | **Defer — reconsider at P4** | Not blocking daily use. But the brief wants the workspace to remember split panes, and P4's "sheet on one side, solution on the other" is the first case with a concrete argument for it. Decide during P4 rather than in the abstract. |
-| **Workspace remembers AI conversations** | **Cut** | A brief workspace-memory item that presumes the in-app assistant. With P7 (terminal), conversation history belongs to the CLI tool, not to this app. |
-| **Note version history / snapshots** | **Challenged — do the cheap version or nothing** | Considered during the P8 planning pass. Building a snapshot store duplicates what Git already does, and P3-4 already assumes a Git-synced workspace. If this is ever wanted, it is a thin read-only wrapper over `git log`/`git show` for the current note — *not* a second storage system. Anything more is out of scope. |
-| **Query blocks / Dataview-lite** | **Challenged — not scheduled** | Powerful, but committing to a query language is a rabbit hole with no natural end, and it would pull metadata design (frontmatter) forward speculatively. P5-5's tag/folder filters plus P8-1's task view cover the realistic 90%. Revisit only if a concrete query is wanted that those two genuinely cannot express. |
+| **Workspace remembers AI conversations** | **Cut** | A brief workspace-memory item that presumes the in-app assistant. With P8 (terminal), conversation history belongs to the CLI tool, not to this app. |
+| **Note version history / snapshots** | **Challenged — do the cheap version or nothing** | Considered during the P9 planning pass. Building a snapshot store duplicates what Git already does, and P3-4 already assumes a Git-synced workspace. If this is ever wanted, it is a thin read-only wrapper over `git log`/`git show` for the current note — *not* a second storage system. Anything more is out of scope. |
+| **Query blocks / Dataview-lite** | **Challenged — not scheduled** | Powerful, but committing to a query language is a rabbit hole with no natural end, and it would pull metadata design (frontmatter) forward speculatively. P6-5's tag/folder filters plus P9-1's task view cover the realistic 90%. Revisit only if a concrete query is wanted that those two genuinely cannot express. |
 | **Lecture audio recording + timestamped notes** | **Cut** | A real student workflow, but a different product surface (capture device, audio storage, playback sync) attached to an app whose entire value is plain-text portability. An audio file is not a `.md`. |
 | **Citations / BibTeX / reference manager** | **Cut** | Coursework cites rarely; this is a thesis-writing need, and Zotero already exists. |
 | **Presentation / slides mode** | **Cut** | Niche, and P3-2's PDF export already covers sharing a note with a study group. |
@@ -525,10 +590,11 @@ Per the mandate to remove work that doesn't earn its keep:
 - **Performance budget:** typing latency is sacred — keep DB work off the keystroke path (P0-3). Search and tree refresh should stay sub-100 ms at a few hundred notes.
 - **Observability:** add lightweight logging behind the save/index/watch paths (P0) so a future "did it save?" question is answerable. No telemetry — local logs only.
 - **Clippy/typecheck gates:** `cargo clippy -- -D warnings`, `npm run typecheck`, `npm run test` stay green on every commit (per `CLAUDE.md`). Note: there is no `npm run lint` script — don't reference one.
-- **Markdown serialization (new, P5-critical):** every custom node must define `addStorage().markdown.serialize/parse`. A node without one serializes as escaped plain text — silent data loss. P5 adds more node types than any previous phase, so this is the phase where that rule gets tested.
-- **YAML frontmatter — deferred, with a named trigger (2026-07-29).** The app has no frontmatter support; the title comes from the first heading. Adding it speculatively was considered and rejected: it is infrastructure with no current consumer, and building it "for later" is the premature abstraction the principles warn against. **The trigger is P8-3.** If spaced repetition needs per-note metadata, frontmatter lands then — and if P8-3 takes Option A (inline card state), it may never be needed at all. Do not add it for any other reason without a concrete consumer.
-- **Derived-not-authoritative (new, P8-critical):** `index.db` is rebuildable — deleting it must lose nothing. P8 introduces the first state that is neither note content nor derivable from it (review schedules), so every P8 task carries the same test: *delete `index.db`, reopen, is anything gone?* If yes, the design is wrong.
-- **External process launching (new, P6/P7-critical):** P6 and P7 are the first features that run external programs, and P6-1 does so using text taken from note content. Pass paths as arguments to a configured command, never through a shell; refuse paths escaping the workspace/project root. This is the one genuinely new security surface on the roadmap.
+- **Markdown serialization (new, P6-critical):** every custom node must define `addStorage().markdown.serialize/parse`. A node without one serializes as escaped plain text — silent data loss. P6 adds more node types than any previous phase, so this is the phase where that rule gets tested.
+- **YAML frontmatter — deferred, with a named trigger (2026-07-29).** The app has no frontmatter support; the title comes from the first heading. Adding it speculatively was considered and rejected: it is infrastructure with no current consumer, and building it "for later" is the premature abstraction the principles warn against. **The trigger is P9-3.** If spaced repetition needs per-note metadata, frontmatter lands then — and if P9-3 takes Option A (inline card state), it may never be needed at all. Do not add it for any other reason without a concrete consumer.
+- **Derived-not-authoritative (new, P9-critical):** `index.db` is rebuildable — deleting it must lose nothing. P9 introduces the first state that is neither note content nor derivable from it (review schedules), so every P9 task carries the same test: *delete `index.db`, reopen, is anything gone?* If yes, the design is wrong.
+- **External process launching (new, P5/P7/P8-critical):** P5, P7 and P8 are the features that run external programs — `git` for the first, an editor and a shell for the others — and P7-1 does so using text taken from note content. Pass paths as arguments to a configured command, never through a shell; refuse paths escaping the workspace/project root. This is the one genuinely new security surface on the roadmap.
+- **Don't touch what you didn't create (new, P5-critical):** P5 is the first feature that writes into a repository the user also works in by hand. Every Git command must be pathspec-scoped to note paths, must abandon rather than repair an unexpected repo state, and must leave staged and unstaged source work untouched. When in doubt, do nothing and say so — a skipped auto-commit costs a few minutes; a wrong one costs trust in the whole feature.
 - **In-flight work:** the content-derived-title change to `notes.rs` has landed. A separate hazard was found and fixed during P0: `@tiptap/starter-kit` resolved a nested `@tiptap/core@3.29.1` against the pinned `3.27.4`, making every `Editor`/`Node` type nominally distinct and leaving `npm run typecheck` red on 4 errors. `package.json` now pins `@tiptap/core` and `@tiptap/pm` via `overrides` — don't remove them without re-checking typecheck.
 
 ---
@@ -538,29 +604,34 @@ Per the mandate to remove work that doesn't earn its keep:
 Completed phases (P0–P3) are collapsed to their outbound edges; the live critical path is P2-3 onward.
 
 ```
-[M0–M3 done] ──> P0-5 watcher ────────────────> P7-1 terminal
+[M0–M3 done] ──> P0-5 watcher ────────────────> P8-1 terminal
              └─> P3-1 pdf render + sidecar ──> P4-1 text extraction ──┬─> P4-2 maths crops / scanned fallback
-             └─> P2-1 settings ─────────────> P6-4 editor command      └─> P4-3 exercise split + add-next-task
-                                                                              └─> P5-3 templates
+             └─> P2-1 settings ─────────────> P7-4 editor command      └─> P4-3 exercise split + add-next-task
+                                                                              └─> P6-3 templates
 P2-3 editor niceties (independent, closes M2)
-P5-1 proof blocks + collapsible ──┬─> P5-2 algorithm blocks
-                                  └─> P8-3 spaced repetition (theorem blocks = cards)
-P5-4 equation snippets (independent) ; P5-5 search refinement (independent)
-P5-6 outline panel (independent, no backend)
-P6-1 deep links ──> P6-2 open-in-IDE ;  P6-4 lands *with* P6-1, not after
-P6-3 project awareness (independent)
-[reindex_note path] ──> P8-1 task view      [P3-2 export] ──> P8-2 formula sheet
-P8-3 storage fork ──> P8-3 implementation ──> (frontmatter decision resolves here)
-P9-* gated behind M8
+P6-1 proof blocks + collapsible ──┬─> P6-2 algorithm blocks
+                                  └─> P9-3 spaced repetition (theorem blocks = cards)
+P6-4 equation snippets (independent) ; P6-5 search refinement (independent)
+P6-6 outline panel (independent, no backend)
+P7-1 deep links ──> P7-2 open-in-IDE ;  P7-4 lands *with* P7-1, not after
+P7-3 project awareness (independent)
+P5-1 repo detection ──┬─> P5-2 auto-commit ──> P5-3 push policy
+                      ├─> P5-4 ff-only pull (independent of P5-2/3)
+                      └─> P5-5 repo creation
+P7-3 project awareness ──> P5-2's code-repo mode is most useful once this exists
+[reindex_note path] ──> P9-1 task view      [P3-2 export] ──> P9-2 formula sheet
+P9-3 storage fork ──> P9-3 implementation ──> (frontmatter decision resolves here)
+P10-* gated behind M9
 ```
 
-**Suggested execution order:** P2-3 → **M2** → P4-1 → P4-2 → P4-3 → **M4** → P5-1 → P5-2 → P5-3 → P5-4 → P5-5 → P5-6 → **M5** → P6-1 + P6-4 together → P6-2 → P6-3 → **M6** → P7-1 → **M7** → P8-1 → P8-2 → P8-3 fork → P8-3 → **M8** → (only then) P9.
+**Suggested execution order:** P2-3 → **M2** → P4-1 → P4-2 → P4-3 → **M4** → P5-1 → P5-2 → P5-3 → P5-4 → P5-5 → **M5** → P6-1 → P6-2 → P6-3 → P6-4 → P6-5 → P6-6 → **M6** → P7-1 + P7-4 together → P7-2 → P7-3 → **M7** → P8-1 → **M8** → P9-1 → P9-2 → P9-3 fork → P9-3 → **M9** → (only then) P10.
 
 Four orderings are deliberate and worth not reshuffling:
 - **P4-2 before P4-3** — splitting a sheet whose equations are garbage produces confidently-wrong output.
-- **P6-4 alongside P6-1** — a hardcoded editor path would be an immediate rewrite.
-- **P5 before P8-3** — theorem/proof blocks turn into flashcards essentially for free; building spaced repetition first means building a card authoring format twice.
-- **P8-3's fork before any P8-3 code** — the storage choice is not refactorable later; it determines what happens to every existing card when a note is renamed.
+- **P7-4 alongside P7-1** — a hardcoded editor path would be an immediate rewrite.
+- **P5-4 is fast-forward-only, permanently** — the moment auto-pull is allowed to merge, a `.md` can acquire conflict markers that the editor renders as ordinary content. There is no version of "smarter merging" that is worth this.
+- **P6 before P9-3** — theorem/proof blocks turn into flashcards essentially for free; building spaced repetition first means building a card authoring format twice.
+- **P9-3's fork before any P9-3 code** — the storage choice is not refactorable later; it determines what happens to every existing card when a note is renamed.
 
 ---
 
@@ -576,5 +647,6 @@ The following are **intentionally not on this roadmap**. Adding any of them is a
 - Plugin system / third-party extension API.
 - Encryption-at-rest / DRM (plain `.md` is the point).
 - Any feature that makes the `.md` file on disk no longer the plain, portable source of truth.
-- **Becoming an IDE.** P6 integrates with your editor; it does not grow into one. No project-wide code navigation, no refactoring, no debugger, no language servers. The moment a P6 task starts wanting a language server, it is out of scope.
+- **Resolving merge conflicts.** P5 automates commits and fast-forward pulls only. The app never merges, rebases, force-pushes, resets, or edits a conflicted file. When Git needs a human, it gets one.
+- **Becoming an IDE.** P7 integrates with your editor; it does not grow into one. No project-wide code navigation, no refactoring, no debugger, no language servers. The moment a P7 task starts wanting a language server, it is out of scope.
 ```

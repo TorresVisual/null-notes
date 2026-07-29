@@ -6,7 +6,7 @@ Effort: **S** ≈ hours · **M** ≈ a day or two · **L** ≈ several days.
 
 **Now:** finish P2-3 to close M2, then start P4-1.
 
-**Two decisions owed before their phase starts:** split-pane editing (during P4) and spaced-repetition storage (before any P8-3 code).
+**Two decisions owed before their phase starts:** split-pane editing (during P4) and spaced-repetition storage (before any P9-3 code).
 
 ---
 
@@ -19,11 +19,12 @@ Effort: **S** ≈ hours · **M** ≈ a day or two · **L** ≈ several days.
 | P2 Feel & ergonomics | M2 — a pleasure to use for hours | 3/4 |
 | P3 Headline features | M3 — the CS superpowers land | ✅ |
 | P4 PDF→Markdown & exercise sheets | M4 — a sheet becomes a workable note | ▶ next |
-| P5 STEM authoring | M5 — fastest place to write maths | |
-| P6 IDE integration | M6 — notes and code are one workflow | |
-| P7 Embedded terminal | M7 — `claude` runs against the open note | |
-| P8 Study & revision | M8 — the app helps me *revise*, not just capture | |
-| P9 Gated stretch | M9 — in-app AI + code execution | gated |
+| P5 Versioned workspaces (Git) | M5 — my notes commit themselves | |
+| P6 STEM authoring | M6 — fastest place to write maths | |
+| P7 IDE integration | M7 — notes and code are one workflow | |
+| P8 Embedded terminal | M8 — `claude` runs against the open note | |
+| P9 Study & revision | M9 — the app helps me *revise*, not just capture | |
+| P10 Gated stretch | M10 — in-app AI + code execution | gated |
 
 ---
 
@@ -67,76 +68,124 @@ Both import modes, chosen at import time, the way Notion does it. **No OCR** —
 
 ---
 
-## ▸ P5 — STEM authoring (M5)
+## ▸ P5 — Versioned workspaces / Git automation (M5)
+
+**Not the cloud sync that was cut** — no accounts, no server, no sync protocol. This drives *your* Git against *your* remote, which is P3-4's promise taken from docs to automation. It's the next tier of P0: P0 made the file on disk safe, this makes yesterday's version recoverable.
+
+Two modes, different defaults — everything here follows from this:
+
+| | Notes-only repo | Notes in a code repo |
+|---|---|---|
+| History is | yours alone | shared, others read it |
+| Auto-push | ✅ yes | ❌ **never** |
+| Risk to unrelated work | none | high — your source lives there |
+
+> 🔒 **Don't touch what you didn't create.** Pathspec-scope every Git command; abandon rather than repair an unexpected repo state; leave staged and unstaged source work untouched. A skipped auto-commit costs minutes — a wrong one costs trust in the feature.
+
+### P5-1 Repo detection + per-workspace config — **S/M**
+- [ ] Detect mode on open: repo root ≈ workspace (notes-only) vs. subtree of a source repo (code repo)
+- [ ] Shell out to `git`, **not** `git2`/`gix` — inherits credential helpers, SSH agent, signing, `.gitconfig` for free
+- [ ] Per-workspace, machine-local config beside `.workspace.json` (already gitignored) — "should this machine autocommit" isn't a fact about the notes
+- [ ] **Opt-in**: detecting a repo prompts once, never starts committing on its own
+
+### P5-2 Batched auto-commit — **M**
+- [ ] One commit per session / N minutes idle — never per-save (far coarser than the 600 ms save and 2.5 s reindex debounces)
+- [ ] Message summarizes which notes changed
+- [ ] **Always `git add -- <paths>` / `git commit -- <paths>`** — never `git add -A`, never a bare commit that sweeps in staged work
+- [ ] Skip entirely on mid-rebase/merge/cherry-pick, detached HEAD, or existing conflict markers; report quietly, never repair
+- [ ] Run hooks and abort on failure — no silent `--no-verify`; opt-in per-workspace toggle to skip them
+- [ ] **Test: staged and unstaged source changes are byte-identical after an auto-commit.** The one unforgivable failure.
+
+### P5-3 Push policy — **S**
+- [ ] Notes-only: push after commit (on by default, configurable)
+- [ ] Code repo: **never auto-push at any setting** — notes ride along with your next real push
+- [ ] Surface no-remote / auth failure / non-fast-forward; never retry blindly, never force
+
+### P5-4 Fast-forward-only auto-pull — **M** — *most dangerous task on the roadmap*
+- [ ] Fetch and compare on workspace open (optionally on an interval)
+- [ ] No divergent local commits → fast-forward silently (P0-5's watcher already debounces the file burst; P3-4 traced this exact path)
+- [ ] Diverged → **stop.** Bar reusing the P0-5 conflict-bar pattern; you resolve it in the terminal (P8) or your Git tool
+- [ ] **Never** auto-merge, auto-rebase, or write a conflict marker into a `.md`
+- [ ] A dirty buffer is never overwritten by a pull — extends the existing CLAUDE.md rule to the pull path
+- [ ] Test: a deliberately diverged history produces **zero** conflict markers in any `.md`
+
+### P5-5 Repo creation for a notes-only workspace — **S**
+- [ ] Offer `git init` + the `.gitignore` P3-4 documents when the workspace isn't a repo
+- [ ] Optional GitHub remote via `gh repo create` — **private by default**
+- [ ] No `gh`? Init locally and print the exact remote command. Never a hard dependency
+
+---
+
+## ▸ P6 — STEM authoring (M6)
 
 > ⚠️ Every new node needs `addStorage().markdown.serialize/parse`. Without one it serialises as escaped plain text — silent data loss.
 
-### P5-1 Proof blocks + collapsible sections — **M**
+### P6-1 Proof blocks + collapsible sections — **M**
 - [ ] Theorem / Lemma / Corollary / Proof / Definition / Example blocks, optional numbering + title
 - [ ] Collapsible sections; collapse state is presentation-only, never touches the `.md`
 - [ ] Build on the existing `Callout` node pattern — don't invent a second block mechanism
 - [ ] Round-trips through save→reload; prints correctly in PDF export
 
-### P5-2 Algorithm blocks — **M** *(after P5-1, reuse its machinery)*
+### P6-2 Algorithm blocks — **M** *(after P6-1, reuse its machinery)*
 - [ ] Complexity / Pseudocode / Implementation / References slots
 - [ ] Serialises to Markdown that still reads sensibly in any other editor
 
-### P5-3 Templates — **S/M**
+### P6-3 Templates — **S/M**
 - [ ] `templates/` folder in the workspace; "New from template" in sidebar + File menu
 - [ ] Minimal placeholder substitution (date, title) — nothing more
 - [ ] Ship the P4-3 exercise-sheet layout as the first template
 
-### P5-4 Equation snippets — **S**
+### P6-4 Equation snippets — **S**
 - [ ] `/gradient` → `\nabla f(x)` and friends, as one editable table
 - [ ] Offered only in a maths context
 
-### P5-5 Search refinement — **S**
+### P6-5 Search refinement — **S**
 - [ ] Filter results by folder and by tag, without leaving the keyboard
 - [ ] Recent-searches list, persisted per workspace
 
-### P5-6 Outline / TOC panel — **S**
+### P6-6 Outline / TOC panel — **S**
 - [ ] Current note's headings in the right rail, click to jump
 - [ ] Highlight the heading currently in view
 - [ ] Share the rail with the backlinks panel — no third permanent column
 - [ ] Toggle on the P2-2 shortcut layer
 
-> No backend work — heading data is already in the ProseMirror doc. Proposed with the P8 study features but moved here: it's **S** and serves any long note, so parking it behind three phases would waste it.
+> No backend work — heading data is already in the ProseMirror doc. Proposed with the P9 study features but moved here: it's **S** and serves any long note, so parking it behind three phases would waste it.
 
 ---
 
-## ▸ P6 — IDE integration (M6)
+## ▸ P7 — IDE integration (M7)
 
 The brief's second pillar. Notes stay plain `.md` — a deep link is ordinary Markdown that degrades to readable text elsewhere.
 
 > 🔒 First feature to launch external processes **using text taken from note content.** Pass paths as arguments to a configured command, never through a shell; refuse paths escaping the workspace/project root.
 
-### P6-1 Code deep links — **M** *(land together with P6-4)*
+### P7-1 Code deep links — **M** *(land together with P7-4)*
 - [ ] Recognise `src/main.cpp:58` and `path/file.rs#L20-L30` in note text
 - [ ] Resolve relative to workspace root, or project root if the workspace sits inside one
 - [ ] Click opens the configured editor at that file and line
 - [ ] Unresolvable path renders inert with a "not found" affordance, like an unresolved wiki-link
 - [ ] Shell metacharacters in a path cannot cause command execution — **with a test**
 
-### P6-4 Editor command setting — **S** *(not after P6-1 — with it)*
+### P7-4 Editor command setting — **S** *(not after P7-1 — with it)*
 - [ ] Configurable launch command template (VS Code / JetBrains / Neovim) in the settings panel
 - [ ] Detect what's installed
 - [ ] Switching editors changes where links open, with no code change
 
-### P6-2 "Open in IDE" on code blocks — **S**
-- [ ] Action on code blocks that carry a source path, reusing P6-1's launcher and guardrails
+### P7-2 "Open in IDE" on code blocks — **S**
+- [ ] Action on code blocks that carry a source path, reusing P7-1's launcher and guardrails
 - [ ] Appears only when the path resolves — never a dead button
 
-### P6-3 Project awareness & project notes — **M**
+### P7-3 Project awareness & project notes — **M**
 - [ ] Open a code repo as a workspace; surface its `README.md` / `docs/` / `notes/` with no import step
 - [ ] Opt-in scaffold of `notes/` (Architecture / Meeting / Research / Todo) — **never automatic**, never writes into source folders
 
 ---
 
-## ▸ P7 — Embedded terminal (M7)
+## ▸ P8 — Embedded terminal (M8)
 
 The brief's AI ask is a *terminal* feature, not an AI feature: no AI code, no API keys, works with any CLI. P0-5's watcher already makes externally-edited files safe.
 
-### P7-1 Terminal pane — **M/L**
+### P8-1 Terminal pane — **M/L**
 - [ ] PTY-backed pane rooted at the workspace
 - [ ] Active note's path available as an env var + one-key insert
 - [ ] `claude` editing the open note updates the editor through the **existing** watcher path — no new reload logic, no conflict special-case
@@ -144,33 +193,33 @@ The brief's AI ask is a *terminal* feature, not an AI feature: no AI code, no AP
 
 ---
 
-## ▸ P8 — Study & revision (M8)
+## ▸ P9 — Study & revision (M9)
 
 The only phase not from the brief. Everything before it is *capture*; this is *retrieval* — what happens at exam time.
 
 > ⚠️ Study state is **data, not index.** Deleting `index.db` must lose nothing, so nothing here may keep its only copy in SQLite. Source of truth in the `.md`, derived table rebuilt by `reindex_note` — same shape as `note_tags`. **Test for every task: delete `index.db`, reopen, is anything gone?**
 
-### P8-1 Workspace-wide task view — **S/M** — *start here*
+### P9-1 Workspace-wide task view — **S/M** — *start here*
 - [ ] Extract `- [ ]` / `- [x]` into a `note_tasks` table (path, text, done, position), mirroring `note_tags`
 - [ ] Build it in the existing `reindex_note` path — inherits the P0-3 debounce and P0-5 watcher for free
 - [ ] View of open tasks grouped by note/folder; click jumps to the task
 - [ ] Ticking from the view writes through the normal save path
 - [ ] Delete `index.db`, reopen → identical list
 
-### P8-2 Formula sheet generation — **M**
+### P9-2 Formula sheet generation — **M**
 - [ ] Collect all block math across a scope (folder / tag / workspace)
 - [ ] Output a **generated note** — plain `.md`, editable afterwards, printable via P3-2
 - [ ] Deduplicate identical formulas
 - [ ] Optional caption: source note + heading
 - [ ] Generate on demand — **no live-updating magic file** that rewrites itself behind your back
 
-### P8-3 Spaced repetition — **decision, then L**
+### P9-3 Spaced repetition — **decision, then L**
 - [ ] **Decide storage before writing any code** — not refactorable later; it determines what happens to every existing card when a note is renamed
   - **A — inline HTML comment beside each card** *(recommended)*: `<!-- sr due=… ease=… interval=… -->`. Survives renames/moves/Git with no key tracking — which matters because note `id` is non-stable and `path` is the real key. Cost: reviews write note files and churn Git history.
   - **B — `.review.json` sidecar**: notes stay pristine, but cards need stable keys — reintroduces the identity problem the app has avoided by never needing one. Editing a card or moving its note can silently orphan its schedule.
   - **C — frontmatter**: rejected on inspection. Cards are per-*card*, not per-note, so it's all of B's identity problem with none of A's locality.
 - [ ] Card syntax: cloze deletion + `Question :: Answer`
-- [ ] **P5-1 theorem/proof blocks become cards for free** — the real reason P5 precedes P8
+- [ ] **P6-1 theorem/proof blocks become cards for free** — the real reason P6 precedes P9
 - [ ] SM-2 scheduling + review session UI
 - [ ] Derived `review_cards` table for "what's due", rebuildable from the notes
 - [ ] Cards stay readable as plain Markdown in any other editor
@@ -180,12 +229,12 @@ The only phase not from the brief. Everything before it is *capture*; this is *r
 
 ---
 
-## ▸ P9 — Gated stretch (M9)
+## ▸ P10 — Gated stretch (M10)
 
-Do not let these influence P0–P8 design.
+Do not let these influence P0–P9 design.
 
-- [ ] **P9-1 In-app AI assistant** — **L**. Gated on M0 *and* on P7 proving insufficient; if the terminal covers the need, this may never need building.
-- [ ] **P9-2 In-editor code execution** (Python / C++) — **L**. Gated on a dedicated design + security pass.
+- [ ] **P10-1 In-app AI assistant** — **L**. Gated on M0 *and* on P8 proving insufficient; if the terminal covers the need, this may never need building.
+- [ ] **P10-2 In-editor code execution** (Python / C++) — **L**. Gated on a dedicated design + security pass.
 
 ---
 
@@ -258,14 +307,15 @@ Cut with reasoning in [ROADMAP §4](docs/ROADMAP.md#4-challenged--cut--de-scoped
 | ~~OCR→LaTeX pipeline~~ | Cut permanently — P4 reaches the same outcome from the text layer |
 | ~~Handwriting search~~ | Needs handwriting recognition; ink is for working through a proof, not for retrieval |
 | ~~Version history / snapshots~~ | Challenged — Git already does this and P3-4 assumes a Git-synced workspace. If ever wanted, it's a thin read-only wrapper over `git log`, not a second storage system |
-| ~~Query blocks / Dataview-lite~~ | Challenged — a query language has no natural end, and it would pull frontmatter design forward speculatively. P5-5 filters + P8-1 task view cover the realistic 90% |
+| ~~Query blocks / Dataview-lite~~ | Challenged — a query language has no natural end, and it would pull frontmatter design forward speculatively. P6-5 filters + P9-1 task view cover the realistic 90% |
 | ~~Lecture audio + timestamped notes~~ | A different product surface bolted onto an app whose value is plain-text portability. An audio file is not a `.md` |
 | ~~Citations / BibTeX~~ | A thesis need, not a coursework one; Zotero exists |
 | ~~Presentation / slides mode~~ | Niche — P3-2's PDF export already covers sharing with a study group |
 | ~~Graphviz, TikZ export~~ | Challenged — Mermaid + PDF export already cover the real need |
-| ~~Cloud sync, mobile, collaboration~~ | Local-first, desktop, single-user — all three are a different product |
-| ~~Workspace remembers AI conversations~~ | Belongs to the CLI tool once P7 lands, not to this app |
-| ~~Becoming an IDE~~ | P6 integrates with your editor. If a task starts wanting a language server, it's out of scope |
+| ~~Cloud sync, mobile, collaboration~~ | Local-first, desktop, single-user — all three are a different product. *(P5 automates your own Git against your own remote — that's P3-4 taken further, not a reversal.)* |
+| ~~Resolving merge conflicts~~ | P5 commits and fast-forwards only. The app never merges, rebases, force-pushes, resets, or edits a conflicted file |
+| ~~Workspace remembers AI conversations~~ | Belongs to the CLI tool once P8 lands, not to this app |
+| ~~Becoming an IDE~~ | P7 integrates with your editor. If a task starts wanting a language server, it's out of scope |
 | ~~Installers, auto-update, code-signing~~ | Personal tool; revisit only if the audience changes |
-| ~~Stable note `id`~~ | `path` is the working key. Re-examine only if P6 needs a durable handle |
+| ~~Stable note `id`~~ | `path` is the working key. Re-examine only if P7 needs a durable handle |
 | ~~CodeMirror migration~~ | The brief named it; TipTap is what makes WYSIWYG-with-inline-ink possible |
