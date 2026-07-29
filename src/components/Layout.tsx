@@ -192,10 +192,19 @@ export function Layout() {
           >
             {isLoading && <p className="status">Loading…</p>}
             {!isLoading && activeTab && viewMode === 'wysiwyg' && (
-              <NoteEditor content={content} notePath={activeTab} onChange={(md) => void save(md)} />
+              <NoteEditor
+                content={content}
+                notePath={activeTab}
+                spellcheck={settings.spellcheck}
+                onChange={(md) => void save(md)}
+              />
             )}
             {!isLoading && activeTab && viewMode === 'raw' && (
-              <RawEditor content={content} onChange={(md) => void save(md)} />
+              <RawEditor
+                content={content}
+                spellcheck={settings.spellcheck}
+                onChange={(md) => void save(md)}
+              />
             )}
             {!activeTab && !workspacePath && <WorkspacePicker />}
             {!activeTab && workspacePath && notes.length === 0 && (

@@ -26,6 +26,7 @@ export interface WorkspaceState {
 export interface AppSettings {
   autosaveDebounceMs: number
   editorMaxWidthPx: number
+  spellcheck: boolean
 }
 
 export interface GraphLink {

@@ -51,11 +51,31 @@ mod tests {
         let original = AppSettings {
             autosave_debounce_ms: 1200,
             editor_max_width_px: 960,
+            spellcheck: true,
         };
         save_settings_to_dir(dir.path(), &original).await.unwrap();
         let loaded = load_settings_from_dir(dir.path()).await.unwrap();
         assert_eq!(loaded.autosave_debounce_ms, 1200);
         assert_eq!(loaded.editor_max_width_px, 960);
+        assert!(loaded.spellcheck);
+    }
+
+    // A settings.json written before spellcheck existed must still load, or
+    // the app comes up with an error instead of the user's preferences.
+    #[tokio::test]
+    async fn test_load_tolerates_a_file_missing_newer_fields() {
+        let dir = tempdir().unwrap();
+        tokio::fs::write(
+            dir.path().join(SETTINGS_FILE),
+            r#"{"autosaveDebounceMs":900,"editorMaxWidthPx":1000}"#,
+        )
+        .await
+        .unwrap();
+
+        let loaded = load_settings_from_dir(dir.path()).await.unwrap();
+
+        assert_eq!(loaded.autosave_debounce_ms, 900);
+        assert!(!loaded.spellcheck);
     }
 
     #[tokio::test]

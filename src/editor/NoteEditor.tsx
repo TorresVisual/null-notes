@@ -10,6 +10,7 @@ import { EditorStatusBar } from './EditorStatusBar'
 interface NoteEditorProps {
   content: string
   notePath: string
+  spellcheck: boolean
   onChange: (markdown: string) => void
 }
 
@@ -29,22 +30,35 @@ const INK_HEIGHT = 900
 
 const EMPTY_INK: InkData = { width: INK_WIDTH, height: INK_HEIGHT, strokes: [], shapes: [] }
 
-export function NoteEditor({ content, notePath, onChange }: NoteEditorProps) {
+function buildEditorProps(spellcheck: boolean) {
+  return {
+    attributes: { spellcheck: String(spellcheck) },
+    handleKeyDown: handleEditorKeyDown,
+    handleTextInput: handleEditorTextInput,
+  }
+}
+
+export function NoteEditor({ content, notePath, spellcheck, onChange }: NoteEditorProps) {
   const isProgrammaticUpdate = useRef(false)
   const [, setEditorVersion] = useState(0)
 
   const editor = useEditor({
     extensions: coreExtensions,
     content,
-    editorProps: {
-      handleKeyDown: handleEditorKeyDown,
-      handleTextInput: handleEditorTextInput,
-    },
+    editorProps: buildEditorProps(spellcheck),
     onUpdate({ editor }) {
       if (isProgrammaticUpdate.current) return
       onChange(getMarkdown(editor.storage))
     },
   })
+
+  // ProseMirror re-applies editorProps.attributes to the DOM on every state
+  // update, so setting the attribute by hand would be undone on the next
+  // keystroke — the option itself has to change. setOptions rather than
+  // useEditor deps, which would rebuild the editor and drop the cursor.
+  useEffect(() => {
+    editor?.setOptions({ editorProps: buildEditorProps(spellcheck) })
+  }, [editor, spellcheck])
 
   useEffect(() => {
     if (!editor) return

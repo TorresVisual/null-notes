@@ -69,6 +69,20 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
           </span>
         </label>
 
+        <label className="settings-row">
+          <span>
+            Spellcheck
+            <small>Underline misspelled words. Off by default — code and maths spell badly.</small>
+          </span>
+          <span className="settings-row-control">
+            <input
+              type="checkbox"
+              checked={settings.spellcheck}
+              onChange={(e) => void update({ spellcheck: e.target.checked })}
+            />
+          </span>
+        </label>
+
         {error && <p className="settings-error">{error}</p>}
 
         <button

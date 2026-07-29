@@ -57,6 +57,12 @@ pub struct GraphTag {
 pub struct AppSettings {
     pub autosave_debounce_ms: u64,
     pub editor_max_width_px: u32,
+    // Added after settings.json shipped, so it has to tolerate its own absence
+    // in a file written by an older build. Off by default: the raw editor
+    // already hardcoded that, and squiggles under every identifier and LaTeX
+    // token are noise in a maths-and-code notebook.
+    #[serde(default)]
+    pub spellcheck: bool,
 }
 
 impl Default for AppSettings {
@@ -64,6 +70,7 @@ impl Default for AppSettings {
         Self {
             autosave_debounce_ms: 600,
             editor_max_width_px: 800,
+            spellcheck: false,
         }
     }
 }

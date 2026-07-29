@@ -1,15 +1,16 @@
 interface RawEditorProps {
   content: string
+  spellcheck: boolean
   onChange: (markdown: string) => void
 }
 
-export function RawEditor({ content, onChange }: RawEditorProps) {
+export function RawEditor({ content, spellcheck, onChange }: RawEditorProps) {
   return (
     <textarea
       className="raw-editor"
       value={content}
       onChange={(e) => onChange(e.target.value)}
-      spellCheck={false}
+      spellCheck={spellcheck}
       aria-label="Raw markdown"
     />
   )
