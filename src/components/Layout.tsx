@@ -11,6 +11,7 @@ import { BacklinksPanel } from './BacklinksPanel'
 import { WorkspacePicker } from './WorkspacePicker'
 import { SettingsPanel } from './SettingsPanel'
 import { ShortcutsOverlay } from './ShortcutsOverlay'
+import { GraphView } from './GraphView'
 import { useWorkspaceStore } from '../store/workspace'
 import { useNotesStore } from '../store/notes'
 import { useSettingsStore } from '../store/settings'
@@ -53,6 +54,7 @@ export function Layout() {
   const [switcherOpen, setSwitcherOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [shortcutsOpen, setShortcutsOpen] = useState(false)
+  const [graphOpen, setGraphOpen] = useState(false)
   const settings = useSettingsStore((s) => s.settings)
   const setSettings = useSettingsStore((s) => s.setSettings)
 
@@ -126,9 +128,12 @@ export function Layout() {
         case 'shortcuts-help':
           setShortcutsOpen(true)
           break
+        case 'graph-view':
+          if (workspacePath) setGraphOpen(true)
+          break
       }
     },
-    [activeTab, viewMode, createNote, createFolder, createCanvasNote, openWorkspace],
+    [activeTab, viewMode, workspacePath, createNote, createFolder, createCanvasNote, openWorkspace],
   )
 
   useEffect(() => {
@@ -168,6 +173,7 @@ export function Layout() {
       {switcherOpen && <QuickSwitcher onClose={() => setSwitcherOpen(false)} />}
       {settingsOpen && <SettingsPanel onClose={() => setSettingsOpen(false)} />}
       {shortcutsOpen && <ShortcutsOverlay onClose={() => setShortcutsOpen(false)} />}
+      {graphOpen && <GraphView onClose={() => setGraphOpen(false)} />}
       <Sidebar onSearchOpen={() => setSearchOpen(true)} onSettingsOpen={() => setSettingsOpen(true)} />
       <div className="main">
         <TabBar

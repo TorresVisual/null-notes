@@ -52,6 +52,7 @@ fn build_menu(handle: &tauri::AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
             &MenuItem::with_id(handle, "quick-switch", "Quick Switcher", true, Some("CmdOrCtrl+P"))?,
             &MenuItem::with_id(handle, "toggle-view", "Toggle Source/Preview", true, Some("CmdOrCtrl+E"))?,
             &MenuItem::with_id(handle, "insert-ink", "Insert Ink Block", true, Some("CmdOrCtrl+Shift+I"))?,
+            &MenuItem::with_id(handle, "graph-view", "Connections Graph", true, Some("CmdOrCtrl+G"))?,
             &PredefinedMenuItem::separator(handle)?,
             &MenuItem::with_id(handle, "shortcuts-help", "Keyboard Shortcuts", true, None::<&str>)?,
         ],
