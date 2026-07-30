@@ -188,6 +188,43 @@ fn consecutive_lines_reflow_into_one_paragraph() {
     );
 }
 
+// pdfium reports a discretionary hyphen as U+0002 with its is_hyphen flag set,
+// which extraction turns into a soft hyphen. It is the only record that the two
+// halves are one word — the geometry says nothing, and pdfium's line marker
+// appears at every line end whether a word was split or not. Found on a real
+// sheet, which read "Entwicklungsstel le".
+#[test]
+fn a_word_broken_across_a_line_closes_up_again() {
+    let mut chars = set("an der Entwicklungsstel", 72.0, 700.0, Style::default());
+    chars.extend(set(
+        &SOFT_HYPHEN.to_string(),
+        72.0 + 23.0 * 5.0,
+        700.0,
+        Style::default(),
+    ));
+    chars.extend(set("le folgt daraus", 72.0, 688.0, Style::default()));
+
+    let markdown = chars_to_markdown(&chars);
+
+    assert_eq!(markdown, "an der Entwicklungsstelle folgt daraus\n");
+}
+
+#[test]
+fn the_break_marker_never_survives_into_the_note() {
+    let mut chars = set("wort", 72.0, 700.0, Style::default());
+    chars.extend(set(&SOFT_HYPHEN.to_string(), 92.0, 700.0, Style::default()));
+
+    assert_eq!(chars_to_markdown(&chars), "wort\n");
+}
+
+#[test]
+fn a_line_that_merely_ends_still_gets_its_space() {
+    let mut chars = set("erster Teil", 72.0, 700.0, Style::default());
+    chars.extend(set("zweiter Teil", 72.0, 688.0, Style::default()));
+
+    assert_eq!(chars_to_markdown(&chars), "erster Teil zweiter Teil\n");
+}
+
 #[test]
 fn a_wide_vertical_gap_splits_paragraphs() {
     let mut chars = Vec::new();

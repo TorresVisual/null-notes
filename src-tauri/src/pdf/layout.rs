@@ -11,6 +11,12 @@
 
 use unicode_normalization::UnicodeNormalization;
 
+/// Marks where a word was broken across a line. Set by extraction from
+/// pdfium's `is_hyphen` flag, and never emitted as text: reflowing the
+/// paragraph puts the word back together, so the hyphen has no reason to
+/// survive into the note.
+pub const SOFT_HYPHEN: char = '\u{00AD}';
+
 /// One character as the PDF places it. PDF user space puts the origin at the
 /// bottom-left, so a **larger `y` is higher up the page**.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -158,6 +164,9 @@ pub struct Line {
     /// True when everything on the line outside its maths regions is
     /// whitespace — a display equation rather than a sentence containing one.
     pub is_display_maths: bool,
+    /// True when the line ends mid-word, so the next line resumes it and must
+    /// join without a space.
+    pub ends_hyphenated: bool,
 }
 
 impl Line {
@@ -345,6 +354,7 @@ fn build_line(mut row: Vec<CharBox>) -> Line {
     let mut spans: Vec<Span> = Vec::new();
     let mut previous_end: Option<f32> = None;
     let mut index = 0usize;
+    let mut ends_hyphenated = false;
 
     while index < row.len() {
         // A maths region is opaque: the text layer cannot express what it says,
@@ -372,6 +382,14 @@ fn build_line(mut row: Vec<CharBox>) -> Line {
 
         let ch = &row[index];
         index += 1;
+
+        // The break itself is not content: the paragraph is about to be
+        // reflowed, which puts the word back together.
+        if ch.ch == SOFT_HYPHEN {
+            ends_hyphenated = true;
+            continue;
+        }
+
         let after_space = spans
             .last()
             .is_some_and(|s| s.text.ends_with(char::is_whitespace));
@@ -433,6 +451,7 @@ fn build_line(mut row: Vec<CharBox>) -> Line {
         font_size,
         fixed_pitch,
         is_display_maths,
+        ends_hyphenated,
     }
 }
 
@@ -719,7 +738,19 @@ fn trim_content(content: &[Inline]) -> Vec<Inline> {
 fn join_lines(lines: &[&Line]) -> Vec<Inline> {
     let mut out: Vec<Inline> = Vec::new();
     for (index, line) in lines.iter().enumerate() {
+        // The line before this one ended mid-word, so the halves close up.
+        // Suppressing the joining space is not enough: that line also carries a
+        // trailing space of its own, at the very line end where it means
+        // nothing.
+        let resumes_word = index > 0 && lines[index - 1].ends_hyphenated;
+        if resumes_word {
+            if let Some(Inline::Text(last)) = out.last_mut() {
+                last.text = last.text.trim_end().to_string();
+            }
+        }
+
         let needs_space = index > 0
+            && !resumes_word
             && !matches!(out.last(), Some(Inline::Text(s)) if s.text.ends_with(' '))
             && !out.is_empty();
         if needs_space {

@@ -214,7 +214,16 @@ fn extract_pages_native(pdf_path: &Path) -> Result<Vec<ExtractedPage>> {
             // geometry, not by markers): a row that picks one up has its
             // median font size dragged to 1.0, which collapses the baseline
             // tolerance to 0.4pt and stops the row grouping anything at all.
-            if ch.font_name().is_empty() || value.is_control() {
+            //
+            // One control character is worth keeping. A word broken across a
+            // line arrives as "…Entwicklungsstel", U+0002, "le" — pdfium
+            // reports that U+0002 as `is_hyphen`, and it is the *only* record
+            // that the two halves are one word. Nothing in the geometry says
+            // so, and pdfium's line marker appears at every line end whether a
+            // word was split or not. It becomes a soft hyphen for the layout
+            // to reflow across.
+            let hyphenation_break = ch.is_hyphen().unwrap_or(false);
+            if !hyphenation_break && (ch.font_name().is_empty() || value.is_control()) {
                 continue;
             }
             // loose_bounds covers the glyph's advance box rather than its inked
@@ -230,7 +239,11 @@ fn extract_pages_native(pdf_path: &Path) -> Result<Vec<ExtractedPage>> {
 
             let font = ch.font_name();
             chars.push(CharBox {
-                ch: value,
+                ch: if hyphenation_break {
+                    layout::SOFT_HYPHEN
+                } else {
+                    value
+                },
                 x: bounds.left().value,
                 y: origin_y.value,
                 width: bounds.width().value,
