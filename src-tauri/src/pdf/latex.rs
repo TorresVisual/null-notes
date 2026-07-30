@@ -212,6 +212,17 @@ fn is_radical(ch: &CharBox) -> bool {
     ch.ch == '√' || (ch.family == Family::Extensible && matches!(ch.ch, 'p' | 'q' | 'r' | 's'))
 }
 
+/// CMEX10 has no Unicode contour-integral character; pdfium falls back to an
+/// ASCII placeholder that varies with the symbol's rendered size — 'I' at
+/// display style, 'H' at the smaller text style. Verified by cropping both
+/// out of a real rendered page and looking at them, the same way every other
+/// glyph-identity decision in this file was verified, rather than assumed
+/// from an encoding table that may not even match this document's font
+/// subset.
+fn is_oint(ch: &CharBox) -> bool {
+    ch.ch == '∮' || (ch.family == Family::Extensible && matches!(ch.ch, 'H' | 'I'))
+}
+
 /// How many characters from the front form an upright multi-letter word.
 fn upright_word(chars: &[CharBox]) -> Option<usize> {
     let count = chars
@@ -242,6 +253,14 @@ fn glyph(ch: &CharBox) -> String {
         Family::Script => return format!("\\mathcal{{{}}}", ch.ch),
         Family::Fraktur => return format!("\\mathfrak{{{}}}", ch.ch),
         _ => {}
+    }
+
+    // No "takes the rest" behaviour needed, unlike the radical: an oint's
+    // subscript is an ordinary raised-or-lowered glyph immediately after it
+    // in the stream, which the script-detection in render() already handles
+    // the same way it handles every other subscript.
+    if is_oint(ch) {
+        return "\\oint".to_string();
     }
 
     if let Some(command) = symbol_command(ch.ch) {
@@ -483,6 +502,51 @@ mod tests {
     #[test]
     fn a_single_upright_letter_is_not_treated_as_a_word() {
         assert_eq!(to_latex(&run("d", Family::Text)), "d");
+    }
+
+    // CMEX10 has no Unicode contour-integral character; pdfium hands back an
+    // ASCII placeholder that differs by rendered size. Confirmed by cropping
+    // both out of a real page and looking at them, not by trusting an
+    // encoding table.
+    #[test]
+    fn the_contour_integral_placeholder_glyphs_become_oint() {
+        assert_eq!(
+            to_latex(&run("I", Family::Extensible)),
+            r"\oint",
+            "display-style placeholder"
+        );
+        assert_eq!(
+            to_latex(&run("H", Family::Extensible)),
+            r"\oint",
+            "text-style placeholder"
+        );
+    }
+
+    #[test]
+    fn an_oints_subscript_is_an_ordinary_subscript() {
+        let mut chars = run("I", Family::Extensible);
+        // A plain subscript variable, not the mathcal contour label — that
+        // combination is covered by the real-document check below.
+        chars.extend(script("n", 106.0, -3.0, Family::Italic));
+        assert_eq!(to_latex(&chars), "\\oint_n");
+    }
+
+    // The exact shape a real contour integral takes: \oint with a \mathcal
+    // subscript, both resolved through the normal per-glyph machinery with no
+    // special-casing between them.
+    #[test]
+    fn an_oint_with_a_mathcal_contour_label_matches_the_real_document() {
+        let mut chars = run("I", Family::Extensible);
+        chars.extend(script("C", 106.0, -3.0, Family::Script));
+        assert_eq!(to_latex(&chars), r"\oint_{\mathcal{C}}");
+    }
+
+    // A body-font 'H'/'I' is an ordinary letter and must not be mistaken for
+    // the symbol — the mapping is scoped to Family::Extensible specifically.
+    #[test]
+    fn an_ordinary_h_or_i_is_not_mistaken_for_oint() {
+        assert_eq!(to_latex(&run("H", Family::Text)), "H");
+        assert_eq!(to_latex(&run("I", Family::Text)), "I");
     }
 
     #[test]
