@@ -43,6 +43,36 @@ mod tests {
         }
     }
 
+    /// The full import, crops included, into a temp directory. The only way to
+    /// see whether the equation images actually land where the Markdown says.
+    #[test]
+    #[ignore]
+    fn dump_with_crops() {
+        let pdf = pdf_or_skip!();
+        let out = std::env::temp_dir().join("null-notes-crop-dump");
+        let _ = std::fs::remove_dir_all(&out);
+
+        let pages = crate::pdf::extract::extract_pages(&pdf).unwrap();
+        let markdown =
+            crate::pdf::extract::document_to_markdown(&pdf, &pages, &out, "Note.assets").unwrap();
+
+        println!("{markdown}");
+        println!("--- crops in {} ---", out.display());
+        let mut files: Vec<_> = std::fs::read_dir(&out)
+            .map(|d| d.flatten().map(|e| e.path()).collect())
+            .unwrap_or_default();
+        files.sort();
+        for path in files {
+            let dimensions = image::image_dimensions(&path).ok();
+            println!(
+                "{}  {:?}  {} bytes",
+                path.file_name().unwrap_or_default().to_string_lossy(),
+                dimensions,
+                std::fs::metadata(&path).map(|m| m.len()).unwrap_or(0)
+            );
+        }
+    }
+
     /// One row per reconstructed line, with the geometry it was grouped on.
     #[test]
     #[ignore]

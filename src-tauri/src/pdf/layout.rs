@@ -72,6 +72,18 @@ impl Rect {
         self.y1 - self.y0
     }
 
+    /// The smallest rectangle containing all of them.
+    fn union_all(rects: &[Rect]) -> Option<Rect> {
+        let mut out = *rects.first()?;
+        for r in rects {
+            out.x0 = out.x0.min(r.x0);
+            out.y0 = out.y0.min(r.y0);
+            out.x1 = out.x1.max(r.x1);
+            out.y1 = out.y1.max(r.y1);
+        }
+        Some(out)
+    }
+
     /// Grows the rectangle on all sides, so a crop does not shave the
     /// antialiased edge off a glyph.
     pub fn padded(&self, pad: f32) -> Rect {
@@ -828,16 +840,26 @@ pub fn group_blocks(lines: &[Line]) -> Vec<Block> {
 
 fn finish_block(lines: &[&Line], kind: LineKind) -> Block {
     match kind {
-        LineKind::MathsDisplay => Block::MathsDisplay {
-            rects: lines
+        LineKind::MathsDisplay => {
+            let parts: Vec<Rect> = lines
                 .iter()
                 .flat_map(|l| l.content.iter())
                 .filter_map(|i| match i {
                     Inline::Maths(rect) => Some(*rect),
                     Inline::Text(_) => None,
                 })
-                .collect(),
-        },
+                .collect();
+            // One display equation routinely spans several baselines: a radical
+            // sign, a fraction bar or a big operator is set on its own, so
+            // "√(x² + y²)" arrives as one row holding the radical and another
+            // holding what is under it. Cropping row by row cuts the equation
+            // into unreadable slivers, so the block becomes a single crop of
+            // the whole thing. Blocks are already split on vertical gaps, so
+            // two genuinely separate equations stay separate.
+            Block::MathsDisplay {
+                rects: Rect::union_all(&parts).into_iter().collect(),
+            }
+        }
         LineKind::Heading(level) => Block::Heading {
             level,
             content: join_lines(lines),
@@ -893,7 +915,11 @@ fn render_content(content: &[Inline], maths_src: &mut impl FnMut(Rect) -> String
             (false, false) => "",
         };
         let trimmed = span.text.trim();
-        if marker.is_empty() || trimmed.is_empty() {
+        // Maths italic supplies its own comma and full stop, so a coordinate
+        // pair came out as "(3*.*02*,*3*.*99)" — emphasis marks around
+        // punctuation that carry no meaning and read as line noise.
+        let worth_marking = trimmed.chars().any(char::is_alphanumeric);
+        if marker.is_empty() || trimmed.is_empty() || !worth_marking {
             out.push_str(&span.text);
             continue;
         }

@@ -26,29 +26,41 @@ pub async fn render_pages(
 // falling back to whatever the OS considers a system library.
 #[cfg(feature = "pdf-native")]
 pub fn bind_pdfium() -> Result<pdfium_render::prelude::Pdfium> {
-    use pdfium_render::prelude::Pdfium;
+    use pdfium_render::prelude::{Pdfium, PdfiumError};
 
     let exe_dir_candidate = std::env::current_exe()
         .ok()
         .and_then(|p| p.parent().map(|p| p.to_path_buf()));
 
-    let bindings = Pdfium::bind_to_library(Pdfium::pdfium_platform_library_name_at_path("./"))
-        .or_else(|_| {
-            exe_dir_candidate
-                .map(|dir| Pdfium::bind_to_library(Pdfium::pdfium_platform_library_name_at_path(&dir)))
-                .unwrap_or_else(|| Pdfium::bind_to_system_library())
-        })
-        .or_else(|_| Pdfium::bind_to_system_library())
-        .map_err(|e| {
-            anyhow::anyhow!(
-                "pdfium ({}) not found — download a prebuilt release for this platform from \
-                 https://github.com/bblanchon/pdfium-binaries and place it next to null-notes.exe \
-                 (original error: {e})",
-                Pdfium::pdfium_platform_library_name().to_string_lossy(),
-            )
-        })?;
+    let attempt = Pdfium::bind_to_library(Pdfium::pdfium_platform_library_name_at_path("./"))
+        .or_else(|e| match e {
+            // Not a failure. pdfium initialises its bindings once per process,
+            // and a second bind reports this rather than handing them back —
+            // which any import doing more than one pdfium pass will hit, as
+            // converting a sheet does (extract the text, then render to crop
+            // the equations). Propagating it as an error made every such import
+            // fail with a bogus "pdfium not found".
+            PdfiumError::PdfiumLibraryBindingsAlreadyInitialized => Err(e),
+            _ => exe_dir_candidate
+                .map(|dir| {
+                    Pdfium::bind_to_library(Pdfium::pdfium_platform_library_name_at_path(&dir))
+                })
+                .unwrap_or_else(Pdfium::bind_to_system_library)
+                .or_else(|_| Pdfium::bind_to_system_library()),
+        });
 
-    Ok(Pdfium::new(bindings))
+    match attempt {
+        Ok(bindings) => Ok(Pdfium::new(bindings)),
+        // Pdfium::default() is the crate's own route to reusing bindings that
+        // are already live; it does not touch the filesystem in this case.
+        Err(PdfiumError::PdfiumLibraryBindingsAlreadyInitialized) => Ok(Pdfium::default()),
+        Err(e) => Err(anyhow::anyhow!(
+            "pdfium ({}) not found — download a prebuilt release for this platform from \
+             https://github.com/bblanchon/pdfium-binaries and place it next to null-notes.exe \
+             (original error: {e})",
+            Pdfium::pdfium_platform_library_name().to_string_lossy(),
+        )),
+    }
 }
 
 // Pages render straight into the note's sidecar directory rather than a temp
