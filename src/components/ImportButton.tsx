@@ -29,6 +29,7 @@ export function ImportButton() {
   const settings = useSettingsStore((s) => s.settings)
   const setSettings = useSettingsStore((s) => s.setSettings)
   const [pending, setPending] = useState<PickedPdf | null>(null)
+  const [scanned, setScanned] = useState<PickedPdf | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [isConverting, setIsConverting] = useState(false)
 
@@ -45,6 +46,7 @@ export function ImportButton() {
   async function runImport(picked: PickedPdf, mode: PdfImportMode) {
     if (!workspacePath) return
     setPending(null)
+    setScanned(null)
     setError(null)
 
     if (mode !== settings.pdfImportMode) {
@@ -53,23 +55,29 @@ export function ImportButton() {
       void api.settings.save(next)
     }
 
-    let note: Awaited<ReturnType<typeof api.notes.create>> | null = null
     try {
-      // Converting first means a PDF with no text layer fails before it has
-      // left an empty note behind.
-      const body =
-        mode === 'markdown'
-          ? await convert(picked.path)
-          : null
+      // Asked before anything is created: a scan has nothing to convert, and
+      // finding that out afterwards would leave an empty note behind.
+      if (mode === 'markdown') {
+        setIsConverting(true)
+        const convertible = await api.pdf.hasTextLayer(picked.path).finally(() => {
+          setIsConverting(false)
+        })
+        if (!convertible) {
+          setScanned(picked)
+          return
+        }
+      }
 
       const folder = selectedFolder ?? workspacePath
-      note = await api.notes.create(workspacePath, folder, picked.title)
+      const note = await api.notes.create(workspacePath, folder, picked.title)
 
-      const content =
-        body !== null
-          ? `# ${picked.title}\n\n${body}`
-          : `# ${picked.title}\n\n${pagesToMarkdown(await importPages(picked.path, note.path))}\n`
+      const body =
+        mode === 'markdown'
+          ? await convert(picked.path, note.path)
+          : `${pagesToMarkdown(await importPages(picked.path, note.path))}\n`
 
+      const content = `# ${picked.title}\n\n${body}`
       await api.notes.save(note.path, content)
       await api.notes.reindex(note.path, workspacePath, content)
       addNote({ ...note, title: picked.title })
@@ -79,10 +87,10 @@ export function ImportButton() {
     }
   }
 
-  async function convert(path: string): Promise<string> {
+  async function convert(path: string, notePath: string): Promise<string> {
     setIsConverting(true)
     try {
-      return await api.pdf.importMarkdown(path)
+      return await api.pdf.importMarkdown(path, notePath)
     } finally {
       setIsConverting(false)
     }
@@ -103,6 +111,20 @@ export function ImportButton() {
       <button onClick={() => void handleClick()} disabled={busy || !workspacePath}>
         <FileUp size={14} /> {busy ? 'Importing…' : 'Import PDF'}
       </button>
+      {/* Naming Pages mode without offering it would leave the user stuck on a
+          message; the button is the whole point of detecting this early. */}
+      {scanned && (
+        <div className="import-fallback">
+          <p>
+            <strong>{scanned.title}</strong> has no text layer — it looks like a scan, so there
+            is nothing to convert.
+          </p>
+          <div className="import-fallback-actions">
+            <button onClick={() => void runImport(scanned, 'pages')}>Import as pages</button>
+            <button onClick={() => setScanned(null)}>Cancel</button>
+          </div>
+        </div>
+      )}
       {isConverting && <p className="import-progress">Reading text layer…</p>}
       {isImporting && progress && (
         <p className="import-progress">

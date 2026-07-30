@@ -77,7 +77,9 @@ export const api = {
       invoke<PdfPage[]>('import_pdf_pages', { pdfPath, notePath }),
     readPage: (path: string) =>
       invoke<string>('read_pdf_page', { path }),
-    importMarkdown: (pdfPath: string) =>
-      invoke<string>('import_pdf_markdown', { pdfPath }),
+    hasTextLayer: (pdfPath: string) =>
+      invoke<boolean>('pdf_has_text_layer', { pdfPath }),
+    importMarkdown: (pdfPath: string, notePath: string) =>
+      invoke<string>('import_pdf_markdown', { pdfPath, notePath }),
   },
 }

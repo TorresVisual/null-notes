@@ -4,12 +4,20 @@ use std::path::{Component, Path, PathBuf};
 // Third sidecar of the same shape as NoteName.ink/ and NoteName.pdf/. Inside
 // the workspace, so a pasted image travels with the note it belongs to — a
 // note whose figures didn't come along is a broken note.
-fn assets_dir_name(note_path: &str) -> String {
+pub fn assets_dir_name(note_path: &str) -> String {
     let stem = Path::new(note_path)
         .file_stem()
         .unwrap_or_default()
         .to_string_lossy();
     format!("{stem}.assets")
+}
+
+/// The note's `.assets` sidecar as an absolute path.
+pub fn assets_dir_for(note_path: &str) -> String {
+    note_parent(note_path)
+        .join(assets_dir_name(note_path))
+        .to_string_lossy()
+        .into_owned()
 }
 
 fn note_parent(note_path: &str) -> PathBuf {
@@ -59,7 +67,7 @@ pub async fn write_note_asset(
     data: Vec<u8>,
 ) -> Result<String, String> {
     let dir_name = assets_dir_name(&note_path);
-    let dir = note_parent(&note_path).join(&dir_name);
+    let dir = PathBuf::from(assets_dir_for(&note_path));
     tokio::fs::create_dir_all(&dir)
         .await
         .map_err(|e| e.to_string())?;

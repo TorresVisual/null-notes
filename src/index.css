@@ -1267,6 +1267,25 @@ body {
   display: block;
 }
 
+/* Scanned PDF: nothing to convert, so route to Pages mode */
+.import-fallback {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding: var(--space-sm);
+  background: var(--bg-hover);
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-secondary);
+}
+
+.import-fallback-actions {
+  display: flex;
+  gap: var(--space-xs);
+}
+
 /* PDF import: pages-vs-markdown choice, asked once per import */
 .import-mode-dialog {
   background: var(--bg-raised);

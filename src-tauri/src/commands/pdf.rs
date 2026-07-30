@@ -45,15 +45,31 @@ pub async fn import_pdf_pages(
     .map_err(|e| e.to_string())
 }
 
-/// Converts a PDF's embedded text layer to Markdown. No OCR: a typeset sheet
-/// already carries its own text, and reading it is exact where recognising it
-/// would only ever be a guess.
+/// Whether a PDF carries a text layer worth converting.
 ///
-/// Errors when the document has no usable text layer, which is the honest
-/// answer for a scan — the caller offers Pages mode instead of writing a note
-/// full of nothing.
+/// Asked *before* a note is created, so a scan is caught while there is still
+/// nothing to clean up — the caller offers Pages mode instead of leaving an
+/// empty note behind.
 #[tauri::command]
-pub async fn import_pdf_markdown(pdf_path: String) -> Result<String, String> {
+pub async fn pdf_has_text_layer(pdf_path: String) -> Result<bool, String> {
+    tokio::task::spawn_blocking(move || {
+        let pages = crate::pdf::extract::extract_pages(Path::new(&pdf_path))
+            .map_err(|e| e.to_string())?;
+        Ok(!pages.iter().all(|page| page.is_effectively_empty()))
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// Converts a PDF's embedded text layer to Markdown for `note_path`. No OCR: a
+/// typeset sheet already carries its own text, and reading it is exact where
+/// recognising pixels would only ever be a guess.
+///
+/// Equations are the exception — the text layer holds no LaTeX, only glyph runs
+/// in maths fonts — so those regions are cropped out of the rendered page into
+/// the note's `.assets` sidecar and linked as images.
+#[tauri::command]
+pub async fn import_pdf_markdown(pdf_path: String, note_path: String) -> Result<String, String> {
     // pdfium is synchronous and a long sheet is real work, so it must not run
     // on the async executor.
     tokio::task::spawn_blocking(move || {
@@ -67,7 +83,16 @@ pub async fn import_pdf_markdown(pdf_path: String) -> Result<String, String> {
             );
         }
 
-        Ok(crate::pdf::extract::pages_to_markdown(&pages))
+        let assets_dir = crate::commands::assets::assets_dir_for(&note_path);
+        let prefix = crate::commands::assets::assets_dir_name(&note_path);
+
+        crate::pdf::extract::document_to_markdown(
+            Path::new(&pdf_path),
+            &pages,
+            Path::new(&assets_dir),
+            &prefix,
+        )
+        .map_err(|e| e.to_string())
     })
     .await
     .map_err(|e| e.to_string())?
