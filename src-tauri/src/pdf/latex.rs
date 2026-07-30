@@ -1,0 +1,539 @@
+//! Rebuilds LaTeX from the glyphs of a typeset equation.
+//!
+//! The PDF holds no LaTeX, but it holds nearly enough to recover it. Which face
+//! a glyph came from carries the meaning Computer Modern encoded there —
+//! variables in `CMMI`, relations in `CMSY`, blackboard bold in `MSBM` — and the
+//! geometry carries the structure: a smaller glyph above the baseline is an
+//! exponent, below it a subscript.
+//!
+//! Cropping the region as an image was the previous answer and was visually
+//! exact, but an image cannot be copied into a prompt, searched, or edited.
+//! LaTeX can, and it renders natively in the editor.
+//!
+//! What this cannot recover is anything whose structure lives in *drawn rules*
+//! rather than glyphs: a fraction's bar and a radical's vinculum are path
+//! objects, not characters, so their extent is unknowable from the text layer.
+//! Those degrade to a best-effort guess — see [`RADICAL_TAKES_REST`].
+//!
+//! Pure, and free of pdfium types, so all of it is testable.
+
+use super::layout::CharBox;
+use super::maths::Family;
+
+/// A radical's vinculum — the bar over its radicand — is a drawn rule, not a
+/// character, so nothing in the text layer says where it ends. The radicand is
+/// assumed to run to the end of the region, which is right when the root is the
+/// last term (`= √(x² + y²)`, the common shape) and too greedy when it is not.
+const RADICAL_TAKES_REST: bool = true;
+
+// A glyph this much smaller than the region's own size is a script rather than
+// part of the base expression.
+const SCRIPT_SIZE_RATIO: f32 = 0.9;
+// And it has to sit at least this far off the baseline, in multiples of the
+// base size, before its offset counts as deliberate.
+//
+// Deliberately small. The size test above has already established that the
+// glyph is a script; this only has to pick which way. TeX drops a subscript far
+// less than it raises a superscript — on a 12pt line the drop measures 1.8pt,
+// against 4.4pt of rise — so a threshold sized for exponents silently swallows
+// every subscript, turning "T_3" into "T3".
+const SCRIPT_OFFSET_RATIO: f32 = 0.05;
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum Level {
+    Base,
+    Super,
+    Sub,
+}
+
+// A cursor jump this many multiples of the body size, with no space glyph
+// between, is treated as a word gap — mirrors layout::SPACE_GAP. A maths region
+// is built by slicing straight out of the page's character row, which bypasses
+// layout's own gap-based space synthesis, so it has to be redone here or
+// "= √(...)" loses its space and reads "=√(...)".
+const SPACE_GAP: f32 = 0.22;
+
+/// Renders a maths region as LaTeX, without the surrounding `$`.
+pub fn to_latex(chars: &[CharBox]) -> String {
+    // Spaces are kept even though LaTeX ignores them for layout: the output is
+    // read by people and pasted into prompts, and "f(x) = 1" is far easier to
+    // follow than "f(x)=1".
+    let printing: Vec<CharBox> = synthesize_gaps(chars);
+    if printing.iter().all(|c| c.ch.is_whitespace()) {
+        return String::new();
+    }
+
+    let base_size = printing
+        .iter()
+        .filter(|c| !c.ch.is_whitespace())
+        .map(|c| c.font_size)
+        .fold(0.0_f32, f32::max);
+    // The baseline of the full-size glyphs, not of whatever sorted first: a
+    // region can open on an exponent.
+    let base_y = printing
+        .iter()
+        .filter(|c| !c.ch.is_whitespace() && c.font_size >= base_size * SCRIPT_SIZE_RATIO)
+        .map(|c| c.y)
+        .next()
+        .unwrap_or_else(|| printing[0].y);
+
+    render(&printing, base_size, base_y).trim().to_string()
+}
+
+/// Inserts a synthetic space wherever two glyphs sit further apart than a
+/// normal letter gap, chars is expected pre-sorted by `x`. A region is a
+/// direct slice of the page row, so it never went through layout's own
+/// gap-based synthesis.
+fn synthesize_gaps(chars: &[CharBox]) -> Vec<CharBox> {
+    let base = chars
+        .iter()
+        .filter(|c| !c.ch.is_whitespace())
+        .map(|c| c.font_size)
+        .fold(0.0_f32, f32::max)
+        .max(1.0);
+
+    let mut out = Vec::with_capacity(chars.len());
+    let mut previous_end: Option<f32> = None;
+    for &c in chars {
+        let gap = previous_end.is_some_and(|end| c.x - end > base * SPACE_GAP);
+        if gap && !c.ch.is_whitespace() && !out.last().is_some_and(|p: &CharBox| p.ch.is_whitespace()) {
+            out.push(CharBox {
+                ch: ' ',
+                ..c
+            });
+        }
+        previous_end = Some(c.x + c.width);
+        out.push(c);
+    }
+    out
+}
+
+fn level_of(ch: &CharBox, base_size: f32, base_y: f32) -> Level {
+    // A space carries no script level of its own; letting it take one would
+    // split an exponent in two.
+    if ch.ch.is_whitespace() {
+        return Level::Base;
+    }
+    let smaller = ch.font_size < base_size * SCRIPT_SIZE_RATIO;
+    let offset = ch.y - base_y;
+    let threshold = base_size * SCRIPT_OFFSET_RATIO;
+
+    if smaller && offset > threshold {
+        Level::Super
+    } else if smaller && offset < -threshold {
+        Level::Sub
+    } else {
+        Level::Base
+    }
+}
+
+fn render(chars: &[CharBox], base_size: f32, base_y: f32) -> String {
+    let mut out = String::new();
+    let mut index = 0usize;
+
+    while index < chars.len() {
+        let level = level_of(&chars[index], base_size, base_y);
+
+        if level != Level::Base {
+            // A run of glyphs at the same script level is one exponent, so
+            // "e^{xy}" does not become "e^{x}^{y}".
+            let start = index;
+            while index < chars.len() && level_of(&chars[index], base_size, base_y) == level {
+                index += 1;
+            }
+            let run = &chars[start..index];
+            // Recursed so a nested script keeps working, measured against the
+            // script's own size.
+            let inner_size = run.iter().map(|c| c.font_size).fold(0.0_f32, f32::max);
+            let inner = render(run, inner_size, run[0].y);
+            let marker = if level == Level::Super { '^' } else { '_' };
+            out.push(marker);
+            out.push_str(&brace(&inner));
+            continue;
+        }
+
+        // A radical swallows the rest of the region, so it has to be handled
+        // before the per-character path.
+        if is_radical(&chars[index]) && RADICAL_TAKES_REST {
+            let mut end = chars.len();
+            // Sentence punctuation glued onto the end almost never belongs to
+            // the radicand: the source reads "√(x²+y²)." with the period after
+            // the equation, never inside it.
+            while end > index + 1 && matches!(chars[end - 1].ch, '.' | ',' | ';' | ':' | '!' | '?')
+            {
+                end -= 1;
+            }
+            let rest = render(&chars[index + 1..end], base_size, base_y);
+            out.push_str("\\sqrt{");
+            out.push_str(rest.trim());
+            out.push('}');
+            out.push_str(&render(&chars[end..], base_size, base_y));
+            return out;
+        }
+
+        // Consecutive upright letters are a function name or an operator name,
+        // never a product of variables: "cos" must not become "c·o·s" in
+        // italics.
+        if let Some(word_len) = upright_word(&chars[index..]) {
+            let word: String = chars[index..index + word_len].iter().map(|c| c.ch).collect();
+            out.push_str(&operator_name(&word));
+            index += word_len;
+            continue;
+        }
+
+        if chars[index].ch.is_whitespace() {
+            if !out.is_empty() && !out.ends_with(' ') {
+                out.push(' ');
+            }
+            index += 1;
+            continue;
+        }
+
+        out.push_str(&glyph(&chars[index]));
+        index += 1;
+    }
+
+    out
+}
+
+/// Wraps in braces unless it is a single token that does not need them.
+fn brace(inner: &str) -> String {
+    let bare_char = inner.chars().count() == 1 && !inner.starts_with('\\');
+    if bare_char {
+        inner.to_string()
+    } else {
+        format!("{{{inner}}}")
+    }
+}
+
+fn is_radical(ch: &CharBox) -> bool {
+    // CMEX's radical is the glyph at 'p'; a Unicode maths font gives the real
+    // character.
+    ch.ch == '√' || (ch.family == Family::Extensible && matches!(ch.ch, 'p' | 'q' | 'r' | 's'))
+}
+
+/// How many characters from the front form an upright multi-letter word.
+fn upright_word(chars: &[CharBox]) -> Option<usize> {
+    let count = chars
+        .iter()
+        .take_while(|c| c.family == Family::Text && c.ch.is_ascii_alphabetic())
+        .count();
+    (count >= 2).then_some(count)
+}
+
+/// The LaTeX for a run of upright letters: a known operator gets its command,
+/// anything else stays upright inside `\mathrm`.
+fn operator_name(word: &str) -> String {
+    const KNOWN: [&str; 22] = [
+        "arccos", "arcsin", "arctan", "cos", "cosh", "cot", "csc", "deg", "det", "dim", "exp",
+        "gcd", "inf", "ker", "lim", "ln", "log", "max", "min", "sec", "sin", "sup",
+    ];
+    // Longest first, so "arccos" is not matched as "cos".
+    if KNOWN.contains(&word.to_ascii_lowercase().as_str()) {
+        format!("\\{}", word.to_ascii_lowercase())
+    } else {
+        format!("\\mathrm{{{word}}}")
+    }
+}
+
+fn glyph(ch: &CharBox) -> String {
+    match ch.family {
+        Family::Blackboard => return format!("\\mathbb{{{}}}", ch.ch),
+        Family::Script => return format!("\\mathcal{{{}}}", ch.ch),
+        Family::Fraktur => return format!("\\mathfrak{{{}}}", ch.ch),
+        _ => {}
+    }
+
+    if let Some(command) = symbol_command(ch.ch) {
+        return command.to_string();
+    }
+
+    // LaTeX's own metacharacters, which a PDF prints as ordinary glyphs.
+    match ch.ch {
+        '%' => "\\%".into(),
+        '&' => "\\&".into(),
+        '#' => "\\#".into(),
+        '$' => "\\$".into(),
+        '_' => "\\_".into(),
+        '{' => "\\{".into(),
+        '}' => "\\}".into(),
+        other => other.to_string(),
+    }
+}
+
+/// Unicode maths characters mapped to the commands that produce them.
+///
+/// The text layer hands over real Unicode for most symbols, so this is a
+/// translation rather than a guess.
+fn symbol_command(ch: char) -> Option<&'static str> {
+    Some(match ch {
+        // Relations
+        '→' | '⟶' => "\\to",
+        '←' => "\\leftarrow",
+        '↦' => "\\mapsto",
+        '⇒' => "\\Rightarrow",
+        '⇔' => "\\iff",
+        '≤' => "\\leq",
+        '≥' => "\\geq",
+        '≠' => "\\neq",
+        '≈' => "\\approx",
+        '≡' => "\\equiv",
+        '∼' => "\\sim",
+        '≪' => "\\ll",
+        '≫' => "\\gg",
+        // Sets
+        '∈' => "\\in",
+        '∉' => "\\notin",
+        '⊂' => "\\subset",
+        '⊆' => "\\subseteq",
+        '⊃' => "\\supset",
+        '⊇' => "\\supseteq",
+        '∪' => "\\cup",
+        '∩' => "\\cap",
+        '∅' => "\\emptyset",
+        '∖' => "\\setminus",
+        // Operators
+        '−' => "-",
+        '±' => "\\pm",
+        '∓' => "\\mp",
+        '×' => "\\times",
+        '÷' => "\\div",
+        '⋅' | '·' => "\\cdot",
+        '∘' => "\\circ",
+        '⊕' => "\\oplus",
+        '⊗' => "\\otimes",
+        // Large operators and calculus
+        '∑' => "\\sum",
+        '∏' => "\\prod",
+        '∫' => "\\int",
+        '∂' => "\\partial",
+        '∇' => "\\nabla",
+        '∞' => "\\infty",
+        '′' => "'",
+        // Logic
+        '∀' => "\\forall",
+        '∃' => "\\exists",
+        '¬' => "\\neg",
+        '∧' => "\\wedge",
+        '∨' => "\\vee",
+        // Greek, lower case
+        'α' => "\\alpha",
+        'β' => "\\beta",
+        'γ' => "\\gamma",
+        'δ' => "\\delta",
+        'ε' | 'ϵ' => "\\varepsilon",
+        'ζ' => "\\zeta",
+        'η' => "\\eta",
+        'θ' => "\\theta",
+        'ι' => "\\iota",
+        'κ' => "\\kappa",
+        'λ' => "\\lambda",
+        'μ' => "\\mu",
+        'ν' => "\\nu",
+        'ξ' => "\\xi",
+        'π' => "\\pi",
+        'ρ' => "\\rho",
+        'σ' => "\\sigma",
+        'τ' => "\\tau",
+        'υ' => "\\upsilon",
+        'φ' | 'ϕ' => "\\varphi",
+        'χ' => "\\chi",
+        'ψ' => "\\psi",
+        'ω' => "\\omega",
+        // Greek, upper case
+        'Γ' => "\\Gamma",
+        'Δ' => "\\Delta",
+        'Θ' => "\\Theta",
+        'Λ' => "\\Lambda",
+        'Ξ' => "\\Xi",
+        'Π' => "\\Pi",
+        'Σ' => "\\Sigma",
+        'Φ' => "\\Phi",
+        'Ψ' => "\\Psi",
+        'Ω' => "\\Omega",
+        _ => return None,
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const BODY: f32 = 12.0;
+
+    fn ch(c: char, x: f32, y: f32, size: f32, family: Family) -> CharBox {
+        CharBox {
+            ch: c,
+            x,
+            y,
+            width: size * 0.5,
+            top: y + size * 0.75,
+            bottom: y - size * 0.25,
+            font_size: size,
+            bold: false,
+            italic: false,
+            fixed_pitch: false,
+            family,
+        }
+    }
+
+    /// Lays a string out on the baseline in one face.
+    fn run(text: &str, family: Family) -> Vec<CharBox> {
+        let mut out = Vec::new();
+        let mut x = 100.0;
+        for c in text.chars() {
+            out.push(ch(c, x, 700.0, BODY, family));
+            x += BODY * 0.5;
+        }
+        out
+    }
+
+    /// Lays a string out immediately after the end of an existing run, with no
+    /// gap — the shape two adjacent glyph runs actually take in a PDF.
+    fn adjoin(before: &[CharBox], text: &str, family: Family) -> Vec<CharBox> {
+        let x = before.last().map(|c| c.x + c.width).unwrap_or(100.0);
+        let mut out = before.to_vec();
+        out.extend(run(text, family).into_iter().enumerate().map(|(i, mut c)| {
+            c.x = x + i as f32 * BODY * 0.5;
+            c
+        }));
+        out
+    }
+
+    /// A smaller glyph parked off the baseline, the way TeX sets a script.
+    fn script(text: &str, x: f32, dy: f32, family: Family) -> Vec<CharBox> {
+        let size = BODY * 0.7;
+        let mut out = Vec::new();
+        let mut cursor = x;
+        for c in text.chars() {
+            out.push(ch(c, cursor, 700.0 + dy, size, family));
+            cursor += size * 0.5;
+        }
+        out
+    }
+
+    #[test]
+    fn plain_variables_pass_straight_through() {
+        assert_eq!(to_latex(&run("f(x)", Family::Italic)), "f(x)");
+    }
+
+    #[test]
+    fn a_raised_smaller_glyph_becomes_an_exponent() {
+        let mut chars = run("x", Family::Italic);
+        chars.extend(script("2", 106.0, 4.0, Family::Text));
+
+        assert_eq!(to_latex(&chars), "x^2");
+    }
+
+    #[test]
+    fn a_lowered_smaller_glyph_becomes_a_subscript() {
+        let mut chars = run("T", Family::Italic);
+        chars.extend(script("1", 106.0, -3.0, Family::Text));
+
+        assert_eq!(to_latex(&chars), "T_1");
+    }
+
+    // A run at one script level is a single exponent: "e^{xy}", not "e^x^y".
+    #[test]
+    fn a_multi_glyph_exponent_is_braced_as_one() {
+        let mut chars = run("e", Family::Italic);
+        chars.extend(script("xy", 106.0, 4.0, Family::Italic));
+
+        assert_eq!(to_latex(&chars), "e^{xy}");
+    }
+
+    #[test]
+    fn blackboard_bold_becomes_mathbb() {
+        assert_eq!(to_latex(&run("R", Family::Blackboard)), r"\mathbb{R}");
+    }
+
+    #[test]
+    fn script_and_fraktur_faces_get_their_own_commands() {
+        assert_eq!(to_latex(&run("F", Family::Script)), r"\mathcal{F}");
+        assert_eq!(to_latex(&run("g", Family::Fraktur)), r"\mathfrak{g}");
+    }
+
+    #[test]
+    fn symbols_become_their_commands() {
+        assert_eq!(to_latex(&run("→", Family::Symbol)), r"\to");
+        assert_eq!(to_latex(&run("∈", Family::Symbol)), r"\in");
+        assert_eq!(to_latex(&run("≤", Family::Symbol)), r"\leq");
+        assert_eq!(to_latex(&run("α", Family::Italic)), r"\alpha");
+    }
+
+    // U+2212 is the real minus sign; a bare "-" is a hyphen and reads wrong.
+    #[test]
+    fn the_minus_sign_becomes_a_plain_hyphen_for_latex() {
+        assert_eq!(to_latex(&run("−", Family::Symbol)), "-");
+    }
+
+    // Consecutive upright letters inside maths are a function name, never a
+    // product of variables — "cos" must not come out as italic c·o·s.
+    #[test]
+    fn a_function_name_becomes_its_operator_command() {
+        let chars = adjoin(&run("cos", Family::Text), "(x)", Family::Italic);
+        assert_eq!(to_latex(&chars), r"\cos(x)");
+    }
+
+    #[test]
+    fn an_unknown_upright_word_stays_upright() {
+        assert_eq!(to_latex(&run("grad", Family::Text)), r"\mathrm{grad}");
+    }
+
+    #[test]
+    fn a_single_upright_letter_is_not_treated_as_a_word() {
+        assert_eq!(to_latex(&run("d", Family::Text)), "d");
+    }
+
+    #[test]
+    fn a_radical_takes_the_rest_of_the_expression() {
+        let chars = adjoin(&run("√", Family::Extensible), "x + y", Family::Italic);
+        assert_eq!(to_latex(&chars), r"\sqrt{x + y}");
+    }
+
+    // "√(x²+y²)." — the radicand must not swallow the sentence's own full stop.
+    #[test]
+    fn trailing_punctuation_stays_outside_the_radical() {
+        let chars = adjoin(&run("√", Family::Extensible), "x+y.", Family::Italic);
+        assert_eq!(to_latex(&chars), r"\sqrt{x+y}.");
+    }
+
+    // CMEX has no Unicode radical: the glyph is named after an ASCII letter.
+    #[test]
+    fn the_computer_modern_radical_glyph_is_recognised() {
+        let chars = adjoin(&run("p", Family::Extensible), "2", Family::Text);
+        assert_eq!(to_latex(&chars), r"\sqrt{2}");
+    }
+
+    #[test]
+    fn latex_metacharacters_are_escaped() {
+        assert_eq!(to_latex(&run("%", Family::Text)), r"\%");
+        assert_eq!(to_latex(&run("&", Family::Text)), r"\&");
+    }
+
+    // Spacing is cosmetic in LaTeX but not in a prompt.
+    #[test]
+    fn the_sources_own_spacing_survives() {
+        assert_eq!(to_latex(&run("f = 1", Family::Italic)), "f = 1");
+    }
+
+    // A region is sliced straight out of the page's character row, bypassing
+    // layout's own gap-based space synthesis — found on a real sheet, where
+    // "f(x, y) = √(...)" merged into "=\sqrt{...}" with no space at all.
+    #[test]
+    fn a_wide_cursor_jump_with_no_space_glyph_still_gets_a_space() {
+        let mut chars = run("=", Family::Text);
+        chars.extend(run("x", Family::Italic).into_iter().map(|mut c| {
+            c.x += 30.0; // well past a normal letter gap
+            c
+        }));
+
+        assert_eq!(to_latex(&chars), "= x");
+    }
+
+    #[test]
+    fn an_empty_or_blank_region_produces_nothing() {
+        assert_eq!(to_latex(&[]), "");
+        assert_eq!(to_latex(&run("   ", Family::Text)), "");
+    }
+}

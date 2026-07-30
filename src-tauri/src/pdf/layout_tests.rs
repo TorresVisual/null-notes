@@ -3,6 +3,7 @@
 //! advancing x by its width. Nothing here needs pdfium.
 
 use super::layout::*;
+use super::maths::Family;
 
 const BODY: f32 = 10.0;
 // Roughly a Times-ish advance; only the ratio to font_size matters.
@@ -14,8 +15,7 @@ struct Style {
     bold: bool,
     italic: bool,
     fixed: bool,
-    maths: bool,
-    symbol: bool,
+    family: Family,
 }
 
 impl Default for Style {
@@ -25,27 +25,23 @@ impl Default for Style {
             bold: false,
             italic: false,
             fixed: false,
-            maths: false,
-            symbol: false,
+            family: Family::Text,
         }
     }
 }
 
-/// A maths *symbol* face — an arrow, an operator, a radical. Something text
-/// cannot express, so a region containing it earns a crop.
+/// A maths *symbol* face — an arrow, an operator, a radical.
 fn maths() -> Style {
     Style {
-        maths: true,
-        symbol: true,
+        family: Family::Symbol,
         ..Style::default()
     }
 }
 
-/// Maths *italic* — the variable alphabet. A lone letter from it is ordinary
-/// italic text and is deliberately not cropped.
+/// Maths *italic* — the variable alphabet.
 fn maths_italic() -> Style {
     Style {
-        maths: true,
+        family: Family::Italic,
         ..Style::default()
     }
 }
@@ -68,8 +64,7 @@ fn set(text: &str, x: f32, y: f32, style: Style) -> Vec<CharBox> {
             bold: style.bold,
             italic: style.italic,
             fixed_pitch: style.fixed,
-            maths: style.maths,
-            symbol: style.symbol,
+            family: style.family,
         });
         cursor += width;
     }
@@ -400,62 +395,33 @@ fn emphasis_markers_never_wrap_surrounding_whitespace() {
     assert_eq!(markdown, "see **word** after\n");
 }
 
-// The text layer has no LaTeX in it — an equation is a run of glyphs in maths
-// fonts, and reading it as text gives confident nonsense. These check it comes
-// out as a crop instead.
+// An equation arrives as glyph runs in maths fonts, and read as flat text it is
+// confident nonsense. These check it comes back as LaTeX — text, so it can be
+// copied into a prompt and edited, which an image could never be.
 #[test]
-fn a_line_that_is_all_maths_becomes_a_standalone_image() {
+fn a_line_that_is_all_maths_becomes_a_display_equation() {
     let mut chars = page(&["Consider the following identity."]);
-    chars.extend(set("f(x) = x2 + 1", 200.0, 660.0, maths()));
+    chars.extend(set("f(x) = 1", 200.0, 660.0, maths()));
 
     let markdown = chars_to_markdown(&chars);
 
-    assert!(markdown.contains("![](maths-1.png)"), "got: {markdown}");
-    // None of the glyph soup should survive as text.
-    assert!(!markdown.contains("x2 + 1"), "maths leaked as text: {markdown}");
-}
-
-// Most inline maths on a real sheet is one italic variable. Cropping each one
-// litters the note with postage stamps that read worse than the letter would.
-#[test]
-fn a_lone_italic_variable_stays_text_rather_than_becoming_an_image() {
-    let mut chars = set("der Wert von ", 72.0, 700.0, Style::default());
-    chars.extend(set("f", 72.0 + 13.0 * 5.0, 700.0, maths_italic()));
-    chars.extend(set(" an der Stelle", 72.0 + 14.0 * 5.0, 700.0, Style::default()));
-
-    let markdown = chars_to_markdown(&chars);
-
-    assert!(!markdown.contains("!["), "cropped a bare variable: {markdown}");
-    assert!(markdown.contains('f'), "lost the variable: {markdown}");
-}
-
-// A subscript is the point at which text stops being able to say it.
-#[test]
-fn a_subscripted_variable_is_cropped() {
-    let mut chars = set("T", 200.0, 700.0, maths_italic());
-    chars.extend(set("1", 205.0, 697.0, Style { size: 8.0, ..Style::default() }));
-
-    let markdown = chars_to_markdown(&chars);
-
-    assert!(markdown.contains("!["), "expected a crop: {markdown}");
+    assert!(markdown.contains("$$f(x) = 1$$"), "got: {markdown}");
 }
 
 #[test]
-fn maths_inside_a_sentence_stays_inside_it() {
+fn maths_inside_a_sentence_stays_inline() {
     let mut chars = set("Sei ", 72.0, 700.0, Style::default());
-    chars.extend(set("f : R", 72.0 + 4.0 * 5.0, 700.0, maths()));
-    chars.extend(set(" gegeben und stetig", 72.0 + 9.0 * 5.0, 700.0, Style::default()));
+    chars.extend(set("f", 72.0 + 4.0 * 5.0, 700.0, maths_italic()));
+    chars.extend(set(" gegeben und stetig", 72.0 + 5.0 * 5.0, 700.0, Style::default()));
 
-    let markdown = chars_to_markdown(&chars);
-
-    assert_eq!(markdown, "Sei ![](maths-1.png) gegeben und stetig\n");
+    assert_eq!(chars_to_markdown(&chars), "Sei $f$ gegeben und stetig\n");
 }
 
 // "f : R² → R" sets the colon and the exponent in the body font, so a region
 // has to absorb what sits between two maths glyphs.
 #[test]
 fn a_region_bridges_body_font_characters_inside_an_equation() {
-    let mut chars = set("f", 200.0, 700.0, maths());
+    let mut chars = set("f", 200.0, 700.0, maths_italic());
     chars.extend(set(" : ", 205.0, 700.0, Style::default()));
     chars.extend(set("R", 220.0, 700.0, maths()));
 
@@ -484,67 +450,35 @@ fn prose_far_from_an_equation_is_not_swallowed_into_it() {
 }
 
 #[test]
-fn a_crop_region_covers_the_full_height_of_its_glyphs() {
-    let mut chars = set("x", 200.0, 700.0, maths());
-    // An exponent, sitting above the baseline.
-    chars.extend(set("2", 205.0, 704.0, Style { size: 7.0, maths: true, ..Style::default() }));
-
-    let lines = group_lines(&chars);
-
-    let Some(Inline::Maths(rect)) = lines[0].content.iter().find(|i| matches!(i, Inline::Maths(_)))
-    else {
-        panic!("no region in {:?}", lines[0].content)
-    };
-    // Tall enough to hold the exponent's top and the base glyph's bottom.
-    assert!(rect.y1 >= 704.0 + 7.0 * 0.75 - 0.01, "top too low: {rect:?}");
-    assert!(rect.y0 <= 700.0 - BODY * 0.25 + 0.01, "bottom too high: {rect:?}");
+fn a_page_with_no_maths_produces_no_dollar_signs() {
+    let markdown = chars_to_markdown(&page(&["just ordinary prose here"]));
+    assert!(!markdown.contains('$'), "got: {markdown}");
 }
 
+// Found on a real sheet: "T2(3.02,3.99)." was followed immediately by a raised
+// footnote-call digit with no gap, and region growth pulled it in as a
+// spurious "^3" on the equation. A footnote marker is geometrically identical
+// to a real exponent — raised, reduced size — except for what it follows: an
+// exponent never sits directly after a full stop.
 #[test]
-fn maths_rects_are_listed_in_the_order_the_markdown_asks_for_them() {
-    let mut chars = set("a", 72.0, 700.0, maths());
-    chars.extend(set("text between them here", 72.0 + 60.0, 700.0, Style::default()));
-    chars.extend(set("b", 72.0 + 220.0, 700.0, maths()));
+fn a_footnote_marker_after_an_equation_does_not_bleed_into_it() {
+    let mut chars = set("siehe die Gleichung", 72.0, 700.0, Style::default());
+    chars.extend(set("T", 72.0 + 21.0 * 5.0, 700.0, maths_italic()));
+    chars.extend(set(".", 72.0 + 22.0 * 5.0, 700.0, Style::default()));
+    // The footnote call: smaller, raised, glued to the period with no gap.
+    chars.extend(set(
+        "3",
+        72.0 + 22.0 * 5.0 + 5.0,
+        704.0,
+        Style { size: BODY * 0.7, ..Style::default() },
+    ));
 
-    let blocks = group_blocks(&group_lines(&chars));
-    let rects = maths_rects(&blocks);
+    let markdown = chars_to_markdown(&chars);
 
-    assert_eq!(rects.len(), 2);
-    assert!(rects[0].x0 < rects[1].x0, "out of reading order: {rects:?}");
-}
-
-#[test]
-fn a_page_with_no_maths_asks_for_no_crops() {
-    let blocks = group_blocks(&group_lines(&page(&["just ordinary prose here"])));
-    assert!(maths_rects(&blocks).is_empty());
-}
-
-// PDF space starts at the bottom-left, an image at the top-left. Getting this
-// backwards crops the mirror image of the equation.
-#[test]
-fn a_rect_maps_onto_the_rendered_page_flipped_vertically() {
-    // A4-ish page, rendered at 2x.
-    let rect = Rect { x0: 100.0, y0: 700.0, x1: 200.0, y1: 720.0 };
-
-    let (x, y, w, h) = rect.to_pixels(600.0, 800.0, 1200, 1600);
-
-    assert_eq!(x, 200, "left edge");
-    // 800 - 720 = 80 points from the top, doubled.
-    assert_eq!(y, 160, "top edge measured down from the top of the page");
-    assert_eq!(w, 200);
-    assert_eq!(h, 40);
-}
-
-#[test]
-fn a_rect_is_clamped_to_the_image_and_never_zero_sized() {
-    let outside = Rect { x0: -50.0, y0: -50.0, x1: 5000.0, y1: 5000.0 };
-    let (x, y, w, h) = outside.to_pixels(600.0, 800.0, 1200, 1600);
-    assert_eq!((x, y), (0, 0));
-    assert!(x + w <= 1200 && y + h <= 1600, "escaped the image: {w}x{h}");
-
-    let degenerate = Rect { x0: 100.0, y0: 100.0, x1: 100.0, y1: 100.0 };
-    let (_, _, w, h) = degenerate.to_pixels(600.0, 800.0, 1200, 1600);
-    assert!(w >= 1 && h >= 1, "zero-sized crop: {w}x{h}");
+    assert!(!markdown.contains("^3"), "footnote leaked into the equation: {markdown}");
+    // The footnote digit itself must survive as ordinary trailing text, not
+    // vanish — it is the mark a reader follows to the footnote.
+    assert!(markdown.trim_end().ends_with('3'), "footnote digit lost: {markdown}");
 }
 
 #[test]

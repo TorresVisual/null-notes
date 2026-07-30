@@ -61,15 +61,16 @@ pub async fn pdf_has_text_layer(pdf_path: String) -> Result<bool, String> {
     .map_err(|e| e.to_string())?
 }
 
-/// Converts a PDF's embedded text layer to Markdown for `note_path`. No OCR: a
-/// typeset sheet already carries its own text, and reading it is exact where
-/// recognising pixels would only ever be a guess.
+/// Converts a PDF's embedded text layer to Markdown. No OCR: a typeset sheet
+/// already carries its own text, and reading it is exact where recognising
+/// pixels would only ever be a guess.
 ///
-/// Equations are the exception — the text layer holds no LaTeX, only glyph runs
-/// in maths fonts — so those regions are cropped out of the rendered page into
-/// the note's `.assets` sidecar and linked as images.
+/// Equations become LaTeX. The text layer holds no LaTeX, but it holds the font
+/// each glyph came from and where it sits, which is enough to rebuild it — and
+/// LaTeX, unlike a cropped image, can be copied into a prompt, searched, and
+/// edited in place.
 #[tauri::command]
-pub async fn import_pdf_markdown(pdf_path: String, note_path: String) -> Result<String, String> {
+pub async fn import_pdf_markdown(pdf_path: String) -> Result<String, String> {
     // pdfium is synchronous and a long sheet is real work, so it must not run
     // on the async executor.
     tokio::task::spawn_blocking(move || {
@@ -83,16 +84,7 @@ pub async fn import_pdf_markdown(pdf_path: String, note_path: String) -> Result<
             );
         }
 
-        let assets_dir = crate::commands::assets::assets_dir_for(&note_path);
-        let prefix = crate::commands::assets::assets_dir_name(&note_path);
-
-        crate::pdf::extract::document_to_markdown(
-            Path::new(&pdf_path),
-            &pages,
-            Path::new(&assets_dir),
-            &prefix,
-        )
-        .map_err(|e| e.to_string())
+        Ok(crate::pdf::extract::pages_to_markdown(&pages))
     })
     .await
     .map_err(|e| e.to_string())?

@@ -42,7 +42,8 @@ export function ImportButton() {
 
   // Pages: each page renders to an image in the note's sidecar and is inserted
   // as a viewable block. Markdown: the PDF's own text layer is reconstructed
-  // into an ordinary editable note — no OCR either way.
+  // into an ordinary editable note, equations included — no OCR, no image
+  // crops, so the note stays plain, copyable Markdown throughout.
   async function runImport(picked: PickedPdf, mode: PdfImportMode) {
     if (!workspacePath) return
     setPending(null)
@@ -56,8 +57,10 @@ export function ImportButton() {
     }
 
     try {
-      // Asked before anything is created: a scan has nothing to convert, and
-      // finding that out afterwards would leave an empty note behind.
+      // Markdown mode converts before the note exists, so a PDF with nothing
+      // to convert — a scan, or a genuine failure — never leaves an empty
+      // note behind.
+      let body: string | null = null
       if (mode === 'markdown') {
         setIsConverting(true)
         const convertible = await api.pdf.hasTextLayer(picked.path).finally(() => {
@@ -67,32 +70,24 @@ export function ImportButton() {
           setScanned(picked)
           return
         }
+        setIsConverting(true)
+        body = await api.pdf.importMarkdown(picked.path).finally(() => setIsConverting(false))
       }
 
       const folder = selectedFolder ?? workspacePath
       const note = await api.notes.create(workspacePath, folder, picked.title)
 
-      const body =
-        mode === 'markdown'
-          ? await convert(picked.path, note.path)
-          : `${pagesToMarkdown(await importPages(picked.path, note.path))}\n`
+      const content =
+        body !== null
+          ? `# ${picked.title}\n\n${body}`
+          : `# ${picked.title}\n\n${pagesToMarkdown(await importPages(picked.path, note.path))}\n`
 
-      const content = `# ${picked.title}\n\n${body}`
       await api.notes.save(note.path, content)
       await api.notes.reindex(note.path, workspacePath, content)
       addNote({ ...note, title: picked.title })
       openTab(note.path)
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
-    }
-  }
-
-  async function convert(path: string, notePath: string): Promise<string> {
-    setIsConverting(true)
-    try {
-      return await api.pdf.importMarkdown(path, notePath)
-    } finally {
-      setIsConverting(false)
     }
   }
 

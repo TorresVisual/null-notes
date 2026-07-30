@@ -9,6 +9,8 @@
 //! keeps the entire algorithm unit-testable without the native library — the
 //! test suite has no pdfium, so anything that touched it would be untestable.
 
+use super::latex;
+use super::maths::Family;
 use unicode_normalization::UnicodeNormalization;
 
 /// Marks where a word was broken across a line. Set by extraction from
@@ -35,115 +37,25 @@ pub struct CharBox {
     pub bold: bool,
     pub italic: bool,
     pub fixed_pitch: bool,
-    /// Set from the character's font family — see [`super::maths`].
-    pub maths: bool,
-    /// A maths *symbol* rather than a maths italic letter. Decides whether a
-    /// region has to be cropped: `→` and `√` cannot be written as text, a lone
-    /// italic `f` plainly can.
-    pub symbol: bool,
+    /// Which maths face the glyph came from, if any. Computer Modern splits
+    /// mathematics across faces by meaning, so this is most of what
+    /// [`super::latex`] needs to rebuild the equation.
+    pub family: Family,
 }
 
-/// A rectangle in PDF user space: origin bottom-left, `y1` above `y0`.
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct Rect {
-    pub x0: f32,
-    pub y0: f32,
-    pub x1: f32,
-    pub y1: f32,
-}
-
-impl Rect {
-    fn around(chars: &[CharBox]) -> Option<Rect> {
-        let first = chars.first()?;
-        let mut rect = Rect {
-            x0: first.x,
-            y0: first.bottom,
-            x1: first.x + first.width,
-            y1: first.top,
-        };
-        for c in chars {
-            rect.x0 = rect.x0.min(c.x);
-            rect.y0 = rect.y0.min(c.bottom);
-            rect.x1 = rect.x1.max(c.x + c.width);
-            rect.y1 = rect.y1.max(c.top);
-        }
-        Some(rect)
-    }
-
-    pub fn width(&self) -> f32 {
-        self.x1 - self.x0
-    }
-
-    pub fn height(&self) -> f32 {
-        self.y1 - self.y0
-    }
-
-    /// The smallest rectangle containing all of them.
-    fn union_all(rects: &[Rect]) -> Option<Rect> {
-        let mut out = *rects.first()?;
-        for r in rects {
-            out.x0 = out.x0.min(r.x0);
-            out.y0 = out.y0.min(r.y0);
-            out.x1 = out.x1.max(r.x1);
-            out.y1 = out.y1.max(r.y1);
-        }
-        Some(out)
-    }
-
-    /// Grows the rectangle on all sides, so a crop does not shave the
-    /// antialiased edge off a glyph.
-    pub fn padded(&self, pad: f32) -> Rect {
-        Rect {
-            x0: self.x0 - pad,
-            y0: self.y0 - pad,
-            x1: self.x1 + pad,
-            y1: self.y1 + pad,
-        }
-    }
-
-    /// Maps the rectangle onto a rendered page image as `(x, y, width, height)`.
-    ///
-    /// The two coordinate systems disagree about which way is up: PDF user
-    /// space starts at the bottom-left, an image at the top-left, so the
-    /// rectangle's *top* becomes the crop's `y`. Results are clamped to the
-    /// image, and never zero-sized — a zero-width crop is an error in every
-    /// image library.
-    pub fn to_pixels(
-        &self,
-        page_width: f32,
-        page_height: f32,
-        image_width: u32,
-        image_height: u32,
-    ) -> (u32, u32, u32, u32) {
-        if page_width <= 0.0 || page_height <= 0.0 {
-            return (0, 0, 1, 1);
-        }
-        let scale_x = image_width as f32 / page_width;
-        let scale_y = image_height as f32 / page_height;
-
-        let left = (self.x0 * scale_x).floor().max(0.0) as u32;
-        let top = ((page_height - self.y1) * scale_y).floor().max(0.0) as u32;
-        let left = left.min(image_width.saturating_sub(1));
-        let top = top.min(image_height.saturating_sub(1));
-
-        let width = (self.width() * scale_x).ceil().max(1.0) as u32;
-        let height = (self.height() * scale_y).ceil().max(1.0) as u32;
-
-        (
-            left,
-            top,
-            width.min(image_width - left).max(1),
-            height.min(image_height - top).max(1),
-        )
+impl CharBox {
+    pub fn is_maths(&self) -> bool {
+        self.family.is_maths()
     }
 }
 
-/// A piece of a line: either text, or a region of mathematics that has to be
-/// cropped from the rendered page because the text layer cannot express it.
+/// A piece of a line: prose, or an equation rebuilt as LaTeX.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Inline {
     Text(Span),
-    Maths(Rect),
+    /// The LaTeX source, without delimiters. Text rather than an image so it can
+    /// be copied into a prompt, searched, and edited in place.
+    Maths(String),
 }
 
 /// A run of characters sharing one emphasis style.
@@ -198,7 +110,7 @@ pub enum Block {
     Code { text: String },
     /// A standalone equation, cropped whole rather than inlined into a
     /// paragraph.
-    MathsDisplay { rects: Vec<Rect> },
+    MathsDisplay { latex: String },
     ListItem {
         ordered: bool,
         number: Option<u32>,
@@ -321,7 +233,35 @@ pub fn group_lines(chars: &[CharBox]) -> Vec<Line> {
         }
     }
 
+    merge_extensible_rows(&mut rows);
     rows.into_iter().map(build_line).collect()
+}
+
+/// Folds a row made only of extensible glyphs into the row beneath it.
+///
+/// A radical sign is set on its own baseline, above the expression it covers, so
+/// `√(x² + y²)` arrives as one row holding nothing but the radical and another
+/// holding the radicand. Left apart, the radical has no radicand to take and
+/// renders as an empty `\sqrt{}` next to a stray expression. Merged, the two sit
+/// in one row where the radical precedes its contents in reading order.
+fn merge_extensible_rows(rows: &mut Vec<Vec<CharBox>>) {
+    let mut index = 0;
+    while index + 1 < rows.len() {
+        let printing: Vec<&CharBox> = rows[index]
+            .iter()
+            .filter(|c| !c.ch.is_whitespace())
+            .collect();
+        let extensible_only =
+            !printing.is_empty() && printing.iter().all(|c| c.family == Family::Extensible);
+
+        if extensible_only {
+            let row = std::mem::take(&mut rows[index]);
+            rows[index + 1].extend(row);
+            rows.remove(index);
+            continue;
+        }
+        index += 1;
+    }
 }
 
 fn build_line(mut row: Vec<CharBox>) -> Line {
@@ -360,7 +300,8 @@ fn build_line(mut row: Vec<CharBox>) -> Line {
         // A maths region is opaque: the text layer cannot express what it says,
         // so the characters inside it are replaced wholesale by a crop.
         if let Some(run) = runs.iter().find(|r| r.0 == index) {
-            if let Some(rect) = Rect::around(&row[run.0..run.1]) {
+            let latex = latex::to_latex(&row[run.0..run.1]);
+            if !latex.is_empty() {
                 // The word gap before an equation is often only a cursor jump,
                 // and the text path's space synthesis does not run here — so
                 // "Funktion f(x)" came out as "Funktion![](…)".
@@ -373,7 +314,7 @@ fn build_line(mut row: Vec<CharBox>) -> Line {
                     push_char(&mut spans, ' ', false, false);
                 }
                 flush_spans(&mut spans, &mut content);
-                content.push(Inline::Maths(rect));
+                content.push(Inline::Maths(latex));
             }
             previous_end = row[run.0..run.1].last().map(|c| c.x + c.width);
             index = run.1;
@@ -480,7 +421,7 @@ fn maths_runs(row: &[CharBox], font_size: f32) -> Vec<(usize, usize)> {
     let seeds: Vec<usize> = row
         .iter()
         .enumerate()
-        .filter(|(_, c)| c.maths && !c.ch.is_whitespace())
+        .filter(|(_, c)| c.is_maths() && !c.ch.is_whitespace())
         .map(|(i, _)| i)
         .collect();
     if seeds.is_empty() {
@@ -511,6 +452,19 @@ fn maths_runs(row: &[CharBox], font_size: f32) -> Vec<(usize, usize)> {
             run.0 -= 1;
         }
         while run.1 < row.len() && !row[run.1].ch.is_alphabetic() && gap_ok(run.1 - 1, run.1) {
+            // A footnote marker is a raised, reduced digit glued onto the
+            // sentence-ending punctuation right after an equation — the same
+            // geometry a genuine exponent has, except for what it follows. An
+            // exponent is never preceded by terminal punctuation, so growth
+            // stops there rather than pulling a footnote call into the maths.
+            let after_terminal =
+                matches!(row[run.1 - 1].ch, '.' | ',' | ';' | ':' | '!' | '?');
+            let candidate = &row[run.1];
+            let is_script = candidate.font_size < font_size * SCRIPT_SIZE_RATIO
+                && candidate.y > row[run.1 - 1].y + font_size * 0.1;
+            if after_terminal && is_script {
+                break;
+            }
             run.1 += 1;
         }
         // Whitespace at either edge belongs to the sentence, not the equation:
@@ -534,40 +488,11 @@ fn maths_runs(row: &[CharBox], font_size: f32) -> Vec<(usize, usize)> {
         }
     });
 
-    runs.retain(|run| needs_crop(&row[run.0..run.1]));
     runs
 }
 
 /// Whether a maths region actually has to become an image.
 ///
-/// Being set in a maths font is not enough. Most inline maths on a page like
-/// this is a single italic variable — `f`, `x`, `T` — which text says perfectly
-/// well, and cropping each one litters the note with postage-stamp images that
-/// read far worse than the letters would have. Only regions holding something
-/// text genuinely cannot express earn a crop.
-fn needs_crop(chars: &[CharBox]) -> bool {
-    // Arrows, set operators, radicals, extensible brackets, blackboard bold.
-    if chars.iter().any(|c| c.symbol) {
-        return true;
-    }
-
-    // Anything outside ASCII is a symbol that survives extraction as mojibake
-    // at best.
-    if chars.iter().any(|c| !c.ch.is_ascii()) {
-        return true;
-    }
-
-    // More than one baseline means superscripts or subscripts, and a flat
-    // string cannot say "x squared".
-    let printing: Vec<&CharBox> = chars.iter().filter(|c| !c.ch.is_whitespace()).collect();
-    let Some(first) = printing.first() else {
-        return false;
-    };
-    printing
-        .iter()
-        .any(|c| (c.y - first.y).abs() > first.font_size.max(1.0) * 0.1)
-}
-
 fn push_char(spans: &mut Vec<Span>, ch: char, bold: bool, italic: bool) {
     match spans.last_mut() {
         Some(last) if last.bold == bold && last.italic == italic => last.text.push(ch),
@@ -758,7 +683,7 @@ fn join_lines(lines: &[&Line]) -> Vec<Inline> {
         }
         for inline in &line.content {
             match inline {
-                Inline::Maths(rect) => out.push(Inline::Maths(*rect)),
+                Inline::Maths(latex) => out.push(Inline::Maths(latex.clone())),
                 Inline::Text(span) => {
                     for ch in span.text.chars() {
                         push_text(&mut out, ch, span.bold, span.italic);
@@ -871,26 +796,21 @@ pub fn group_blocks(lines: &[Line]) -> Vec<Block> {
 
 fn finish_block(lines: &[&Line], kind: LineKind) -> Block {
     match kind {
-        LineKind::MathsDisplay => {
-            let parts: Vec<Rect> = lines
+        LineKind::MathsDisplay => Block::MathsDisplay {
+            // One display equation can span several baselines — a radical sign
+            // or a fraction bar is set on its own row — so the rows' pieces
+            // concatenate into a single expression rather than becoming
+            // separate equations.
+            latex: lines
                 .iter()
                 .flat_map(|l| l.content.iter())
                 .filter_map(|i| match i {
-                    Inline::Maths(rect) => Some(*rect),
+                    Inline::Maths(latex) => Some(latex.as_str()),
                     Inline::Text(_) => None,
                 })
-                .collect();
-            // One display equation routinely spans several baselines: a radical
-            // sign, a fraction bar or a big operator is set on its own, so
-            // "√(x² + y²)" arrives as one row holding the radical and another
-            // holding what is under it. Cropping row by row cuts the equation
-            // into unreadable slivers, so the block becomes a single crop of
-            // the whole thing. Blocks are already split on vertical gaps, so
-            // two genuinely separate equations stay separate.
-            Block::MathsDisplay {
-                rects: Rect::union_all(&parts).into_iter().collect(),
-            }
-        }
+                .collect::<Vec<_>>()
+                .join(" "),
+        },
         LineKind::Heading(level) => Block::Heading {
             level,
             content: join_lines(lines),
@@ -929,12 +849,12 @@ fn finish_block(lines: &[&Line], kind: LineKind) -> Block {
     }
 }
 
-fn render_content(content: &[Inline], maths_src: &mut impl FnMut(Rect) -> String) -> String {
+fn render_content(content: &[Inline]) -> String {
     let mut out = String::new();
     for inline in content {
         let span = match inline {
-            Inline::Maths(rect) => {
-                out.push_str(&format!("![]({})", maths_src(*rect)));
+            Inline::Maths(latex) => {
+                out.push_str(&format!("${latex}$"));
                 continue;
             }
             Inline::Text(span) => span,
@@ -967,29 +887,21 @@ fn render_content(content: &[Inline], maths_src: &mut impl FnMut(Rect) -> String
     out
 }
 
-/// Renders blocks to Markdown. `maths_src` names the image each cropped maths
-/// region will be written to — the crop itself happens where the rendered page
-/// is available, which is not here.
-pub fn blocks_to_markdown(
-    blocks: &[Block],
-    maths_src: &mut impl FnMut(Rect) -> String,
-) -> String {
+/// Renders blocks to Markdown, equations included: `$…$` inline and `$…$$` as
+/// their own block.
+pub fn blocks_to_markdown(blocks: &[Block]) -> String {
     let mut parts: Vec<String> = Vec::new();
     for block in blocks {
         match block {
             Block::Heading { level, content } => {
                 let hashes = "#".repeat((*level).clamp(1, 6) as usize);
-                parts.push(format!("{hashes} {}", render_content(content, maths_src)));
+                parts.push(format!("{hashes} {}", render_content(content)));
             }
-            Block::Paragraph { content } => parts.push(render_content(content, maths_src)),
+            Block::Paragraph { content } => parts.push(render_content(content)),
             Block::Code { text } => parts.push(format!("```\n{text}\n```")),
-            Block::MathsDisplay { rects } => parts.push(
-                rects
-                    .iter()
-                    .map(|rect| format!("![]({})", maths_src(*rect)))
-                    .collect::<Vec<_>>()
-                    .join(" "),
-            ),
+            // Display maths gets its own block so it renders centred, the way
+            // the source set it.
+            Block::MathsDisplay { latex } => parts.push(format!("$${latex}$$")),
             Block::ListItem {
                 ordered,
                 number,
@@ -1004,7 +916,7 @@ pub fn blocks_to_markdown(
                 };
                 parts.push(format!(
                     "{indent}{marker} {}",
-                    render_content(content, maths_src)
+                    render_content(content)
                 ));
             }
         }
@@ -1016,35 +928,7 @@ pub fn blocks_to_markdown(
     out
 }
 
-/// Every maths region on the page, in reading order — what the caller has to
-/// crop, in the order `blocks_to_markdown` will ask for them.
-pub fn maths_rects(blocks: &[Block]) -> Vec<Rect> {
-    let mut rects = Vec::new();
-    for block in blocks {
-        match block {
-            Block::MathsDisplay { rects: display } => rects.extend(display.iter().copied()),
-            Block::Heading { content, .. }
-            | Block::Paragraph { content }
-            | Block::ListItem { content, .. } => {
-                rects.extend(content.iter().filter_map(|i| match i {
-                    Inline::Maths(rect) => Some(*rect),
-                    Inline::Text(_) => None,
-                }))
-            }
-            Block::Code { .. } => {}
-        }
-    }
-    rects
-}
-
-/// The whole pipeline, with maths regions named but not cropped. Callers that
-/// can render the page substitute real filenames; this shape is what the tests
-/// and the no-image case use.
+/// The whole pipeline: characters in, Markdown out.
 pub fn chars_to_markdown(chars: &[CharBox]) -> String {
-    let blocks = group_blocks(&group_lines(chars));
-    let mut index = 0;
-    blocks_to_markdown(&blocks, &mut |_| {
-        index += 1;
-        format!("maths-{index}.png")
-    })
+    blocks_to_markdown(&group_blocks(&group_lines(chars)))
 }

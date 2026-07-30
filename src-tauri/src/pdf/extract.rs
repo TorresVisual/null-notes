@@ -47,133 +47,6 @@ pub fn pages_to_markdown(pages: &[ExtractedPage]) -> String {
     out
 }
 
-/// Equations are cropped from a render at this multiple of the PDF's own point
-/// size. A page rendered 1:1 gives 72 DPI, which makes a fraction bar mush.
-const MATHS_RENDER_SCALE: f32 = 3.0;
-
-/// Converts a document to Markdown, cropping every maths region out of the
-/// rendered pages into `assets_dir` and referencing it from the note.
-///
-/// `asset_prefix` is the note-relative directory the Markdown should point at,
-/// so the links stay portable when the workspace moves.
-pub fn document_to_markdown(
-    pdf_path: &Path,
-    pages: &[ExtractedPage],
-    assets_dir: &Path,
-    asset_prefix: &str,
-) -> Result<String> {
-    // Structure first, so the crops can be done in one pdfium pass rather than
-    // re-opening the document per page.
-    let per_page: Vec<(usize, Vec<layout::Block>)> = pages
-        .iter()
-        .map(|page| {
-            (
-                page.index,
-                layout::group_blocks(&layout::group_lines(&page.chars)),
-            )
-        })
-        .collect();
-
-    let wanted: Vec<(usize, Vec<layout::Rect>)> = per_page
-        .iter()
-        .map(|(index, blocks)| (*index, layout::maths_rects(blocks)))
-        .filter(|(_, rects)| !rects.is_empty())
-        .collect();
-
-    let mut names = if wanted.is_empty() {
-        std::collections::HashMap::new()
-    } else {
-        std::fs::create_dir_all(assets_dir)?;
-        crop_regions(pdf_path, &wanted, assets_dir)?
-    };
-
-    let mut chunks: Vec<String> = Vec::new();
-    for (index, blocks) in &per_page {
-        // blocks_to_markdown asks for regions in the same order maths_rects
-        // returned them, so the crops line up by position.
-        let mut queue = names.remove(index).unwrap_or_default().into_iter();
-        let markdown = layout::blocks_to_markdown(blocks, &mut |_| {
-            queue
-                .next()
-                .map(|name| format!("{asset_prefix}/{name}"))
-                .unwrap_or_default()
-        });
-
-        if !markdown.trim().is_empty() {
-            chunks.push(markdown.trim_end().to_string());
-        }
-    }
-
-    let mut out = chunks.join("\n\n");
-    if !out.is_empty() {
-        out.push('\n');
-    }
-    Ok(out)
-}
-
-/// Renders each page that has equations once and crops every region out of it,
-/// returning the written filenames per page index.
-#[cfg(feature = "pdf-native")]
-fn crop_regions(
-    pdf_path: &Path,
-    wanted: &[(usize, Vec<layout::Rect>)],
-    assets_dir: &Path,
-) -> Result<std::collections::HashMap<usize, Vec<String>>> {
-    use pdfium_render::prelude::PdfRenderConfig;
-
-    let pdfium = super::renderer::bind_pdfium()?;
-    let doc = pdfium.load_pdf_from_file(pdf_path, None)?;
-    let mut out = std::collections::HashMap::new();
-    let mut counter = 0usize;
-
-    for (page_index, rects) in wanted {
-        let page = doc
-            .pages()
-            .get(*page_index as i32)
-            .map_err(|e| anyhow::anyhow!("page {page_index} could not be opened: {e}"))?;
-
-        let page_width = page.width().value;
-        let page_height = page.height().value;
-
-        let bitmap = page.render_with_config(
-            &PdfRenderConfig::new()
-                .set_target_width((page_width * MATHS_RENDER_SCALE) as u16 as i32),
-        )?;
-        let (width, height) = (bitmap.width() as u32, bitmap.height() as u32);
-        // Built through our own `image` crate rather than bitmap.as_image(), for
-        // the same reason render_pages does — see the note there.
-        let rendered = image::RgbaImage::from_raw(width, height, bitmap.as_rgba_bytes())
-            .ok_or_else(|| anyhow::anyhow!("page {page_index} had a mismatched pixel buffer"))?;
-
-        let mut names = Vec::new();
-        for rect in rects {
-            let (x, y, w, h) = rect
-                .padded(MATHS_CROP_PAD)
-                .to_pixels(page_width, page_height, width, height);
-            let cropped = image::imageops::crop_imm(&rendered, x, y, w, h).to_image();
-
-            counter += 1;
-            let name = format!("eq-{counter}.png");
-            cropped.save(assets_dir.join(&name))?;
-            names.push(name);
-        }
-        out.insert(*page_index, names);
-    }
-    Ok(out)
-}
-
-#[cfg(not(feature = "pdf-native"))]
-fn crop_regions(
-    _pdf_path: &Path,
-    _wanted: &[(usize, Vec<layout::Rect>)],
-    _assets_dir: &Path,
-) -> Result<std::collections::HashMap<usize, Vec<String>>> {
-    anyhow::bail!("cropping equations requires the pdf-native feature")
-}
-
-/// Breathing room around a cropped equation, in PDF points.
-const MATHS_CROP_PAD: f32 = 1.5;
-
 pub fn extract_pages(pdf_path: &Path) -> Result<Vec<ExtractedPage>> {
     #[cfg(feature = "pdf-native")]
     {
@@ -249,8 +122,7 @@ fn extract_pages_native(pdf_path: &Path) -> Result<Vec<ExtractedPage>> {
                 width: bounds.width().value,
                 top: bounds.top().value,
                 bottom: bounds.bottom().value,
-                maths: super::maths::is_maths_font(&font),
-                symbol: super::maths::is_symbol_font(&font),
+                family: super::maths::family_of(&font),
                 font_size: ch.scaled_font_size().value,
                 bold: matches!(
                     ch.font_weight(),
@@ -285,8 +157,7 @@ mod tests {
             bold: false,
             italic: false,
             fixed_pitch: false,
-            maths: false,
-            symbol: false,
+            family: super::super::maths::Family::Text,
         }
     }
 
