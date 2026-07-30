@@ -514,6 +514,24 @@ fn a_footnote_marker_after_an_equation_does_not_bleed_into_it() {
     assert!(markdown.trim_end().ends_with('3'), "footnote digit lost: {markdown}");
 }
 
+// Found on a real sheet: "(a) C ist der Kreis..." (an enumeration label
+// immediately before a lone mathcal variable, with no space wide enough to
+// stop the ordinary gap check) absorbed the label's closing paren into the
+// equation, reading "(a$) C$ ist" instead of "(a) $C$ ist". Growing backward
+// must never cross a ')' at all — it always belongs to some other,
+// already-closed bracketed group, never to the equation being grown.
+#[test]
+fn an_enumeration_labels_closing_paren_does_not_leak_into_a_following_equation() {
+    let mut chars = set("(a)", 90.9, 700.0, Style::default());
+    chars.extend(set("C", 111.7, 700.0, maths()));
+    chars.extend(set(" ist der Kreis", 118.1, 700.0, Style::default()));
+
+    let markdown = chars_to_markdown(&chars);
+
+    assert!(markdown.contains("$C$"), "got: {markdown}");
+    assert!(!markdown.contains(")$"), "closing paren leaked into the region: {markdown}");
+}
+
 #[test]
 fn an_empty_page_produces_an_empty_document() {
     assert_eq!(chars_to_markdown(&[]), "");

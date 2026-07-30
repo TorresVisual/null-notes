@@ -451,7 +451,20 @@ fn maths_runs(row: &[CharBox], font_size: f32) -> Vec<(usize, usize)> {
         row[right].x - (row[left].x + row[left].width) <= em
     };
     for run in &mut runs {
-        while run.0 > 0 && !row[run.0 - 1].ch.is_alphabetic() && gap_ok(run.0 - 1, run.0) {
+        while run.0 > 0
+            && !row[run.0 - 1].ch.is_alphabetic()
+            // A ')' is never legitimate to pick up growing backward: an
+            // equation opens a paren before its content and closes it after,
+            // so backward growth only ever needs a '(' or an operator/digit.
+            // A ')' encountered scanning backward is always the end of some
+            // other, already-closed bracketed group — on a real sheet, an
+            // enumeration label ("(a)") sitting right before a lone mathcal
+            // variable with no source-level space wide enough to stop the
+            // gap check, absorbing its closing paren and reading "(a$) C$"
+            // instead of "(a) $\mathcal{C}$".
+            && row[run.0 - 1].ch != ')'
+            && gap_ok(run.0 - 1, run.0)
+        {
             run.0 -= 1;
         }
         while run.1 < row.len() && !row[run.1].ch.is_alphabetic() && gap_ok(run.1 - 1, run.1) {
