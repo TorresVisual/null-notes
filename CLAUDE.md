@@ -99,6 +99,15 @@ No OCR. A typeset PDF carries its own text layer, and reading it is exact where 
 
 Use `loose_bounds()`, not `tight_bounds()` — tight bounds cover a glyph's inked extent, so gap-based space detection fires after every comma. pdfium is synchronous, so page work belongs in `spawn_blocking`.
 
+Two things about pdfium that cost real debugging time:
+
+- It injects **synthetic characters** describing the text layer's own structure (CR/LF at every line end, spacing markers). They report a font size of 1.0 with zero bounds, and are identified by an **empty font name** — real glyphs always have one. Keeping them drags a row's median font size to 1.0 and collapses the baseline tolerance, which shreds the whole document.
+- It binds its library **once per process** and answers later attempts with `PdfiumLibraryBindingsAlreadyInitialized` rather than returning the bindings. Any import making two passes must treat that as success, not as "pdfium not found".
+
+Equations are cropped from a render, not reconstructed as text — a LaTeX PDF contains no LaTeX. Only *symbol* faces (`CMSY`/`CMEX`/`MSAM`/`MSBM`) seed a crop; `CMMI` is the maths italic alphabet, and cropping a lone `f` gives a postage stamp where a word would do. A region must then grow outward over non-letters, because Computer Modern takes digits, parentheses and `=` from the body font.
+
+Judging this pipeline means looking at real output: `pdf/dump.rs` holds `#[ignore]`d diagnostics driven by `NULL_NOTES_PDF`. Every bug found so far was invisible in synthetic fixtures.
+
 ## TypeScript Guidelines
 
 ### Config

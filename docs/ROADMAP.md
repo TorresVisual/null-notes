@@ -1,6 +1,6 @@
 # null-notes — Product & Technical Roadmap
 
-**Last updated:** 2026-07-29 (**M0–M3 all reached** — P2-3 closed M2; **P4-1 done** — PDF→Markdown converts from the embedded text layer, no OCR; re-scoped against `notes/Plan.md`; **Phases 5 "Versioned Workspaces" and 9 "Study & Revision" added** — the first features that go beyond the original brief. **Next: P4-2.**)
+**Last updated:** 2026-07-30 (**M0–M3 all reached** — P2-3 closed M2; **P4-1 + P4-2 done** — PDF→Markdown converts from the embedded text layer with no OCR, and equations are cropped from the rendered page rather than mangled into text; re-scoped against `notes/Plan.md`; **Phases 5 "Versioned Workspaces" and 9 "Study & Revision" added** — the first features that go beyond the original brief. **Next: P4-3, which closes M4.**)
 **Audience of this doc:** the maintainer (solo dev).
 **Product audience:** you — a personal, offline, daily-driver note app for CS coursework. This is **not** aimed at public distribution yet, which deliberately pushes packaging, cross-platform, auto-update, branding, and onboarding *down* the priority list. Correctness, data integrity, and the editor/ink/PDF workflow come first.
 
@@ -131,7 +131,7 @@ Given "personal daily driver," priority = **`(daily-use value) × (risk of data 
 | **P1** | Everyday-use completeness | **M1:** I don't reach for another app | ✅ | Small gaps that break flow (links, refresh, quick-switch) |
 | **P2** | Feel & ergonomics | **M2:** it's a pleasure to use for hours | ✅ | Compounding daily quality-of-life |
 | **P3** | Headline features & power tools | **M3:** the CS-specific superpowers land | ✅ | PDF-as-reference, export, graph |
-| **P4** | PDF→Markdown & exercise sheets | **M4:** an exercise sheet becomes a workable note in one step | 1/3 | The brief's own flagship; the biggest single time-saver |
+| **P4** | PDF→Markdown & exercise sheets | **M4:** an exercise sheet becomes a workable note in one step | 2/3 | The brief's own flagship; the biggest single time-saver |
 | **P5** | Versioned workspaces (Git automation) | **M5:** my notes commit themselves, in both kinds of repo | | The next tier of P0's data safety — a commit is a recoverable backup |
 | **P6** | STEM authoring | **M6:** writing maths/algorithms is faster here than anywhere else | | Compounds on every note; cheap, since the infra exists |
 | **P7** | IDE integration | **M7:** notes and code are one workflow, not two | | The brief's second pillar — "integrate, don't replace" |
@@ -345,7 +345,7 @@ Sync is out of scope as a *feature* (principle #2), but since files are plain `.
 
 ---
 
-## Phase 4 — PDF → Markdown & the Exercise-Sheet Workflow (P4) — P4-1 done, P4-2 next
+## Phase 4 — PDF → Markdown & the Exercise-Sheet Workflow (P4) — P4-1 + P4-2 done, P4-3 closes M4
 
 **Milestone M4:** *I can drop an exercise sheet into the app and immediately start writing solutions into it — as text I can edit, not a picture.*
 
@@ -379,16 +379,31 @@ This is why P3-1's audit conclusion ("OCR is unsalvageable") and this phase are 
 
 *Also: `loose_bounds()` rather than `tight_bounds()`, because tight bounds cover a glyph's inked extent and a comma would then leave a gap wide enough to fake a space after every one. Conversion runs in `spawn_blocking` (pdfium is synchronous) and **before** the note is created, so a failed conversion leaves no empty note behind.*
 
-*Scanned-PDF detection landed here rather than in P4-2 because it was five lines and P4-1 must not produce a garbage note. What is **not** done is P4-2's half: the message says "import it as pages instead" but does not yet offer the button that does so.*
+*Scanned-PDF detection landed here rather than in P4-2 because it was five lines and P4-1 must not produce a garbage note. The other half — actually offering Pages mode rather than only naming it — shipped with P4-2.*
 
 *Not verified against a real PDF — pdfium is not present on this machine, so the whole pdfium-facing path (`extract_pages_native`) is compile-checked only. The geometry it feeds is thoroughly tested; the translation into it is not.*
 
-### P4-2 — Honest degradation: maths regions and scanned PDFs — **M**
+### P4-2 — Honest degradation: maths regions and scanned PDFs — **M** ✅
 The two ways P4-1 can produce garbage. Both must fail visibly, never silently.
 - **Maths.** LaTeX-rendered equations have no LaTeX in the PDF — they are glyph runs in maths fonts (CMMI/CMSY/MSAM/STIX). Extracting them as text yields mangled nonsense. Detect maths-font runs and, instead of emitting text, **crop that region from the rendered page** (P3-1 already renders pages) and insert it as an inline image. Visually exact, zero ML, and honest about what it doesn't know.
 - **Scanned PDFs.** A near-empty text layer means there is nothing to convert. Detect it up front, say so plainly, and offer Pages mode instead of producing an empty or garbled note.
 - **Dependency:** P4-1. The crop mechanism already exists: P2-3 added the `NoteName.assets/` sidecar and an inline `image` node that renders a stored file, so this needs the region geometry and the crop, not new plumbing.
 - **DoD:** A sheet with display and inline maths imports with every equation visually intact (as crops, not as corrupted text). A scanned PDF is detected before conversion and routed to Pages mode with an explanatory message — it never produces a garbage note.
+
+*Done, and **verified by rendering the crops and looking at them** — the only way to judge this. Against a real Analysis sheet: `f : ℝ² → ℝ`, `f(x, y) = y cos(x) + e^{xy}`, `f(x, y) = √(x² + y²)` and `(x₀, y₀) = (3, 4)` all come out visually exact, superscripts and subscripts intact, where before they read `p x2 + y2` and `f : R2 → R`.*
+
+***The distinction that makes this work:** maths faces split into two kinds. `CMSY`/`CMEX`/`MSAM`/`MSBM` hold what text genuinely cannot say — `→`, `∈`, radicals, extensible brackets, blackboard bold — and a region containing one earns a crop. `CMMI` is the maths **italic alphabet**, so a lone `f` or `x` from it is an ordinary italic letter; cropping those would litter the note with postage-stamp images where a word would do. Only symbol faces seed a region.*
+
+*A region cannot be just its maths glyphs. Computer Modern takes the digits, parentheses, commas and `=` from the **body** font, so a region seeded on maths glyphs alone stopped short — `T3(x, y)` lost its closing bracket and `(x₀, y₀) = (0, 0)` shattered into fragments with stray punctuation between them. Regions therefore bridge across nearby maths glyphs and then grow outward over non-letters. Letters stop the growth, which is what keeps the surrounding prose out of the image.*
+
+*Three bugs that only a real document exposed:*
+- ***A display equation spans several baselines.** A radical sign, fraction bar or big operator is set on its own row, so row-by-row cropping cut `√(x² + y²)` into two images — one of them a clipped radical and nothing else. A display block's regions are now unioned into one crop.*
+- ***pdfium binds its library once per process** and answers any later attempt with `PdfiumLibraryBindingsAlreadyInitialized` instead of handing the bindings back. Converting a sheet makes two passes (extract the text, then render to crop), so **every** such import failed with a bogus "pdfium not found". The second bind now reuses the live bindings.*
+- ***Maths italic supplies its own comma and full stop**, so a coordinate pair serialised as `(3*.*02*,*3*.*99)`. Emphasis is no longer marked around spans holding no alphanumeric character.*
+
+*Scanned detection now **offers** Pages mode rather than only naming it — the button was the missing half flagged in P4-1.*
+
+***Known limitation, not fixed.** A word hyphenated across a line break rejoins with a space: `Entwicklungsstel le`. The text layer holds no hyphen for it, and pdfium inserts its CR/LF line marker at every visual line end whether or not a word was split — so the character stream carries **no signal** distinguishing a wrapped word from two words. An attempt to use stream adjacency was built, measured against the real document, found to detect nothing, and reverted rather than left in as machinery that looks like it works. Recovering this needs either a hyphen glyph the document does not emit or a dictionary, so it is deliberately left alone.*
 
 ### P4-3 — Exercise splitting, solution scaffold, and "add next task" — **M**
 The part the brief says "would save students hours every semester."

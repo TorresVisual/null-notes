@@ -4,7 +4,7 @@ Feature checklist. **The [roadmap](docs/ROADMAP.md) holds the reasoning and the 
 
 Effort: **S** ≈ hours · **M** ≈ a day or two · **L** ≈ several days.
 
-**Now:** M2 closed, P4-1 done. Next: P4-2 (honest degradation) — then P4-3 closes M4.
+**Now:** M2 closed; P4-1 and P4-2 done. Next: P4-3 (exercise splitting), which closes M4.
 
 **Two decisions owed before their phase starts:** split-pane editing (during P4) and spaced-repetition storage (before any P9-3 code).
 
@@ -18,7 +18,7 @@ Effort: **S** ≈ hours · **M** ≈ a day or two · **L** ≈ several days.
 | P1 Everyday-use completeness | M1 — I don't reach for another app | ✅ |
 | P2 Feel & ergonomics | M2 — a pleasure to use for hours | ✅ |
 | P3 Headline features | M3 — the CS superpowers land | ✅ |
-| P4 PDF→Markdown & exercise sheets | M4 — a sheet becomes a workable note | 1/3 |
+| P4 PDF→Markdown & exercise sheets | M4 — a sheet becomes a workable note | 2/3 |
 | P5 Versioned workspaces (Git) | M5 — my notes commit themselves | |
 | P6 STEM authoring | M6 — fastest place to write maths | |
 | P7 IDE integration | M7 — notes and code are one workflow | |
@@ -42,13 +42,19 @@ Both import modes, chosen at import time, the way Notion does it. **No OCR** —
 - [x] Bold/italic font variants → `**` / `*`
 - [x] Converted note is a normal editable note, and searchable via `Ctrl+K` *(closes the brief's "search should include PDFs" gap)*
 
-> `pdf/layout.rs` takes plain `CharBox` values, **not** pdfium types — that's what makes it testable (22 tests) on a machine with no pdfium. `pdf/extract.rs` is the thin translation layer and holds no decisions. The pdfium-facing path is compile-checked only; **not yet run against a real PDF.**
+> `pdf/layout.rs` takes plain `CharBox` values, **not** pdfium types — that's what makes it testable on a machine with no pdfium. `pdf/extract.rs` is the thin translation layer and holds no decisions. Since verified against a real Analysis sheet, which exposed four bugs synthetic fixtures could not.
 
-### P4-2 Honest degradation — **M** — *do before P4-3*
-- [ ] Detect maths-font runs (CMMI/CMSY/MSAM/STIX) and crop those regions from the rendered page as inline images, rather than emitting mangled glyph text *(the crop mechanism already exists — P2-3's `NoteName.assets/` sidecar + inline `image` node)*
+### P4-2 Honest degradation — **M** ✅
+- [x] Detect maths-font runs and crop those regions from the rendered page as inline images, rather than emitting mangled glyph text *(reuses P2-3's `NoteName.assets/` sidecar)*
 - [x] Detect a near-empty text layer (scanned PDF) *before* converting — landed early in P4-1, since it was five lines and P4-1 must not write a garbage note
-- [ ] …but **offer** Pages mode, not just name it: the message says "import it as pages instead" with no button that does so
-- [ ] Never produce a garbled or empty note
+- [x] **Offer** Pages mode, not just name it — a button, not only a message
+- [x] Never produce a garbled or empty note
+
+> **Only symbol faces seed a crop.** `CMSY`/`CMEX`/`MSAM`/`MSBM` hold what text can't say (`→`, `√`, blackboard bold); `CMMI` is the maths *italic alphabet*, so a lone `f` stays italic text rather than becoming a postage-stamp image. Regions then grow outward over non-letters, because Computer Modern takes digits, parens and `=` from the **body** font — without that, `T3(x, y)` lost its bracket.
+>
+> Verified by rendering the crops and looking at them: `f : ℝ² → ℝ`, `√(x² + y²)`, `(x₀, y₀) = (3, 4)` all visually exact.
+>
+> **Known limitation:** a word hyphenated across a line break rejoins with a space (`Entwicklungsstel le`). The text layer has no hyphen and pdfium's line marker appears at every visual line end regardless, so nothing distinguishes a wrapped word from two words. Needs a dictionary; deliberately left alone.
 
 ### P4-3 Exercise splitting & solution scaffold — **M**
 - [ ] Split on exercise headings (`Aufgabe N`, `Task N`, `Exercise N`, `Problem N`, `N.`) into `## Task N` + `### Solution` pairs
