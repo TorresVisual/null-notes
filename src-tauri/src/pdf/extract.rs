@@ -14,6 +14,24 @@ use std::path::Path;
 /// P4-2 routes it to Pages mode rather than producing a garbled note.
 pub const MIN_CHARS_PER_PAGE: usize = 20;
 
+/// No real glyph in any document this pipeline has been run against is ever
+/// set this small; pdfium's own layout filler (CR/LF markers, paragraph and
+/// word-gap padding) consistently measures 1.0pt regardless of the
+/// surrounding text's real size.
+const LAYOUT_FILLER_MAX_SIZE: f32 = 1.5;
+
+/// Whether a character this small is pdfium's own layout filler rather than a
+/// real, if tiny, glyph.
+///
+/// Deliberately **not** based on an empty `font_name()`. That used to be the
+/// signal, and held for the first document this pipeline was built against —
+/// but a font name is producer-dependent: one real PDF's actual body-text
+/// font reports an empty name too, through no fault of its own, and that
+/// version of the check silently discarded every word of prose in it.
+fn is_layout_filler(font_size: f32) -> bool {
+    font_size <= LAYOUT_FILLER_MAX_SIZE
+}
+
 #[derive(Debug, Clone)]
 pub struct ExtractedPage {
     pub index: usize,
@@ -78,15 +96,12 @@ fn extract_pages_native(pdf_path: &Path) -> Result<Vec<ExtractedPage>> {
                 continue;
             };
             // pdfium injects synthetic characters that describe the text
-            // layer's own structure — CR/LF at every line end, plus spacing
-            // markers. They report a font size of 1.0 and zero bounds, and
-            // every one of them has an empty font name, which real glyphs
-            // never do.
-            //
-            // They are not merely useless here (lines are grouped by
-            // geometry, not by markers): a row that picks one up has its
-            // median font size dragged to 1.0, which collapses the baseline
-            // tolerance to 0.4pt and stops the row grouping anything at all.
+            // layer's own structure — CR/LF at every line end, plus filler
+            // marking a paragraph or word gap. They are not merely useless
+            // here (lines are grouped by geometry, not by markers): a row that
+            // picks one up has its median font size dragged toward whatever
+            // degenerate size the filler reports, which can collapse the
+            // baseline tolerance and stop the row grouping anything at all.
             //
             // One control character is worth keeping. A word broken across a
             // line arrives as "…Entwicklungsstel", U+0002, "le" — pdfium
@@ -96,7 +111,9 @@ fn extract_pages_native(pdf_path: &Path) -> Result<Vec<ExtractedPage>> {
             // word was split or not. It becomes a soft hyphen for the layout
             // to reflow across.
             let hyphenation_break = ch.is_hyphen().unwrap_or(false);
-            if !hyphenation_break && (ch.font_name().is_empty() || value.is_control()) {
+            if !hyphenation_break
+                && (is_layout_filler(ch.scaled_font_size().value) || value.is_control())
+            {
                 continue;
             }
             // loose_bounds covers the glyph's advance box rather than its inked
@@ -144,6 +161,33 @@ fn extract_pages_native(pdf_path: &Path) -> Result<Vec<ExtractedPage>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // pdfium's own layout filler consistently measures 1.0pt in every
+    // document seen; ordinary superscripts/subscripts still sit well above
+    // this (a 12pt line's script is usually ~8pt), and body text can be
+    // 8pt+ in a footnote or caption, so the cutoff has real headroom on
+    // both sides.
+    #[test]
+    fn a_degenerate_size_is_layout_filler() {
+        assert!(is_layout_filler(1.0));
+        assert!(is_layout_filler(0.0));
+    }
+
+    #[test]
+    fn ordinary_text_at_any_real_size_is_not_filler() {
+        assert!(!is_layout_filler(7.97)); // a real subscript/superscript
+        assert!(!is_layout_filler(11.96)); // ordinary body text
+        assert!(!is_layout_filler(24.79)); // a heading
+    }
+
+    // The bug this guards: one real PDF's body-text font reported an empty
+    // font_name() through pdfium for entirely legitimate prose, and a filter
+    // keyed on font-name emptiness discarded every word of it. Size is the
+    // only signal that told the two apart.
+    #[test]
+    fn an_empty_font_name_alone_is_not_evidence_of_filler() {
+        assert!(!is_layout_filler(11.96), "a real 11.96pt glyph must never read as filler regardless of its font name");
+    }
 
     fn char_at(ch: char, x: f32, y: f32) -> CharBox {
         CharBox {

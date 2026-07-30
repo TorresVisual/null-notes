@@ -91,4 +91,67 @@ mod tests {
             }
         }
     }
+
+    /// Renders page 0 to a PNG in the OS temp dir, for comparing the actual
+    /// typeset page against what the pipeline extracted. The only way to
+    /// confirm the text layer is missing content rather than the layout
+    /// algorithm mishandling it.
+    #[test]
+    #[ignore]
+    fn dump_render_page0() {
+        let pdf = pdf_or_skip!();
+        let out = std::env::temp_dir().join("null-notes-page0.png");
+        let pdfium = crate::pdf::renderer::bind_pdfium().unwrap();
+        let doc = pdfium.load_pdf_from_file(&pdf, None).unwrap();
+        let page = doc.pages().first().unwrap();
+        use pdfium_render::prelude::PdfRenderConfig;
+        let bitmap = page.render_with_config(&PdfRenderConfig::new().set_target_width(1600)).unwrap();
+        let (w, h) = (bitmap.width() as u32, bitmap.height() as u32);
+        let img = image::RgbaImage::from_raw(w, h, bitmap.as_rgba_bytes()).unwrap();
+        img.save(&out).unwrap();
+        println!("saved to {}", out.display());
+    }
+
+    /// Raw pdfium output, bypassing every filter this pipeline applies —
+    /// including characters `extract.rs` would drop. Found the bug where one
+    /// PDF's real body-text font reported an empty `font_name()`, which a
+    /// name-based filter mistook for pdfium's own layout filler.
+    #[test]
+    #[ignore]
+    fn dump_raw_pdfium_chars() {
+        let pdf = pdf_or_skip!();
+        let pdfium = crate::pdf::renderer::bind_pdfium().unwrap();
+        let doc = pdfium.load_pdf_from_file(&pdf, None).unwrap();
+        let page = doc.pages().first().unwrap();
+        let text = page.text().unwrap();
+        let chars = text.chars();
+        println!("total raw chars on page: {}", chars.len());
+
+        let mut none_unicode = 0;
+        let mut empty_font = 0;
+        let mut ok = 0;
+        for c in chars.iter() {
+            match c.unicode_char() {
+                None => none_unicode += 1,
+                Some(_) => {
+                    if c.font_name().is_empty() {
+                        empty_font += 1;
+                    } else {
+                        ok += 1;
+                    }
+                }
+            }
+        }
+        println!("none_unicode={none_unicode} empty_font={empty_font} ok={ok}");
+
+        for c in chars.iter().take(80) {
+            println!(
+                "uni={:?} font={:?} size={:.2} gen={:?}",
+                c.unicode_char(),
+                c.font_name(),
+                c.scaled_font_size().value,
+                c.is_generated().ok(),
+            );
+        }
+    }
 }
