@@ -180,6 +180,78 @@ fn median(values: &mut [f32]) -> f32 {
     values[(values.len() - 1) / 2]
 }
 
+/// Whether `ch` sits close enough to `anchor` in `y` to share its row, scaled
+/// by whichever of the two is larger and loosened for a script (superscript,
+/// subscript, footnote marker), which sits further off the baseline than a
+/// same-size character would.
+fn baseline_tolerance_ok(anchor: &CharBox, ch: &CharBox) -> bool {
+    let scale = anchor.font_size.max(ch.font_size).max(1.0);
+    // Symmetric: a raised exponent sorts above the line it belongs to and so
+    // can become the anchor itself, which made a one-sided test compare the
+    // body text against the script instead.
+    let is_script = anchor.font_size.min(ch.font_size) < scale * SCRIPT_SIZE_RATIO;
+    let tolerance = if is_script {
+        SCRIPT_BASELINE_TOLERANCE
+    } else {
+        BASELINE_TOLERANCE
+    };
+    (anchor.y - ch.y).abs() <= scale * tolerance
+}
+
+/// Whether `ch` sits low enough to be the subscript of a lone big operator
+/// (`∮`, `∑`, `∫`, …) — never the ordinary [`baseline_tolerance_ok`] window,
+/// which is scaled to an *adjacent* character's own size and comes nowhere
+/// close to reaching a subscript sitting at the foot of a much taller glyph.
+/// On the real document this was built against, `∮`'s own glyph spans 27pt
+/// top to bottom, and its "_C" subscript sits right at the bottom of that —
+/// far outside any tolerance scaled from a normal single-line offset. The
+/// operator's own measured height is the only signal wide enough to find it.
+fn fits_below_big_operator(row: &[(usize, CharBox)], ch: &CharBox) -> bool {
+    let [(_, op)] = row else { return false };
+    if op.family != Family::Extensible {
+        return false;
+    }
+    let margin = op.font_size.max(1.0) * SCRIPT_BASELINE_TOLERANCE;
+    ch.y >= op.bottom - margin && ch.y <= op.top + margin
+}
+
+/// Horizontal distance between two glyphs' advance boxes — `0.0` if they
+/// overlap in `x`, otherwise the gap between the nearer pair of edges.
+fn horizontal_gap(a: &CharBox, b: &CharBox) -> f32 {
+    let (a0, a1) = (a.x, a.x + a.width);
+    let (b0, b1) = (b.x, b.x + b.width);
+    if a1 < b0 {
+        b0 - a1
+    } else if b1 < a0 {
+        a0 - b1
+    } else {
+        0.0
+    }
+}
+
+/// A rough, whole-selection estimate of "what body text is sized at" —
+/// whichever size the most non-whitespace characters share. Used only to
+/// separate script-sized glyphs from body text in [`group_lines`]; the
+/// per-document [`body_font_size`] is a different, later thing computed once
+/// real lines exist.
+fn dominant_font_size(chars: &[CharBox]) -> f32 {
+    let mut weighted: Vec<(f32, usize)> = Vec::new();
+    for c in chars.iter().filter(|c| !c.ch.is_whitespace()) {
+        match weighted
+            .iter_mut()
+            .find(|(size, _)| (*size - c.font_size).abs() < 0.51)
+        {
+            Some((_, count)) => *count += 1,
+            None => weighted.push((c.font_size, 1)),
+        }
+    }
+    weighted
+        .into_iter()
+        .max_by_key(|(_, count)| *count)
+        .map(|(size, _)| size)
+        .unwrap_or(12.0)
+}
+
 /// Groups characters into lines by baseline, then into styled spans.
 pub fn group_lines(chars: &[CharBox]) -> Vec<Line> {
     if chars.is_empty() {
@@ -199,31 +271,28 @@ pub fn group_lines(chars: &[CharBox]) -> Vec<Line> {
             .then(a.x.partial_cmp(&b.x).unwrap_or(std::cmp::Ordering::Equal))
     });
 
+    // Body text sets its own rows first, and script-sized glyphs are placed
+    // afterward against the finished result — see the comment below for why
+    // this has to happen in two passes rather than one sequential scan.
+    let body_ref = dominant_font_size(chars);
+    let is_script_sized = |ch: &CharBox| ch.font_size < body_ref * SCRIPT_SIZE_RATIO;
+
     let mut rows: Vec<Vec<(usize, CharBox)>> = Vec::new();
+    let mut scripts: Vec<(usize, CharBox)> = Vec::new();
     // The row's reference baseline, taken from the largest character in it so
-    // far. Anchoring to the row's *first* character instead is wrong twice
-    // over: a row opened by a raised footnote marker keeps measuring from that
-    // marker's baseline, which shifts the whole tolerance window up and drops
-    // a diacritic sitting at the bottom of it — the umlaut of "abzuschätzen"
-    // ends up stranded on a line of its own. Body text is the largest thing on
-    // a line, so it is what the line should be measured from.
+    // far. Anchoring to the row's *first* character instead is wrong: a row
+    // opened by something raised keeps measuring from that baseline instead
+    // of the body text's, which is the larger and more representative of the
+    // two. Only body text sets rows in this pass, so this can no longer be a
+    // raised footnote marker or a script — see the second pass instead.
     let mut anchor: Option<CharBox> = None;
 
     for (index, ch) in sorted {
-        let same_line = anchor.is_some_and(|a| {
-            let scale = a.font_size.max(ch.font_size).max(1.0);
-            // Symmetric: a raised exponent sorts above the line it belongs to
-            // and so becomes the anchor itself, which made a one-sided test
-            // compare the body text against the script instead.
-            let is_script = a.font_size.min(ch.font_size) < scale * SCRIPT_SIZE_RATIO;
-            let tolerance = if is_script {
-                SCRIPT_BASELINE_TOLERANCE
-            } else {
-                BASELINE_TOLERANCE
-            };
-            (a.y - ch.y).abs() <= scale * tolerance
-        });
-
+        if is_script_sized(&ch) {
+            scripts.push((index, ch));
+            continue;
+        }
+        let same_line = anchor.is_some_and(|a| baseline_tolerance_ok(&a, &ch));
         match rows.last_mut() {
             Some(row) if same_line => {
                 if ch.font_size > anchor.map(|a| a.font_size).unwrap_or(0.0) {
@@ -236,6 +305,61 @@ pub fn group_lines(chars: &[CharBox]) -> Vec<Line> {
                 rows.push(vec![(index, ch)]);
             }
         }
+    }
+
+    // A script-sized glyph joins whichever row it sits horizontally nearest
+    // to, not whichever row happened to be forming when it was scanned.
+    //
+    // A single running anchor cannot make this call correctly once a page has
+    // more than one tall thing near each other: a fraction's numerator sits
+    // on its own row, its own exponent one baseline-tolerance window above
+    // that, and a big operator (∮, a radical) can easily sit closer in `y` to
+    // that exponent than the exponent's own base character does — sorting the
+    // exponent onto the operator's row instead of its numerator's, purely
+    // because the operator was scanned first. Horizontal proximity is what a
+    // reader actually uses to tell whose exponent something is, so it decides
+    // here, gated by the same baseline-tolerance rule as everything else.
+    if rows.is_empty() {
+        // Nothing but scripts in the whole selection — a real document
+        // should not produce this, but give every glyph a row rather than
+        // silently dropping it.
+        rows = scripts.into_iter().map(|c| vec![c]).collect();
+    } else {
+        for (index, ch) in scripts {
+            let best_row = rows
+                .iter()
+                .enumerate()
+                .filter_map(|(row_index, row)| {
+                    let anchor = row.iter().max_by(|(_, a), (_, b)| {
+                        a.font_size.partial_cmp(&b.font_size).unwrap_or(std::cmp::Ordering::Equal)
+                    })?;
+                    let y_ok = baseline_tolerance_ok(&anchor.1, &ch)
+                        || fits_below_big_operator(row, &ch);
+                    y_ok.then(|| {
+                        let distance = row
+                            .iter()
+                            .map(|(_, c)| horizontal_gap(c, &ch))
+                            .fold(f32::INFINITY, f32::min);
+                        (row_index, distance)
+                    })
+                })
+                .min_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+
+            match best_row {
+                Some((row_index, _)) => rows[row_index].push((index, ch)),
+                // Nothing within baseline tolerance at all — its own row
+                // rather than a forced, wrong attachment.
+                None => rows.push(vec![(index, ch)]),
+            }
+        }
+        // The second pass appends by best match, not by position, so a script
+        // that opened its own new row may now sit out of top-to-bottom order.
+        rows.sort_by(|a, b| {
+            let y_of = |row: &[(usize, CharBox)]| {
+                row.iter().map(|(_, c)| c.y).fold(f32::MIN, f32::max)
+            };
+            y_of(b).partial_cmp(&y_of(a)).unwrap_or(std::cmp::Ordering::Equal)
+        });
     }
 
     merge_extensible_rows(&mut rows);
@@ -257,10 +381,17 @@ fn merge_extensible_rows(rows: &mut Vec<Vec<(usize, CharBox)>>) {
             .map(|(_, c)| c)
             .filter(|c| !c.ch.is_whitespace())
             .collect();
-        let extensible_only =
-            !printing.is_empty() && printing.iter().all(|c| c.family == Family::Extensible);
+        // Radicals specifically, not "any row that happens to be entirely
+        // Extensible glyphs" — a lone `∮` is also a one-character Extensible
+        // row, but it does not take the row beneath it as an argument the way
+        // a radical takes its radicand. Merging it in anyway corrupts the
+        // numerator it lands on: `to_latex` measures a region's baseline from
+        // the first full-size character in stream order, and `∮` is drawn
+        // before the numerator it now sits in front of, so every exponent in
+        // that numerator reads as a subscript instead.
+        let radical_only = !printing.is_empty() && printing.iter().all(|c| latex::is_radical(c));
 
-        if extensible_only {
+        if radical_only {
             let row = std::mem::take(&mut rows[index]);
             rows[index + 1].extend(row);
             rows.remove(index);

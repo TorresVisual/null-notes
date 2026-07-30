@@ -46,6 +46,15 @@ fn maths_italic() -> Style {
     }
 }
 
+/// A big extensible operator — ∮, a radical, ∑ — the face that can span
+/// several ordinary lines' worth of height.
+fn extensible() -> Style {
+    Style {
+        family: Family::Extensible,
+        ..Style::default()
+    }
+}
+
 /// Lays one line of text out at (x, y), returning its characters.
 fn set(text: &str, x: f32, y: f32, style: Style) -> Vec<CharBox> {
     let mut out = Vec::new();
@@ -530,6 +539,90 @@ fn an_enumeration_labels_closing_paren_does_not_leak_into_a_following_equation()
 
     assert!(markdown.contains("$C$"), "got: {markdown}");
     assert!(!markdown.contains(")$"), "closing paren leaked into the region: {markdown}");
+}
+
+// Found on a real sheet: a fraction's numerator sits on its own row, with its
+// own exponent one script-tolerance window above that — and a big operator (a
+// contour integral, ∮) drawn just to the left can easily sort closer in `y` to
+// that exponent than the exponent's own base character does. The old
+// sequential-anchor rule attached the exponent to whichever row was open when
+// it was scanned, which read "z2 + 5" as a bare "2" stuck to the operator
+// instead of "z^2 + 5".
+#[test]
+fn an_exponent_attaches_to_its_own_base_row_not_a_nearby_tall_symbol() {
+    // The big operator: tall, positioned to the left, well above the
+    // numerator's own baseline — the shape a display-style ∮ actually takes.
+    let mut oint = set("∮", 268.0, 676.24, extensible());
+    if let Some(c) = oint.first_mut() {
+        c.top = 676.72;
+        c.bottom = 649.68;
+    }
+    let mut chars = oint;
+    // The numerator base. Built in the order a real content stream draws it
+    // — the exponent immediately after "z", before "+ 5" — since build_line
+    // orders a row by stream position, not by x.
+    chars.extend(set("z", 296.78, 668.05, maths_italic()));
+    // The exponent: script-sized, positioned just above and right of "z",
+    // closer in y to the operator above than to "z" below it — the trap.
+    chars.push(CharBox {
+        ch: '2',
+        x: 302.75,
+        y: 672.39,
+        width: 4.23,
+        top: 676.0,
+        bottom: 670.0,
+        font_size: BODY * 0.7,
+        family: Family::Text,
+        ..chars[chars.len() - 1]
+    });
+    chars.extend(set("+", 310.14, 668.05, Style::default()));
+    chars.extend(set("5", 321.89, 668.05, Style::default()));
+
+    let markdown = chars_to_markdown(&chars);
+
+    assert!(markdown.contains("z^2"), "exponent lost its base: {markdown}");
+    assert!(!markdown.contains("∮^2") && !markdown.contains("oint}^2"), "got: {markdown}");
+}
+
+// The other half of the same real bug: the operator's *own* subscript sits at
+// the foot of its glyph, which for a tall symbol like ∮ is far below its own
+// baseline — well outside any tolerance scaled from a normal single-line
+// offset. It has to be found from the operator's own measured height instead.
+#[test]
+fn a_subscript_far_below_a_tall_operator_still_attaches_to_it() {
+    // Establishes BODY as the page's dominant size — a real page always has
+    // plenty of body text elsewhere; without it, a 2-character fixture has no
+    // way to tell body text from a script by count alone.
+    let mut chars = page(&["ordinary body text surrounding the equation"]);
+    let mut oint = set("∮", 268.33, 676.24, extensible());
+    if let Some(c) = oint.first_mut() {
+        c.top = 676.72;
+        c.bottom = 649.68;
+    }
+    chars.extend(oint);
+    chars.push(CharBox {
+        ch: 'C',
+        x: 274.97,
+        y: 649.17,
+        width: 4.49,
+        top: 655.15,
+        bottom: 647.62,
+        font_size: BODY * 0.7,
+        family: Family::Script,
+        ..chars[chars.len() - 1]
+    });
+
+    let lines = group_lines(&chars);
+
+    // The body-text paragraph is its own line; the operator and its subscript
+    // together are the second. Three would mean the subscript split off on
+    // its own instead of joining the operator's row.
+    assert_eq!(lines.len(), 2, "the subscript split off into its own line: {lines:?}");
+    assert!(
+        lines[1].content.iter().any(|i| matches!(i, Inline::Maths(s) if s.contains("mathcal{C}"))),
+        "subscript missing from the operator's line: {:?}",
+        lines[1].content
+    );
 }
 
 #[test]

@@ -206,7 +206,7 @@ fn brace(inner: &str) -> String {
     }
 }
 
-fn is_radical(ch: &CharBox) -> bool {
+pub(super) fn is_radical(ch: &CharBox) -> bool {
     // CMEX's radical is the glyph at 'p'; a Unicode maths font gives the real
     // character.
     ch.ch == '√' || (ch.family == Family::Extensible && matches!(ch.ch, 'p' | 'q' | 'r' | 's'))
