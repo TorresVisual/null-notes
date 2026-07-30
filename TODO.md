@@ -1,5 +1,10 @@
 # null-notes — TODO
 
+## Issues Discovered
+
+* [ ] Spellcheck for German
+* [ ] .assets folder is displayed in the app
+
 Feature checklist. **The [roadmap](docs/ROADMAP.md) holds the reasoning and the Definitions of Done; this file holds the boxes.** If the two disagree, the roadmap wins.
 
 Effort: **S** ≈ hours · **M** ≈ a day or two · **L** ≈ several days.
