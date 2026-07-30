@@ -205,6 +205,109 @@ body {
 .import-progress { font-size: 12px; color: var(--text-secondary); }
 .import-error { font-size: 12px; color: var(--danger); }
 
+/* ── HTML Typography Marks ─────────────────────────────────────── */
+.note-editor mark {
+  background: var(--accent-bg);
+  color: var(--accent);
+  border-radius: 2px;
+  padding: 0 2px;
+}
+
+.note-editor kbd {
+  display: inline-block;
+  font-family: 'Cascadia Code', 'Fira Code', monospace;
+  font-size: 0.8em;
+  line-height: 1.4;
+  padding: 1px 5px;
+  border: 1px solid var(--border-strong);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  background: var(--bg-hover);
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+/* Browser defaults for sub/sup shift the line-height; reset it */
+.note-editor sub,
+.note-editor sup {
+  font-size: 0.75em;
+  line-height: 0;
+  position: relative;
+  vertical-align: baseline;
+}
+.note-editor sup { top: -0.5em; }
+.note-editor sub { bottom: -0.25em; }
+
+.note-editor u { text-decoration: underline; text-underline-offset: 2px; }
+
+/* ── Details / Summary ─────────────────────────────────────────── */
+.details-wrapper {
+  border-left: 2px solid var(--border-strong);
+  border-radius: 0 4px 4px 0;
+  margin: 0.6em 0;
+  background: var(--bg-raised);
+}
+
+.details-summary {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 10px;
+  cursor: pointer;
+  user-select: none;
+  color: var(--text-secondary);
+  font-size: 0.9em;
+}
+.details-summary:hover { color: var(--text-primary); }
+
+.details-chevron {
+  flex-shrink: 0;
+  transition: transform 180ms ease;
+}
+.details-wrapper.open .details-chevron { transform: rotate(90deg); }
+
+.details-summary-input {
+  background: none;
+  border: none;
+  outline: none;
+  color: inherit;
+  font: inherit;
+  flex: 1;
+  cursor: text;
+}
+
+.details-body {
+  padding: 4px 10px 10px 24px;
+}
+
+/* ── Div Block ─────────────────────────────────────────────────── */
+.note-editor div[data-type="div-block"] {
+  margin: 0.6em 0;
+}
+
+/* ── Text Alignment ────────────────────────────────────────────── */
+.note-editor [style*="text-align: center"],
+.note-editor [align="center"] { text-align: center; }
+.note-editor [style*="text-align: right"],
+.note-editor [align="right"]  { text-align: right; }
+.note-editor [style*="text-align: justify"],
+.note-editor [align="justify"]{ text-align: justify; }
+
+/* ── Generic HTML Block & Inline Containers ────────────────────── */
+.html-block-container {
+  margin: 0.8em 0;
+  overflow-x: auto;
+}
+.html-block-container > div {
+  max-width: 100%;
+}
+
+/* SVG inside a block scales to fit */
+.html-block-container svg {
+  max-width: 100%;
+  height: auto;
+}
+
 /* Math blocks */
 .block-math {
   padding: 12px 0;

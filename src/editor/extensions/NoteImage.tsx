@@ -11,6 +11,8 @@ interface NoteImageAttrs {
   src: string
   alt: string | null
   title: string | null
+  width: number | null
+  height: number | null
 }
 
 function isExternal(src: string): boolean {
@@ -113,6 +115,20 @@ export const NoteImage = Node.create({
       },
       alt: { default: null },
       title: { default: null },
+      width: {
+        default: null,
+        parseHTML: (element: HTMLElement) => {
+          const w = element.getAttribute('width')
+          return w ? parseInt(w, 10) : null
+        },
+      },
+      height: {
+        default: null,
+        parseHTML: (element: HTMLElement) => {
+          const h = element.getAttribute('height')
+          return h ? parseInt(h, 10) : null
+        },
+      },
     }
   },
 
@@ -157,12 +173,23 @@ export const NoteImage = Node.create({
     return {
       markdown: {
         serialize(state: Record<string, unknown>, node: { attrs: NoteImageAttrs }) {
-          const { src, alt, title } = node.attrs
-          // esc reads its own options off the state, so it has to stay a
-          // method call — pulling it out as a bare function throws.
+          const { src, alt, title, width, height } = node.attrs
           const typed = state as unknown as {
             esc: (text: string) => string
             write: (text: string) => void
+          }
+          // When explicit dimensions are set, emit a raw HTML <img> tag so the
+          // width/height survive the round-trip (Markdown image syntax has no
+          // dimension fields).
+          if (width !== null || height !== null) {
+            const encodedSrc = encodeSrc(src)
+            const attrs = [`src="${encodedSrc}"`]
+            if (alt) attrs.push(`alt="${alt.replace(/"/g, '&quot;')}"`)
+            if (title) attrs.push(`title="${title.replace(/"/g, '&quot;')}"`)
+            if (width !== null) attrs.push(`width="${width}"`)
+            if (height !== null) attrs.push(`height="${height}"`)
+            typed.write(`<img ${attrs.join(' ')}>`)
+            return
           }
           const suffix = title ? ` "${title.replace(/"/g, '\\"')}"` : ''
           const destination = encodeSrc(src).replace(/[()]/g, '\\$&')

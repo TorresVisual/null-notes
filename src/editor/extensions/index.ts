@@ -24,6 +24,17 @@ import { Tag } from './Tag'
 import { NoteContext } from './NoteContext'
 import { SlashCommands } from './SlashCommands'
 import { CodeBlockEditor } from './CodeBlockEditor'
+import { Underline } from './Underline'
+import { Subscript } from './Subscript'
+import { Superscript } from './Superscript'
+import { Highlight } from './Highlight'
+import { Kbd } from './Kbd'
+import { SpanStyle } from './SpanStyle'
+import { HTMLInline } from './HTMLInline'
+import { HTMLBlock } from './HTMLBlock'
+import { DivBlock } from './DivBlock'
+import { Details } from './Details'
+import { TextAlignment } from './TextAlignment'
 
 const lowlight = createLowlight(common)
 
@@ -103,9 +114,9 @@ const TaskItemInLists = TaskItem.extend({
 })
 
 export const coreExtensions = [
-  // StarterKit 3 bundles its own Link; leaving it on registered the name twice
-  // and the app's own openOnClick/autolink config was the one that lost.
-  StarterKit.configure({ code: false, codeBlock: false, link: false }),
+  // StarterKit 3 bundles its own Link and Underline; leaving them on registers
+  // the name twice and the app's own config is the one that loses.
+  StarterKit.configure({ code: false, codeBlock: false, link: false, underline: false }),
   CodeWithRegexpRule.configure({ HTMLAttributes: NO_SPELLCHECK }),
   CodeBlockEditor.configure({ lowlight, HTMLAttributes: NO_SPELLCHECK }),
   Table.configure({ resizable: false }),
@@ -116,7 +127,7 @@ export const coreExtensions = [
   TaskItemInLists.configure({ nested: true }),
   Link.configure({ openOnClick: false, autolink: true }),
   Markdown.configure({
-    html: false,
+    html: true,
     transformPastedText: true,
     transformCopiedText: true,
   }),
@@ -133,4 +144,18 @@ export const coreExtensions = [
   Tag,
   NoteContext,
   SlashCommands,
+  // Typography marks
+  Underline,
+  Subscript,
+  Superscript,
+  Highlight,
+  Kbd,
+  SpanStyle,
+  // Generic HTML containers (must come after specific custom nodes so priority
+  // order allows Callout / Details / InlineMath to claim their tags first)
+  Details,
+  DivBlock,
+  HTMLBlock,
+  HTMLInline,
+  TextAlignment,
 ]
