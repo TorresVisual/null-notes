@@ -154,4 +154,55 @@ mod tests {
             );
         }
     }
+
+    #[test]
+    #[ignore]
+    fn dump_specific_chars() {
+        let pages = crate::pdf::extract::extract_pages(&pdf_or_skip!()).unwrap();
+        let all: Vec<_> = pages.iter().flat_map(|p| p.chars.iter()).collect();
+
+        // "wird jeweils" — find "wird" then show what follows, in char space
+        // throughout. A byte offset from str::find would misalign against a
+        // char index once any multi-byte German character appears earlier.
+        let chars: Vec<char> = all.iter().map(|c| c.ch).collect();
+        let text: String = chars.iter().collect();
+        if let Some(byte_idx) = text.find("wird") {
+            let idx = text[..byte_idx].chars().count();
+            let window: String = chars[idx..(idx + 12).min(chars.len())].iter().collect();
+            println!("AROUND 'wird': {window:?}");
+        }
+
+        // The oint/contour integral symbol — first char on the page after the heading.
+        println!("--- first 10 chars of first display equation on page 0 ---");
+        for c in pages[0].chars.iter().skip(50).take(15) {
+            println!("{:?} size={:.2} fam={:?}", c.ch, c.font_size, c.family);
+        }
+
+        // ß / ÿ
+        if let Some(byte_idx) = text.find('\u{ff}') {
+            let idx = text[..byte_idx].chars().count();
+            let start = idx.saturating_sub(5);
+            let window: String = chars[start..(idx + 5).min(chars.len())].iter().collect();
+            println!("AROUND ÿ: {window:?}");
+        } else {
+            println!("no ÿ found in extracted text");
+        }
+    }
+
+    #[test]
+    #[ignore]
+    fn dump_wird_geometry() {
+        let pages = crate::pdf::extract::extract_pages(&pdf_or_skip!()).unwrap();
+        let all: Vec<_> = pages.iter().flat_map(|p| p.chars.iter()).collect();
+        let chars: Vec<char> = all.iter().map(|c| c.ch).collect();
+        let text: String = chars.iter().collect();
+        let byte_idx = text.find("wird").unwrap();
+        let idx = text[..byte_idx].chars().count();
+        for c in &all[idx.saturating_sub(2)..(idx + 14).min(all.len())] {
+            println!(
+                "{:?} x={:8.3} y={:8.3} w={:6.3} size={:.2} fam={:?} preceded_by_maths_family={:?}",
+                c.ch, c.x, c.y, c.width, c.font_size, c.family, c.family
+            );
+        }
+    }
 }

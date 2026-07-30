@@ -124,6 +124,32 @@ fn synthesises_a_space_from_a_wide_cursor_jump() {
     assert_eq!(lines[0].text(), "hello world");
 }
 
+// Found on a real document: a generated space's own x can land inside the
+// following letter's advance box rather than between the two words it
+// separates. Sorting by that x then read "wird jeweils" as "wirdj eweils" —
+// the "j" sorted ahead of the space meant to precede it. Characters are
+// ordered by their position in the page's own extraction stream instead,
+// which pdfium never gets wrong regardless of what a synthetic glyph's own
+// coordinate says.
+#[test]
+fn a_space_with_a_misleading_x_still_lands_between_its_words() {
+    let mut chars = set("wird", 259.261, 627.256, Style::default());
+    // A real, zero-width space character, whose x sits inside where "j" is
+    // about to be drawn — this is what a synthetic space is not guaranteed
+    // to avoid.
+    chars.push(CharBox {
+        ch: ' ',
+        x: 285.251,
+        width: 0.0,
+        ..chars[0]
+    });
+    chars.extend(set("jeweils", 284.653, 627.256, Style::default()));
+
+    let lines = group_lines(&chars);
+
+    assert_eq!(lines[0].text(), "wird jeweils", "got: {:?}", lines[0].text());
+}
+
 #[test]
 fn does_not_invent_a_space_between_adjacent_glyphs() {
     let lines = group_lines(&set("adjacent", 72.0, 700.0, Style::default()));
@@ -316,12 +342,19 @@ fn a_standalone_accent_glyph_recomposes_with_its_letter() {
 // far enough to drop the umlaut of "abzuschätzen" onto a line of its own.
 #[test]
 fn a_raised_footnote_marker_does_not_push_a_diacritic_off_the_line() {
-    let mut chars = set("abzuschatzen", 111.7, 495.73, Style { size: 12.0, ..Style::default() });
-    chars.extend(set("1", 179.1, 500.0, Style { size: 8.0, ..Style::default() }));
+    // Built in plausible PDF stream order: a generator draws the accent right
+    // after the letter it sits over, not appended once the whole word (and
+    // whatever follows it) is done — confirmed against a real document, where
+    // the diaeresis for "Analysis" landed immediately after the letter it
+    // marks, not at the end of the run.
+    let body = Style { size: 12.0, ..Style::default() };
+    let mut chars = set("abzuscha", 111.7, 495.73, body);
     // The umlaut, at exactly the x of the second "a" it sits over — an accent
     // shares its letter's position rather than following it.
     let second_a = 111.7 + 7.0 * 12.0 * ADVANCE;
-    chars.extend(set("\u{00A8}", second_a, 495.26, Style { size: 12.0, ..Style::default() }));
+    chars.extend(set("\u{00A8}", second_a, 495.26, body));
+    chars.extend(set("tzen", 111.7 + 8.0 * 12.0 * ADVANCE, 495.73, body));
+    chars.extend(set("1", 179.1, 500.0, Style { size: 8.0, ..Style::default() }));
 
     let lines = group_lines(&chars);
 

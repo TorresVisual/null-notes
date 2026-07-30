@@ -186,15 +186,20 @@ pub fn group_lines(chars: &[CharBox]) -> Vec<Line> {
         return Vec::new();
     }
 
-    let mut sorted: Vec<CharBox> = chars.to_vec();
-    // Down the page first, then left to right within a line.
-    sorted.sort_by(|a, b| {
+    // Paired with its position in the caller's own array before anything else
+    // touches order. That position is what `build_line` sorts a row by, in
+    // place of raw `x` — see the note there for why.
+    let mut sorted: Vec<(usize, CharBox)> = chars.iter().copied().enumerate().collect();
+    // Down the page first, then left to right within a line. The x here only
+    // has to get characters into roughly the right row-local neighbourhood;
+    // final intra-row order is decided in build_line.
+    sorted.sort_by(|(_, a), (_, b)| {
         b.y.partial_cmp(&a.y)
             .unwrap_or(std::cmp::Ordering::Equal)
             .then(a.x.partial_cmp(&b.x).unwrap_or(std::cmp::Ordering::Equal))
     });
 
-    let mut rows: Vec<Vec<CharBox>> = Vec::new();
+    let mut rows: Vec<Vec<(usize, CharBox)>> = Vec::new();
     // The row's reference baseline, taken from the largest character in it so
     // far. Anchoring to the row's *first* character instead is wrong twice
     // over: a row opened by a raised footnote marker keeps measuring from that
@@ -204,7 +209,7 @@ pub fn group_lines(chars: &[CharBox]) -> Vec<Line> {
     // a line, so it is what the line should be measured from.
     let mut anchor: Option<CharBox> = None;
 
-    for ch in sorted {
+    for (index, ch) in sorted {
         let same_line = anchor.is_some_and(|a| {
             let scale = a.font_size.max(ch.font_size).max(1.0);
             // Symmetric: a raised exponent sorts above the line it belongs to
@@ -224,11 +229,11 @@ pub fn group_lines(chars: &[CharBox]) -> Vec<Line> {
                 if ch.font_size > anchor.map(|a| a.font_size).unwrap_or(0.0) {
                     anchor = Some(ch);
                 }
-                row.push(ch);
+                row.push((index, ch));
             }
             _ => {
                 anchor = Some(ch);
-                rows.push(vec![ch]);
+                rows.push(vec![(index, ch)]);
             }
         }
     }
@@ -244,11 +249,12 @@ pub fn group_lines(chars: &[CharBox]) -> Vec<Line> {
 /// holding the radicand. Left apart, the radical has no radicand to take and
 /// renders as an empty `\sqrt{}` next to a stray expression. Merged, the two sit
 /// in one row where the radical precedes its contents in reading order.
-fn merge_extensible_rows(rows: &mut Vec<Vec<CharBox>>) {
+fn merge_extensible_rows(rows: &mut Vec<Vec<(usize, CharBox)>>) {
     let mut index = 0;
     while index + 1 < rows.len() {
         let printing: Vec<&CharBox> = rows[index]
             .iter()
+            .map(|(_, c)| c)
             .filter(|c| !c.ch.is_whitespace())
             .collect();
         let extensible_only =
@@ -264,20 +270,17 @@ fn merge_extensible_rows(rows: &mut Vec<Vec<CharBox>>) {
     }
 }
 
-fn build_line(mut row: Vec<CharBox>) -> Line {
-    row.sort_by(|a, b| {
-        a.x.partial_cmp(&b.x)
-            .unwrap_or(std::cmp::Ordering::Equal)
-            // An accent is placed at its letter's own x, so the two tie. It has
-            // to land after the letter to combine with it, and which side of
-            // the tie it fell on was otherwise decided by the order pdfium
-            // happened to emit them in.
-            .then_with(|| {
-                combining_form(a.ch)
-                    .is_some()
-                    .cmp(&combining_form(b.ch).is_some())
-            })
-    });
+fn build_line(mut row: Vec<(usize, CharBox)>) -> Line {
+    // Ordered by position in the page's own extraction stream, not by `x`.
+    // `x` is right for everything geometric — gaps, scripts, region bounds —
+    // but a PDF can hand back a generated space (or any other synthetic
+    // filler) with a coordinate that makes no visual sense: found on a real
+    // document where a word-gap space's x landed *inside* the following
+    // letter's advance box, so an x-sort read "wird jeweils" as "wirdj
+    // eweils". The stream position pdfium emitted it at never lies, because
+    // it reflects the order the content was actually authored in.
+    row.sort_by_key(|(index, _)| *index);
+    let row: Vec<CharBox> = row.into_iter().map(|(_, c)| c).collect();
 
     let mut sizes: Vec<f32> = row.iter().map(|c| c.font_size).collect();
     let font_size = median(&mut sizes);
