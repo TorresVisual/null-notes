@@ -70,6 +70,12 @@ pub struct Span {
 pub struct Line {
     pub content: Vec<Inline>,
     pub x: f32,
+    /// Right edge of the line's own characters — `x` marks the left. Fraction
+    /// detection needs both: a numerator and denominator are recognised by
+    /// their horizontal *ranges* overlapping, not merely by a shared left
+    /// edge, and unrelated trailing content (`dz` beside a fraction) is
+    /// recognised by *not* overlapping either.
+    pub right: f32,
     pub y: f32,
     pub font_size: f32,
     pub fixed_pitch: bool,
@@ -519,8 +525,14 @@ fn build_line(mut row: Vec<(usize, CharBox)>) -> Line {
             Inline::Maths(_) => true,
         });
 
+    let right = row
+        .iter()
+        .map(|c| c.x + c.width)
+        .fold(f32::MIN, f32::max);
+
     Line {
         x: row.first().map(|c| c.x).unwrap_or_default(),
+        right,
         y: row.first().map(|c| c.y).unwrap_or_default(),
         content,
         font_size,
@@ -625,14 +637,35 @@ fn maths_runs(row: &[CharBox], font_size: f32) -> Vec<(usize, usize)> {
         }
     }
 
-    // Growing outward can make neighbouring regions meet.
+    // Growing outward can make neighbouring regions meet — but "meet" has to
+    // mean physically adjacent, not merely index-adjacent. Two regions whose
+    // own growth independently stopped at consecutive indices can still sit
+    // far apart on the page, because that is *why* growth stopped where it
+    // did: the gap between them was too wide to bridge. A baseline row on
+    // either side of a fraction takes exactly this shape — "f(z) =" and "."
+    // land on consecutive indices with nothing between them on this row at
+    // all, because the numerator and denominator sit on different rows
+    // entirely, 100pt away. Treating index-adjacency alone as "meet" merged
+    // them into one region spanning the empty column where the fraction
+    // itself belongs.
     runs.dedup_by(|later, earlier| {
-        if later.0 <= earlier.1 {
+        if later.0 < earlier.1 {
+            // Genuine index overlap, not merely adjacency — always merge.
             earlier.1 = earlier.1.max(later.1);
-            true
-        } else {
-            false
+            return true;
         }
+        if later.0 > earlier.1 {
+            return false;
+        }
+        // Consecutive array indices with nothing between them — which says
+        // nothing about the page distance between the characters on either
+        // side. That's the check that actually decides "meet".
+        let last = &row[earlier.1 - 1];
+        let touches = row[later.0].x - (last.x + last.width) <= em;
+        if touches {
+            earlier.1 = earlier.1.max(later.1);
+        }
+        touches
     });
 
     runs

@@ -477,6 +477,31 @@ fn a_region_bridges_body_font_characters_inside_an_equation() {
     assert_eq!(regions.len(), 1, "expected one region, got {:?}", lines[0].content);
 }
 
+// Found on a real sheet: growing outward can leave two regions at
+// *consecutive array indices* with nothing between them — but that says
+// nothing about the actual page distance between the characters on either
+// side. "f(z) =" and "." are ~100pt apart on a baseline that has nothing in
+// between at all, because a fraction's numerator and denominator sit on
+// entirely different rows — yet index-adjacency alone was merging them into
+// one region spanning that empty column, corrupting exactly the seam a
+// fraction later needs to splice into.
+#[test]
+fn regions_separated_by_a_wide_gap_do_not_merge_just_because_nothing_sits_between_them() {
+    let mut chars = set("f(z) =", 200.0, 700.0, maths_italic());
+    // Far to the right — nothing else on this row at all, the shape a
+    // baseline takes when its fraction lives on other rows entirely.
+    chars.extend(set(".", 300.0, 700.0, maths_italic()));
+
+    let lines = group_lines(&chars);
+
+    let regions: Vec<_> = lines[0]
+        .content
+        .iter()
+        .filter(|i| matches!(i, Inline::Maths(_)))
+        .collect();
+    assert_eq!(regions.len(), 2, "wide gap merged into one region: {:?}", lines[0].content);
+}
+
 #[test]
 fn prose_far_from_an_equation_is_not_swallowed_into_it() {
     let mut chars = set("x", 72.0, 700.0, maths());
