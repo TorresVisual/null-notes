@@ -50,16 +50,18 @@ Both import modes, chosen at import time, the way Notion does it. **No OCR** —
 > `pdf/layout.rs` takes plain `CharBox` values, **not** pdfium types — that's what makes it testable on a machine with no pdfium. `pdf/extract.rs` is the thin translation layer and holds no decisions. Since verified against a real Analysis sheet, which exposed four bugs synthetic fixtures could not.
 
 ### P4-2 Honest degradation — **M** ✅
-- [x] Detect maths-font runs and crop those regions from the rendered page as inline images, rather than emitting mangled glyph text *(reuses P2-3's `NoteName.assets/` sidecar)*
+- [x] Detect maths-font runs and **rebuild them as LaTeX** (`$…$` / `$$…$$`) rather than emitting mangled glyph text
 - [x] Detect a near-empty text layer (scanned PDF) *before* converting — landed early in P4-1, since it was five lines and P4-1 must not write a garbage note
 - [x] **Offer** Pages mode, not just name it — a button, not only a message
 - [x] Never produce a garbled or empty note
 
-> **Only symbol faces seed a crop.** `CMSY`/`CMEX`/`MSAM`/`MSBM` hold what text can't say (`→`, `√`, blackboard bold); `CMMI` is the maths *italic alphabet*, so a lone `f` stays italic text rather than becoming a postage-stamp image. Regions then grow outward over non-letters, because Computer Modern takes digits, parens and `=` from the **body** font — without that, `T3(x, y)` lost its bracket.
+> **Shipped as image crops first, replaced with LaTeX the same day.** Crops were visually exact but fail the actual use case — pasting a converted sheet into an LLM prompt needs *text*, not an image, and an image never renders through the editor's own KaTeX nodes either. `pdf/maths.rs` now classifies *which* maths face a glyph came from (`CMMI` variable, `CMSY` relation, `MSBM` blackboard bold, …); `pdf/latex.rs` turns face + geometry into LaTeX. Four real bugs along the way: a radical sits on its own baseline above its radicand and has to be row-merged before its region forms; the subscript-vs-superscript offset threshold was sized for exponents and silently ate every subscript (`T_3` read as `T3`); a maths region bypasses `layout.rs`'s own space synthesis entirely and needed its own; a footnote marker is geometrically identical to a real exponent except that it follows terminal punctuation, which is now the signal that stops it bleeding in.
 >
-> Verified by rendering the crops and looking at them: `f : ℝ² → ℝ`, `√(x² + y²)`, `(x₀, y₀) = (3, 4)` all visually exact.
+> Verified against the real Analysis sheet: `$f : \mathbb{R}^2 \to \mathbb{R}$`, `$$f(x, y) = \sqrt{x^2 + y^2}.$$`, `$T_3(x, y)$`.
 >
-> **Known limitation:** a word hyphenated across a line break rejoins with a space (`Entwicklungsstel le`). The text layer has no hyphen and pdfium's line marker appears at every visual line end regardless, so nothing distinguishes a wrapped word from two words. Needs a dictionary; deliberately left alone.
+> **Known and out of scope:** multi-line vector/matrix notation (gradient · stacked column, a Hessian) has no single-baseline representation and comes out as glyph-order text, not valid LaTeX — a structurally different problem, not a tuning gap. `throwOnError: false` contains the failure to that one equation.
+>
+> **Hyphenation, fixed separately (not by P4-2):** a word broken across a line was rejoining with a space (`Entwicklungsstel le`). pdfium reports the discretionary hyphen as `U+0002` with `is_hyphen()` set — the synthetic-character filter was dropping it as a control character, discarding the only record that the two halves are one word.
 
 ### P4-3 Exercise splitting & solution scaffold — **M**
 - [ ] Split on exercise headings (`Aufgabe N`, `Task N`, `Exercise N`, `Problem N`, `N.`) into `## Task N` + `### Solution` pairs
