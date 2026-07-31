@@ -1110,5 +1110,183 @@ pub fn blocks_to_markdown(blocks: &[Block]) -> String {
 
 /// The whole pipeline: characters in, Markdown out.
 pub fn chars_to_markdown(chars: &[CharBox]) -> String {
-    blocks_to_markdown(&group_blocks(&group_lines(chars)))
+    blocks_to_markdown(&group_blocks(&reconstruct_fractions(group_lines(chars))))
+}
+
+// How far apart (in multiples of the larger line's font size) two maths-only
+// lines can sit and still be considered a numerator/denominator pair, rather
+// than two unrelated equations that happen to be nearby.
+const FRACTION_MAX_ROW_GAP: f32 = 4.0;
+// How much of the narrower line's width the two must share to count as
+// "stacked on the same column" rather than merely nearby.
+const FRACTION_MIN_OVERLAP_RATIO: f32 = 0.3;
+
+fn range_overlap(a0: f32, a1: f32, b0: f32, b1: f32) -> f32 {
+    (a1.min(b1) - a0.max(b0)).max(0.0)
+}
+
+/// A display-maths line's content, flattened to one LaTeX string. Meant only
+/// for lines that are already [`Line::is_display_maths`] — anything that
+/// isn't maths on such a line is whitespace by definition, so dropping the
+/// `Text` pieces loses nothing.
+fn combined_maths_latex(line: &Line) -> String {
+    line.content
+        .iter()
+        .filter_map(|i| match i {
+            Inline::Maths(s) => Some(s.as_str()),
+            Inline::Text(_) => None,
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+/// A line that is a *single*, unbroken maths region — the shape a genuine
+/// numerator or denominator takes. `is_display_maths` alone is not enough: a
+/// baseline row like `f(z) = ... .` also reads as maths-only once its own
+/// prefix and suffix are each their own region, and pairing it against the
+/// numerator as if *it* were the denominator was exactly the wrong match this
+/// was found producing.
+fn is_single_region(line: &Line) -> bool {
+    matches!(line.content.as_slice(), [Inline::Maths(_)])
+}
+
+/// The closest vertically-stacked, horizontally-overlapping pair of
+/// single-region maths lines still left to reconstruct, read as (numerator
+/// index, denominator index).
+///
+/// Pairing is scoped to one paragraph: without that, a generous vertical
+/// window meant to span a fraction's own numerator/baseline/denominator rows
+/// just as easily reaches across an actual paragraph break to the *next*
+/// exercise's own equation, pairing unrelated content — found happening
+/// exactly that way on the real document this was built against.
+fn find_fraction_pair(lines: &[Line]) -> Option<(usize, usize)> {
+    let mut gaps: Vec<f32> = lines
+        .windows(2)
+        .map(|w| (w[0].y - w[1].y).abs())
+        .collect();
+    let typical_gap = median(&mut gaps);
+
+    let mut best: Option<(usize, usize, f32)> = None;
+    for i in 0..lines.len() {
+        if !is_single_region(&lines[i]) {
+            continue;
+        }
+        for j in (i + 1)..lines.len() {
+            if !is_single_region(&lines[j]) {
+                continue;
+            }
+            let gap = lines[i].y - lines[j].y;
+            if gap <= 0.0 {
+                continue;
+            }
+            let body = lines[i].font_size.max(lines[j].font_size).max(1.0);
+            if gap > body * FRACTION_MAX_ROW_GAP {
+                continue;
+            }
+            let crosses_a_paragraph_break = (i..j).any(|k| {
+                typical_gap > 0.0
+                    && (lines[k].y - lines[k + 1].y).abs() > typical_gap * BLOCK_GAP_RATIO
+            });
+            if crosses_a_paragraph_break {
+                continue;
+            }
+            let overlap = range_overlap(lines[i].x, lines[i].right, lines[j].x, lines[j].right);
+            let min_width = (lines[i].right - lines[i].x)
+                .min(lines[j].right - lines[j].x)
+                .max(1.0);
+            if overlap < min_width * FRACTION_MIN_OVERLAP_RATIO {
+                continue;
+            }
+            if best.is_none_or(|(_, _, best_gap)| gap < best_gap) {
+                best = Some((i, j, gap));
+            }
+        }
+    }
+    best.map(|(i, j, _)| (i, j))
+}
+
+/// Inserts `frac` into a baseline line's own content, at the gap that its
+/// numerator and denominator were found to leave — see [`reconstruct_fractions`].
+///
+/// Best-effort rather than exact: a baseline's `Vec<Inline>` carries no
+/// per-piece position, only the order pieces were assembled in, so the split
+/// point is inferred as "just before whatever comes last" — right for the
+/// common shape (`prefix = \frac{}{} suffix`, one trailing piece like a
+/// period or nothing) and not guaranteed for a baseline with several
+/// fractions or several trailing pieces of its own.
+fn splice_into_baseline(line: &mut Line, frac: Inline) {
+    // Before the last piece when there's more than one (prefix, ..., suffix —
+    // insert ahead of the suffix); appended when there's nothing to split
+    // ("R =" with nothing trailing at all).
+    let insert_at = if line.content.len() > 1 {
+        line.content.len() - 1
+    } else {
+        line.content.len()
+    };
+    line.content.insert(insert_at, frac);
+}
+
+/// Reconstructs a bar-less fraction: the vinculum LaTeX draws between a
+/// numerator and denominator is a graphics path, not a character, so it is
+/// invisible to the text layer and the two arrive as separate lines with
+/// nothing connecting them. Detected by geometry alone — vertical stacking
+/// and horizontal column overlap between two otherwise-unrelated maths-only
+/// lines — and spliced into whichever baseline row (if any) straddles them.
+///
+/// Best-effort in the same spirit as `RADICAL_TAKES_REST`: a fully general
+/// reconstruction needs the drawn vinculum itself, which this pipeline does
+/// not read. With no baseline row present at all — an operator sitting
+/// directly above the fraction, trailing content like `dz` beside it —
+/// surrounding lines are ordered by which side of the fraction's own column
+/// they fall on rather than spliced into a specific gap.
+fn reconstruct_fractions(mut lines: Vec<Line>) -> Vec<Line> {
+    while let Some((num_i, den_i)) = find_fraction_pair(&lines) {
+        let frac = Inline::Maths(format!(
+            "\\frac{{{}}}{{{}}}",
+            combined_maths_latex(&lines[num_i]).trim(),
+            combined_maths_latex(&lines[den_i]).trim(),
+        ));
+        let frac_x0 = lines[num_i].x.min(lines[den_i].x);
+
+        // A baseline straddles the fraction: it starts before the fraction's
+        // own column, with a prefix like "f(z) =" leading into it. Trailing
+        // content that merely sits a little to the right of the fraction —
+        // "dz" beside it, never in front of it — can extend past the
+        // fraction's own right edge on its own, but never *starts* before
+        // frac_x0, which is what actually distinguishes "wraps around the
+        // fraction" from "sits beside it".
+        let baseline = (num_i + 1..den_i).find(|&k| lines[k].x < frac_x0 - 1.0);
+
+        if let Some(k) = baseline {
+            splice_into_baseline(&mut lines[k], frac);
+            let mut remove: Vec<usize> = (num_i..=den_i).filter(|&i| i != k).collect();
+            remove.sort_unstable_by(|a, b| b.cmp(a));
+            for i in remove {
+                lines.remove(i);
+            }
+        } else {
+            // No baseline: anything else between the pair sits beside the
+            // fraction rather than around it — ordered by which side of the
+            // fraction's own column it falls on.
+            let mut prefix: Vec<Inline> = Vec::new();
+            let mut suffix: Vec<Inline> = Vec::new();
+            for between in &lines[(num_i + 1)..den_i] {
+                if between.right <= frac_x0 {
+                    prefix.extend(between.content.clone());
+                } else {
+                    suffix.extend(between.content.clone());
+                }
+            }
+            let mut content = prefix;
+            content.push(frac);
+            content.extend(suffix);
+
+            let replacement = Line {
+                content,
+                ..lines[den_i].clone()
+            };
+            lines.splice(num_i..=den_i, std::iter::once(replacement));
+        }
+    }
+    lines
 }

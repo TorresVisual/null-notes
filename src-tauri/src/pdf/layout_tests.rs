@@ -650,6 +650,72 @@ fn a_subscript_far_below_a_tall_operator_still_attaches_to_it() {
     );
 }
 
+// LaTeX's fraction bar is a drawn rule, invisible to the text layer, so a
+// numerator and denominator arrive as separate lines with nothing connecting
+// them. Found on a real sheet and reconstructed from geometry alone: vertical
+// stacking plus horizontal column overlap between two single-region maths
+// lines.
+#[test]
+fn a_numerator_and_denominator_on_separate_lines_become_one_fraction() {
+    let mut chars = set("a + b", 300.0, 700.0, maths_italic());
+    chars.extend(set("c + d", 300.0, 680.0, maths_italic()));
+
+    let markdown = chars_to_markdown(&chars);
+
+    assert!(markdown.contains(r"\frac{a + b}{c + d}"), "got: {markdown}");
+}
+
+// Trailing content beside a fraction ("dz" after an integral) sits close to
+// the fraction's own column and can extend past its right edge — but it
+// never *starts* before the fraction the way a real baseline prefix
+// ("f(z) =") does. Found reversed on a real sheet: "dz" was landing before
+// the fraction instead of after it, because the first version of this check
+// treated "extends past either edge" as evidence of being a baseline,
+// when only "starts before the left edge" actually is.
+#[test]
+fn trailing_content_beside_a_fraction_stays_after_it_not_before() {
+    let mut chars = set("a + b", 300.0, 700.0, maths_italic());
+    // Sits mostly to the right of the fraction's own column, its right edge
+    // extending a little past it — the shape "dz" takes beside a fraction.
+    chars.extend(set("dz", 340.0, 690.0, maths_italic()));
+    chars.extend(set("c + d", 300.0, 680.0, maths_italic()));
+
+    let markdown = chars_to_markdown(&chars);
+
+    assert!(markdown.contains(r"\frac{a + b}{c + d} dz"), "got: {markdown}");
+}
+
+// The baseline-splitting pattern in `regions_separated_by_a_wide_gap_...`
+// above ("f(z) =" and "." as two regions on one line) also makes that line
+// read as `is_display_maths` — all its non-maths content is whitespace. That
+// alone is not enough to rule it out as a fraction's other half: found on a
+// real sheet pairing a numerator with this baseline instead of the real
+// denominator below it, since the baseline sat closer in `y`. A genuine
+// numerator or denominator is a *single* unbroken region; a baseline like
+// this is not, and that is the distinction that has to decide it.
+#[test]
+fn a_baseline_shaped_line_is_never_mistaken_for_the_other_half_of_a_fraction() {
+    // Ordinary paragraph text elsewhere, so the paragraph-break check that
+    // scopes fraction pairing to one paragraph has more than two gaps to
+    // measure a "normal" line spacing from — with only the three lines of
+    // the fraction itself, a median of two samples is unstable and the check
+    // misfires on this fixture in a way a real page never gives it the
+    // chance to.
+    let mut chars = page_at(900.0, &["ordinary paragraph text", "with a normal line spacing"]);
+    chars.extend(set("a + b", 300.0, 700.0, maths_italic()));
+    // Closer to the numerator than the real denominator is, and — because of
+    // the wide gap between "f(z) =" and "." — reads as is_display_maths, the
+    // same as a genuine numerator or denominator would.
+    chars.extend(set("f(z) =", 250.0, 693.0, maths_italic()));
+    chars.extend(set(".", 340.0, 693.0, maths_italic()));
+    chars.extend(set("c + d", 300.0, 680.0, maths_italic()));
+
+    let markdown = chars_to_markdown(&chars);
+
+    assert!(markdown.contains(r"\frac{a + b}{c + d}"), "got: {markdown}");
+    assert!(!markdown.contains(r"\frac{a + b}{f(z) ="), "paired with the baseline instead: {markdown}");
+}
+
 #[test]
 fn an_empty_page_produces_an_empty_document() {
     assert_eq!(chars_to_markdown(&[]), "");
