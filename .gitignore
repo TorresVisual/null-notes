@@ -36,3 +36,6 @@ src-tauri/pix2tex-venv/
 
 # Brainstorming visual companion mockups
 .superpowers/
+
+# Added by Null IDE Auto-Gitignore
+.claude/
