@@ -1217,3 +1217,46 @@ fn consecutive_table_row_lines_merge_into_one_table_block() {
     assert_eq!(rows.len(), 2);
     assert_eq!(rows[0].len(), 2);
 }
+
+#[test]
+fn a_simple_table_renders_as_gfm() {
+    let mut chars = set("ID", 72.0, 700.0, Style::default());
+    chars.extend(set("Name", 100.0, 700.0, Style::default()));
+    chars.extend(set("1", 72.0, 688.0, Style::default()));
+    chars.extend(set("Alice", 100.0, 688.0, Style::default()));
+    chars.extend(set("2", 72.0, 676.0, Style::default()));
+    chars.extend(set("Bob", 100.0, 676.0, Style::default()));
+
+    let markdown = chars_to_markdown(&chars);
+
+    assert_eq!(
+        markdown.trim_end(),
+        "| ID | Name |\n| --- | --- |\n| 1 | Alice |\n| 2 | Bob |"
+    );
+}
+
+#[test]
+fn a_wrapped_cell_produces_one_clean_data_row() {
+    let mut chars = set("Component", 72.0, 700.0, Style::default());
+    chars.extend(set("Description", 150.0, 700.0, Style::default()));
+    chars.extend(set("Owner", 430.0, 700.0, Style::default()));
+    chars.extend(set("Core", 72.0, 688.0, Style::default()));
+    chars.extend(set("Handles extraction of text", 150.0, 688.0, Style::default()));
+    chars.extend(set("A", 430.0, 688.0, Style::default()));
+    chars.extend(set("and more here", 150.0, 676.0, Style::default()));
+
+    let markdown = chars_to_markdown(&chars);
+
+    assert_eq!(
+        markdown.trim_end(),
+        "| Component | Description | Owner |\n\
+         | --- | --- | --- |\n\
+         | Core | Handles extraction of text and more here | A |"
+    );
+}
+
+#[test]
+fn a_literal_pipe_in_a_cell_is_escaped() {
+    assert_eq!(escape_table_cell("a | b"), "a \\| b");
+    assert_eq!(escape_table_cell("no pipes here"), "no pipes here");
+}
