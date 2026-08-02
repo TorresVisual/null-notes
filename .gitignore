@@ -39,3 +39,4 @@ src-tauri/pix2tex-venv/
 
 # Added by Null IDE Auto-Gitignore
 .claude/
+.playwright-mcp/
