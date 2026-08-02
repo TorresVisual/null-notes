@@ -181,6 +181,21 @@ fn a_baseline_with_no_label_still_reads_its_connectors() {
     assert_eq!(baseline_label(&row), "");
 }
 
+// Found on Analysis_1_Blatt2_2025.pdf: pdfium places the "+" right after
+// "(b)" with a cursor jump and no actual space character in between — so a
+// row built with no literal whitespace glyph between ")" and its content
+// still has to produce a label ending in exactly one space. `list_marker`'s
+// own length calculation always counts the separator after an enumeration
+// label as exactly one character, so `baseline_label` disagreeing with that
+// by even one character shifts `strip_leading_chars` into eating the start
+// of whatever comes right after the label.
+#[test]
+fn a_label_with_no_literal_space_before_its_content_still_gets_one() {
+    let mut row = set("(b)", 90.0, 590.0, Style::default());
+    row.extend(set("+", 101.3, 590.0, maths())); // no space CharBox at all
+    assert_eq!(baseline_label(&row), "(b) ");
+}
+
 #[test]
 fn a_row_with_only_a_trailing_period_is_not_a_connector_baseline() {
     // The shape a single (already-handled) fraction's baseline takes:

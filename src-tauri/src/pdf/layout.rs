@@ -385,19 +385,28 @@ pub(super) fn connector_baseline(row: &[CharBox]) -> Option<(Vec<char>, bool)> {
     (!connectors.is_empty()).then_some((connectors, trailing_period))
 }
 
-/// The leading enumeration label on a connector baseline — `"(b) "` — read
-/// straight off the row's own characters (including whatever whitespace
-/// follows the `)`) so the reconstructed line keeps the source's own
-/// spacing. Empty when the row opens with no such label.
+/// The leading enumeration label on a connector baseline — `"(b) "`. Empty
+/// when the row opens with no such label.
+///
+/// Always ends in exactly one space, synthesized rather than read off the
+/// row's own characters: PDFs frequently place the next glyph with a cursor
+/// jump instead of an actual space character (confirmed on this exact
+/// document — nothing but a cursor advance sits between `)` and the `+`
+/// that follows it), and `list_marker`'s own `len` calculation always
+/// counts the separator after an enumeration label as exactly one
+/// character. Any literal whitespace `CharBox`es already present are
+/// skipped rather than kept, so the two stay in agreement regardless of
+/// what the source actually contained.
 pub(super) fn baseline_label(row: &[CharBox]) -> String {
-    let mut sorted: Vec<CharBox> = row.iter().copied().collect();
+    let mut sorted: Vec<CharBox> = row.to_vec();
     sorted.sort_by(|a, b| a.x.partial_cmp(&b.x).unwrap_or(std::cmp::Ordering::Equal));
 
     let Some(paren) = sorted.iter().position(|c| c.ch == ')') else {
         return String::new();
     };
-    let trailing_space = sorted[paren + 1..].iter().take_while(|c| c.ch.is_whitespace()).count();
-    sorted[..=paren + trailing_space].iter().map(|c| c.ch).collect()
+    let mut label: String = sorted[..=paren].iter().map(|c| c.ch).collect();
+    label.push(' ');
+    label
 }
 
 /// Finds and reconstructs a "sum of stacked fractions" — several fractions
