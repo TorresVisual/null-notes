@@ -5,6 +5,7 @@
 //! [`layout`](super::layout) reasons about. All the judgement lives there,
 //! where it can be tested without the native library.
 
+use super::columns;
 use super::layout::{self, CharBox};
 use anyhow::Result;
 use std::path::Path;
@@ -53,9 +54,11 @@ impl ExtractedPage {
 pub fn pages_to_markdown(pages: &[ExtractedPage]) -> String {
     let mut chunks: Vec<String> = Vec::new();
     for page in pages {
-        let markdown = layout::chars_to_markdown(&page.chars);
-        if !markdown.trim().is_empty() {
-            chunks.push(markdown.trim_end().to_string());
+        for region in columns::segment_regions(&page.chars) {
+            let markdown = layout::chars_to_markdown(&region);
+            if !markdown.trim().is_empty() {
+                chunks.push(markdown.trim_end().to_string());
+            }
         }
     }
     let mut out = chunks.join("\n\n");
