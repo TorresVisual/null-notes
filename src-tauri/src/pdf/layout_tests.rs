@@ -1200,3 +1200,20 @@ fn two_rows_with_no_shared_gutter_produce_no_table_row_lines() {
         .iter()
         .all(|l| !matches!(l.content.as_slice(), [Inline::TableRow(_)])));
 }
+
+#[test]
+fn consecutive_table_row_lines_merge_into_one_table_block() {
+    let mut chars = set("ID", 72.0, 700.0, Style::default());
+    chars.extend(set("Name", 100.0, 700.0, Style::default()));
+    chars.extend(set("1", 72.0, 688.0, Style::default()));
+    chars.extend(set("Alice", 100.0, 688.0, Style::default()));
+
+    let blocks = group_blocks(&group_lines(&chars));
+
+    assert_eq!(blocks.len(), 1);
+    let Block::Table { rows } = &blocks[0] else {
+        panic!("expected a single Block::Table, got {:?}", blocks[0]);
+    };
+    assert_eq!(rows.len(), 2);
+    assert_eq!(rows[0].len(), 2);
+}

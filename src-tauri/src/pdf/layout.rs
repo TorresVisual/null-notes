@@ -1662,9 +1662,16 @@ enum LineKind {
     Heading(u8),
     List(bool, usize),
     MathsDisplay,
+    Table,
 }
 
 fn classify(line: &Line, body: f32, left_margin: f32) -> LineKind {
+    // Checked before everything else, for the same reason as the
+    // display-maths check just below: a table row's own font size or
+    // leading whitespace could otherwise misread as a heading or list.
+    if matches!(line.content.as_slice(), [Inline::TableRow(_)]) {
+        return LineKind::Table;
+    }
     // Checked before everything else: a display equation is centred and set in
     // maths fonts, so heading and list detection would both misread it.
     if line.is_display_maths {
@@ -1792,6 +1799,19 @@ fn finish_block(lines: &[&Line], kind: LineKind) -> Block {
         }
         LineKind::Prose => Block::Paragraph {
             content: join_lines(lines),
+        },
+        // Every line here was classified `Table` by `classify`, so its
+        // content is always `[Inline::TableRow(cells)]` by construction —
+        // `filter_map` rather than an unwrap/panic if that invariant is
+        // ever violated, per CLAUDE.md.
+        LineKind::Table => Block::Table {
+            rows: lines
+                .iter()
+                .filter_map(|l| match l.content.as_slice() {
+                    [Inline::TableRow(cells)] => Some(cells.clone()),
+                    _ => None,
+                })
+                .collect(),
         },
     }
 }
