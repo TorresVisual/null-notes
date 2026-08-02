@@ -316,12 +316,16 @@ body {
   user-select: none;
 }
 
+.block-math .katex { font-size: 4em; }
+
 /* inline-block + relative so the editor popover has something to anchor to */
 .inline-math {
   display: inline-block;
   position: relative;
   user-select: none;
 }
+
+.inline-math .katex { font-size: 1.15em; }
 
 .inline-math-render { cursor: pointer; border-radius: 3px; padding: 0 1px; }
 .inline-math-render:hover { background: var(--accent-bg); }
@@ -366,6 +370,8 @@ body {
   overflow-x: auto;
   color: var(--text-primary);
 }
+
+.math-editor-preview .katex { font-size: 1.15em; }
 
 .math-editor-error {
   font-size: 11px;
