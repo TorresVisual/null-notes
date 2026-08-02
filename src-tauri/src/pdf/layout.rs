@@ -634,6 +634,178 @@ fn reconstruct_fraction_sums(rows: Vec<Vec<(usize, CharBox)>>) -> (Vec<Line>, Ve
     (synthesized, remaining)
 }
 
+/// Appends a wrapped cell's continuation content onto `cell`, space-joined
+/// — a description that wraps across two PDF lines becomes one cell, not
+/// two. Reuses the same `push_text` helper `join_lines` already uses to
+/// join text runs.
+fn append_cell_content(cell: &mut Vec<Inline>, extra: Vec<Inline>) {
+    if extra.is_empty() {
+        return;
+    }
+    if !cell.is_empty() {
+        push_text(cell, ' ', false, false);
+    }
+    cell.extend(extra);
+}
+
+/// Every logical row this candidate found, and every physical row (primary
+/// or wrapped-continuation) it absorbed, for the caller to mark consumed.
+struct TableMatch {
+    logical_rows: Vec<(usize, Vec<Vec<Inline>>)>,
+    consumed_rows: Vec<usize>,
+}
+
+/// Attempts to grow a table starting at `plain[start]`. Establishes column
+/// gutters from the first two rows, then greedily absorbs subsequent rows:
+/// a row with content in most of the established cells is a new logical
+/// row; a row with content in *exactly one* cell is a wrapped-cell
+/// continuation, folded onto that cell in the row above; a row that
+/// straddles a gutter, or has no content at all, ends the table. `None`
+/// when the result doesn't clear `TABLE_MIN_ROWS`/`TABLE_MIN_FILL_RATIO` —
+/// released back to normal paragraph processing rather than forced.
+fn try_table_at(
+    rows: &[Vec<(usize, CharBox)>],
+    plain: &[Vec<CharBox>],
+    start: usize,
+) -> Option<TableMatch> {
+    let cut_xs = table_gutters(&plain[start..start + 2])?;
+
+    // Both seed rows must themselves show real multi-cell structure, not
+    // merely that the two rows *combined* happen to leave a gap somewhere.
+    // Without this, two entirely unrelated rows of different lengths — a
+    // maths expression's numerator, and an unrelated line below it — can
+    // produce a spurious gutter purely from their different content
+    // lengths, even though neither row is itself tabular.
+    let seed_is_tabular = |row: &[(usize, CharBox)]| {
+        split_row_into_cells(row, &cut_xs)
+            .iter()
+            .filter(|c| cell_has_content(c))
+            .count()
+            >= 2
+    };
+    if !seed_is_tabular(&rows[start]) || !seed_is_tabular(&rows[start + 1]) {
+        return None;
+    }
+
+    let cells_of = |row: &[(usize, CharBox)]| -> Vec<Vec<Inline>> {
+        split_row_into_cells(row, &cut_xs)
+            .into_iter()
+            .map(|cell| if cell.is_empty() { Vec::new() } else { build_line(cell).content })
+            .collect()
+    };
+
+    let mut consumed_rows: Vec<usize> = vec![start];
+    let mut anchor_row = start;
+    let mut anchor_cells = cells_of(&rows[start]);
+    let mut logical_rows: Vec<(usize, Vec<Vec<Inline>>)> = Vec::new();
+
+    let mut i = start + 1;
+    while i < rows.len() {
+        if row_crosses_gutters(&plain[i], &cut_xs) {
+            break;
+        }
+        let raw_cells = split_row_into_cells(&rows[i], &cut_xs);
+        let filled: Vec<usize> = raw_cells
+            .iter()
+            .enumerate()
+            .filter(|(_, c)| cell_has_content(c))
+            .map(|(idx, _)| idx)
+            .collect();
+
+        if filled.is_empty() {
+            break;
+        }
+        if filled.len() == 1 {
+            let cell_index = filled[0];
+            let extra = if raw_cells[cell_index].is_empty() {
+                Vec::new()
+            } else {
+                build_line(raw_cells[cell_index].clone()).content
+            };
+            append_cell_content(&mut anchor_cells[cell_index], extra);
+            consumed_rows.push(i);
+            i += 1;
+            continue;
+        }
+
+        logical_rows.push((anchor_row, std::mem::take(&mut anchor_cells)));
+        consumed_rows.push(i);
+        anchor_row = i;
+        anchor_cells = raw_cells
+            .into_iter()
+            .map(|cell| if cell.is_empty() { Vec::new() } else { build_line(cell).content })
+            .collect();
+        i += 1;
+    }
+    logical_rows.push((anchor_row, anchor_cells));
+
+    if logical_rows.len() < TABLE_MIN_ROWS {
+        return None;
+    }
+    let total = logical_rows.len() * (cut_xs.len() + 1);
+    let filled_count = logical_rows
+        .iter()
+        .flat_map(|(_, cells)| cells.iter())
+        .filter(|c| !c.is_empty())
+        .count();
+    if (filled_count as f32) < total as f32 * TABLE_MIN_FILL_RATIO {
+        return None;
+    }
+
+    Some(TableMatch { logical_rows, consumed_rows })
+}
+
+/// Finds and reconstructs runs of rows whose text aligns into a shared grid
+/// of columns into `Line`s carrying `Inline::TableRow` — see the design
+/// spec (`docs/specs/pdf-table-reconstruction-design.md`) for the full
+/// detection rationale. Runs on the same raw rows `reconstruct_fraction_sums`
+/// consumes, and for the same reason: this needs the raw `CharBox`
+/// x-positions a `Line` no longer carries once `build_line` collapses a row.
+fn reconstruct_tables(rows: Vec<Vec<(usize, CharBox)>>) -> (Vec<Line>, Vec<Vec<(usize, CharBox)>>) {
+    let plain: Vec<Vec<CharBox>> = rows.iter().map(|r| r.iter().map(|(_, c)| *c).collect()).collect();
+    let mut consumed = vec![false; rows.len()];
+    let mut synthesized: Vec<Line> = Vec::new();
+
+    let mut start = 0;
+    while start < rows.len() {
+        if consumed[start] || start + 1 >= rows.len() {
+            start += 1;
+            continue;
+        }
+        let Some(table) = try_table_at(&rows, &plain, start) else {
+            start += 1;
+            continue;
+        };
+        for &row_index in &table.consumed_rows {
+            consumed[row_index] = true;
+        }
+        for (anchor_row, cells) in table.logical_rows {
+            let anchor = &plain[anchor_row];
+            let (x, right) = row_x_extent(anchor);
+            synthesized.push(Line {
+                content: vec![Inline::TableRow(cells)],
+                x,
+                right,
+                y: row_y(anchor),
+                font_size: row_font_size(anchor),
+                fixed_pitch: false,
+                is_display_maths: false,
+                ends_hyphenated: false,
+            });
+        }
+        start = table.consumed_rows.iter().copied().max().map(|m| m + 1).unwrap_or(start + 1);
+    }
+
+    let remaining: Vec<Vec<(usize, CharBox)>> = rows
+        .into_iter()
+        .enumerate()
+        .filter(|(i, _)| !consumed[*i])
+        .map(|(_, row)| row)
+        .collect();
+
+    (synthesized, remaining)
+}
+
 /// Groups characters into lines by baseline, then into styled spans.
 pub fn group_lines(chars: &[CharBox]) -> Vec<Line> {
     if chars.is_empty() {
@@ -746,6 +918,8 @@ pub fn group_lines(chars: &[CharBox]) -> Vec<Line> {
 
     merge_extensible_rows(&mut rows);
     let (mut lines, rows) = reconstruct_fraction_sums(rows);
+    let (table_lines, rows) = reconstruct_tables(rows);
+    lines.extend(table_lines);
     lines.extend(rows.into_iter().map(build_line));
     lines.sort_by(|a, b| b.y.partial_cmp(&a.y).unwrap_or(std::cmp::Ordering::Equal));
     lines

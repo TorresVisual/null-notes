@@ -1114,3 +1114,89 @@ fn row_crosses_gutters_is_false_when_nothing_straddles() {
     let row = set("AB", 72.0, 700.0, Style::default());
     assert!(!row_crosses_gutters(&row, &[90.0]));
 }
+
+fn table_row_cell_text(cell: &[Inline]) -> String {
+    cell.iter()
+        .filter_map(|i| match i {
+            Inline::Text(span) => Some(span.text.as_str()),
+            _ => None,
+        })
+        .collect()
+}
+
+#[test]
+fn a_simple_two_column_table_becomes_table_row_lines() {
+    let mut chars = set("ID", 72.0, 700.0, Style::default());
+    chars.extend(set("Name", 100.0, 700.0, Style::default()));
+    chars.extend(set("1", 72.0, 688.0, Style::default()));
+    chars.extend(set("Alice", 100.0, 688.0, Style::default()));
+    chars.extend(set("2", 72.0, 676.0, Style::default()));
+    chars.extend(set("Bob", 100.0, 676.0, Style::default()));
+
+    let lines = group_lines(&chars);
+
+    assert_eq!(lines.len(), 3);
+    for line in &lines {
+        assert!(
+            matches!(line.content.as_slice(), [Inline::TableRow(_)]),
+            "expected every line to be a table row, got {:?}",
+            line.content
+        );
+    }
+    let Inline::TableRow(header_cells) = &lines[0].content[0] else {
+        panic!("expected TableRow");
+    };
+    assert_eq!(header_cells.len(), 2);
+    assert_eq!(table_row_cell_text(&header_cells[0]), "ID");
+    assert_eq!(table_row_cell_text(&header_cells[1]), "Name");
+}
+
+// Mirrors table_test.pdf's wrapped-cell table: a row with all three cells
+// filled, followed by a row with content in only the middle (Description)
+// cell — the signature of a wrapped line, not a new row. This is the exact
+// shape that produces the "files.Team A" bug in today's pipeline.
+#[test]
+fn a_wrapped_cell_merges_into_the_row_above_it_instead_of_a_new_row() {
+    let mut chars = set("Component", 72.0, 700.0, Style::default());
+    chars.extend(set("Description", 150.0, 700.0, Style::default()));
+    chars.extend(set("Owner", 430.0, 700.0, Style::default()));
+
+    chars.extend(set("Core", 72.0, 688.0, Style::default()));
+    chars.extend(set("Handles extraction of text", 150.0, 688.0, Style::default()));
+    chars.extend(set("A", 430.0, 688.0, Style::default()));
+
+    // Continuation row: only the Description column has content.
+    chars.extend(set("and more here", 150.0, 676.0, Style::default()));
+
+    let lines = group_lines(&chars);
+
+    // Exactly 2 table-row lines — the continuation must not have become a
+    // third.
+    assert_eq!(lines.len(), 2);
+    let Inline::TableRow(data_cells) = &lines[1].content[0] else {
+        panic!("expected TableRow");
+    };
+    assert_eq!(
+        table_row_cell_text(&data_cells[1]),
+        "Handles extraction of text and more here"
+    );
+}
+
+#[test]
+fn a_lone_row_never_becomes_a_table_row_line() {
+    let chars = set("just one row of text here", 72.0, 700.0, Style::default());
+    let lines = group_lines(&chars);
+    assert!(lines
+        .iter()
+        .all(|l| !matches!(l.content.as_slice(), [Inline::TableRow(_)])));
+}
+
+#[test]
+fn two_rows_with_no_shared_gutter_produce_no_table_row_lines() {
+    let mut chars = set("hello world today", 72.0, 700.0, Style::default());
+    chars.extend(set("goodbye friend now", 72.0, 688.0, Style::default()));
+    let lines = group_lines(&chars);
+    assert!(lines
+        .iter()
+        .all(|l| !matches!(l.content.as_slice(), [Inline::TableRow(_)])));
+}
