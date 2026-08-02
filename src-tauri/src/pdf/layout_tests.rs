@@ -909,6 +909,62 @@ fn a_baseline_shaped_line_is_never_mistaken_for_the_other_half_of_a_fraction() {
     assert!(!markdown.contains(r"\frac{a + b}{f(z) ="), "paired with the baseline instead: {markdown}");
 }
 
+// Reconstructs the shape exercise 1(b) on Analysis_1_Blatt2_2025.pdf takes:
+// three fractions summed, one numerator row, one denominator row, joined by
+// "+"/"-" on the baseline in between. `render_content` wraps every
+// `Inline::Maths` as `$latex$` with nothing added around it (verified by
+// reading `render_content` directly), so the exact expected markdown is
+// spelled out below rather than guessed at.
+#[test]
+fn a_sum_of_three_stacked_fractions_becomes_three_fracs() {
+    // Numerators: "p", "q", "r" — three single terms with a generous, equal
+    // gap between them.
+    let mut chars = set("p", 115.0, 599.0, maths_italic());
+    chars.extend(set("q", 145.0, 599.0, maths_italic()));
+    chars.extend(set("r", 175.0, 599.0, maths_italic()));
+
+    // Baseline: "(b) " + "+" + "+" + "." — two connectors, so three terms.
+    chars.extend(set("(b) ", 90.0, 591.0, Style::default()));
+    chars.extend(set("+", 118.0, 591.0, maths()));
+    chars.extend(set("+", 148.0, 591.0, maths()));
+    chars.extend(set(".", 205.0, 591.0, Style::default()));
+
+    // Denominators: "s", "t+u", "v-w" — wider terms sitting closer together
+    // than the numerators above them, the exact geometry that made the old
+    // single-gap-threshold bridging glue all three denominators into one
+    // string.
+    chars.extend(set("s", 113.0, 583.0, maths_italic()));
+    chars.extend(set("t+u", 123.0, 583.0, maths_italic()));
+    chars.extend(set("v-w", 148.0, 583.0, maths_italic()));
+
+    let markdown = chars_to_markdown(&chars);
+
+    // "(b) " itself is consumed by the pipeline's pre-existing "(a)"-style
+    // list-marker stripping (`list_marker`/`strip_leading_chars` in this
+    // same file) once this line reaches `group_blocks` — same as it already
+    // would for an ordinary, non-fraction "(b) ..." list item — so it's not
+    // part of what this test is checking. What matters here is that the
+    // three fractions came out right and stayed joined by their connectors
+    // in the correct left-to-right order.
+    assert!(
+        markdown.contains("$\\frac{p}{s}$ + $\\frac{q}{t+u}$ + $\\frac{r}{v-w}$."),
+        "got: {markdown}"
+    );
+}
+
+// A single fraction (no connectors on its baseline) must keep going through
+// the existing `reconstruct_fractions` path unchanged — this pass only
+// engages once there's at least one connector.
+#[test]
+fn a_single_fraction_is_left_to_the_existing_reconstruction() {
+    let mut chars = set("a + b", 300.0, 700.0, maths_italic());
+    chars.extend(set("c + d", 300.0, 680.0, maths_italic()));
+
+    let markdown = chars_to_markdown(&chars);
+
+    assert!(markdown.contains(r"\frac{a + b}{c + d}"), "got: {markdown}");
+}
+
 #[test]
 fn an_empty_page_produces_an_empty_document() {
     assert_eq!(chars_to_markdown(&[]), "");

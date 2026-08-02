@@ -400,6 +400,130 @@ pub(super) fn baseline_label(row: &[CharBox]) -> String {
     sorted[..=paren + trailing_space].iter().map(|c| c.ch).collect()
 }
 
+/// Finds and reconstructs a "sum of stacked fractions" — several fractions
+/// joined by `+`/`-`, with every numerator on one row and every denominator
+/// on another, the way exercise 1(b) on Analysis_1_Blatt2_2025.pdf sets
+/// `1/x² + y²/(x⁴+x³y) + y³/(x⁵-x³y²)`.
+///
+/// Runs on the raw rows, before `build_line` collapses them into `Inline`s,
+/// because splitting several terms sharing one row needs their real x-gaps:
+/// once collapsed to a LaTeX string, a genuine fraction-boundary gap and a
+/// gap synthesized around an ordinary internal operator both render as an
+/// indistinguishable single space. A single fraction (no connectors) is
+/// left alone for `reconstruct_fractions`, further down the pipeline, to
+/// keep handling exactly as it does today.
+///
+/// Consumes rows nearest-baseline-first: every row is examined once as a
+/// potential connector baseline, and whichever still-unconsumed numerator
+/// and denominator row match it (by vertical gap and horizontal overlap,
+/// the same tolerances `find_fraction_pair` uses) are claimed.
+///
+/// Returns the finished `Line`s for whatever matched, and every row that
+/// didn't — for the caller to run through the normal `build_line` path.
+fn reconstruct_fraction_sums(rows: Vec<Vec<(usize, CharBox)>>) -> (Vec<Line>, Vec<Vec<(usize, CharBox)>>) {
+    let plain: Vec<Vec<CharBox>> = rows.iter().map(|r| r.iter().map(|(_, c)| *c).collect()).collect();
+    let mut consumed = vec![false; rows.len()];
+    let mut synthesized: Vec<Line> = Vec::new();
+
+    for baseline_i in 0..plain.len() {
+        if consumed[baseline_i] {
+            continue;
+        }
+        let Some((connectors, trailing_period)) = connector_baseline(&plain[baseline_i]) else {
+            continue;
+        };
+        let terms = connectors.len() + 1;
+        let base_y = row_y(&plain[baseline_i]);
+        let base_size = row_font_size(&plain[baseline_i]).max(1.0);
+        let (base_x0, base_x1) = row_x_extent(&plain[baseline_i]);
+
+        let nearest = |order: Vec<usize>| -> Option<usize> {
+            order
+                .into_iter()
+                .filter(|&i| !consumed[i])
+                .filter(|&i| {
+                    let gap = (row_y(&plain[i]) - base_y).abs();
+                    if gap <= 0.0 || gap > base_size * FRACTION_MAX_ROW_GAP {
+                        return false;
+                    }
+                    let (x0, x1) = row_x_extent(&plain[i]);
+                    let overlap = range_overlap(x0, x1, base_x0, base_x1);
+                    let min_width = (x1 - x0).min(base_x1 - base_x0).max(1.0);
+                    overlap >= min_width * FRACTION_MIN_OVERLAP_RATIO
+                })
+                .min_by(|&a, &b| {
+                    let da = (row_y(&plain[a]) - base_y).abs();
+                    let db = (row_y(&plain[b]) - base_y).abs();
+                    da.partial_cmp(&db).unwrap_or(std::cmp::Ordering::Equal)
+                })
+        };
+
+        let Some(num_i) = nearest((0..baseline_i).collect()) else { continue };
+        let Some(den_i) = nearest((baseline_i + 1..plain.len()).collect()) else { continue };
+
+        let Some(num_groups) = split_into_terms(&plain[num_i], terms) else { continue };
+        let Some(den_groups) = split_into_terms(&plain[den_i], terms) else { continue };
+
+        let fracs: Vec<String> = num_groups
+            .iter()
+            .zip(den_groups.iter())
+            .map(|(n, d)| format!("\\frac{{{}}}{{{}}}", latex::to_latex(n), latex::to_latex(d)))
+            .collect();
+
+        let mut content: Vec<Inline> = Vec::new();
+        let label = baseline_label(&plain[baseline_i]);
+        if !label.is_empty() {
+            content.push(Inline::Text(Span { text: label, bold: false, italic: false }));
+        }
+        for (i, frac) in fracs.iter().enumerate() {
+            content.push(Inline::Maths(frac.clone()));
+            if let Some(&c) = connectors.get(i) {
+                let symbol = if c == '\u{2212}' { '-' } else { c };
+                content.push(Inline::Text(Span {
+                    text: format!(" {symbol} "),
+                    bold: false,
+                    italic: false,
+                }));
+            }
+        }
+        if trailing_period {
+            content.push(Inline::Text(Span { text: ".".to_string(), bold: false, italic: false }));
+        }
+
+        let is_display_maths = content.iter().all(|i| match i {
+            Inline::Text(span) => span.text.trim().is_empty(),
+            Inline::Maths(_) => true,
+        });
+
+        let (num_x0, num_x1) = row_x_extent(&plain[num_i]);
+        let (den_x0, den_x1) = row_x_extent(&plain[den_i]);
+
+        synthesized.push(Line {
+            content,
+            x: base_x0.min(num_x0).min(den_x0),
+            right: base_x1.max(num_x1).max(den_x1),
+            y: base_y,
+            font_size: base_size,
+            fixed_pitch: false,
+            is_display_maths,
+            ends_hyphenated: false,
+        });
+
+        consumed[baseline_i] = true;
+        consumed[num_i] = true;
+        consumed[den_i] = true;
+    }
+
+    let remaining: Vec<Vec<(usize, CharBox)>> = rows
+        .into_iter()
+        .enumerate()
+        .filter(|(i, _)| !consumed[*i])
+        .map(|(_, row)| row)
+        .collect();
+
+    (synthesized, remaining)
+}
+
 /// Groups characters into lines by baseline, then into styled spans.
 pub fn group_lines(chars: &[CharBox]) -> Vec<Line> {
     if chars.is_empty() {
@@ -511,7 +635,10 @@ pub fn group_lines(chars: &[CharBox]) -> Vec<Line> {
     }
 
     merge_extensible_rows(&mut rows);
-    rows.into_iter().map(build_line).collect()
+    let (mut lines, rows) = reconstruct_fraction_sums(rows);
+    lines.extend(rows.into_iter().map(build_line));
+    lines.sort_by(|a, b| b.y.partial_cmp(&a.y).unwrap_or(std::cmp::Ordering::Equal));
+    lines
 }
 
 /// Folds a row made only of extensible glyphs into the row beneath it.
