@@ -56,6 +56,17 @@ pub enum Inline {
     /// The LaTeX source, without delimiters. Text rather than an image so it can
     /// be copied into a prompt, searched, and edited in place.
     Maths(String),
+    /// One table row's cells, each a `Vec<Inline>` in its own right so a cell
+    /// can hold bold/italic spans or inline maths for free, plus whether this
+    /// is the first row of its own detected table. `group_blocks` merges
+    /// consecutive `TableRow`-only `Line`s into one `Block::Table`, using
+    /// that flag — not a vertical-gap heuristic — to tell "this starts a new
+    /// table" apart from "this continues the one before it": a wrapped
+    /// cell's continuation line folds into its anchor row rather than
+    /// becoming its own `Line` (see `reconstruct_tables`), so the gap to the
+    /// *next* row is irregular by design, exactly the kind of row-height
+    /// variation a gap-based heuristic would misread as a table boundary.
+    TableRow(Vec<Vec<Inline>>, bool),
 }
 
 /// A run of characters sharing one emphasis style.
@@ -95,13 +106,19 @@ impl Line {
             .iter()
             .filter_map(|i| match i {
                 Inline::Text(span) => Some(span.text.as_str()),
-                Inline::Maths(_) => None,
+                Inline::Maths(_) | Inline::TableRow(_, _) => None,
             })
             .collect()
     }
 
-    fn is_blank(&self) -> bool {
-        self.text().trim().is_empty() && !self.content.iter().any(is_maths)
+    pub(super) fn is_blank(&self) -> bool {
+        // A table-row line carries no `Text`/`Maths` content of its own by
+        // this measure (its content is nested one level deeper, inside each
+        // cell), so without this check a real table row would be filtered
+        // out as blank before `classify` ever saw it.
+        self.text().trim().is_empty()
+            && !self.content.iter().any(is_maths)
+            && !matches!(self.content.as_slice(), [Inline::TableRow(_, _)])
     }
 }
 
@@ -123,6 +140,10 @@ pub enum Block {
         depth: usize,
         content: Vec<Inline>,
     },
+    /// Every row's cells, first row always the header — a table with no
+    /// natural header row is out of scope (see the design spec's
+    /// Non-goals).
+    Table { rows: Vec<Vec<Vec<Inline>>> },
 }
 
 // Chars on one line share a baseline, but superscripts, subscripts and inline
@@ -153,6 +174,18 @@ const LIST_INDENT_EMS: f32 = 2.0;
 // Wide enough to bridge " : " or "cos", narrow enough that the prose on either
 // side of an equation is not swallowed into it.
 const MATHS_BRIDGE_EMS: f32 = 2.5;
+// Table cell padding is far narrower than a page-column gutter — chosen
+// against notes/table_test.pdf's own ~12pt (ReportLab's LEFTPADDING +
+// RIGHTPADDING) minimum cell spacing at an 11-12pt body size, comfortably
+// above any ordinary inter-word gap.
+const TABLE_MIN_GUTTER_EMS: f32 = 0.8;
+// A table needs at least this many logical rows (a header plus at least
+// one data row) to be worth reconstructing.
+const TABLE_MIN_ROWS: usize = 2;
+// ...and at least this fraction of its (row, cell) slots holding real
+// content, so a coincidentally-aligned run of mostly-blank lines is never
+// mistaken for a data grid.
+const TABLE_MIN_FILL_RATIO: f32 = 0.5;
 
 /// The standalone accent glyphs LaTeX's Computer Modern fonts emit, mapped to
 /// their combining forms. CM has no precomposed "ü": it prints a `u` and then
@@ -291,6 +324,79 @@ pub(super) fn row_font_size(row: &[CharBox]) -> f32 {
         .map(|c| c.font_size)
         .collect();
     median(&mut sizes)
+}
+
+/// Finds column-boundary x-positions shared by every row in `rows`, by
+/// merging every non-whitespace character's x-interval — not each row's
+/// own collapsed extent the way `row_x_extent` works, since a table needs
+/// *sub-row* boundaries — into covered ranges. The gaps left over are
+/// candidate cell boundaries, each returned as its midpoint. `None` when
+/// there's no gap wide enough to be a real cell boundary rather than an
+/// ordinary word-space within one cell.
+///
+/// Different rows' words rarely start and end at exactly the same x, so
+/// merging *across* rows (not measuring each row alone) is what makes this
+/// robust: two rows of ordinary prose with different word lengths leave no
+/// gap anywhere in the union, while two rows of real tabular data — whose
+/// column starts are genuinely aligned — do.
+pub(super) fn table_gutters(rows: &[Vec<CharBox>]) -> Option<Vec<f32>> {
+    let mut intervals: Vec<(f32, f32)> = rows
+        .iter()
+        .flatten()
+        .filter(|c| !c.ch.is_whitespace())
+        .map(|c| (c.x, c.x + c.width))
+        .collect();
+    if intervals.is_empty() {
+        return None;
+    }
+    intervals.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
+
+    let mut merged: Vec<(f32, f32)> = Vec::new();
+    for (s, e) in intervals {
+        match merged.last_mut() {
+            Some((_, last_e)) if s <= *last_e => *last_e = last_e.max(e),
+            _ => merged.push((s, e)),
+        }
+    }
+
+    let mut sizes: Vec<f32> = rows.iter().flatten().map(|c| c.font_size).collect();
+    let threshold = median(&mut sizes).max(1.0) * TABLE_MIN_GUTTER_EMS;
+
+    let gutters: Vec<f32> = merged
+        .windows(2)
+        .filter(|w| w[1].0 - w[0].1 >= threshold)
+        .map(|w| (w[0].1 + w[1].0) / 2.0)
+        .collect();
+
+    (!gutters.is_empty()).then_some(gutters)
+}
+
+/// Splits `row` into `cut_xs.len() + 1` cells at the given x-positions,
+/// preserving each character's original stream index — `build_line` (used
+/// on each cell's characters in `reconstruct_tables`) sorts by that index,
+/// not by `x`.
+pub(super) fn split_row_into_cells(
+    row: &[(usize, CharBox)],
+    cut_xs: &[f32],
+) -> Vec<Vec<(usize, CharBox)>> {
+    let mut cells: Vec<Vec<(usize, CharBox)>> = vec![Vec::new(); cut_xs.len() + 1];
+    for &(index, ch) in row {
+        let cell = cut_xs.iter().filter(|&&cx| ch.x > cx).count();
+        cells[cell].push((index, ch));
+    }
+    cells
+}
+
+pub(super) fn cell_has_content(cell: &[(usize, CharBox)]) -> bool {
+    cell.iter().any(|(_, c)| !c.ch.is_whitespace())
+}
+
+/// Whether any character in `row` straddles one of `cut_xs` — the signal
+/// that this row does not belong to the table the gutters were established
+/// from, rather than merely being one more row of it.
+pub(super) fn row_crosses_gutters(row: &[CharBox], cut_xs: &[f32]) -> bool {
+    row.iter()
+        .any(|c| cut_xs.iter().any(|&cx| c.x < cx && c.x + c.width > cx))
 }
 
 /// Splits `row`'s printing characters into exactly `n` left-to-right groups,
@@ -502,6 +608,7 @@ fn reconstruct_fraction_sums(rows: Vec<Vec<(usize, CharBox)>>) -> (Vec<Line>, Ve
         let is_display_maths = content.iter().all(|i| match i {
             Inline::Text(span) => span.text.trim().is_empty(),
             Inline::Maths(_) => true,
+            Inline::TableRow(_, _) => false,
         });
 
         let (num_x0, num_x1) = row_x_extent(&plain[num_i]);
@@ -521,6 +628,178 @@ fn reconstruct_fraction_sums(rows: Vec<Vec<(usize, CharBox)>>) -> (Vec<Line>, Ve
         consumed[baseline_i] = true;
         consumed[num_i] = true;
         consumed[den_i] = true;
+    }
+
+    let remaining: Vec<Vec<(usize, CharBox)>> = rows
+        .into_iter()
+        .enumerate()
+        .filter(|(i, _)| !consumed[*i])
+        .map(|(_, row)| row)
+        .collect();
+
+    (synthesized, remaining)
+}
+
+/// Appends a wrapped cell's continuation content onto `cell`, space-joined
+/// — a description that wraps across two PDF lines becomes one cell, not
+/// two. Reuses the same `push_text` helper `join_lines` already uses to
+/// join text runs.
+fn append_cell_content(cell: &mut Vec<Inline>, extra: Vec<Inline>) {
+    if extra.is_empty() {
+        return;
+    }
+    if !cell.is_empty() {
+        push_text(cell, ' ', false, false);
+    }
+    cell.extend(extra);
+}
+
+/// Every logical row this candidate found, and every physical row (primary
+/// or wrapped-continuation) it absorbed, for the caller to mark consumed.
+struct TableMatch {
+    logical_rows: Vec<(usize, Vec<Vec<Inline>>)>,
+    consumed_rows: Vec<usize>,
+}
+
+/// Attempts to grow a table starting at `plain[start]`. Establishes column
+/// gutters from the first two rows, then greedily absorbs subsequent rows:
+/// a row with content in most of the established cells is a new logical
+/// row; a row with content in *exactly one* cell is a wrapped-cell
+/// continuation, folded onto that cell in the row above; a row that
+/// straddles a gutter, or has no content at all, ends the table. `None`
+/// when the result doesn't clear `TABLE_MIN_ROWS`/`TABLE_MIN_FILL_RATIO` —
+/// released back to normal paragraph processing rather than forced.
+fn try_table_at(
+    rows: &[Vec<(usize, CharBox)>],
+    plain: &[Vec<CharBox>],
+    start: usize,
+) -> Option<TableMatch> {
+    let cut_xs = table_gutters(&plain[start..start + 2])?;
+
+    // Both seed rows must themselves show real multi-cell structure, not
+    // merely that the two rows *combined* happen to leave a gap somewhere.
+    // Without this, two entirely unrelated rows of different lengths — a
+    // maths expression's numerator, and an unrelated line below it — can
+    // produce a spurious gutter purely from their different content
+    // lengths, even though neither row is itself tabular.
+    let seed_is_tabular = |row: &[(usize, CharBox)]| {
+        split_row_into_cells(row, &cut_xs)
+            .iter()
+            .filter(|c| cell_has_content(c))
+            .count()
+            >= 2
+    };
+    if !seed_is_tabular(&rows[start]) || !seed_is_tabular(&rows[start + 1]) {
+        return None;
+    }
+
+    let cells_of = |row: &[(usize, CharBox)]| -> Vec<Vec<Inline>> {
+        split_row_into_cells(row, &cut_xs)
+            .into_iter()
+            .map(|cell| if cell.is_empty() { Vec::new() } else { build_line(cell).content })
+            .collect()
+    };
+
+    let mut consumed_rows: Vec<usize> = vec![start];
+    let mut anchor_row = start;
+    let mut anchor_cells = cells_of(&rows[start]);
+    let mut logical_rows: Vec<(usize, Vec<Vec<Inline>>)> = Vec::new();
+
+    let mut i = start + 1;
+    while i < rows.len() {
+        if row_crosses_gutters(&plain[i], &cut_xs) {
+            break;
+        }
+        let raw_cells = split_row_into_cells(&rows[i], &cut_xs);
+        let filled: Vec<usize> = raw_cells
+            .iter()
+            .enumerate()
+            .filter(|(_, c)| cell_has_content(c))
+            .map(|(idx, _)| idx)
+            .collect();
+
+        if filled.is_empty() {
+            break;
+        }
+        if filled.len() == 1 {
+            let cell_index = filled[0];
+            let extra = if raw_cells[cell_index].is_empty() {
+                Vec::new()
+            } else {
+                build_line(raw_cells[cell_index].clone()).content
+            };
+            append_cell_content(&mut anchor_cells[cell_index], extra);
+            consumed_rows.push(i);
+            i += 1;
+            continue;
+        }
+
+        logical_rows.push((anchor_row, std::mem::take(&mut anchor_cells)));
+        consumed_rows.push(i);
+        anchor_row = i;
+        anchor_cells = raw_cells
+            .into_iter()
+            .map(|cell| if cell.is_empty() { Vec::new() } else { build_line(cell).content })
+            .collect();
+        i += 1;
+    }
+    logical_rows.push((anchor_row, anchor_cells));
+
+    if logical_rows.len() < TABLE_MIN_ROWS {
+        return None;
+    }
+    let total = logical_rows.len() * (cut_xs.len() + 1);
+    let filled_count = logical_rows
+        .iter()
+        .flat_map(|(_, cells)| cells.iter())
+        .filter(|c| !c.is_empty())
+        .count();
+    if (filled_count as f32) < total as f32 * TABLE_MIN_FILL_RATIO {
+        return None;
+    }
+
+    Some(TableMatch { logical_rows, consumed_rows })
+}
+
+/// Finds and reconstructs runs of rows whose text aligns into a shared grid
+/// of columns into `Line`s carrying `Inline::TableRow` — see the design
+/// spec (`docs/specs/pdf-table-reconstruction-design.md`) for the full
+/// detection rationale. Runs on the same raw rows `reconstruct_fraction_sums`
+/// consumes, and for the same reason: this needs the raw `CharBox`
+/// x-positions a `Line` no longer carries once `build_line` collapses a row.
+fn reconstruct_tables(rows: Vec<Vec<(usize, CharBox)>>) -> (Vec<Line>, Vec<Vec<(usize, CharBox)>>) {
+    let plain: Vec<Vec<CharBox>> = rows.iter().map(|r| r.iter().map(|(_, c)| *c).collect()).collect();
+    let mut consumed = vec![false; rows.len()];
+    let mut synthesized: Vec<Line> = Vec::new();
+
+    let mut start = 0;
+    while start < rows.len() {
+        if consumed[start] || start + 1 >= rows.len() {
+            start += 1;
+            continue;
+        }
+        let Some(table) = try_table_at(&rows, &plain, start) else {
+            start += 1;
+            continue;
+        };
+        for &row_index in &table.consumed_rows {
+            consumed[row_index] = true;
+        }
+        for (index, (anchor_row, cells)) in table.logical_rows.into_iter().enumerate() {
+            let anchor = &plain[anchor_row];
+            let (x, right) = row_x_extent(anchor);
+            synthesized.push(Line {
+                content: vec![Inline::TableRow(cells, index == 0)],
+                x,
+                right,
+                y: row_y(anchor),
+                font_size: row_font_size(anchor),
+                fixed_pitch: false,
+                is_display_maths: false,
+                ends_hyphenated: false,
+            });
+        }
+        start = table.consumed_rows.iter().copied().max().map(|m| m + 1).unwrap_or(start + 1);
     }
 
     let remaining: Vec<Vec<(usize, CharBox)>> = rows
@@ -645,6 +924,8 @@ pub fn group_lines(chars: &[CharBox]) -> Vec<Line> {
 
     merge_extensible_rows(&mut rows);
     let (mut lines, rows) = reconstruct_fraction_sums(rows);
+    let (table_lines, rows) = reconstruct_tables(rows);
+    lines.extend(table_lines);
     lines.extend(rows.into_iter().map(build_line));
     lines.sort_by(|a, b| b.y.partial_cmp(&a.y).unwrap_or(std::cmp::Ordering::Equal));
     lines
@@ -901,6 +1182,7 @@ fn build_line(mut row: Vec<(usize, CharBox)>) -> Line {
         && content.iter().all(|i| match i {
             Inline::Text(span) => span.text.trim().is_empty(),
             Inline::Maths(_) => true,
+            Inline::TableRow(_, _) => false,
         });
 
     let right = row
@@ -1354,6 +1636,12 @@ fn join_lines(lines: &[&Line]) -> Vec<Inline> {
                         push_text(&mut out, ch, span.bold, span.italic);
                     }
                 }
+                // Unreachable in practice: `classify` diverts a table-row
+                // line before it ever reaches `join_lines` (only
+                // Heading/List/Prose-kind lines do). Kept as a no-op rather
+                // than a panic — see CLAUDE.md on trusting internal
+                // invariants without crashing if one is ever violated.
+                Inline::TableRow(_, _) => {}
             }
         }
     }
@@ -1380,9 +1668,16 @@ enum LineKind {
     Heading(u8),
     List(bool, usize),
     MathsDisplay,
+    Table,
 }
 
 fn classify(line: &Line, body: f32, left_margin: f32) -> LineKind {
+    // Checked before everything else, for the same reason as the
+    // display-maths check just below: a table row's own font size or
+    // leading whitespace could otherwise misread as a heading or list.
+    if matches!(line.content.as_slice(), [Inline::TableRow(_, _)]) {
+        return LineKind::Table;
+    }
     // Checked before everything else: a display equation is centred and set in
     // maths fonts, so heading and list detection would both misread it.
     if line.is_display_maths {
@@ -1426,7 +1721,21 @@ pub fn group_blocks(lines: &[Line]) -> Vec<Block> {
 
     for (index, line) in lines.iter().enumerate() {
         let kind = classify(line, body, left_margin);
-        let gap_break = index > 0
+        // A table row that isn't the first row of its own detected table is
+        // a continuation of whatever table came right before it, by
+        // construction — `reconstruct_tables` already decided that at the
+        // geometry level, and is the source of truth for where a table
+        // starts and ends, not a gap measured after the fact. That matters
+        // because a wrapped cell's continuation line folds into its anchor
+        // row's own synthesized Line rather than becoming its own `Line`
+        // (see `reconstruct_tables`), so the gap from one table row to the
+        // next is legitimately irregular — exactly the row-height variation
+        // the vertical-gap heuristic below would otherwise misread as a
+        // table boundary.
+        let starts_new_table = matches!(line.content.as_slice(), [Inline::TableRow(_, true)]);
+        let continues_same_table = kind == LineKind::Table && !starts_new_table;
+        let gap_break = !continues_same_table
+            && index > 0
             && typical_gap > 0.0
             && (lines[index - 1].y - line.y).abs() > typical_gap * BLOCK_GAP_RATIO;
 
@@ -1437,10 +1746,12 @@ pub fn group_blocks(lines: &[Line]) -> Vec<Block> {
             && !gap_break
             && current.first().is_some_and(|first| line.x > first.x + 1.0);
 
-        // A list marker always opens a new item, and nothing accumulates onto
-        // a heading; everything else only breaks when the kind changes.
-        let opens_block =
-            matches!(kind, LineKind::List(_, _)) || matches!(current_kind, LineKind::Heading(_));
+        // A list marker always opens a new item, nothing accumulates onto a
+        // heading, and a table row that starts a new table always opens its
+        // own block — everything else only breaks when the kind changes.
+        let opens_block = matches!(kind, LineKind::List(_, _))
+            || matches!(current_kind, LineKind::Heading(_))
+            || starts_new_table;
         let kind_break = opens_block || (kind != current_kind && !continues_item);
 
         if !current.is_empty() && (gap_break || kind_break) {
@@ -1471,7 +1782,7 @@ fn finish_block(lines: &[&Line], kind: LineKind) -> Block {
                 .flat_map(|l| l.content.iter())
                 .filter_map(|i| match i {
                     Inline::Maths(latex) => Some(latex.as_str()),
-                    Inline::Text(_) => None,
+                    Inline::Text(_) | Inline::TableRow(_, _) => None,
                 })
                 .collect::<Vec<_>>()
                 .join(" "),
@@ -1511,7 +1822,33 @@ fn finish_block(lines: &[&Line], kind: LineKind) -> Block {
         LineKind::Prose => Block::Paragraph {
             content: join_lines(lines),
         },
+        // Every line here was classified `Table` by `classify`, so its
+        // content is always `[Inline::TableRow(cells)]` by construction —
+        // `filter_map` rather than an unwrap/panic if that invariant is
+        // ever violated, per CLAUDE.md.
+        LineKind::Table => Block::Table {
+            rows: lines
+                .iter()
+                .filter_map(|l| match l.content.as_slice() {
+                    [Inline::TableRow(cells, _)] => Some(cells.clone()),
+                    _ => None,
+                })
+                .collect(),
+        },
     }
+}
+
+/// GFM's pipe-table syntax uses `|` to separate cells, so a literal `|`
+/// inside a cell's own content has to be escaped or it would corrupt that
+/// row's column structure. Nothing else in this pipeline escapes markdown
+/// syntax — every other block either renders characters safe to emit as-is,
+/// or generates its own syntax (list markers, headings) rather than passing
+/// arbitrary content through a character that means something structural.
+/// Scoped to table cells because tables are the one place this pipeline's
+/// own choice of output syntax collides with a character real prose can
+/// contain.
+pub(super) fn escape_table_cell(text: &str) -> String {
+    text.replace('|', "\\|")
 }
 
 fn render_content(content: &[Inline]) -> String {
@@ -1523,6 +1860,11 @@ fn render_content(content: &[Inline]) -> String {
                 continue;
             }
             Inline::Text(span) => span,
+            // Unreachable: a cell's own content never nests another table
+            // row, and `render_content` is never called on a `Block::Table`
+            // directly (Task 5 renders each cell's `Vec<Inline>` through
+            // this function instead).
+            Inline::TableRow(_, _) => continue,
         };
         let marker = match (span.bold, span.italic) {
             (true, true) => "***",
@@ -1584,6 +1926,21 @@ pub fn blocks_to_markdown(blocks: &[Block]) -> String {
                     render_content(content)
                 ));
             }
+            Block::Table { rows } => {
+                let mut table_lines: Vec<String> = Vec::new();
+                for (index, row) in rows.iter().enumerate() {
+                    let cells: Vec<String> = row
+                        .iter()
+                        .map(|cell| escape_table_cell(&render_content(cell)))
+                        .collect();
+                    table_lines.push(format!("| {} |", cells.join(" | ")));
+                    if index == 0 {
+                        let delimiter = vec!["---"; row.len()].join(" | ");
+                        table_lines.push(format!("| {delimiter} |"));
+                    }
+                }
+                parts.push(table_lines.join("\n"));
+            }
         }
     }
     let mut out = parts.join("\n\n");
@@ -1619,7 +1976,7 @@ fn combined_maths_latex(line: &Line) -> String {
         .iter()
         .filter_map(|i| match i {
             Inline::Maths(s) => Some(s.as_str()),
-            Inline::Text(_) => None,
+            Inline::Text(_) | Inline::TableRow(_, _) => None,
         })
         .collect::<Vec<_>>()
         .join(" ")

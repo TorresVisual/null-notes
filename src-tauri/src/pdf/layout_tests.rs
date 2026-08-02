@@ -1020,3 +1020,283 @@ fn converts_a_representative_exercise_sheet() {
          - G ist zyklisch\n"
     );
 }
+
+fn table_row_line(cells: Vec<Vec<Inline>>) -> Line {
+    Line {
+        content: vec![Inline::TableRow(cells, true)],
+        x: 72.0,
+        right: 200.0,
+        y: 700.0,
+        font_size: BODY,
+        fixed_pitch: false,
+        is_display_maths: false,
+        ends_hyphenated: false,
+    }
+}
+
+#[test]
+fn a_table_row_line_is_not_blank() {
+    let line = table_row_line(vec![
+        vec![Inline::Text(Span { text: "a".into(), bold: false, italic: false })],
+        vec![Inline::Text(Span { text: "b".into(), bold: false, italic: false })],
+    ]);
+    assert!(!line.is_blank());
+}
+
+#[test]
+fn a_table_row_lines_own_text_is_empty() {
+    let line = table_row_line(vec![vec![Inline::Text(Span {
+        text: "cell".into(),
+        bold: false,
+        italic: false,
+    })]]);
+    assert_eq!(line.text(), "");
+}
+
+#[test]
+fn table_gutters_finds_the_shared_gap_between_two_rows() {
+    let mut row1 = set("ID", 72.0, 700.0, Style::default());
+    row1.extend(set("Name", 100.0, 700.0, Style::default()));
+    let mut row2 = set("1", 72.0, 688.0, Style::default());
+    row2.extend(set("Alice", 100.0, 688.0, Style::default()));
+
+    let gutters = table_gutters(&[row1, row2]).expect("expected a shared gutter");
+
+    assert_eq!(gutters.len(), 1);
+    assert!(gutters[0] > 82.0 && gutters[0] < 100.0);
+}
+
+// Different word lengths across the two lines mean the union of their
+// non-whitespace spans has no gap left over anywhere — the same property
+// that keeps ordinary prose from ever being mistaken for a table.
+#[test]
+fn table_gutters_is_none_when_rows_share_no_gap() {
+    let row1 = set("hello world today", 72.0, 700.0, Style::default());
+    let row2 = set("goodbye friend now", 72.0, 688.0, Style::default());
+    assert_eq!(table_gutters(&[row1, row2]), None);
+}
+
+#[test]
+fn split_row_into_cells_buckets_by_the_cut_points() {
+    let row: Vec<(usize, CharBox)> = set("AB", 72.0, 700.0, Style::default())
+        .into_iter()
+        .chain(set("CD", 100.0, 700.0, Style::default()))
+        .enumerate()
+        .collect();
+
+    let cells = split_row_into_cells(&row, &[90.0]);
+
+    assert_eq!(cells.len(), 2);
+    assert_eq!(cells[0].iter().map(|(_, c)| c.ch).collect::<String>(), "AB");
+    assert_eq!(cells[1].iter().map(|(_, c)| c.ch).collect::<String>(), "CD");
+}
+
+#[test]
+fn cell_has_content_is_false_for_whitespace_or_nothing() {
+    let whitespace_only: Vec<(usize, CharBox)> =
+        set("  ", 72.0, 700.0, Style::default()).into_iter().enumerate().collect();
+    assert!(!cell_has_content(&whitespace_only));
+    assert!(!cell_has_content(&[]));
+
+    let real: Vec<(usize, CharBox)> =
+        set("x", 72.0, 700.0, Style::default()).into_iter().enumerate().collect();
+    assert!(cell_has_content(&real));
+}
+
+#[test]
+fn row_crosses_gutters_detects_a_straddling_character() {
+    let row = set("straddle", 85.0, 700.0, Style::default());
+    assert!(row_crosses_gutters(&row, &[87.0]));
+}
+
+#[test]
+fn row_crosses_gutters_is_false_when_nothing_straddles() {
+    let row = set("AB", 72.0, 700.0, Style::default());
+    assert!(!row_crosses_gutters(&row, &[90.0]));
+}
+
+fn table_row_cell_text(cell: &[Inline]) -> String {
+    cell.iter()
+        .filter_map(|i| match i {
+            Inline::Text(span) => Some(span.text.as_str()),
+            _ => None,
+        })
+        .collect()
+}
+
+#[test]
+fn a_simple_two_column_table_becomes_table_row_lines() {
+    let mut chars = set("ID", 72.0, 700.0, Style::default());
+    chars.extend(set("Name", 100.0, 700.0, Style::default()));
+    chars.extend(set("1", 72.0, 688.0, Style::default()));
+    chars.extend(set("Alice", 100.0, 688.0, Style::default()));
+    chars.extend(set("2", 72.0, 676.0, Style::default()));
+    chars.extend(set("Bob", 100.0, 676.0, Style::default()));
+
+    let lines = group_lines(&chars);
+
+    assert_eq!(lines.len(), 3);
+    for line in &lines {
+        assert!(
+            matches!(line.content.as_slice(), [Inline::TableRow(_, _)]),
+            "expected every line to be a table row, got {:?}",
+            line.content
+        );
+    }
+    let Inline::TableRow(header_cells, _) = &lines[0].content[0] else {
+        panic!("expected TableRow");
+    };
+    assert_eq!(header_cells.len(), 2);
+    assert_eq!(table_row_cell_text(&header_cells[0]), "ID");
+    assert_eq!(table_row_cell_text(&header_cells[1]), "Name");
+}
+
+// Mirrors table_test.pdf's wrapped-cell table: a row with all three cells
+// filled, followed by a row with content in only the middle (Description)
+// cell — the signature of a wrapped line, not a new row. This is the exact
+// shape that produces the "files.Team A" bug in today's pipeline.
+#[test]
+fn a_wrapped_cell_merges_into_the_row_above_it_instead_of_a_new_row() {
+    let mut chars = set("Component", 72.0, 700.0, Style::default());
+    chars.extend(set("Description", 150.0, 700.0, Style::default()));
+    chars.extend(set("Owner", 430.0, 700.0, Style::default()));
+
+    chars.extend(set("Core", 72.0, 688.0, Style::default()));
+    chars.extend(set("Handles extraction of text", 150.0, 688.0, Style::default()));
+    chars.extend(set("A", 430.0, 688.0, Style::default()));
+
+    // Continuation row: only the Description column has content.
+    chars.extend(set("and more here", 150.0, 676.0, Style::default()));
+
+    let lines = group_lines(&chars);
+
+    // Exactly 2 table-row lines — the continuation must not have become a
+    // third.
+    assert_eq!(lines.len(), 2);
+    let Inline::TableRow(data_cells, _) = &lines[1].content[0] else {
+        panic!("expected TableRow");
+    };
+    assert_eq!(
+        table_row_cell_text(&data_cells[1]),
+        "Handles extraction of text and more here"
+    );
+}
+
+#[test]
+fn a_lone_row_never_becomes_a_table_row_line() {
+    let chars = set("just one row of text here", 72.0, 700.0, Style::default());
+    let lines = group_lines(&chars);
+    assert!(lines
+        .iter()
+        .all(|l| !matches!(l.content.as_slice(), [Inline::TableRow(_, _)])));
+}
+
+#[test]
+fn two_rows_with_no_shared_gutter_produce_no_table_row_lines() {
+    let mut chars = set("hello world today", 72.0, 700.0, Style::default());
+    chars.extend(set("goodbye friend now", 72.0, 688.0, Style::default()));
+    let lines = group_lines(&chars);
+    assert!(lines
+        .iter()
+        .all(|l| !matches!(l.content.as_slice(), [Inline::TableRow(_, _)])));
+}
+
+#[test]
+fn consecutive_table_row_lines_merge_into_one_table_block() {
+    let mut chars = set("ID", 72.0, 700.0, Style::default());
+    chars.extend(set("Name", 100.0, 700.0, Style::default()));
+    chars.extend(set("1", 72.0, 688.0, Style::default()));
+    chars.extend(set("Alice", 100.0, 688.0, Style::default()));
+
+    let blocks = group_blocks(&group_lines(&chars));
+
+    assert_eq!(blocks.len(), 1);
+    let Block::Table { rows } = &blocks[0] else {
+        panic!("expected a single Block::Table, got {:?}", blocks[0]);
+    };
+    assert_eq!(rows.len(), 2);
+    assert_eq!(rows[0].len(), 2);
+}
+
+#[test]
+fn a_simple_table_renders_as_gfm() {
+    let mut chars = set("ID", 72.0, 700.0, Style::default());
+    chars.extend(set("Name", 100.0, 700.0, Style::default()));
+    chars.extend(set("1", 72.0, 688.0, Style::default()));
+    chars.extend(set("Alice", 100.0, 688.0, Style::default()));
+    chars.extend(set("2", 72.0, 676.0, Style::default()));
+    chars.extend(set("Bob", 100.0, 676.0, Style::default()));
+
+    let markdown = chars_to_markdown(&chars);
+
+    assert_eq!(
+        markdown.trim_end(),
+        "| ID | Name |\n| --- | --- |\n| 1 | Alice |\n| 2 | Bob |"
+    );
+}
+
+#[test]
+fn a_wrapped_cell_produces_one_clean_data_row() {
+    let mut chars = set("Component", 72.0, 700.0, Style::default());
+    chars.extend(set("Description", 150.0, 700.0, Style::default()));
+    chars.extend(set("Owner", 430.0, 700.0, Style::default()));
+    chars.extend(set("Core", 72.0, 688.0, Style::default()));
+    chars.extend(set("Handles extraction of text", 150.0, 688.0, Style::default()));
+    chars.extend(set("A", 430.0, 688.0, Style::default()));
+    chars.extend(set("and more here", 150.0, 676.0, Style::default()));
+
+    let markdown = chars_to_markdown(&chars);
+
+    assert_eq!(
+        markdown.trim_end(),
+        "| Component | Description | Owner |\n\
+         | --- | --- | --- |\n\
+         | Core | Handles extraction of text and more here | A |"
+    );
+}
+
+#[test]
+fn a_literal_pipe_in_a_cell_is_escaped() {
+    assert_eq!(escape_table_cell("a | b"), "a \\| b");
+    assert_eq!(escape_table_cell("no pipes here"), "no pipes here");
+}
+
+// Regression test for a real bug found against table_test.pdf: a wrapped
+// cell's continuation line folds into its anchor row rather than becoming
+// its own Line, so the y-gap from that anchor to the *next* row is bigger
+// than an ordinary row-to-row gap — group_blocks's own vertical-gap
+// heuristic used to misread that as "the table ended here" and split one
+// table into several. Two separate tables (a real gap between them) must
+// still split correctly, while a table whose own rows wrap must not.
+#[test]
+fn two_separate_tables_with_wrapped_rows_stay_separate_and_intact() {
+    let mut chars = set("ID", 72.0, 700.0, Style::default());
+    chars.extend(set("Note", 150.0, 700.0, Style::default()));
+    chars.extend(set("1", 72.0, 688.0, Style::default()));
+    chars.extend(set("first row of the note text", 150.0, 688.0, Style::default()));
+    chars.extend(set("continues down here", 150.0, 676.0, Style::default()));
+    chars.extend(set("2", 72.0, 664.0, Style::default()));
+    chars.extend(set("second entry text goes here", 150.0, 664.0, Style::default()));
+
+    // A real gap — a new, unrelated table starts well below.
+    chars.extend(set("Component", 72.0, 600.0, Style::default()));
+    chars.extend(set("Description", 150.0, 600.0, Style::default()));
+    chars.extend(set("Core", 72.0, 588.0, Style::default()));
+    chars.extend(set("first wrapped line of text", 150.0, 588.0, Style::default()));
+    chars.extend(set("second wrapped line here", 150.0, 576.0, Style::default()));
+    chars.extend(set("Engine", 72.0, 564.0, Style::default()));
+    chars.extend(set("another data row entry", 150.0, 564.0, Style::default()));
+
+    let blocks = group_blocks(&group_lines(&chars));
+
+    let tables: Vec<&Vec<Vec<Vec<Inline>>>> = blocks
+        .iter()
+        .filter_map(|b| match b {
+            Block::Table { rows } => Some(rows),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(tables.len(), 2, "expected exactly two separate tables, got {blocks:?}");
+    assert_eq!(tables[0].len(), 3, "first table should keep all 3 logical rows");
+    assert_eq!(tables[1].len(), 3, "second table should keep all 3 logical rows");
+}
