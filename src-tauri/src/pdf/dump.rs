@@ -34,6 +34,21 @@ mod tests {
         };
     }
 
+    /// Every line's full content vector, Text and Maths pieces both, with
+    /// geometry — for seeing exactly how a row's pieces were split (or
+    /// weren't) before fraction reconstruction runs.
+    #[test]
+    #[ignore]
+    fn dump_line_pieces() {
+        let pages = crate::pdf::extract::extract_pages(&pdf_or_skip!()).unwrap();
+        for line in crate::pdf::layout::group_lines(&pages[0].chars) {
+            println!(
+                "y={:8.2} x={:7.2} right={:7.2} display_maths={} content={:?}",
+                line.y, line.x, line.right, line.is_display_maths, line.content
+            );
+        }
+    }
+
     /// What the import would actually write into the note.
     #[test]
     #[ignore]
