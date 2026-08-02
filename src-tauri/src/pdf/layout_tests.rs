@@ -1023,7 +1023,7 @@ fn converts_a_representative_exercise_sheet() {
 
 fn table_row_line(cells: Vec<Vec<Inline>>) -> Line {
     Line {
-        content: vec![Inline::TableRow(cells)],
+        content: vec![Inline::TableRow(cells, true)],
         x: 72.0,
         right: 200.0,
         y: 700.0,
@@ -1138,12 +1138,12 @@ fn a_simple_two_column_table_becomes_table_row_lines() {
     assert_eq!(lines.len(), 3);
     for line in &lines {
         assert!(
-            matches!(line.content.as_slice(), [Inline::TableRow(_)]),
+            matches!(line.content.as_slice(), [Inline::TableRow(_, _)]),
             "expected every line to be a table row, got {:?}",
             line.content
         );
     }
-    let Inline::TableRow(header_cells) = &lines[0].content[0] else {
+    let Inline::TableRow(header_cells, _) = &lines[0].content[0] else {
         panic!("expected TableRow");
     };
     assert_eq!(header_cells.len(), 2);
@@ -1173,7 +1173,7 @@ fn a_wrapped_cell_merges_into_the_row_above_it_instead_of_a_new_row() {
     // Exactly 2 table-row lines — the continuation must not have become a
     // third.
     assert_eq!(lines.len(), 2);
-    let Inline::TableRow(data_cells) = &lines[1].content[0] else {
+    let Inline::TableRow(data_cells, _) = &lines[1].content[0] else {
         panic!("expected TableRow");
     };
     assert_eq!(
@@ -1188,7 +1188,7 @@ fn a_lone_row_never_becomes_a_table_row_line() {
     let lines = group_lines(&chars);
     assert!(lines
         .iter()
-        .all(|l| !matches!(l.content.as_slice(), [Inline::TableRow(_)])));
+        .all(|l| !matches!(l.content.as_slice(), [Inline::TableRow(_, _)])));
 }
 
 #[test]
@@ -1198,7 +1198,7 @@ fn two_rows_with_no_shared_gutter_produce_no_table_row_lines() {
     let lines = group_lines(&chars);
     assert!(lines
         .iter()
-        .all(|l| !matches!(l.content.as_slice(), [Inline::TableRow(_)])));
+        .all(|l| !matches!(l.content.as_slice(), [Inline::TableRow(_, _)])));
 }
 
 #[test]
@@ -1259,4 +1259,44 @@ fn a_wrapped_cell_produces_one_clean_data_row() {
 fn a_literal_pipe_in_a_cell_is_escaped() {
     assert_eq!(escape_table_cell("a | b"), "a \\| b");
     assert_eq!(escape_table_cell("no pipes here"), "no pipes here");
+}
+
+// Regression test for a real bug found against table_test.pdf: a wrapped
+// cell's continuation line folds into its anchor row rather than becoming
+// its own Line, so the y-gap from that anchor to the *next* row is bigger
+// than an ordinary row-to-row gap — group_blocks's own vertical-gap
+// heuristic used to misread that as "the table ended here" and split one
+// table into several. Two separate tables (a real gap between them) must
+// still split correctly, while a table whose own rows wrap must not.
+#[test]
+fn two_separate_tables_with_wrapped_rows_stay_separate_and_intact() {
+    let mut chars = set("ID", 72.0, 700.0, Style::default());
+    chars.extend(set("Note", 150.0, 700.0, Style::default()));
+    chars.extend(set("1", 72.0, 688.0, Style::default()));
+    chars.extend(set("first row of the note text", 150.0, 688.0, Style::default()));
+    chars.extend(set("continues down here", 150.0, 676.0, Style::default()));
+    chars.extend(set("2", 72.0, 664.0, Style::default()));
+    chars.extend(set("second entry text goes here", 150.0, 664.0, Style::default()));
+
+    // A real gap — a new, unrelated table starts well below.
+    chars.extend(set("Component", 72.0, 600.0, Style::default()));
+    chars.extend(set("Description", 150.0, 600.0, Style::default()));
+    chars.extend(set("Core", 72.0, 588.0, Style::default()));
+    chars.extend(set("first wrapped line of text", 150.0, 588.0, Style::default()));
+    chars.extend(set("second wrapped line here", 150.0, 576.0, Style::default()));
+    chars.extend(set("Engine", 72.0, 564.0, Style::default()));
+    chars.extend(set("another data row entry", 150.0, 564.0, Style::default()));
+
+    let blocks = group_blocks(&group_lines(&chars));
+
+    let tables: Vec<&Vec<Vec<Vec<Inline>>>> = blocks
+        .iter()
+        .filter_map(|b| match b {
+            Block::Table { rows } => Some(rows),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(tables.len(), 2, "expected exactly two separate tables, got {blocks:?}");
+    assert_eq!(tables[0].len(), 3, "first table should keep all 3 logical rows");
+    assert_eq!(tables[1].len(), 3, "second table should keep all 3 logical rows");
 }

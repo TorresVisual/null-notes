@@ -57,10 +57,16 @@ pub enum Inline {
     /// be copied into a prompt, searched, and edited in place.
     Maths(String),
     /// One table row's cells, each a `Vec<Inline>` in its own right so a cell
-    /// can hold bold/italic spans or inline maths for free. A carrier only —
-    /// `group_blocks` merges consecutive `TableRow`-only `Line`s into one
-    /// `Block::Table`; see `reconstruct_tables`.
-    TableRow(Vec<Vec<Inline>>),
+    /// can hold bold/italic spans or inline maths for free, plus whether this
+    /// is the first row of its own detected table. `group_blocks` merges
+    /// consecutive `TableRow`-only `Line`s into one `Block::Table`, using
+    /// that flag — not a vertical-gap heuristic — to tell "this starts a new
+    /// table" apart from "this continues the one before it": a wrapped
+    /// cell's continuation line folds into its anchor row rather than
+    /// becoming its own `Line` (see `reconstruct_tables`), so the gap to the
+    /// *next* row is irregular by design, exactly the kind of row-height
+    /// variation a gap-based heuristic would misread as a table boundary.
+    TableRow(Vec<Vec<Inline>>, bool),
 }
 
 /// A run of characters sharing one emphasis style.
@@ -100,7 +106,7 @@ impl Line {
             .iter()
             .filter_map(|i| match i {
                 Inline::Text(span) => Some(span.text.as_str()),
-                Inline::Maths(_) | Inline::TableRow(_) => None,
+                Inline::Maths(_) | Inline::TableRow(_, _) => None,
             })
             .collect()
     }
@@ -112,7 +118,7 @@ impl Line {
         // out as blank before `classify` ever saw it.
         self.text().trim().is_empty()
             && !self.content.iter().any(is_maths)
-            && !matches!(self.content.as_slice(), [Inline::TableRow(_)])
+            && !matches!(self.content.as_slice(), [Inline::TableRow(_, _)])
     }
 }
 
@@ -602,7 +608,7 @@ fn reconstruct_fraction_sums(rows: Vec<Vec<(usize, CharBox)>>) -> (Vec<Line>, Ve
         let is_display_maths = content.iter().all(|i| match i {
             Inline::Text(span) => span.text.trim().is_empty(),
             Inline::Maths(_) => true,
-            Inline::TableRow(_) => false,
+            Inline::TableRow(_, _) => false,
         });
 
         let (num_x0, num_x1) = row_x_extent(&plain[num_i]);
@@ -779,11 +785,11 @@ fn reconstruct_tables(rows: Vec<Vec<(usize, CharBox)>>) -> (Vec<Line>, Vec<Vec<(
         for &row_index in &table.consumed_rows {
             consumed[row_index] = true;
         }
-        for (anchor_row, cells) in table.logical_rows {
+        for (index, (anchor_row, cells)) in table.logical_rows.into_iter().enumerate() {
             let anchor = &plain[anchor_row];
             let (x, right) = row_x_extent(anchor);
             synthesized.push(Line {
-                content: vec![Inline::TableRow(cells)],
+                content: vec![Inline::TableRow(cells, index == 0)],
                 x,
                 right,
                 y: row_y(anchor),
@@ -1176,7 +1182,7 @@ fn build_line(mut row: Vec<(usize, CharBox)>) -> Line {
         && content.iter().all(|i| match i {
             Inline::Text(span) => span.text.trim().is_empty(),
             Inline::Maths(_) => true,
-            Inline::TableRow(_) => false,
+            Inline::TableRow(_, _) => false,
         });
 
     let right = row
@@ -1635,7 +1641,7 @@ fn join_lines(lines: &[&Line]) -> Vec<Inline> {
                 // Heading/List/Prose-kind lines do). Kept as a no-op rather
                 // than a panic — see CLAUDE.md on trusting internal
                 // invariants without crashing if one is ever violated.
-                Inline::TableRow(_) => {}
+                Inline::TableRow(_, _) => {}
             }
         }
     }
@@ -1669,7 +1675,7 @@ fn classify(line: &Line, body: f32, left_margin: f32) -> LineKind {
     // Checked before everything else, for the same reason as the
     // display-maths check just below: a table row's own font size or
     // leading whitespace could otherwise misread as a heading or list.
-    if matches!(line.content.as_slice(), [Inline::TableRow(_)]) {
+    if matches!(line.content.as_slice(), [Inline::TableRow(_, _)]) {
         return LineKind::Table;
     }
     // Checked before everything else: a display equation is centred and set in
@@ -1715,7 +1721,21 @@ pub fn group_blocks(lines: &[Line]) -> Vec<Block> {
 
     for (index, line) in lines.iter().enumerate() {
         let kind = classify(line, body, left_margin);
-        let gap_break = index > 0
+        // A table row that isn't the first row of its own detected table is
+        // a continuation of whatever table came right before it, by
+        // construction — `reconstruct_tables` already decided that at the
+        // geometry level, and is the source of truth for where a table
+        // starts and ends, not a gap measured after the fact. That matters
+        // because a wrapped cell's continuation line folds into its anchor
+        // row's own synthesized Line rather than becoming its own `Line`
+        // (see `reconstruct_tables`), so the gap from one table row to the
+        // next is legitimately irregular — exactly the row-height variation
+        // the vertical-gap heuristic below would otherwise misread as a
+        // table boundary.
+        let starts_new_table = matches!(line.content.as_slice(), [Inline::TableRow(_, true)]);
+        let continues_same_table = kind == LineKind::Table && !starts_new_table;
+        let gap_break = !continues_same_table
+            && index > 0
             && typical_gap > 0.0
             && (lines[index - 1].y - line.y).abs() > typical_gap * BLOCK_GAP_RATIO;
 
@@ -1726,10 +1746,12 @@ pub fn group_blocks(lines: &[Line]) -> Vec<Block> {
             && !gap_break
             && current.first().is_some_and(|first| line.x > first.x + 1.0);
 
-        // A list marker always opens a new item, and nothing accumulates onto
-        // a heading; everything else only breaks when the kind changes.
-        let opens_block =
-            matches!(kind, LineKind::List(_, _)) || matches!(current_kind, LineKind::Heading(_));
+        // A list marker always opens a new item, nothing accumulates onto a
+        // heading, and a table row that starts a new table always opens its
+        // own block — everything else only breaks when the kind changes.
+        let opens_block = matches!(kind, LineKind::List(_, _))
+            || matches!(current_kind, LineKind::Heading(_))
+            || starts_new_table;
         let kind_break = opens_block || (kind != current_kind && !continues_item);
 
         if !current.is_empty() && (gap_break || kind_break) {
@@ -1760,7 +1782,7 @@ fn finish_block(lines: &[&Line], kind: LineKind) -> Block {
                 .flat_map(|l| l.content.iter())
                 .filter_map(|i| match i {
                     Inline::Maths(latex) => Some(latex.as_str()),
-                    Inline::Text(_) | Inline::TableRow(_) => None,
+                    Inline::Text(_) | Inline::TableRow(_, _) => None,
                 })
                 .collect::<Vec<_>>()
                 .join(" "),
@@ -1808,7 +1830,7 @@ fn finish_block(lines: &[&Line], kind: LineKind) -> Block {
             rows: lines
                 .iter()
                 .filter_map(|l| match l.content.as_slice() {
-                    [Inline::TableRow(cells)] => Some(cells.clone()),
+                    [Inline::TableRow(cells, _)] => Some(cells.clone()),
                     _ => None,
                 })
                 .collect(),
@@ -1842,7 +1864,7 @@ fn render_content(content: &[Inline]) -> String {
             // row, and `render_content` is never called on a `Block::Table`
             // directly (Task 5 renders each cell's `Vec<Inline>` through
             // this function instead).
-            Inline::TableRow(_) => continue,
+            Inline::TableRow(_, _) => continue,
         };
         let marker = match (span.bold, span.italic) {
             (true, true) => "***",
@@ -1954,7 +1976,7 @@ fn combined_maths_latex(line: &Line) -> String {
         .iter()
         .filter_map(|i| match i {
             Inline::Maths(s) => Some(s.as_str()),
-            Inline::Text(_) | Inline::TableRow(_) => None,
+            Inline::Text(_) | Inline::TableRow(_, _) => None,
         })
         .collect::<Vec<_>>()
         .join(" ")
