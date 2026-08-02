@@ -1052,3 +1052,65 @@ fn a_table_row_lines_own_text_is_empty() {
     })]]);
     assert_eq!(line.text(), "");
 }
+
+#[test]
+fn table_gutters_finds_the_shared_gap_between_two_rows() {
+    let mut row1 = set("ID", 72.0, 700.0, Style::default());
+    row1.extend(set("Name", 100.0, 700.0, Style::default()));
+    let mut row2 = set("1", 72.0, 688.0, Style::default());
+    row2.extend(set("Alice", 100.0, 688.0, Style::default()));
+
+    let gutters = table_gutters(&[row1, row2]).expect("expected a shared gutter");
+
+    assert_eq!(gutters.len(), 1);
+    assert!(gutters[0] > 82.0 && gutters[0] < 100.0);
+}
+
+// Different word lengths across the two lines mean the union of their
+// non-whitespace spans has no gap left over anywhere — the same property
+// that keeps ordinary prose from ever being mistaken for a table.
+#[test]
+fn table_gutters_is_none_when_rows_share_no_gap() {
+    let row1 = set("hello world today", 72.0, 700.0, Style::default());
+    let row2 = set("goodbye friend now", 72.0, 688.0, Style::default());
+    assert_eq!(table_gutters(&[row1, row2]), None);
+}
+
+#[test]
+fn split_row_into_cells_buckets_by_the_cut_points() {
+    let row: Vec<(usize, CharBox)> = set("AB", 72.0, 700.0, Style::default())
+        .into_iter()
+        .chain(set("CD", 100.0, 700.0, Style::default()))
+        .enumerate()
+        .collect();
+
+    let cells = split_row_into_cells(&row, &[90.0]);
+
+    assert_eq!(cells.len(), 2);
+    assert_eq!(cells[0].iter().map(|(_, c)| c.ch).collect::<String>(), "AB");
+    assert_eq!(cells[1].iter().map(|(_, c)| c.ch).collect::<String>(), "CD");
+}
+
+#[test]
+fn cell_has_content_is_false_for_whitespace_or_nothing() {
+    let whitespace_only: Vec<(usize, CharBox)> =
+        set("  ", 72.0, 700.0, Style::default()).into_iter().enumerate().collect();
+    assert!(!cell_has_content(&whitespace_only));
+    assert!(!cell_has_content(&[]));
+
+    let real: Vec<(usize, CharBox)> =
+        set("x", 72.0, 700.0, Style::default()).into_iter().enumerate().collect();
+    assert!(cell_has_content(&real));
+}
+
+#[test]
+fn row_crosses_gutters_detects_a_straddling_character() {
+    let row = set("straddle", 85.0, 700.0, Style::default());
+    assert!(row_crosses_gutters(&row, &[87.0]));
+}
+
+#[test]
+fn row_crosses_gutters_is_false_when_nothing_straddles() {
+    let row = set("AB", 72.0, 700.0, Style::default());
+    assert!(!row_crosses_gutters(&row, &[90.0]));
+}

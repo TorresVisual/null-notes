@@ -168,6 +168,18 @@ const LIST_INDENT_EMS: f32 = 2.0;
 // Wide enough to bridge " : " or "cos", narrow enough that the prose on either
 // side of an equation is not swallowed into it.
 const MATHS_BRIDGE_EMS: f32 = 2.5;
+// Table cell padding is far narrower than a page-column gutter — chosen
+// against notes/table_test.pdf's own ~12pt (ReportLab's LEFTPADDING +
+// RIGHTPADDING) minimum cell spacing at an 11-12pt body size, comfortably
+// above any ordinary inter-word gap.
+const TABLE_MIN_GUTTER_EMS: f32 = 0.8;
+// A table needs at least this many logical rows (a header plus at least
+// one data row) to be worth reconstructing.
+const TABLE_MIN_ROWS: usize = 2;
+// ...and at least this fraction of its (row, cell) slots holding real
+// content, so a coincidentally-aligned run of mostly-blank lines is never
+// mistaken for a data grid.
+const TABLE_MIN_FILL_RATIO: f32 = 0.5;
 
 /// The standalone accent glyphs LaTeX's Computer Modern fonts emit, mapped to
 /// their combining forms. CM has no precomposed "ü": it prints a `u` and then
@@ -306,6 +318,79 @@ pub(super) fn row_font_size(row: &[CharBox]) -> f32 {
         .map(|c| c.font_size)
         .collect();
     median(&mut sizes)
+}
+
+/// Finds column-boundary x-positions shared by every row in `rows`, by
+/// merging every non-whitespace character's x-interval — not each row's
+/// own collapsed extent the way `row_x_extent` works, since a table needs
+/// *sub-row* boundaries — into covered ranges. The gaps left over are
+/// candidate cell boundaries, each returned as its midpoint. `None` when
+/// there's no gap wide enough to be a real cell boundary rather than an
+/// ordinary word-space within one cell.
+///
+/// Different rows' words rarely start and end at exactly the same x, so
+/// merging *across* rows (not measuring each row alone) is what makes this
+/// robust: two rows of ordinary prose with different word lengths leave no
+/// gap anywhere in the union, while two rows of real tabular data — whose
+/// column starts are genuinely aligned — do.
+pub(super) fn table_gutters(rows: &[Vec<CharBox>]) -> Option<Vec<f32>> {
+    let mut intervals: Vec<(f32, f32)> = rows
+        .iter()
+        .flatten()
+        .filter(|c| !c.ch.is_whitespace())
+        .map(|c| (c.x, c.x + c.width))
+        .collect();
+    if intervals.is_empty() {
+        return None;
+    }
+    intervals.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
+
+    let mut merged: Vec<(f32, f32)> = Vec::new();
+    for (s, e) in intervals {
+        match merged.last_mut() {
+            Some((_, last_e)) if s <= *last_e => *last_e = last_e.max(e),
+            _ => merged.push((s, e)),
+        }
+    }
+
+    let mut sizes: Vec<f32> = rows.iter().flatten().map(|c| c.font_size).collect();
+    let threshold = median(&mut sizes).max(1.0) * TABLE_MIN_GUTTER_EMS;
+
+    let gutters: Vec<f32> = merged
+        .windows(2)
+        .filter(|w| w[1].0 - w[0].1 >= threshold)
+        .map(|w| (w[0].1 + w[1].0) / 2.0)
+        .collect();
+
+    (!gutters.is_empty()).then_some(gutters)
+}
+
+/// Splits `row` into `cut_xs.len() + 1` cells at the given x-positions,
+/// preserving each character's original stream index — `build_line` (used
+/// on each cell's characters in `reconstruct_tables`) sorts by that index,
+/// not by `x`.
+pub(super) fn split_row_into_cells(
+    row: &[(usize, CharBox)],
+    cut_xs: &[f32],
+) -> Vec<Vec<(usize, CharBox)>> {
+    let mut cells: Vec<Vec<(usize, CharBox)>> = vec![Vec::new(); cut_xs.len() + 1];
+    for &(index, ch) in row {
+        let cell = cut_xs.iter().filter(|&&cx| ch.x > cx).count();
+        cells[cell].push((index, ch));
+    }
+    cells
+}
+
+pub(super) fn cell_has_content(cell: &[(usize, CharBox)]) -> bool {
+    cell.iter().any(|(_, c)| !c.ch.is_whitespace())
+}
+
+/// Whether any character in `row` straddles one of `cut_xs` — the signal
+/// that this row does not belong to the table the gutters were established
+/// from, rather than merely being one more row of it.
+pub(super) fn row_crosses_gutters(row: &[CharBox], cut_xs: &[f32]) -> bool {
+    row.iter()
+        .any(|c| cut_xs.iter().any(|&cx| c.x < cx && c.x + c.width > cx))
 }
 
 /// Splits `row`'s printing characters into exactly `n` left-to-right groups,
