@@ -122,6 +122,41 @@ fn row_y_and_font_size_read_off_the_row() {
     assert_eq!(row_font_size(&row), BODY);
 }
 
+#[test]
+fn splits_a_row_into_n_groups_at_its_widest_gaps() {
+    // Three narrow terms with a wide gap between each — the shape three
+    // stacked fractions' numerators take: "1   y^2   y^3".
+    let mut row = set("1", 100.0, 700.0, Style::default());
+    row.extend(set("y2", 130.0, 700.0, Style::default()));
+    row.extend(set("y3", 160.0, 700.0, Style::default()));
+
+    let groups = split_into_terms(&row, 3).expect("expected a confident 3-way split");
+    let texts: Vec<String> = groups.iter().map(|g| g.iter().map(|c| c.ch).collect()).collect();
+    assert_eq!(texts, ["1", "y2", "y3"]);
+}
+
+#[test]
+fn refuses_to_split_when_gaps_do_not_clearly_separate() {
+    // One evenly-spaced run of letters has no gap that stands out from the
+    // rest — forcing a 3-way split here would be a guess, not a measurement.
+    let row = set("abcdef", 100.0, 700.0, Style::default());
+    assert_eq!(split_into_terms(&row, 3), None);
+}
+
+#[test]
+fn refuses_to_split_when_there_are_fewer_characters_than_terms() {
+    let row = set("ab", 100.0, 700.0, Style::default());
+    assert_eq!(split_into_terms(&row, 3), None);
+}
+
+#[test]
+fn a_single_term_is_the_whole_row_unsplit() {
+    let row = set("x + y", 100.0, 700.0, Style::default());
+    let groups = split_into_terms(&row, 1).expect("n=1 always succeeds");
+    assert_eq!(groups.len(), 1);
+    assert_eq!(groups[0].len(), row.iter().filter(|c| !c.ch.is_whitespace()).count());
+}
+
 // A subscript or inline-maths glyph sits off the baseline but belongs to the
 // line it is printed on.
 #[test]

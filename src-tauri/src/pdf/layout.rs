@@ -293,6 +293,62 @@ pub(super) fn row_font_size(row: &[CharBox]) -> f32 {
     median(&mut sizes)
 }
 
+/// Splits `row`'s printing characters into exactly `n` left-to-right groups,
+/// cut at its `n - 1` widest horizontal gaps.
+///
+/// This is how a numerator or denominator row holding several stacked
+/// fraction terms actually divides, once `n` is known from the baseline's
+/// own connector count (see `connector_baseline`) — measuring the row's own
+/// gaps, rather than guessing from `MATHS_BRIDGE_EMS`, is what correctly
+/// separates three denominators that sit closer together than their
+/// numerators do.
+///
+/// `None` when there aren't enough characters to fill `n` non-empty groups,
+/// or when the row's gaps don't clearly separate into `n` groups — the
+/// narrowest cut chosen must be markedly wider than the widest gap left
+/// uncut, or forcing a split would be a guess rather than a measurement.
+pub(super) fn split_into_terms(row: &[CharBox], n: usize) -> Option<Vec<Vec<CharBox>>> {
+    let mut sorted: Vec<CharBox> = row.iter().copied().filter(|c| !c.ch.is_whitespace()).collect();
+    if n == 0 || sorted.len() < n {
+        return None;
+    }
+    sorted.sort_by(|a, b| a.x.partial_cmp(&b.x).unwrap_or(std::cmp::Ordering::Equal));
+
+    if n == 1 {
+        return Some(vec![sorted]);
+    }
+
+    let mut gaps: Vec<(f32, usize)> = sorted
+        .windows(2)
+        .enumerate()
+        .map(|(i, w)| (horizontal_gap(&w[0], &w[1]), i))
+        .collect();
+    gaps.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
+
+    if gaps.len() < n - 1 {
+        return None;
+    }
+
+    let cuts = &gaps[..n - 1];
+    let widest_kept = cuts.iter().map(|(g, _)| *g).fold(f32::INFINITY, f32::min);
+    let widest_dropped = gaps.get(n - 1).map(|(g, _)| *g).unwrap_or(0.0);
+    if widest_kept <= widest_dropped * 1.5 {
+        return None;
+    }
+
+    let mut cut_indices: Vec<usize> = cuts.iter().map(|(_, i)| *i).collect();
+    cut_indices.sort_unstable();
+
+    let mut groups = Vec::with_capacity(n);
+    let mut start = 0;
+    for cut in cut_indices {
+        groups.push(sorted[start..=cut].to_vec());
+        start = cut + 1;
+    }
+    groups.push(sorted[start..].to_vec());
+    Some(groups)
+}
+
 /// Groups characters into lines by baseline, then into styled spans.
 pub fn group_lines(chars: &[CharBox]) -> Vec<Line> {
     if chars.is_empty() {
