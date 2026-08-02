@@ -407,6 +407,66 @@ fn merge_extensible_rows(rows: &mut Vec<Vec<(usize, CharBox)>>) {
     }
 }
 
+/// A displaced accent's real base letter is still always its closest
+/// neighbour by x, even when a producer defers drawing it until long after
+/// the letter it sits over rather than right next to it. Found on
+/// Analysis_2_Blatt1_2026.pdf: the diaeresis for "Übungsblatt" arrives
+/// *eleven* characters later in the stream, immediately before the next
+/// line's own "1." list marker — but its x still sits within 2pt of the
+/// "U" it belongs to. `build_line`'s own combining logic already gets this
+/// right the moment the two land next to each other in stream order (see
+/// `push_latex`'s sibling below); this only has to handle the case where
+/// they don't, by physically moving the accent there first, so that logic
+/// never has to know the difference. Deliberately leaves alone any accent
+/// whose nearest match is already an immediate neighbour — the common case,
+/// already handled, and touching it risks undoing the forward-attach
+/// direction (an accent already sitting *before* its letter must stay
+/// there, not get pushed after it).
+fn relocate_stray_accents(row: Vec<CharBox>) -> Vec<CharBox> {
+    // Far enough that this is clearly a different letter's own position,
+    // not a font's ordinary accent-to-base kerning.
+    const MAX_RELOCATE_DISTANCE: f32 = 3.0;
+
+    let relocations: Vec<(usize, usize)> = row
+        .iter()
+        .enumerate()
+        .filter(|(_, ch)| combining_form(ch.ch).is_some())
+        .filter_map(|(i, ch)| {
+            let (j, target) = row
+                .iter()
+                .enumerate()
+                .filter(|(j, c)| *j != i && combining_form(c.ch).is_none())
+                .min_by(|(_, a), (_, b)| {
+                    (ch.x - a.x)
+                        .abs()
+                        .partial_cmp(&(ch.x - b.x).abs())
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                })?;
+            let already_adjacent = j + 1 == i || i + 1 == j;
+            (!already_adjacent && (target.x - ch.x).abs() <= MAX_RELOCATE_DISTANCE)
+                .then_some((i, j))
+        })
+        .collect();
+
+    if relocations.is_empty() {
+        return row;
+    }
+
+    let mut out = Vec::with_capacity(row.len());
+    for (i, ch) in row.iter().enumerate() {
+        if relocations.iter().any(|(accent_i, _)| *accent_i == i) {
+            continue; // placed right after its target below instead
+        }
+        out.push(*ch);
+        for (accent_i, target_i) in &relocations {
+            if *target_i == i {
+                out.push(row[*accent_i]);
+            }
+        }
+    }
+    out
+}
+
 fn build_line(mut row: Vec<(usize, CharBox)>) -> Line {
     // Ordered by position in the page's own extraction stream, not by `x`.
     // `x` is right for everything geometric — gaps, scripts, region bounds —
@@ -418,6 +478,7 @@ fn build_line(mut row: Vec<(usize, CharBox)>) -> Line {
     // it reflects the order the content was actually authored in.
     row.sort_by_key(|(index, _)| *index);
     let row: Vec<CharBox> = row.into_iter().map(|(_, c)| c).collect();
+    let row = relocate_stray_accents(row);
 
     let mut sizes: Vec<f32> = row.iter().map(|c| c.font_size).collect();
     let font_size = median(&mut sizes);
@@ -435,6 +496,15 @@ fn build_line(mut row: Vec<(usize, CharBox)>) -> Line {
     let mut previous_end: Option<f32> = None;
     let mut index = 0usize;
     let mut ends_hyphenated = false;
+    // The x of the last real (non-accent) character emitted, kept alongside
+    // `previous_end` (its right edge) because the accent-attachment decision
+    // below needs the character's own position, not where it ends.
+    let mut previous_char_x: Option<f32> = None;
+    // An accent whose base letter turned out to be the *next* character, not
+    // the previous one — see the comment where it is set. Flushed onto the
+    // very next real character pushed, or left standalone if the row ends
+    // first.
+    let mut pending_accent: Option<char> = None;
 
     while index < row.len() {
         // A maths region is opaque: the text layer cannot express what it says,
@@ -488,10 +558,29 @@ fn build_line(mut row: Vec<(usize, CharBox)>) -> Line {
             continue;
         }
 
-        // An accent glyph sorts to just after the letter it sits above, so it
-        // attaches to whatever was last emitted. With nothing before it there
-        // is nothing to combine with, and it stays the standalone character.
+        // An accent glyph shares its letter's x position rather than
+        // reliably sorting to either side of it — one real document draws
+        // "u", then the diaeresis, then "r" (accent follows its vowel);
+        // another draws "M", then the diaeresis, then "o" (accent precedes
+        // it). Stream order alone cannot tell these apart, so whichever
+        // neighbour — the letter just emitted, or the one about to be — sits
+        // closer in x is the one it combines with.
         if let Some(combining) = combining_form(ch.ch) {
+            let backward_dist = previous_char_x.map(|x| (ch.x - x).abs());
+            let forward = row.get(index).filter(|n| !n.ch.is_whitespace() && combining_form(n.ch).is_none());
+            let forward_dist = forward.map(|n| (ch.x - n.x).abs());
+
+            let attach_forward = match (backward_dist, forward_dist) {
+                (Some(back), Some(fwd)) => fwd < back,
+                (None, Some(_)) => true,
+                _ => false,
+            };
+
+            if attach_forward {
+                pending_accent = Some(combining);
+                continue;
+            }
+
             if !after_space && !spans.is_empty() {
                 push_char(&mut spans, combining, ch.bold, ch.italic);
                 // Still advance the cursor. An accent usually overlays its
@@ -513,6 +602,17 @@ fn build_line(mut row: Vec<(usize, CharBox)>) -> Line {
         }
         push_char(&mut spans, ch.ch, ch.bold, ch.italic);
         previous_end = Some(ch.x + ch.width);
+        previous_char_x = Some(ch.x);
+        if let Some(combining) = pending_accent.take() {
+            push_char(&mut spans, combining, ch.bold, ch.italic);
+        }
+    }
+
+    // The row ended before the accent's chosen base letter arrived — a
+    // maths run or a line break intervened. Emit it standalone rather than
+    // silently dropping it.
+    if let Some(combining) = pending_accent.take() {
+        push_char(&mut spans, combining, false, false);
     }
 
     flush_spans(&mut spans, &mut content);
@@ -554,6 +654,78 @@ fn flush_spans(spans: &mut Vec<Span>, content: &mut Vec<Inline>) {
     }
 }
 
+/// Whether `row[start..]` begins with a known operator name (`cos`, `log`,
+/// …), case-insensitively. Comes back with the word's length in characters.
+///
+/// Matches the *maximal* run of consecutive upright-text-family letters
+/// starting here, not a fixed-length prefix — checking only "is the next
+/// character non-alphabetic" mistakes "cos" for a match inside "cosh", but
+/// also, wrongly, rejects a real match: TeX's own inter-atom spacing between
+/// an operator and a parenthesis-less argument can be zero, so "log" sitting
+/// directly against the variable "n" with no space glyph between them at
+/// all is legitimate and has to match. What actually distinguishes the two
+/// is font family, not adjacency — `n` is `Family::Italic`, the
+/// maths-variable face, not a continuation of `log`'s own upright word, so
+/// the run correctly stops there regardless of the missing space; "cosh"'s
+/// `h` is the *same* family as "cos", so the run correctly continues
+/// through it and (being itself a known name) still matches, just longer.
+fn operator_word_at(row: &[CharBox], start: usize) -> Option<usize> {
+    let run_len = row[start..]
+        .iter()
+        .take_while(|c| c.ch.is_alphabetic() && c.family == Family::Text)
+        .count();
+    let candidate: String = row[start..start + run_len].iter().map(|c| c.ch).collect();
+    latex::KNOWN_OPERATOR_NAMES
+        .iter()
+        .any(|word| candidate.eq_ignore_ascii_case(word))
+        .then_some(run_len)
+}
+
+/// The backward-scanning counterpart of [`operator_word_at`]: whether
+/// `row[..end]` ends with a known operator name, matched against the
+/// maximal same-family letter run ending here for the same reason. Comes
+/// back with the word's start index.
+fn operator_word_ending_at(row: &[CharBox], end: usize) -> Option<usize> {
+    let run_len = row[..end]
+        .iter()
+        .rev()
+        .take_while(|c| c.ch.is_alphabetic() && c.family == Family::Text)
+        .count();
+    let start = end - run_len;
+    let candidate: String = row[start..end].iter().map(|c| c.ch).collect();
+    latex::KNOWN_OPERATOR_NAMES
+        .iter()
+        .any(|word| candidate.eq_ignore_ascii_case(word))
+        .then_some(start)
+}
+
+/// Whether every alphabetic run strictly between `from` and `to` (both
+/// indices into `row`) is a whole, known operator name — i.e. whether the
+/// stretch between two nearby maths seeds is safe to fuse into one run.
+///
+/// Punctuation, digits and operators impose no restriction here (`"f : R"`
+/// bridges its colon this way, same as it always has); only *letters* are
+/// gated, and only by the same fixed, known list `maths_runs`'s
+/// outward-growth uses. Without this, two single-letter maths variables
+/// separated only by a short, ordinary word — "paths from `s` to `t`" — sit
+/// close enough in `x` for `MATHS_BRIDGE_EMS` to fuse them into one run with
+/// "to" trapped inside it, rendering `$s \mathrm{to} t$` instead of leaving
+/// "to" as the prose it is.
+fn bridge_has_only_known_words(row: &[CharBox], from: usize, to: usize) -> bool {
+    let mut index = from;
+    while index < to {
+        if row[index].ch.is_alphabetic() {
+            match operator_word_at(row, index) {
+                Some(len) if index + len <= to => index += len,
+                _ => return false,
+            }
+        } else {
+            index += 1;
+        }
+    }
+    true
+}
+
 /// Index ranges `[start, end)` over an x-sorted row that should be cropped as
 /// mathematics.
 ///
@@ -577,7 +749,10 @@ fn maths_runs(row: &[CharBox], font_size: f32) -> Vec<(usize, usize)> {
     let mut runs: Vec<(usize, usize)> = Vec::new();
     for index in seeds {
         match runs.last_mut() {
-            Some(run) if row[index].x - row[run.1 - 1].x <= em * MATHS_BRIDGE_EMS => {
+            Some(run)
+                if row[index].x - row[run.1 - 1].x <= em * MATHS_BRIDGE_EMS
+                    && bridge_has_only_known_words(row, run.1, index) =>
+            {
                 run.1 = index + 1
             }
             _ => runs.push((index, index + 1)),
@@ -594,8 +769,25 @@ fn maths_runs(row: &[CharBox], font_size: f32) -> Vec<(usize, usize)> {
         row[right].x - (row[left].x + row[left].width) <= em
     };
     for run in &mut runs {
-        while run.0 > 0
-            && !row[run.0 - 1].ch.is_alphabetic()
+        while run.0 > 0 && gap_ok(run.0 - 1, run.0) {
+            if row[run.0 - 1].ch.is_alphabetic() {
+                // An upright word is normally where an equation ends — but
+                // "cos" in "cos(z)" is a known operator name, set upright,
+                // sitting right against the maths that follows it. Absorb
+                // the whole word in one step rather than stopping at its
+                // first letter, so long as spelling it out backward from
+                // here matches a name on the fixed, known list; anything
+                // else (ordinary prose ending right before the equation)
+                // still stops the growth exactly as before.
+                let Some(word_start) = operator_word_ending_at(row, run.0) else {
+                    break;
+                };
+                if word_start > 0 && !gap_ok(word_start - 1, word_start) {
+                    break;
+                }
+                run.0 = word_start;
+                continue;
+            }
             // A ')' is never legitimate to pick up growing backward: an
             // equation opens a paren before its content and closes it after,
             // so backward growth only ever needs a '(' or an operator/digit.
@@ -605,12 +797,27 @@ fn maths_runs(row: &[CharBox], font_size: f32) -> Vec<(usize, usize)> {
             // variable with no source-level space wide enough to stop the
             // gap check, absorbing its closing paren and reading "(a$) C$"
             // instead of "(a) $\mathcal{C}$".
-            && row[run.0 - 1].ch != ')'
-            && gap_ok(run.0 - 1, run.0)
-        {
+            if row[run.0 - 1].ch == ')' {
+                break;
+            }
             run.0 -= 1;
         }
-        while run.1 < row.len() && !row[run.1].ch.is_alphabetic() && gap_ok(run.1 - 1, run.1) {
+        while run.1 < row.len() && gap_ok(run.1 - 1, run.1) {
+            if row[run.1].ch.is_alphabetic() {
+                // The forward-growth counterpart of the operator-name case
+                // above — "log" in "O(m log n)".
+                let Some(word_len) = operator_word_at(row, run.1) else {
+                    break;
+                };
+                let word_end = run.1 + word_len;
+                if word_end < row.len() && !gap_ok(word_end - 1, word_end) {
+                    // The word butts against real prose on its far side —
+                    // matching the spelling alone isn't enough evidence.
+                    break;
+                }
+                run.1 = word_end;
+                continue;
+            }
             // A footnote marker is a raised, reduced digit glued onto the
             // sentence-ending punctuation right after an equation — the same
             // geometry a genuine exponent has, except for what it follows. An

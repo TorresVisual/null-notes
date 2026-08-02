@@ -145,6 +145,48 @@ fn render(chars: &[CharBox], base_size: f32, base_y: f32) -> String {
             // Recursed so a nested script keeps working, measured against the
             // script's own size.
             let inner_size = run.iter().map(|c| c.font_size).fold(0.0_f32, f32::max);
+
+            // A superscript run immediately followed by a subscript run
+            // stacked at (about) the same x, with no base character drawn
+            // between them, is not "raised to nothing, then lowered to
+            // nothing" — it's a compact inline fraction set too small for a
+            // separate numerator/denominator row pair: "R = 1/2" typeset
+            // small enough that both digits are just script-sized glyphs at
+            // one x.
+            //
+            // x-alignment alone is not enough to tell that apart from a
+            // genuine sequential pair, though — found on Analysis_2_Blatt12.pdf:
+            // "y'_1(t)" (a prime, then a subscript, both on base "y") sets the
+            // prime and the "1" at nearly the same x too, since both simply
+            // sit right where "y" ends. What actually distinguishes them is
+            // whether a real base character immediately precedes the run at
+            // all: a fraction's numerator is never attached to one — nothing
+            // before "1" in "= 1/2" would sensibly take it as an exponent —
+            // while every real superscript follows some base glyph directly.
+            let has_preceding_base = start > 0 && !chars[start - 1].ch.is_whitespace();
+            if level == Level::Super && !has_preceding_base && index < chars.len() {
+                let aligned = (chars[index].x - run[0].x).abs() <= inner_size.max(1.0);
+                if aligned && level_of(&chars[index], base_size, base_y) == Level::Sub {
+                    let den_start = index;
+                    while index < chars.len()
+                        && level_of(&chars[index], base_size, base_y) == Level::Sub
+                    {
+                        index += 1;
+                    }
+                    let denominator = &chars[den_start..index];
+                    let den_size =
+                        denominator.iter().map(|c| c.font_size).fold(0.0_f32, f32::max);
+                    let num = render(run, inner_size, run[0].y);
+                    let den = render(denominator, den_size, denominator[0].y);
+                    out.push_str("\\frac{");
+                    out.push_str(num.trim());
+                    out.push_str("}{");
+                    out.push_str(den.trim());
+                    out.push('}');
+                    continue;
+                }
+            }
+
             let inner = render(run, inner_size, run[0].y);
             let marker = if level == Level::Super { '^' } else { '_' };
             out.push(marker);
@@ -176,7 +218,7 @@ fn render(chars: &[CharBox], base_size: f32, base_y: f32) -> String {
         // italics.
         if let Some(word_len) = upright_word(&chars[index..]) {
             let word: String = chars[index..index + word_len].iter().map(|c| c.ch).collect();
-            out.push_str(&operator_name(&word));
+            push_latex(&mut out, &operator_name(&word));
             index += word_len;
             continue;
         }
@@ -189,11 +231,38 @@ fn render(chars: &[CharBox], base_size: f32, base_y: f32) -> String {
             continue;
         }
 
-        out.push_str(&glyph(&chars[index]));
+        push_latex(&mut out, &glyph(&chars[index]));
         index += 1;
     }
 
     out
+}
+
+/// LaTeX reads a run of letters straight through a backslash as one command
+/// name — `\alpha` immediately followed by the variable `f` is not "α then
+/// f", it is the single, undefined command `\alphaf`. A space breaks the
+/// run without adding a visible gap: LaTeX (and KaTeX) consume whitespace
+/// right after a control word as the command's own terminator, so it never
+/// renders.
+///
+/// Only a *command's* trailing letters are ambiguous — two bare adjacent
+/// variables ("xy", meaning x times y) must stay glued exactly as the source
+/// had them, or `e^{xy}` grows a spurious `e^{x y}`. So the check walks back
+/// from the end of `out` through its trailing letter run and asks whether a
+/// `\` started it, not merely whether the last character was a letter.
+fn push_latex(out: &mut String, next: &str) {
+    let letters_start = out
+        .rfind(|c: char| !c.is_ascii_alphabetic())
+        .map(|i| i + 1)
+        .unwrap_or(0);
+    let ends_a_command = letters_start > 0
+        && letters_start < out.len()
+        && out.as_bytes()[letters_start - 1] == b'\\';
+
+    if ends_a_command && next.chars().next().is_some_and(|c| c.is_ascii_alphabetic()) {
+        out.push(' ');
+    }
+    out.push_str(next);
 }
 
 /// Wraps in braces unless it is a single token that does not need them.
@@ -223,6 +292,19 @@ fn is_oint(ch: &CharBox) -> bool {
     ch.ch == '∮' || (ch.family == Family::Extensible && matches!(ch.ch, 'H' | 'I'))
 }
 
+/// CMEX10 has no Unicode plain-integral character either; pdfium falls back
+/// to 'Z'. Verified the same way as [`is_oint`] — cropping it out of a real
+/// rendered page (Analysis_2_Blatt1_2026.pdf's `∫ 1/(x√(ln x)) dx`) and
+/// looking at it — not assumed from an encoding table. Less of a guess than
+/// it looks: `cmex10` is Knuth's own Metafont program, the same physical
+/// font essentially every LaTeX installation embeds unchanged, so pdfium's
+/// "no ToUnicode entry, fall back to the glyph's raw index" behaviour for it
+/// is a property of that one font, not of this document's producer — the
+/// same reasoning that already justified `H`/`I` for `is_oint`.
+fn is_integral(ch: &CharBox) -> bool {
+    ch.ch == '∫' || (ch.family == Family::Extensible && ch.ch == 'Z')
+}
+
 /// How many characters from the front form an upright multi-letter word.
 fn upright_word(chars: &[CharBox]) -> Option<usize> {
     let count = chars
@@ -232,15 +314,22 @@ fn upright_word(chars: &[CharBox]) -> Option<usize> {
     (count >= 2).then_some(count)
 }
 
+/// LaTeX operator names that TeX sets upright, in the *text* font family —
+/// the same family as ordinary prose — rather than the maths-italic face
+/// every variable uses. `layout.rs`'s region-growing needs this same list to
+/// recognise one sitting inside an equation ("O(m log n)") rather than
+/// treating its letters as the sentence that follows; keeping one shared
+/// list is what stops the two from silently drifting apart.
+pub(super) const KNOWN_OPERATOR_NAMES: [&str; 22] = [
+    "arccos", "arcsin", "arctan", "cos", "cosh", "cot", "csc", "deg", "det", "dim", "exp", "gcd",
+    "inf", "ker", "lim", "ln", "log", "max", "min", "sec", "sin", "sup",
+];
+
 /// The LaTeX for a run of upright letters: a known operator gets its command,
 /// anything else stays upright inside `\mathrm`.
 fn operator_name(word: &str) -> String {
-    const KNOWN: [&str; 22] = [
-        "arccos", "arcsin", "arctan", "cos", "cosh", "cot", "csc", "deg", "det", "dim", "exp",
-        "gcd", "inf", "ker", "lim", "ln", "log", "max", "min", "sec", "sin", "sup",
-    ];
     // Longest first, so "arccos" is not matched as "cos".
-    if KNOWN.contains(&word.to_ascii_lowercase().as_str()) {
+    if KNOWN_OPERATOR_NAMES.contains(&word.to_ascii_lowercase().as_str()) {
         format!("\\{}", word.to_ascii_lowercase())
     } else {
         format!("\\mathrm{{{word}}}")
@@ -261,6 +350,10 @@ fn glyph(ch: &CharBox) -> String {
     // the same way it handles every other subscript.
     if is_oint(ch) {
         return "\\oint".to_string();
+    }
+
+    if is_integral(ch) {
+        return "\\int".to_string();
     }
 
     if let Some(command) = symbol_command(ch.ch) {
@@ -444,6 +537,41 @@ mod tests {
         assert_eq!(to_latex(&chars), "x^2");
     }
 
+    // Found on Analysis_2_Blatt11.pdf: "R = 1/2" typeset small enough that
+    // the numerator and denominator are just two script-sized glyphs
+    // stacked at one x, with no base character for either to attach to —
+    // the digits arrived as `R = ^1_2`, "1" raised to nothing and "2"
+    // lowered to nothing, rather than a fraction. Real coordinates: both "1"
+    // and "2" sit at x=276.341, size 7.97, against a 11.96pt "R = ".
+    #[test]
+    fn a_stacked_pair_with_no_base_becomes_a_fraction() {
+        let mut chars = run("R = ", Family::Text);
+        let frac_x = chars.last().map(|c| c.x + c.width).unwrap_or(100.0);
+        chars.extend(script("1", frac_x, 3.0, Family::Text));
+        chars.extend(script("2", frac_x, -3.0, Family::Text));
+
+        assert_eq!(to_latex(&chars), r"R = \frac{1}{2}");
+    }
+
+    // A regression the fraction fix above introduced and real-document
+    // testing caught: "y'_1(t)" on Analysis_2_Blatt12.pdf — a prime
+    // superscript immediately followed by a subscript, both on base "y" —
+    // started rendering as `y\frac{'}{1}(t)` instead of `y^'_1(t)`. x-alignment
+    // alone doesn't tell a fraction's numerator apart from a real exponent:
+    // both the prime and the "1" sit at essentially the same x here too,
+    // simply because both attach right where "y" ends. What actually
+    // distinguishes them is whether a real base character immediately
+    // precedes the superscript run — "y" does, "= " (whitespace) doesn't.
+    #[test]
+    fn a_prime_and_subscript_on_the_same_base_is_not_mistaken_for_a_fraction() {
+        let mut chars = run("y", Family::Italic);
+        let x = chars.last().map(|c| c.x + c.width).unwrap_or(100.0);
+        chars.extend(script("′", x, 3.0, Family::Symbol));
+        chars.extend(script("1", x, -3.0, Family::Text));
+
+        assert_eq!(to_latex(&chars), "y^'_1");
+    }
+
     #[test]
     fn a_lowered_smaller_glyph_becomes_a_subscript() {
         let mut chars = run("T", Family::Italic);
@@ -478,6 +606,23 @@ mod tests {
         assert_eq!(to_latex(&run("∈", Family::Symbol)), r"\in");
         assert_eq!(to_latex(&run("≤", Family::Symbol)), r"\leq");
         assert_eq!(to_latex(&run("α", Family::Italic)), r"\alpha");
+    }
+
+    // Found against a real document: "αf+βg" rendered as `\alphaf+\betag` —
+    // LaTeX reads the letters right through the backslash as one command
+    // name, so `\alpha` glued to the variable `f` is the undefined command
+    // `\alphaf`, not "α then f".
+    #[test]
+    fn a_greek_command_does_not_swallow_the_variable_after_it() {
+        let chars = adjoin(&run("α", Family::Italic), "f", Family::Italic);
+        assert_eq!(to_latex(&chars), r"\alpha f");
+    }
+
+    // The fix above must not glue together two bare variables that were
+    // never separated by a command name — "xy" (x times y) stays "xy".
+    #[test]
+    fn two_bare_variables_stay_glued_with_no_command_between_them() {
+        assert_eq!(to_latex(&run("xy", Family::Italic)), "xy");
     }
 
     // U+2212 is the real minus sign; a bare "-" is a hyphen and reads wrong.
@@ -547,6 +692,23 @@ mod tests {
     fn an_ordinary_h_or_i_is_not_mistaken_for_oint() {
         assert_eq!(to_latex(&run("H", Family::Text)), "H");
         assert_eq!(to_latex(&run("I", Family::Text)), "I");
+    }
+
+    // CMEX10 has no Unicode plain-integral character either; pdfium hands
+    // back 'Z'. Confirmed the same way as the oint placeholders — cropping
+    // it out of a real rendered page (Analysis_2_Blatt1_2026.pdf) and
+    // looking at it.
+    #[test]
+    fn the_integral_placeholder_glyph_becomes_int() {
+        assert_eq!(to_latex(&run("Z", Family::Extensible)), r"\int");
+    }
+
+    // A body-font or maths-italic 'Z' is an ordinary letter/variable and
+    // must not be mistaken for the symbol — scoped to Family::Extensible.
+    #[test]
+    fn an_ordinary_z_is_not_mistaken_for_an_integral() {
+        assert_eq!(to_latex(&run("Z", Family::Text)), "Z");
+        assert_eq!(to_latex(&run("Z", Family::Italic)), "Z");
     }
 
     #[test]

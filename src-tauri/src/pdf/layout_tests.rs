@@ -371,10 +371,66 @@ fn a_raised_footnote_marker_does_not_push_a_diacritic_off_the_line() {
     assert!(lines[0].text().contains("abzuschätzen"), "got: {}", lines[0].text());
 }
 
+// Found against a second real document (Ue14.pdf): this producer draws the
+// accent *before* the vowel it decorates ("l", diaeresis, "o" for "lösen")
+// rather than after it, the reverse of
+// `a_standalone_accent_glyph_recomposes_with_its_letter`. Stream order can't
+// tell the two producers apart; only x-proximity to the accent's own glyph
+// can, since it always sits at its vowel's position regardless of which side
+// it was drawn from. Coordinates are the real ones read off that document.
+#[test]
+fn a_standalone_accent_before_its_letter_recomposes_forward() {
+    let body = Style { size: 12.0, ..Style::default() };
+    let mut chars = set("l", 85.04, 623.06, body);
+    chars.extend(set("\u{00A8}", 87.71, 622.58, body));
+    chars.extend(set("osen", 87.83, 623.06, body));
+
+    let markdown = chars_to_markdown(&chars);
+
+    assert!(markdown.contains("lösen"), "got: {markdown}");
+}
+
 #[test]
 fn an_accent_with_no_letter_before_it_is_left_alone() {
     let markdown = chars_to_markdown(&page(&["\u{00A8} alone on the line"]));
     assert!(markdown.contains('\u{00A8}'), "got: {markdown}");
+}
+
+// Found against Analysis_2_Blatt1_2026.pdf: the diaeresis for "Übungsblatt"
+// — a heading, not body text — arrives *eleven* characters after the whole
+// word in stream order, immediately before the next line's own "1." list
+// marker, rather than next to the "U" it sits over on either side. Real
+// coordinates: "U" at x=69.700, the accent at x=71.161 — 1.46pt apart, well
+// within the same tolerance every other accent test in this file uses, but
+// nowhere near an immediate stream neighbour of it.
+#[test]
+fn a_heading_accent_deferred_far_past_its_word_still_finds_its_letter() {
+    let body = Style { size: 11.96, ..Style::default() };
+    let mut chars = set("Ubungsblatt", 69.700, 739.092, body);
+    chars.extend(set("\u{00A8}", 71.161, 741.643, body));
+
+    let markdown = chars_to_markdown(&chars);
+
+    assert!(markdown.contains("Übungsblatt"), "got: {markdown:?}");
+}
+
+// Found against Analysis_2_Blatt12.pdf: pdfium reports the "ff" ligature of
+// "Differentialgleichung" as a real, body-sized glyph with no usable Unicode
+// value (extract.rs replaces it with U+FFFD rather than dropping it — see
+// the comment there for why dropping is unsafe). This is the consequence
+// that actually matters at this layer: whatever extract.rs hands over for an
+// unrepresentable glyph must keep its geometric slot in the row, or the gap
+// where a real character used to be reads as a word boundary and
+// "Differentialgleichung" silently becomes the two plausible-looking words
+// "Di erentialgleichung" — a worse failure than an ugly placeholder, because
+// nothing about it looks broken.
+#[test]
+fn an_unrepresentable_glyph_stays_inside_its_word_not_a_false_space() {
+    let markdown = chars_to_markdown(&page(&["Di\u{FFFD}erentialgleichung"]));
+    assert!(
+        markdown.contains("Di\u{FFFD}erentialgleichung"),
+        "an undecodable mid-word glyph must not read as a word break: got {markdown:?}"
+    );
 }
 
 #[test]
@@ -514,6 +570,55 @@ fn prose_far_from_an_equation_is_not_swallowed_into_it() {
     let regions = lines[0].content.iter().filter(|i| matches!(i, Inline::Maths(_))).count();
     assert_eq!(regions, 2, "got: {:?}", lines[0].content);
     assert!(lines[0].text().contains("und"), "prose lost: {}", lines[0].text());
+}
+
+// Found on Assignment10_DA.pdf: "O(m log n)" set "log" directly against the
+// variable "n" with *no* space glyph between them at all — TeX's own
+// math-mode inter-atom spacing can be zero, unlike a real word gap. A
+// boundary check keyed on "is the next character non-alphabetic" (right for
+// telling "cos" apart from "cosh") wrongly rejects this too; only the font
+// family actually distinguishes them, since "n" is the maths-italic
+// variable face, not a continuation of "log"'s own upright word.
+#[test]
+fn an_operator_name_touching_its_variable_with_no_space_is_still_absorbed() {
+    let mut chars = set("O(m", 200.0, 700.0, maths_italic());
+    chars.extend(set("log", 215.0, 700.0, Style::default()));
+    // Directly against "log" — zero gap, the case that broke.
+    chars.extend(set("n)", 230.0, 700.0, maths_italic()));
+
+    let lines = group_lines(&chars);
+
+    let regions: Vec<_> = lines[0]
+        .content
+        .iter()
+        .filter(|i| matches!(i, Inline::Maths(_)))
+        .collect();
+    assert_eq!(regions.len(), 1, "expected one region, got {:?}", lines[0].content);
+    if let Inline::Maths(latex) = regions[0] {
+        assert!(latex.contains("\\log"), "got: {latex}");
+    }
+}
+
+// Found on Assignment10_DA.pdf: two single-letter maths variables close
+// enough in x for `MATHS_BRIDGE_EMS` to bridge — but the word sitting
+// between them is ordinary prose ("to"), not an operator name, and must
+// stay outside both regions: "paths from s to t" is prose with two
+// one-letter equations in it, not one equation reading "s \mathrm{to} t".
+#[test]
+fn an_ordinary_word_between_two_maths_variables_is_not_absorbed_as_an_operator() {
+    let mut chars = set("s", 200.0, 700.0, maths_italic());
+    chars.extend(set(" to ", 205.0, 700.0, Style::default()));
+    chars.extend(set("t", 225.0, 700.0, maths_italic()));
+
+    let lines = group_lines(&chars);
+
+    let regions: Vec<_> = lines[0]
+        .content
+        .iter()
+        .filter(|i| matches!(i, Inline::Maths(_)))
+        .collect();
+    assert_eq!(regions.len(), 2, "\"to\" was absorbed into the equation: {:?}", lines[0].content);
+    assert!(lines[0].text().contains(" to "), "got: {}", lines[0].text());
 }
 
 #[test]

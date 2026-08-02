@@ -111,11 +111,35 @@ fn extract_pages_native(pdf_path: &Path) -> Result<Vec<ExtractedPage>> {
             // word was split or not. It becomes a soft hyphen for the layout
             // to reflow across.
             let hyphenation_break = ch.is_hyphen().unwrap_or(false);
-            if !hyphenation_break
-                && (is_layout_filler(ch.scaled_font_size().value) || value.is_control())
-            {
+            if !hyphenation_break && is_layout_filler(ch.scaled_font_size().value) {
                 continue;
             }
+            // A real (non-filler) glyph pdfium cannot map to a genuine
+            // Unicode value — confirmed, via both the per-character API used
+            // here and the separate `FPDFText_GetBoundedText` path `dump.rs`
+            // cross-checked it against, to be the same underdetermined
+            // result rather than an artifact of this extraction path. Most
+            // often a ligature (ff/fi/ffi) in a font whose ToUnicode CMap has
+            // no entry for it. Which letters it actually represents is
+            // producer- and font-specific — the same codepoint means
+            // something else in a different document's font, exactly like
+            // the `ß`/`∮` glyph-identity problems in `maths.rs`/`latex.rs` —
+            // so guessing the letters is not safe here either.
+            //
+            // Dropping it outright, the previous behaviour, is worse than
+            // showing the loss: the glyph vanishes but its geometric slot
+            // does not, and the resulting gap reads to the space
+            // synthesizer as an ordinary word boundary —
+            // "Differentialgleichung" silently became the two perfectly
+            // plausible words "Di erentialgleichung", with nothing to flag
+            // the sentence as broken. Keeping it as U+FFFD keeps the glyph's
+            // geometry in its row, so the word stays one word, and makes the
+            // loss visible instead of silent.
+            let value = if !hyphenation_break && value.is_control() {
+                '\u{FFFD}'
+            } else {
+                value
+            };
             // loose_bounds covers the glyph's advance box rather than its inked
             // extent, which is what the space-detection gap logic needs — a
             // comma's tight bounds would leave a gap wide enough to fake a
