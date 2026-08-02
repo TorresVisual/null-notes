@@ -1020,3 +1020,35 @@ fn converts_a_representative_exercise_sheet() {
          - G ist zyklisch\n"
     );
 }
+
+fn table_row_line(cells: Vec<Vec<Inline>>) -> Line {
+    Line {
+        content: vec![Inline::TableRow(cells)],
+        x: 72.0,
+        right: 200.0,
+        y: 700.0,
+        font_size: BODY,
+        fixed_pitch: false,
+        is_display_maths: false,
+        ends_hyphenated: false,
+    }
+}
+
+#[test]
+fn a_table_row_line_is_not_blank() {
+    let line = table_row_line(vec![
+        vec![Inline::Text(Span { text: "a".into(), bold: false, italic: false })],
+        vec![Inline::Text(Span { text: "b".into(), bold: false, italic: false })],
+    ]);
+    assert!(!line.is_blank());
+}
+
+#[test]
+fn a_table_row_lines_own_text_is_empty() {
+    let line = table_row_line(vec![vec![Inline::Text(Span {
+        text: "cell".into(),
+        bold: false,
+        italic: false,
+    })]]);
+    assert_eq!(line.text(), "");
+}

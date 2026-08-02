@@ -56,6 +56,11 @@ pub enum Inline {
     /// The LaTeX source, without delimiters. Text rather than an image so it can
     /// be copied into a prompt, searched, and edited in place.
     Maths(String),
+    /// One table row's cells, each a `Vec<Inline>` in its own right so a cell
+    /// can hold bold/italic spans or inline maths for free. A carrier only —
+    /// `group_blocks` merges consecutive `TableRow`-only `Line`s into one
+    /// `Block::Table`; see `reconstruct_tables`.
+    TableRow(Vec<Vec<Inline>>),
 }
 
 /// A run of characters sharing one emphasis style.
@@ -95,13 +100,19 @@ impl Line {
             .iter()
             .filter_map(|i| match i {
                 Inline::Text(span) => Some(span.text.as_str()),
-                Inline::Maths(_) => None,
+                Inline::Maths(_) | Inline::TableRow(_) => None,
             })
             .collect()
     }
 
-    fn is_blank(&self) -> bool {
-        self.text().trim().is_empty() && !self.content.iter().any(is_maths)
+    pub(super) fn is_blank(&self) -> bool {
+        // A table-row line carries no `Text`/`Maths` content of its own by
+        // this measure (its content is nested one level deeper, inside each
+        // cell), so without this check a real table row would be filtered
+        // out as blank before `classify` ever saw it.
+        self.text().trim().is_empty()
+            && !self.content.iter().any(is_maths)
+            && !matches!(self.content.as_slice(), [Inline::TableRow(_)])
     }
 }
 
@@ -123,6 +134,10 @@ pub enum Block {
         depth: usize,
         content: Vec<Inline>,
     },
+    /// Every row's cells, first row always the header — a table with no
+    /// natural header row is out of scope (see the design spec's
+    /// Non-goals).
+    Table { rows: Vec<Vec<Vec<Inline>>> },
 }
 
 // Chars on one line share a baseline, but superscripts, subscripts and inline
@@ -502,6 +517,7 @@ fn reconstruct_fraction_sums(rows: Vec<Vec<(usize, CharBox)>>) -> (Vec<Line>, Ve
         let is_display_maths = content.iter().all(|i| match i {
             Inline::Text(span) => span.text.trim().is_empty(),
             Inline::Maths(_) => true,
+            Inline::TableRow(_) => false,
         });
 
         let (num_x0, num_x1) = row_x_extent(&plain[num_i]);
@@ -901,6 +917,7 @@ fn build_line(mut row: Vec<(usize, CharBox)>) -> Line {
         && content.iter().all(|i| match i {
             Inline::Text(span) => span.text.trim().is_empty(),
             Inline::Maths(_) => true,
+            Inline::TableRow(_) => false,
         });
 
     let right = row
@@ -1354,6 +1371,12 @@ fn join_lines(lines: &[&Line]) -> Vec<Inline> {
                         push_text(&mut out, ch, span.bold, span.italic);
                     }
                 }
+                // Unreachable in practice: `classify` diverts a table-row
+                // line before it ever reaches `join_lines` (only
+                // Heading/List/Prose-kind lines do). Kept as a no-op rather
+                // than a panic — see CLAUDE.md on trusting internal
+                // invariants without crashing if one is ever violated.
+                Inline::TableRow(_) => {}
             }
         }
     }
@@ -1471,7 +1494,7 @@ fn finish_block(lines: &[&Line], kind: LineKind) -> Block {
                 .flat_map(|l| l.content.iter())
                 .filter_map(|i| match i {
                     Inline::Maths(latex) => Some(latex.as_str()),
-                    Inline::Text(_) => None,
+                    Inline::Text(_) | Inline::TableRow(_) => None,
                 })
                 .collect::<Vec<_>>()
                 .join(" "),
@@ -1514,6 +1537,19 @@ fn finish_block(lines: &[&Line], kind: LineKind) -> Block {
     }
 }
 
+/// GFM's pipe-table syntax uses `|` to separate cells, so a literal `|`
+/// inside a cell's own content has to be escaped or it would corrupt that
+/// row's column structure. Nothing else in this pipeline escapes markdown
+/// syntax — every other block either renders characters safe to emit as-is,
+/// or generates its own syntax (list markers, headings) rather than passing
+/// arbitrary content through a character that means something structural.
+/// Scoped to table cells because tables are the one place this pipeline's
+/// own choice of output syntax collides with a character real prose can
+/// contain.
+pub(super) fn escape_table_cell(text: &str) -> String {
+    text.replace('|', "\\|")
+}
+
 fn render_content(content: &[Inline]) -> String {
     let mut out = String::new();
     for inline in content {
@@ -1523,6 +1559,11 @@ fn render_content(content: &[Inline]) -> String {
                 continue;
             }
             Inline::Text(span) => span,
+            // Unreachable: a cell's own content never nests another table
+            // row, and `render_content` is never called on a `Block::Table`
+            // directly (Task 5 renders each cell's `Vec<Inline>` through
+            // this function instead).
+            Inline::TableRow(_) => continue,
         };
         let marker = match (span.bold, span.italic) {
             (true, true) => "***",
@@ -1584,6 +1625,21 @@ pub fn blocks_to_markdown(blocks: &[Block]) -> String {
                     render_content(content)
                 ));
             }
+            Block::Table { rows } => {
+                let mut table_lines: Vec<String> = Vec::new();
+                for (index, row) in rows.iter().enumerate() {
+                    let cells: Vec<String> = row
+                        .iter()
+                        .map(|cell| escape_table_cell(&render_content(cell)))
+                        .collect();
+                    table_lines.push(format!("| {} |", cells.join(" | ")));
+                    if index == 0 {
+                        let delimiter = vec!["---"; row.len()].join(" | ");
+                        table_lines.push(format!("| {delimiter} |"));
+                    }
+                }
+                parts.push(table_lines.join("\n"));
+            }
         }
     }
     let mut out = parts.join("\n\n");
@@ -1619,7 +1675,7 @@ fn combined_maths_latex(line: &Line) -> String {
         .iter()
         .filter_map(|i| match i {
             Inline::Maths(s) => Some(s.as_str()),
-            Inline::Text(_) => None,
+            Inline::Text(_) | Inline::TableRow(_) => None,
         })
         .collect::<Vec<_>>()
         .join(" ")
