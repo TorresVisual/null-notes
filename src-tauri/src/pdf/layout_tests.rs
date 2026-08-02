@@ -157,6 +157,44 @@ fn a_single_term_is_the_whole_row_unsplit() {
     assert_eq!(groups[0].len(), row.iter().filter(|c| !c.ch.is_whitespace()).count());
 }
 
+#[test]
+fn a_labelled_row_of_only_connectors_and_a_period_is_a_connector_baseline() {
+    let mut row = set("(b) ", 90.0, 590.0, Style::default());
+    row.extend(set("+", 110.0, 590.0, maths()));
+    row.extend(set(" + ", 115.0, 590.0, Style::default()));
+    row.extend(set(".", 130.0, 590.0, Style::default()));
+
+    let (connectors, trailing_period) =
+        connector_baseline(&row).expect("expected a connector baseline");
+    assert_eq!(connectors, ['+', '+']);
+    assert!(trailing_period);
+    assert_eq!(baseline_label(&row), "(b) ");
+}
+
+#[test]
+fn a_baseline_with_no_label_still_reads_its_connectors() {
+    let row = set("- +", 90.0, 590.0, maths());
+    let (connectors, trailing_period) =
+        connector_baseline(&row).expect("expected a connector baseline");
+    assert_eq!(connectors, ['-', '+']);
+    assert!(!trailing_period);
+    assert_eq!(baseline_label(&row), "");
+}
+
+#[test]
+fn a_row_with_only_a_trailing_period_is_not_a_connector_baseline() {
+    // The shape a single (already-handled) fraction's baseline takes:
+    // "(a) ." with no connectors at all.
+    let row = set("(a) .", 90.0, 590.0, Style::default());
+    assert_eq!(connector_baseline(&row), None);
+}
+
+#[test]
+fn ordinary_prose_is_not_a_connector_baseline() {
+    let row = set("(a) some words here", 90.0, 590.0, Style::default());
+    assert_eq!(connector_baseline(&row), None);
+}
+
 // A subscript or inline-maths glyph sits off the baseline but belongs to the
 // line it is printed on.
 #[test]

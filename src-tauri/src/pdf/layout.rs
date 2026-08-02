@@ -349,6 +349,57 @@ pub(super) fn split_into_terms(row: &[CharBox], n: usize) -> Option<Vec<Vec<Char
     Some(groups)
 }
 
+/// Whether `row` is a "connector baseline": a row whose printing content,
+/// once a leading enumeration label like `(b)` is stripped, is nothing but
+/// `+`/`-` connectors and an optional trailing `.` — the shape a baseline
+/// takes when it joins several side-by-side fraction terms, rather than
+/// sitting beside a single one (`f(z) = ... .`) or carrying prose of its
+/// own. `None` if the row has any other content, or no connectors at all —
+/// zero connectors is a single fraction's baseline, already handled by
+/// `reconstruct_fractions`.
+///
+/// Returns the connectors in left-to-right order and whether the row ends
+/// in a trailing period.
+pub(super) fn connector_baseline(row: &[CharBox]) -> Option<(Vec<char>, bool)> {
+    let mut sorted: Vec<CharBox> = row.iter().copied().filter(|c| !c.ch.is_whitespace()).collect();
+    sorted.sort_by(|a, b| a.x.partial_cmp(&b.x).unwrap_or(std::cmp::Ordering::Equal));
+
+    let after_label = match sorted.iter().position(|c| c.ch == ')') {
+        Some(i) => &sorted[i + 1..],
+        None => &sorted[..],
+    };
+    if after_label.is_empty() {
+        return None;
+    }
+
+    let last = after_label.len() - 1;
+    let mut connectors = Vec::new();
+    let mut trailing_period = false;
+    for (i, c) in after_label.iter().enumerate() {
+        match c.ch {
+            '+' | '-' | '\u{2212}' => connectors.push(c.ch),
+            '.' if i == last => trailing_period = true,
+            _ => return None,
+        }
+    }
+    (!connectors.is_empty()).then_some((connectors, trailing_period))
+}
+
+/// The leading enumeration label on a connector baseline — `"(b) "` — read
+/// straight off the row's own characters (including whatever whitespace
+/// follows the `)`) so the reconstructed line keeps the source's own
+/// spacing. Empty when the row opens with no such label.
+pub(super) fn baseline_label(row: &[CharBox]) -> String {
+    let mut sorted: Vec<CharBox> = row.iter().copied().collect();
+    sorted.sort_by(|a, b| a.x.partial_cmp(&b.x).unwrap_or(std::cmp::Ordering::Equal));
+
+    let Some(paren) = sorted.iter().position(|c| c.ch == ')') else {
+        return String::new();
+    };
+    let trailing_space = sorted[paren + 1..].iter().take_while(|c| c.ch.is_whitespace()).count();
+    sorted[..=paren + trailing_space].iter().map(|c| c.ch).collect()
+}
+
 /// Groups characters into lines by baseline, then into styled spans.
 pub fn group_lines(chars: &[CharBox]) -> Vec<Line> {
     if chars.is_empty() {
