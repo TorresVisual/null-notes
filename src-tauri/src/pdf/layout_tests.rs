@@ -107,6 +107,21 @@ fn separates_lines_by_baseline_and_orders_them_down_the_page() {
     assert_eq!(texts, ["first", "second", "third"]);
 }
 
+#[test]
+fn row_x_extent_spans_the_widest_printing_characters() {
+    let row = set("ab", 100.0, 700.0, Style::default());
+    let (x0, x1) = row_x_extent(&row);
+    assert_eq!(x0, 100.0);
+    assert_eq!(x1, 100.0 + 2.0 * BODY * ADVANCE);
+}
+
+#[test]
+fn row_y_and_font_size_read_off_the_row() {
+    let row = set("ab", 100.0, 700.0, Style::default());
+    assert_eq!(row_y(&row), 700.0);
+    assert_eq!(row_font_size(&row), BODY);
+}
+
 // A subscript or inline-maths glyph sits off the baseline but belongs to the
 // line it is printed on.
 #[test]

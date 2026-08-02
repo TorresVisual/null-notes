@@ -258,6 +258,41 @@ fn dominant_font_size(chars: &[CharBox]) -> f32 {
         .unwrap_or(12.0)
 }
 
+/// The horizontal span of a row's printing characters — left edge of the
+/// leftmost, right edge of the rightmost. Whitespace carries no width worth
+/// counting, so it's excluded the same way `dominant_font_size` excludes it.
+///
+/// `pub(super)` (not private) because `layout_tests` is a sibling module of
+/// `layout`, not a child of it — unlike `latex.rs`'s own `#[cfg(test)] mod
+/// tests`, which sits inside the file it tests and so gets private access
+/// for free, this file's tests live in `layout_tests.rs` and need explicit
+/// visibility to unit-test these helpers directly rather than only through
+/// `group_lines`/`chars_to_markdown`.
+pub(super) fn row_x_extent(row: &[CharBox]) -> (f32, f32) {
+    row.iter()
+        .filter(|c| !c.ch.is_whitespace())
+        .fold((f32::MAX, f32::MIN), |(lo, hi), c| (lo.min(c.x), hi.max(c.x + c.width)))
+}
+
+/// A row's own baseline `y` — every character on it shares one by
+/// construction (`group_lines`'s baseline-tolerance grouping already
+/// guaranteed that), so any one of them reads it off just as well as an
+/// average would.
+pub(super) fn row_y(row: &[CharBox]) -> f32 {
+    row.iter().map(|c| c.y).fold(f32::MIN, f32::max)
+}
+
+/// The row's dominant font size, the same `median`-based measure
+/// `build_line` uses for its own `Line::font_size`.
+pub(super) fn row_font_size(row: &[CharBox]) -> f32 {
+    let mut sizes: Vec<f32> = row
+        .iter()
+        .filter(|c| !c.ch.is_whitespace())
+        .map(|c| c.font_size)
+        .collect();
+    median(&mut sizes)
+}
+
 /// Groups characters into lines by baseline, then into styled spans.
 pub fn group_lines(chars: &[CharBox]) -> Vec<Line> {
     if chars.is_empty() {
