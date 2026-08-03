@@ -1300,3 +1300,35 @@ fn two_separate_tables_with_wrapped_rows_stay_separate_and_intact() {
     assert_eq!(tables[0].len(), 3, "first table should keep all 3 logical rows");
     assert_eq!(tables[1].len(), 3, "second table should keep all 3 logical rows");
 }
+
+fn image_ref_line(placeholder: &str, alt: &str, y: f32, left: f32, right: f32) -> Line {
+    Line {
+        content: vec![Inline::ImageRef(placeholder.to_string(), alt.to_string())],
+        x: left,
+        right,
+        y,
+        font_size: 0.0,
+        fixed_pitch: false,
+        is_display_maths: false,
+        ends_hyphenated: false,
+    }
+}
+
+#[test]
+fn an_image_ref_line_is_not_blank() {
+    assert!(!image_ref_line("pdf-image://0", "", 700.0, 72.0, 200.0).is_blank());
+}
+
+#[test]
+fn an_image_ref_lines_own_text_is_empty() {
+    assert_eq!(image_ref_line("pdf-image://0", "a figure", 700.0, 72.0, 200.0).text(), "");
+}
+
+#[test]
+fn a_block_image_renders_as_a_markdown_image_reference() {
+    let markdown = blocks_to_markdown(&[Block::Image {
+        placeholder: "pdf-image://0".to_string(),
+        alt: String::new(),
+    }]);
+    assert_eq!(markdown.trim_end(), "![](pdf-image://0)");
+}

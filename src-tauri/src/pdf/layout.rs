@@ -67,6 +67,12 @@ pub enum Inline {
     /// *next* row is irregular by design, exactly the kind of row-height
     /// variation a gap-based heuristic would misread as a table boundary.
     TableRow(Vec<Vec<Inline>>, bool),
+    /// A page image, referenced by a placeholder — not yet a real asset
+    /// path. `import_pdf_markdown` (`commands/pdf.rs`) has no note to write
+    /// a `.assets/` sidecar into at the point this Markdown is produced (see
+    /// the design spec for why), so the actual file only exists once the
+    /// frontend writes it and substitutes the placeholder for a real path.
+    ImageRef(String, String),
 }
 
 /// A run of characters sharing one emphasis style.
@@ -106,19 +112,19 @@ impl Line {
             .iter()
             .filter_map(|i| match i {
                 Inline::Text(span) => Some(span.text.as_str()),
-                Inline::Maths(_) | Inline::TableRow(_, _) => None,
+                Inline::Maths(_) | Inline::TableRow(_, _) | Inline::ImageRef(_, _) => None,
             })
             .collect()
     }
 
     pub(super) fn is_blank(&self) -> bool {
-        // A table-row line carries no `Text`/`Maths` content of its own by
-        // this measure (its content is nested one level deeper, inside each
-        // cell), so without this check a real table row would be filtered
-        // out as blank before `classify` ever saw it.
+        // A table-row or image-ref line carries no `Text`/`Maths` content of
+        // its own by this measure, so without this check either would be
+        // filtered out as blank before `classify` ever saw it.
         self.text().trim().is_empty()
             && !self.content.iter().any(is_maths)
             && !matches!(self.content.as_slice(), [Inline::TableRow(_, _)])
+            && !matches!(self.content.as_slice(), [Inline::ImageRef(_, _)])
     }
 }
 
@@ -144,6 +150,9 @@ pub enum Block {
     /// natural header row is out of scope (see the design spec's
     /// Non-goals).
     Table { rows: Vec<Vec<Vec<Inline>>> },
+    /// A single embedded image, referenced by placeholder — see
+    /// `Inline::ImageRef`.
+    Image { placeholder: String, alt: String },
 }
 
 // Chars on one line share a baseline, but superscripts, subscripts and inline
@@ -608,7 +617,7 @@ fn reconstruct_fraction_sums(rows: Vec<Vec<(usize, CharBox)>>) -> (Vec<Line>, Ve
         let is_display_maths = content.iter().all(|i| match i {
             Inline::Text(span) => span.text.trim().is_empty(),
             Inline::Maths(_) => true,
-            Inline::TableRow(_, _) => false,
+            Inline::TableRow(_, _) | Inline::ImageRef(_, _) => false,
         });
 
         let (num_x0, num_x1) = row_x_extent(&plain[num_i]);
@@ -1182,7 +1191,7 @@ fn build_line(mut row: Vec<(usize, CharBox)>) -> Line {
         && content.iter().all(|i| match i {
             Inline::Text(span) => span.text.trim().is_empty(),
             Inline::Maths(_) => true,
-            Inline::TableRow(_, _) => false,
+            Inline::TableRow(_, _) | Inline::ImageRef(_, _) => false,
         });
 
     let right = row
@@ -1636,12 +1645,12 @@ fn join_lines(lines: &[&Line]) -> Vec<Inline> {
                         push_text(&mut out, ch, span.bold, span.italic);
                     }
                 }
-                // Unreachable in practice: `classify` diverts a table-row
-                // line before it ever reaches `join_lines` (only
-                // Heading/List/Prose-kind lines do). Kept as a no-op rather
-                // than a panic — see CLAUDE.md on trusting internal
+                // Unreachable in practice: `classify` diverts a table-row or
+                // image-ref line before either ever reaches `join_lines`
+                // (only Heading/List/Prose-kind lines do). Kept as a no-op
+                // rather than a panic — see CLAUDE.md on trusting internal
                 // invariants without crashing if one is ever violated.
-                Inline::TableRow(_, _) => {}
+                Inline::TableRow(_, _) | Inline::ImageRef(_, _) => {}
             }
         }
     }
@@ -1782,7 +1791,7 @@ fn finish_block(lines: &[&Line], kind: LineKind) -> Block {
                 .flat_map(|l| l.content.iter())
                 .filter_map(|i| match i {
                     Inline::Maths(latex) => Some(latex.as_str()),
-                    Inline::Text(_) | Inline::TableRow(_, _) => None,
+                    Inline::Text(_) | Inline::TableRow(_, _) | Inline::ImageRef(_, _) => None,
                 })
                 .collect::<Vec<_>>()
                 .join(" "),
@@ -1861,10 +1870,10 @@ fn render_content(content: &[Inline]) -> String {
             }
             Inline::Text(span) => span,
             // Unreachable: a cell's own content never nests another table
-            // row, and `render_content` is never called on a `Block::Table`
-            // directly (Task 5 renders each cell's `Vec<Inline>` through
-            // this function instead).
-            Inline::TableRow(_, _) => continue,
+            // row or an image ref, and `render_content` is never called on
+            // a `Block::Table`/`Block::Image` directly — each renders
+            // through its own arm in `blocks_to_markdown` instead.
+            Inline::TableRow(_, _) | Inline::ImageRef(_, _) => continue,
         };
         let marker = match (span.bold, span.italic) {
             (true, true) => "***",
@@ -1941,6 +1950,12 @@ pub fn blocks_to_markdown(blocks: &[Block]) -> String {
                 }
                 parts.push(table_lines.join("\n"));
             }
+            // The placeholder travels through verbatim — it isn't a real
+            // path yet (see `Inline::ImageRef`), so there is nothing here
+            // that needs the escaping a table cell's content does.
+            Block::Image { placeholder, alt } => {
+                parts.push(format!("![{alt}]({placeholder})"));
+            }
         }
     }
     let mut out = parts.join("\n\n");
@@ -1976,7 +1991,7 @@ fn combined_maths_latex(line: &Line) -> String {
         .iter()
         .filter_map(|i| match i {
             Inline::Maths(s) => Some(s.as_str()),
-            Inline::Text(_) | Inline::TableRow(_, _) => None,
+            Inline::Text(_) | Inline::TableRow(_, _) | Inline::ImageRef(_, _) => None,
         })
         .collect::<Vec<_>>()
         .join(" ")
