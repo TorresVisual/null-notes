@@ -61,16 +61,25 @@ pub async fn pdf_has_text_layer(pdf_path: String) -> Result<bool, String> {
     .map_err(|e| e.to_string())?
 }
 
-/// Converts a PDF's embedded text layer to Markdown. No OCR: a typeset sheet
-/// already carries its own text, and reading it is exact where recognising
-/// pixels would only ever be a guess.
+/// Converts a PDF's embedded text layer to Markdown, with embedded raster
+/// images extracted alongside it (placeholder-referenced — see
+/// `pdf::models::PdfMarkdownImport`). No OCR: a typeset sheet already
+/// carries its own text, and reading it is exact where recognising pixels
+/// would only ever be a guess.
 ///
 /// Equations become LaTeX. The text layer holds no LaTeX, but it holds the font
 /// each glyph came from and where it sits, which is enough to rebuild it — and
 /// LaTeX, unlike a cropped image, can be copied into a prompt, searched, and
 /// edited in place.
+///
+/// Writes no files and takes no note path: this runs before the note it
+/// will belong to exists (see `ImportButton.tsx`, which deliberately
+/// converts before creating the note so a PDF that turns out unconvertible
+/// never leaves an empty note behind). The caller writes each returned
+/// image via the existing `write_note_asset` once the note's path is known,
+/// substituting the real path for each placeholder.
 #[tauri::command]
-pub async fn import_pdf_markdown(pdf_path: String) -> Result<String, String> {
+pub async fn import_pdf_markdown(pdf_path: String) -> Result<crate::pdf::models::PdfMarkdownImport, String> {
     // pdfium is synchronous and a long sheet is real work, so it must not run
     // on the async executor.
     tokio::task::spawn_blocking(move || {
