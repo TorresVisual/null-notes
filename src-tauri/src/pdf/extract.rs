@@ -7,6 +7,7 @@
 
 use super::columns;
 use super::layout::{self, CharBox};
+use super::models;
 use anyhow::Result;
 use std::path::Path;
 
@@ -61,22 +62,111 @@ impl ExtractedPage {
     }
 }
 
-/// Renders every page's text layer to Markdown, one document.
-pub fn pages_to_markdown(pages: &[ExtractedPage]) -> String {
+/// Renders every page's text layer, with images interleaved into reading
+/// order, to Markdown, one document. Images are referenced by placeholder
+/// — see `pdf::models::PendingImage`.
+pub fn pages_to_markdown(pages: &[ExtractedPage]) -> models::PdfMarkdownImport {
     let mut chunks: Vec<String> = Vec::new();
+    let mut pending: Vec<models::PendingImage> = Vec::new();
+    let mut next_placeholder = 0usize;
+
     for page in pages {
-        for region in columns::segment_regions(&page.chars) {
-            let markdown = layout::chars_to_markdown(&region);
+        let regions = columns::segment_regions(&page.chars);
+
+        if regions.is_empty() {
+            // No text on this page at all. An ordinary blank page has no
+            // images either and is skipped, unchanged from today — but a
+            // page that is *entirely* one large figure (no text layer of
+            // its own) still has images worth keeping rather than silently
+            // losing an entire page's content.
+            if page.images.is_empty() {
+                continue;
+            }
+            let image_refs = take_images_as_refs(&page.images, &mut pending, &mut next_placeholder);
+            let markdown = layout::chars_and_images_to_markdown(&[], &image_refs);
+            if !markdown.trim().is_empty() {
+                chunks.push(markdown.trim_end().to_string());
+            }
+            continue;
+        }
+
+        let region_bounds: Vec<(f32, f32)> =
+            regions.iter().map(|r| layout::row_x_extent(r)).collect();
+        let mut images_by_region: Vec<Vec<&ExtractedImage>> = vec![Vec::new(); regions.len()];
+        for img in &page.images {
+            let center_x = (img.left + img.right) / 2.0;
+            if let Some((best_index, _)) = region_bounds
+                .iter()
+                .enumerate()
+                .min_by(|(_, a), (_, b)| {
+                    x_distance(center_x, a)
+                        .partial_cmp(&x_distance(center_x, b))
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                })
+            {
+                images_by_region[best_index].push(img);
+            }
+        }
+
+        for (region, imgs) in regions.iter().zip(images_by_region) {
+            let owned: Vec<ExtractedImage> = imgs.into_iter().cloned().collect();
+            let image_refs = take_images_as_refs(&owned, &mut pending, &mut next_placeholder);
+            let markdown = layout::chars_and_images_to_markdown(region, &image_refs);
             if !markdown.trim().is_empty() {
                 chunks.push(markdown.trim_end().to_string());
             }
         }
     }
-    let mut out = chunks.join("\n\n");
-    if !out.is_empty() {
-        out.push('\n');
+
+    let mut markdown = chunks.join("\n\n");
+    if !markdown.is_empty() {
+        markdown.push('\n');
     }
-    out
+    models::PdfMarkdownImport { markdown, images: pending }
+}
+
+/// Distance from `x` to the nearest edge of `bounds` — `0.0` when `x` falls
+/// inside it. Used to assign an image that doesn't cleanly land inside any
+/// single multi-column region (e.g. one spanning a gutter) to whichever
+/// region is closest, rather than dropping it.
+fn x_distance(x: f32, bounds: &(f32, f32)) -> f32 {
+    let (x0, x1) = *bounds;
+    if x < x0 {
+        x0 - x
+    } else if x > x1 {
+        x - x1
+    } else {
+        0.0
+    }
+}
+
+/// Converts a page's raw extracted images into placeholder-tagged
+/// `layout::ImageRef`s, pushing each one's bytes onto `pending` (the list
+/// `pages_to_markdown` ultimately returns) as it goes.
+fn take_images_as_refs(
+    images: &[ExtractedImage],
+    pending: &mut Vec<models::PendingImage>,
+    next_placeholder: &mut usize,
+) -> Vec<layout::ImageRef> {
+    images
+        .iter()
+        .map(|img| {
+            let placeholder = format!("pdf-image://{next_placeholder}");
+            *next_placeholder += 1;
+            pending.push(models::PendingImage {
+                placeholder: placeholder.clone(),
+                mime: "image/png".to_string(),
+                data: img.data.clone(),
+            });
+            layout::ImageRef {
+                placeholder,
+                alt: String::new(),
+                left: img.left,
+                right: img.right,
+                y: (img.top + img.bottom) / 2.0,
+            }
+        })
+        .collect()
 }
 
 pub fn extract_pages(pdf_path: &Path) -> Result<Vec<ExtractedPage>> {
@@ -195,7 +285,7 @@ fn extract_pages_native(pdf_path: &Path) -> Result<Vec<ExtractedPage>> {
             let PdfPageObject::Image(ref image_object) = object else {
                 continue;
             };
-            if let Some(extracted) = extract_image(&image_object, &doc) {
+            if let Some(extracted) = extract_image(image_object, &doc) {
                 images.push(extracted);
             }
         }
@@ -326,9 +416,10 @@ mod tests {
     fn pages_are_concatenated_into_one_document() {
         let pages = vec![page_of("First page text here."), page_of("Second page text.")];
 
-        let markdown = pages_to_markdown(&pages);
+        let result = pages_to_markdown(&pages);
 
-        assert_eq!(markdown, "First page text here.\n\nSecond page text.\n");
+        assert_eq!(result.markdown, "First page text here.\n\nSecond page text.\n");
+        assert!(result.images.is_empty());
     }
 
     #[test]
@@ -339,6 +430,46 @@ mod tests {
             page_of("More content."),
         ];
 
-        assert_eq!(pages_to_markdown(&pages), "Real content.\n\nMore content.\n");
+        assert_eq!(pages_to_markdown(&pages).markdown, "Real content.\n\nMore content.\n");
+    }
+
+    fn image_at(left: f32, bottom: f32, right: f32, top: f32) -> ExtractedImage {
+        ExtractedImage { data: vec![1, 2, 3, 4], left, bottom, right, top }
+    }
+
+    #[test]
+    fn an_extracted_image_becomes_a_placeholder_and_a_pending_entry() {
+        let mut page = page_of("some text on the page");
+        page.images.push(image_at(72.0, 690.0, 300.0, 710.0));
+
+        let result = pages_to_markdown(&[page]);
+
+        assert_eq!(result.images.len(), 1);
+        assert_eq!(result.images[0].mime, "image/png");
+        assert_eq!(result.images[0].data, vec![1, 2, 3, 4]);
+        assert!(
+            result.markdown.contains(&format!("![]({})", result.images[0].placeholder)),
+            "got: {}",
+            result.markdown
+        );
+    }
+
+    #[test]
+    fn a_page_that_is_only_an_image_still_keeps_it() {
+        let mut page = ExtractedPage { index: 0, chars: vec![], images: Vec::new() };
+        page.images.push(image_at(72.0, 690.0, 300.0, 710.0));
+
+        let result = pages_to_markdown(&[page]);
+
+        assert_eq!(result.images.len(), 1);
+        assert!(result.markdown.contains("![]("), "got: {}", result.markdown);
+    }
+
+    #[test]
+    fn a_page_with_no_text_and_no_images_produces_nothing() {
+        let page = ExtractedPage { index: 0, chars: vec![], images: Vec::new() };
+        let result = pages_to_markdown(&[page]);
+        assert_eq!(result.markdown, "");
+        assert!(result.images.is_empty());
     }
 }
