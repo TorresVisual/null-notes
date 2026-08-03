@@ -34,9 +34,20 @@ fn is_layout_filler(font_size: f32) -> bool {
 }
 
 #[derive(Debug, Clone)]
+pub struct ExtractedImage {
+    /// PNG-encoded bytes, ready to write to disk as-is.
+    pub data: Vec<u8>,
+    pub left: f32,
+    pub bottom: f32,
+    pub right: f32,
+    pub top: f32,
+}
+
+#[derive(Debug, Clone)]
 pub struct ExtractedPage {
     pub index: usize,
     pub chars: Vec<CharBox>,
+    pub images: Vec<ExtractedImage>,
 }
 
 impl ExtractedPage {
@@ -84,7 +95,7 @@ pub fn extract_pages(pdf_path: &Path) -> Result<Vec<ExtractedPage>> {
 
 #[cfg(feature = "pdf-native")]
 fn extract_pages_native(pdf_path: &Path) -> Result<Vec<ExtractedPage>> {
-    use pdfium_render::prelude::PdfFontWeight;
+    use pdfium_render::prelude::{PdfFontWeight, PdfPageObject, PdfPageObjectsCommon};
 
     let pdfium = super::renderer::bind_pdfium()?;
     let doc = pdfium.load_pdf_from_file(pdf_path, None)?;
@@ -179,10 +190,60 @@ fn extract_pages_native(pdf_path: &Path) -> Result<Vec<ExtractedPage>> {
             });
         }
 
-        pages.push(ExtractedPage { index, chars });
+        let mut images = Vec::new();
+        for object in page.objects().iter() {
+            let PdfPageObject::Image(ref image_object) = object else {
+                continue;
+            };
+            if let Some(extracted) = extract_image(&image_object, &doc) {
+                images.push(extracted);
+            }
+        }
+
+        pages.push(ExtractedPage { index, chars, images });
     }
 
     Ok(pages)
+}
+
+/// Pulls one embedded raster image's bytes and page bounds out of an image
+/// page object. `None` — never an error — when pdfium can't decode this
+/// particular image: one bad embedded image must not fail the whole
+/// document, the same posture a bad equation already gets (it renders its
+/// own KaTeX error rather than breaking the page around it).
+///
+/// `get_processed_bitmap` (not `get_raw_bitmap`) so filters, masks, and
+/// object transforms applied to the image are accounted for — the same
+/// bitmap-to-PNG path `renderer.rs`'s whole-page rasterization already
+/// uses, for the same reason its own comment gives: building the PNG
+/// through this crate's own `image` dependency, rather than pdfium-render's
+/// optional (and separately-versioned) `image_api` feature, sidesteps a
+/// PNG encoder that isn't compiled in by default under that feature.
+#[cfg(feature = "pdf-native")]
+fn extract_image(
+    image_object: &pdfium_render::prelude::PdfPageImageObject,
+    doc: &pdfium_render::prelude::PdfDocument,
+) -> Option<ExtractedImage> {
+    use pdfium_render::prelude::PdfPageObjectCommon;
+
+    let bounds = image_object.bounds().ok()?;
+    let bitmap = image_object.get_processed_bitmap(doc).ok()?;
+    let (width, height) = (bitmap.width() as u32, bitmap.height() as u32);
+    let rgba = bitmap.as_rgba_bytes();
+    let img = image::RgbaImage::from_raw(width, height, rgba)?;
+
+    let mut data = Vec::new();
+    image::DynamicImage::ImageRgba8(img)
+        .write_to(&mut std::io::Cursor::new(&mut data), image::ImageOutputFormat::Png)
+        .ok()?;
+
+    Some(ExtractedImage {
+        data,
+        left: bounds.left().value,
+        bottom: bounds.bottom().value,
+        right: bounds.right().value,
+        top: bounds.top().value,
+    })
 }
 
 #[cfg(test)]
@@ -240,13 +301,14 @@ mod tests {
                 .enumerate()
                 .map(|(i, c)| char_at(c, 72.0 + i as f32 * 5.0, 700.0))
                 .collect(),
+            images: Vec::new(),
         }
     }
 
     #[test]
     fn a_page_with_almost_no_text_reads_as_empty() {
         assert!(page_of("Fig. 1").is_effectively_empty());
-        assert!(ExtractedPage { index: 0, chars: vec![] }.is_effectively_empty());
+        assert!(ExtractedPage { index: 0, chars: vec![], images: Vec::new() }.is_effectively_empty());
     }
 
     #[test]
@@ -273,7 +335,7 @@ mod tests {
     fn a_blank_page_does_not_leave_a_hole_in_the_document() {
         let pages = vec![
             page_of("Real content."),
-            ExtractedPage { index: 1, chars: vec![] },
+            ExtractedPage { index: 1, chars: vec![], images: Vec::new() },
             page_of("More content."),
         ];
 
