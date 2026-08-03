@@ -54,9 +54,10 @@ mod tests {
     #[ignore]
     fn dump_markdown() {
         let pages = crate::pdf::extract::extract_pages(&pdf_or_skip!()).unwrap();
-        for page in &pages {
-            println!("--- page {} ---", page.index);
-            println!("{}", crate::pdf::layout::chars_to_markdown(&page.chars));
+        let result = crate::pdf::extract::pages_to_markdown(&pages);
+        println!("{}", result.markdown);
+        for image in &result.images {
+            println!("[image] {} ({} bytes)", image.placeholder, image.data.len());
         }
     }
 
