@@ -1678,6 +1678,7 @@ enum LineKind {
     List(bool, usize),
     MathsDisplay,
     Table,
+    Image,
 }
 
 fn classify(line: &Line, body: f32, left_margin: f32) -> LineKind {
@@ -1686,6 +1687,9 @@ fn classify(line: &Line, body: f32, left_margin: f32) -> LineKind {
     // leading whitespace could otherwise misread as a heading or list.
     if matches!(line.content.as_slice(), [Inline::TableRow(_, _)]) {
         return LineKind::Table;
+    }
+    if matches!(line.content.as_slice(), [Inline::ImageRef(_, _)]) {
+        return LineKind::Image;
     }
     // Checked before everything else: a display equation is centred and set in
     // maths fonts, so heading and list detection would both misread it.
@@ -1756,11 +1760,14 @@ pub fn group_blocks(lines: &[Line]) -> Vec<Block> {
             && current.first().is_some_and(|first| line.x > first.x + 1.0);
 
         // A list marker always opens a new item, nothing accumulates onto a
-        // heading, and a table row that starts a new table always opens its
-        // own block — everything else only breaks when the kind changes.
+        // heading, a table row that starts a new table always opens its own
+        // block, and every image always opens its own block too — an image
+        // never merges with a neighbor the way a table row's continuation
+        // can, so there is no equivalent "still the same one" flag to check.
         let opens_block = matches!(kind, LineKind::List(_, _))
             || matches!(current_kind, LineKind::Heading(_))
-            || starts_new_table;
+            || starts_new_table
+            || kind == LineKind::Image;
         let kind_break = opens_block || (kind != current_kind && !continues_item);
 
         if !current.is_empty() && (gap_break || kind_break) {
@@ -1844,6 +1851,19 @@ fn finish_block(lines: &[&Line], kind: LineKind) -> Block {
                 })
                 .collect(),
         },
+        // `opens_block` guarantees exactly one line here whenever kind is
+        // Image — every image-kind line forces its own block, never
+        // accumulating with a neighbor.
+        LineKind::Image => {
+            let (placeholder, alt) = lines
+                .first()
+                .and_then(|l| match l.content.as_slice() {
+                    [Inline::ImageRef(placeholder, alt)] => Some((placeholder.clone(), alt.clone())),
+                    _ => None,
+                })
+                .unwrap_or_default();
+            Block::Image { placeholder, alt }
+        }
     }
 }
 
@@ -1968,6 +1988,48 @@ pub fn blocks_to_markdown(blocks: &[Block]) -> String {
 /// The whole pipeline: characters in, Markdown out.
 pub fn chars_to_markdown(chars: &[CharBox]) -> String {
     blocks_to_markdown(&group_blocks(&reconstruct_fractions(group_lines(chars))))
+}
+
+/// One page image, ready to be interleaved into reading order. `left`/
+/// `right`/`y` are in the same PDF user-space coordinates `CharBox` already
+/// uses (bottom-left origin, larger `y` higher on the page) — `y` is the
+/// image's own vertical center, since it has no baseline the way text does.
+pub struct ImageRef {
+    pub placeholder: String,
+    pub alt: String,
+    pub left: f32,
+    pub right: f32,
+    pub y: f32,
+}
+
+/// Like `chars_to_markdown`, but also places `images` into reading order.
+/// Reuses the same pattern proven for tables, simpler here because an image
+/// never wraps or merges with a neighbor: each becomes a synthetic `Line`
+/// carrying a single `Inline::ImageRef`, appended to the `Line`s
+/// `group_lines` already built from `chars` (which is untouched — no new
+/// parameter, nothing about its own sort changes), then the combined list
+/// is re-sorted by `y` before block grouping runs.
+///
+/// Each synthetic `Line` uses the image's own `left`/`right` for `x`/
+/// `right` rather than a placeholder `0.0` — `group_blocks`'s own
+/// `left_margin` computation folds `f32::min` over every line's `x`
+/// (image lines included, since they are not blank), so a `0.0` here would
+/// silently collapse the page's computed left margin and inflate every
+/// list item's indent depth on any page containing an image.
+pub fn chars_and_images_to_markdown(chars: &[CharBox], images: &[ImageRef]) -> String {
+    let mut lines = group_lines(chars);
+    lines.extend(images.iter().map(|img| Line {
+        content: vec![Inline::ImageRef(img.placeholder.clone(), img.alt.clone())],
+        x: img.left,
+        right: img.right,
+        y: img.y,
+        font_size: 0.0,
+        fixed_pitch: false,
+        is_display_maths: false,
+        ends_hyphenated: false,
+    }));
+    lines.sort_by(|a, b| b.y.partial_cmp(&a.y).unwrap_or(std::cmp::Ordering::Equal));
+    blocks_to_markdown(&group_blocks(&reconstruct_fractions(lines)))
 }
 
 // How far apart (in multiples of the larger line's font size) two maths-only

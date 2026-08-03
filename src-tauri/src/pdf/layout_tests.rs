@@ -1332,3 +1332,46 @@ fn a_block_image_renders_as_a_markdown_image_reference() {
     }]);
     assert_eq!(markdown.trim_end(), "![](pdf-image://0)");
 }
+
+#[test]
+fn an_image_lands_between_the_two_paragraphs_it_sits_between() {
+    let mut chars = set("first paragraph text here", 72.0, 700.0, Style::default());
+    chars.extend(set("second paragraph text here", 72.0, 640.0, Style::default()));
+
+    let images = vec![ImageRef {
+        placeholder: "pdf-image://0".to_string(),
+        alt: String::new(),
+        left: 72.0,
+        right: 300.0,
+        y: 670.0, // between the two paragraphs' y positions
+    }];
+
+    let markdown = chars_and_images_to_markdown(&chars, &images);
+    let parts: Vec<&str> = markdown.trim_end().split("\n\n").collect();
+
+    assert_eq!(parts.len(), 3, "got: {markdown}");
+    assert_eq!(parts[0], "first paragraph text here");
+    assert_eq!(parts[1], "![](pdf-image://0)");
+    assert_eq!(parts[2], "second paragraph text here");
+}
+
+#[test]
+fn two_images_never_merge_into_one_block() {
+    let images = vec![
+        ImageRef { placeholder: "pdf-image://0".to_string(), alt: String::new(), left: 72.0, right: 300.0, y: 700.0 },
+        ImageRef { placeholder: "pdf-image://1".to_string(), alt: String::new(), left: 72.0, right: 300.0, y: 680.0 },
+    ];
+
+    let markdown = chars_and_images_to_markdown(&[], &images);
+
+    assert_eq!(
+        markdown.trim_end(),
+        "![](pdf-image://0)\n\n![](pdf-image://1)"
+    );
+}
+
+#[test]
+fn no_images_behaves_exactly_like_chars_to_markdown() {
+    let chars = set("ordinary text", 72.0, 700.0, Style::default());
+    assert_eq!(chars_and_images_to_markdown(&chars, &[]), chars_to_markdown(&chars));
+}
