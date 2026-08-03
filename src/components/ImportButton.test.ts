@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { pagesToMarkdown } from './ImportButton'
+import { pagesToMarkdown, substituteImagePlaceholders } from './ImportButton'
 import type { PdfPage } from '../pdf/types'
 
 function page(index: number, path: string): PdfPage {
@@ -24,5 +24,28 @@ describe('pagesToMarkdown', () => {
 
   it('returns an empty string for no pages', () => {
     expect(pagesToMarkdown([])).toBe('')
+  })
+})
+
+describe('substituteImagePlaceholders', () => {
+  it('replaces each placeholder with its real path', () => {
+    const markdown = 'before\n\n![](pdf-image://0)\n\nafter'
+    const result = substituteImagePlaceholders(markdown, [
+      { placeholder: 'pdf-image://0', src: 'Note.assets/image-1.png' },
+    ])
+    expect(result).toBe('before\n\n![](Note.assets/image-1.png)\n\nafter')
+  })
+
+  it('replaces multiple placeholders independently', () => {
+    const markdown = '![](pdf-image://0)\n\n![](pdf-image://1)'
+    const result = substituteImagePlaceholders(markdown, [
+      { placeholder: 'pdf-image://0', src: 'a.png' },
+      { placeholder: 'pdf-image://1', src: 'b.png' },
+    ])
+    expect(result).toBe('![](a.png)\n\n![](b.png)')
+  })
+
+  it('is a no-op when there are no images', () => {
+    expect(substituteImagePlaceholders('plain text', [])).toBe('plain text')
   })
 })

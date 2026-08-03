@@ -1,6 +1,6 @@
 import { invoke } from '@tauri-apps/api/core'
 import type { NoteMetadata, WorkspaceState, WorkspaceTree, SearchResult, AppSettings, GraphLink, GraphTag } from '../types'
-import type { PdfPage } from '../pdf/types'
+import type { PdfPage, PdfMarkdownImport } from '../pdf/types'
 
 export const api = {
   notes: {
@@ -80,6 +80,6 @@ export const api = {
     hasTextLayer: (pdfPath: string) =>
       invoke<boolean>('pdf_has_text_layer', { pdfPath }),
     importMarkdown: (pdfPath: string) =>
-      invoke<string>('import_pdf_markdown', { pdfPath }),
+      invoke<PdfMarkdownImport>('import_pdf_markdown', { pdfPath }),
   },
 }
