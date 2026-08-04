@@ -312,6 +312,14 @@ fn is_integral(ch: &CharBox) -> bool {
         || (ch.family == Family::Extensible && matches!(ch.ch, 'Z' | 'R'))
 }
 
+/// CMEX's large Σ has no Unicode entry in this font subset either —
+/// confirmed on Ue9.pdf's Beispiel 9.3 by rendering the page: 'X' at
+/// Family::Extensible immediately followed by a subscript/superscript pair,
+/// the same way `is_integral`'s placeholders were confirmed.
+fn is_sum(ch: &CharBox) -> bool {
+    ch.family == Family::Extensible && ch.ch == 'X'
+}
+
 /// How many characters from the front form an upright multi-letter word.
 fn upright_word(chars: &[CharBox]) -> Option<usize> {
     let count = chars
@@ -361,6 +369,10 @@ fn glyph(ch: &CharBox) -> String {
 
     if is_integral(ch) {
         return "\\int".to_string();
+    }
+
+    if is_sum(ch) {
+        return "\\sum".to_string();
     }
 
     if let Some(command) = symbol_command(ch.ch) {
@@ -740,6 +752,23 @@ mod tests {
     fn an_ordinary_r_is_not_mistaken_for_an_integral() {
         assert_eq!(to_latex(&run("R", Family::Text)), "R");
         assert_eq!(to_latex(&run("R", Family::Italic)), "R");
+    }
+
+    // Ue9.pdf Beispiel 9.3: the inclusion-exclusion formula's leading
+    // Σ_{k=1}^n rendered as U+FFFD before this mapping existed (extract.rs
+    // was erasing its control-range fallback upstream). Confirmed by
+    // rendering the page: 'X' at Family::Extensible immediately followed by
+    // a subscript "k=1" and superscript "n" — exactly the shape of a
+    // sum with explicit limits.
+    #[test]
+    fn the_sum_placeholder_glyph_becomes_sum() {
+        assert_eq!(to_latex(&run("X", Family::Extensible)), r"\sum");
+    }
+
+    #[test]
+    fn an_ordinary_x_is_not_mistaken_for_a_sum() {
+        assert_eq!(to_latex(&run("X", Family::Text)), "X");
+        assert_eq!(to_latex(&run("X", Family::Italic)), "X");
     }
 
     // Once extract.rs stops collapsing maths-face fallback codepoints to
