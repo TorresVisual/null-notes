@@ -332,6 +332,14 @@ fn is_sum(ch: &CharBox) -> bool {
 /// bare `(`/`)` adequately around a \frac-shaped body without needing
 /// \left/\right for automatic stretch sizing, which this corpus doesn't
 /// need.
+///
+/// The large opening brace a `\cases`/piecewise definition needs is a
+/// separate glyph slot in the same font instance — confirmed on
+/// Analysis_2_Blatt12.pdf's Heaviside definition (`'\u{1a}'`, same 11.96pt
+/// document as Blatt11 but a different codepoint from its parens). There is
+/// deliberately no matching close-brace case: real `\cases` LaTeX output
+/// only ever draws a left brace, confirmed by the rendered page showing no
+/// right brace either.
 fn large_paren_glyph(ch: &CharBox) -> Option<&'static str> {
     if ch.family != Family::Extensible {
         return None;
@@ -339,6 +347,7 @@ fn large_paren_glyph(ch: &CharBox) -> Option<&'static str> {
     match ch.ch {
         '\u{12}' | '\u{10}' | '\0' => Some("("),
         '\u{13}' | '\u{11}' | '\u{1}' => Some(")"),
+        '\u{1a}' => Some("\\{"),
         _ => None,
     }
 }
@@ -832,6 +841,20 @@ mod tests {
     #[test]
     fn ordinary_control_codepoints_outside_the_confirmed_set_are_not_mistaken_for_parens() {
         assert_eq!(to_latex(&run("\u{2}", Family::Extensible)), "\u{FFFD}");
+    }
+
+    // Analysis_2_Blatt12.pdf: the Heaviside piecewise definition
+    // "H(t-b) = { 1 for t≥b, 0 for t<b" rendered its opening brace as
+    // U+FFFD. Confirmed by rendering the page: '\u{1a}' at
+    // Family::Extensible, 11.96pt (same document, same size as item 6's
+    // vector parens but a distinct codepoint — a different glyph slot in
+    // the same font instance). No closing-brace codepoint exists to find:
+    // \cases/piecewise notation only ever draws a left brace in real LaTeX
+    // output, confirmed by the rendered page showing no matching right
+    // brace either.
+    #[test]
+    fn the_cases_open_brace_placeholder_becomes_a_plain_brace() {
+        assert_eq!(to_latex(&run("\u{1a}", Family::Extensible)), "\\{");
     }
 
     // Once extract.rs stops collapsing maths-face fallback codepoints to
