@@ -924,6 +924,40 @@ fn a_baseline_shaped_line_is_never_mistaken_for_the_other_half_of_a_fraction() {
     assert!(!markdown.contains(r"\frac{a + b}{f(z) ="), "paired with the baseline instead: {markdown}");
 }
 
+// A \binom vector's large open/close parens land on their own line — their
+// y matches neither content row above/below them (see
+// docs/specs/pdf-table-fraction-maths-guards-design.md for why: TeX draws
+// a tall delimiter at one shared reference point, not once per row it
+// spans). Once latex::to_latex turns them into plain "(" / ")" (the
+// operator-glyphs fix), their presence is evidence this is a
+// delimiter-flanked construct, not a bare fraction — the pairing must be
+// refused, unlike the unflanked case in
+// a_numerator_and_denominator_on_separate_lines_become_one_fraction above.
+#[test]
+fn a_binom_flanked_pair_of_lines_is_not_mistaken_for_a_bare_fraction() {
+    // Ordinary paragraph text elsewhere, for the same reason
+    // a_baseline_shaped_line_is_never_mistaken_for_the_other_half_of_a_fraction
+    // needs it: find_fraction_pair scopes pairing to one paragraph using a
+    // *median* line gap, and the delimiter row is itself an extra line that
+    // feeds that median. Placing it 20pt above the numerator (matching the
+    // numerator-denominator gap itself, rather than an arbitrary smaller
+    // value) keeps the median from dropping low enough to make the real
+    // numerator-denominator gap look like a paragraph break by comparison —
+    // confirmed necessary by first observing this fixture fail for that
+    // unrelated reason with a closer delimiter placement.
+    let mut chars = page_at(900.0, &["ordinary paragraph text", "with a normal line spacing"]);
+    chars.extend(set("(", 290.0, 720.0, extensible()));
+    chars.extend(set(")", 340.0, 720.0, extensible()));
+    chars.extend(set("a + b", 300.0, 700.0, maths_italic()));
+    chars.extend(set("c + d", 300.0, 680.0, maths_italic()));
+
+    let markdown = chars_to_markdown(&chars);
+
+    assert!(!markdown.contains(r"\frac{a + b}{c + d}"), "got: {markdown}");
+    assert!(markdown.contains("a + b"), "numerator content lost: {markdown}");
+    assert!(markdown.contains("c + d"), "denominator content lost: {markdown}");
+}
+
 // Reconstructs the shape exercise 1(b) on Analysis_1_Blatt2_2025.pdf takes:
 // three fractions summed, one numerator row, one denominator row, joined by
 // "+"/"-" on the baseline in between. `render_content` wraps every

@@ -2107,6 +2107,23 @@ fn combined_maths_latex(line: &Line) -> String {
         .join(" ")
 }
 
+/// Whether `line`'s content is nothing but large paren/brace delimiter
+/// glyphs (and whitespace between them) — the shape a `\binom`/`\cases`
+/// delimiter line takes once `latex::to_latex` has already turned the
+/// glyph into a plain `"("`, `")"`, or `"\{"` (see `large_paren_glyph` in
+/// `latex.rs`). Evidence that a candidate fraction pair is really a
+/// delimiter-flanked multi-row construct, not a bare fraction.
+fn is_delimiter_only_line(line: &Line) -> bool {
+    if line.content.is_empty() {
+        return false;
+    }
+    line.content.iter().all(|inline| match inline {
+        Inline::Maths(latex) => matches!(latex.trim(), "(" | ")" | "\\{"),
+        Inline::Text(span) => span.text.trim().is_empty(),
+        Inline::TableRow(_, _) | Inline::ImageRef(_, _) => false,
+    })
+}
+
 /// A line that is a *single*, unbroken maths region — the shape a genuine
 /// numerator or denominator takes. `is_display_maths` alone is not enough: a
 /// baseline row like `f(z) = ... .` also reads as maths-only once its own
@@ -2162,6 +2179,13 @@ fn find_fraction_pair(lines: &[Line]) -> Option<(usize, usize)> {
                 .min(lines[j].right - lines[j].x)
                 .max(1.0);
             if overlap < min_width * FRACTION_MIN_OVERLAP_RATIO {
+                continue;
+            }
+            let margin = body * FRACTION_MAX_ROW_GAP;
+            let flanked = lines
+                .iter()
+                .any(|l| is_delimiter_only_line(l) && l.y <= lines[i].y + margin && l.y >= lines[j].y - margin);
+            if flanked {
                 continue;
             }
             if best.is_none_or(|(_, _, best_gap)| gap < best_gap) {
