@@ -369,6 +369,11 @@ fn glyph(ch: &CharBox) -> String {
         '_' => "\\_".into(),
         '{' => "\\{".into(),
         '}' => "\\}".into(),
+        // Nothing above recognized this glyph, and extract.rs no longer
+        // guarantees a maths-face control codepoint was already turned into
+        // FFFD upstream (see resolve_fallback_char) — so make the loss
+        // visible here instead of emitting an unprintable raw byte.
+        other if other.is_control() => '\u{FFFD}'.to_string(),
         other => other.to_string(),
     }
 }
@@ -709,6 +714,18 @@ mod tests {
     fn an_ordinary_z_is_not_mistaken_for_an_integral() {
         assert_eq!(to_latex(&run("Z", Family::Text)), "Z");
         assert_eq!(to_latex(&run("Z", Family::Italic)), "Z");
+    }
+
+    // Once extract.rs stops collapsing maths-face fallback codepoints to
+    // FFFD (see extract.rs's resolve_fallback_char), latex.rs can receive a
+    // real control character it has no predicate for yet. It must never
+    // leak that raw byte into the rendered LaTeX — same "make the loss
+    // visible instead of silent" principle extract.rs already applies to
+    // body text, just enforced here for whatever the maths-face predicates
+    // above this fallback don't recognize.
+    #[test]
+    fn an_unrecognized_control_glyph_in_a_maths_face_becomes_fffd_not_a_raw_byte() {
+        assert_eq!(to_latex(&run("\u{3}", Family::Extensible)), "\u{FFFD}");
     }
 
     #[test]
