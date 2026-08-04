@@ -301,8 +301,15 @@ fn is_oint(ch: &CharBox) -> bool {
 /// "no ToUnicode entry, fall back to the glyph's raw index" behaviour for it
 /// is a property of that one font, not of this document's producer — the
 /// same reasoning that already justified `H`/`I` for `is_oint`.
+///
+/// A second placeholder, `'R'`, showed up on `Analysis_2_Blatt7_2026.pdf`'s
+/// `∬_S` (item 1's surface flux) — confirmed the same way, by rendering the
+/// page and cropping the glyph: two `'R'`s at Family::Extensible, raised
+/// above the body-text baseline, immediately followed by an italic 'S'
+/// subscript.
 fn is_integral(ch: &CharBox) -> bool {
-    ch.ch == '∫' || (ch.family == Family::Extensible && ch.ch == 'Z')
+    ch.ch == '∫'
+        || (ch.family == Family::Extensible && matches!(ch.ch, 'Z' | 'R'))
 }
 
 /// How many characters from the front form an upright multi-letter word.
@@ -714,6 +721,25 @@ mod tests {
     fn an_ordinary_z_is_not_mistaken_for_an_integral() {
         assert_eq!(to_latex(&run("Z", Family::Text)), "Z");
         assert_eq!(to_latex(&run("Z", Family::Italic)), "Z");
+    }
+
+    // Analysis_2_Blatt7_2026.pdf: a double integral (∬_S, surface flux)
+    // rendered as $$RR$$ — each ∫ independently corrupted to the letter
+    // 'R'. Confirmed by cropping it out of the rendered page (item 1's
+    // "∬_S v⃗ · do⃗"), the same way the 'Z' mapping above it was confirmed:
+    // both 'R' glyphs sit at 11.96pt, Family::Extensible, raised above the
+    // surrounding body-text baseline, immediately followed by an italic 'S'
+    // subscript — exactly the shape of a double integral with a region
+    // label.
+    #[test]
+    fn a_second_integral_placeholder_glyph_becomes_int() {
+        assert_eq!(to_latex(&run("R", Family::Extensible)), r"\int");
+    }
+
+    #[test]
+    fn an_ordinary_r_is_not_mistaken_for_an_integral() {
+        assert_eq!(to_latex(&run("R", Family::Text)), "R");
+        assert_eq!(to_latex(&run("R", Family::Italic)), "R");
     }
 
     // Once extract.rs stops collapsing maths-face fallback codepoints to
