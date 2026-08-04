@@ -183,6 +183,22 @@ pub fn extract_pages(pdf_path: &Path) -> Result<Vec<ExtractedPage>> {
     }
 }
 
+/// A real (non-filler) glyph pdfium could only decode to a control-range
+/// codepoint, most often a ligature (`ff`/`fi`/`ffi`) or a symbol-font
+/// placeholder with no `ToUnicode` entry. Kept raw for a maths face —
+/// `latex.rs`'s per-family glyph identification (`is_integral`, `is_oint`,
+/// ...) needs the original fallback value to recognize a symbol-font
+/// placeholder the same way it already recognizes printable ones like `'Z'`
+/// or `'H'`. Collapsed to `U+FFFD` for body text, where the letters it
+/// actually represents are producer- and font-specific and unsafe to guess.
+fn resolve_fallback_char(value: char, family: super::maths::Family, hyphenation_break: bool) -> char {
+    if !hyphenation_break && value.is_control() && !family.is_maths() {
+        '\u{FFFD}'
+    } else {
+        value
+    }
+}
+
 #[cfg(feature = "pdf-native")]
 fn extract_pages_native(pdf_path: &Path) -> Result<Vec<ExtractedPage>> {
     use pdfium_render::prelude::{PdfFontWeight, PdfPageObject, PdfPageObjectsCommon};
@@ -218,6 +234,8 @@ fn extract_pages_native(pdf_path: &Path) -> Result<Vec<ExtractedPage>> {
             if !hyphenation_break && is_layout_filler(ch.scaled_font_size().value) {
                 continue;
             }
+            let font = ch.font_name();
+            let family = super::maths::family_of(&font);
             // A real (non-filler) glyph pdfium cannot map to a genuine
             // Unicode value — confirmed, via both the per-character API used
             // here and the separate `FPDFText_GetBoundedText` path `dump.rs`
@@ -228,7 +246,11 @@ fn extract_pages_native(pdf_path: &Path) -> Result<Vec<ExtractedPage>> {
             // producer- and font-specific — the same codepoint means
             // something else in a different document's font, exactly like
             // the `ß`/`∮` glyph-identity problems in `maths.rs`/`latex.rs` —
-            // so guessing the letters is not safe here either.
+            // so guessing the letters is not safe here either, for body
+            // text. A maths-face glyph is different: its raw fallback value
+            // is kept (see `resolve_fallback_char`) so `latex.rs`'s
+            // per-family glyph identification can recognize it, the same
+            // way it already recognizes printable placeholders like `'Z'`.
             //
             // Dropping it outright, the previous behaviour, is worse than
             // showing the loss: the glyph vanishes but its geometric slot
@@ -239,11 +261,7 @@ fn extract_pages_native(pdf_path: &Path) -> Result<Vec<ExtractedPage>> {
             // the sentence as broken. Keeping it as U+FFFD keeps the glyph's
             // geometry in its row, so the word stays one word, and makes the
             // loss visible instead of silent.
-            let value = if !hyphenation_break && value.is_control() {
-                '\u{FFFD}'
-            } else {
-                value
-            };
+            let value = resolve_fallback_char(value, family, hyphenation_break);
             // loose_bounds covers the glyph's advance box rather than its inked
             // extent, which is what the space-detection gap logic needs — a
             // comma's tight bounds would leave a gap wide enough to fake a
@@ -255,7 +273,6 @@ fn extract_pages_native(pdf_path: &Path) -> Result<Vec<ExtractedPage>> {
                 continue;
             };
 
-            let font = ch.font_name();
             chars.push(CharBox {
                 ch: if hyphenation_break {
                     layout::SOFT_HYPHEN
@@ -267,7 +284,7 @@ fn extract_pages_native(pdf_path: &Path) -> Result<Vec<ExtractedPage>> {
                 width: bounds.width().value,
                 top: bounds.top().value,
                 bottom: bounds.bottom().value,
-                family: super::maths::family_of(&font),
+                family,
                 font_size: ch.scaled_font_size().value,
                 bold: matches!(
                     ch.font_weight(),
@@ -365,6 +382,36 @@ mod tests {
     #[test]
     fn an_empty_font_name_alone_is_not_evidence_of_filler() {
         assert!(!is_layout_filler(11.96), "a real 11.96pt glyph must never read as filler regardless of its font name");
+    }
+
+    #[test]
+    fn a_control_fallback_in_body_text_becomes_fffd() {
+        assert_eq!(
+            resolve_fallback_char('\u{2}', super::super::maths::Family::Text, false),
+            '\u{FFFD}'
+        );
+    }
+
+    #[test]
+    fn a_control_fallback_in_a_maths_face_is_kept_raw() {
+        assert_eq!(
+            resolve_fallback_char('\u{2}', super::super::maths::Family::Extensible, false),
+            '\u{2}'
+        );
+    }
+
+    #[test]
+    fn a_printable_fallback_is_never_touched_regardless_of_family() {
+        assert_eq!(resolve_fallback_char('R', super::super::maths::Family::Extensible, false), 'R');
+        assert_eq!(resolve_fallback_char('Z', super::super::maths::Family::Text, false), 'Z');
+    }
+
+    #[test]
+    fn a_hyphenation_break_is_never_collapsed_even_if_control() {
+        assert_eq!(
+            resolve_fallback_char('\u{2}', super::super::maths::Family::Text, true),
+            '\u{2}'
+        );
     }
 
     fn char_at(ch: char, x: f32, y: f32) -> CharBox {
