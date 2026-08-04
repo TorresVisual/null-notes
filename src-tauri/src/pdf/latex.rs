@@ -320,6 +320,29 @@ fn is_sum(ch: &CharBox) -> bool {
     ch.family == Family::Extensible && ch.ch == 'X'
 }
 
+/// CMEX's large stretchy parentheses (the delimiters a multi-row vector or
+/// a parenthesized subexpression needs) have no Unicode entry in this font
+/// subset — confirmed on two documents by rendering the page and cropping
+/// the glyphs: `'\u{12}'`/`'\u{13}'` on Analysis_2_Blatt11.pdf item 6 (a
+/// 2-row vector field, 11.96pt), and `'\u{10}'`/`'\u{11}'` (outer) plus
+/// `'\0'`/`'\u{1}'` (inner) on Ue9.pdf Beispiel 9.1(a) (nested logical
+/// grouping, 10.91pt) — a different codepoint set in a different document,
+/// because cmex is embedded per document at whatever design size that
+/// document's body text uses. Mapped to plain ASCII parens: KaTeX sizes a
+/// bare `(`/`)` adequately around a \frac-shaped body without needing
+/// \left/\right for automatic stretch sizing, which this corpus doesn't
+/// need.
+fn large_paren_glyph(ch: &CharBox) -> Option<&'static str> {
+    if ch.family != Family::Extensible {
+        return None;
+    }
+    match ch.ch {
+        '\u{12}' | '\u{10}' | '\0' => Some("("),
+        '\u{13}' | '\u{11}' | '\u{1}' => Some(")"),
+        _ => None,
+    }
+}
+
 /// How many characters from the front form an upright multi-letter word.
 fn upright_word(chars: &[CharBox]) -> Option<usize> {
     let count = chars
@@ -373,6 +396,10 @@ fn glyph(ch: &CharBox) -> String {
 
     if is_sum(ch) {
         return "\\sum".to_string();
+    }
+
+    if let Some(paren) = large_paren_glyph(ch) {
+        return paren.to_string();
     }
 
     if let Some(command) = symbol_command(ch.ch) {
@@ -769,6 +796,42 @@ mod tests {
     fn an_ordinary_x_is_not_mistaken_for_a_sum() {
         assert_eq!(to_latex(&run("X", Family::Text)), "X");
         assert_eq!(to_latex(&run("X", Family::Italic)), "X");
+    }
+
+    // Analysis_2_Blatt11.pdf item 6: a 2-row vector field `⃗v(x, y) =
+    // (3x²-3y²+2x+2y, -6xy+2x-2y)` rendered with stray U+FFFD before and
+    // after its rows — the large open/close parens. Confirmed by rendering
+    // the page: '\u{12}' immediately before the top row, '\u{13}'
+    // immediately after the bottom row, both at Family::Extensible,
+    // 11.96pt.
+    #[test]
+    fn the_blatt11_large_paren_placeholders_become_plain_parens() {
+        assert_eq!(to_latex(&run("\u{12}", Family::Extensible)), "(");
+        assert_eq!(to_latex(&run("\u{13}", Family::Extensible)), ")");
+    }
+
+    // Ue9.pdf Beispiel 9.1(a): ¬∀y((∃xP(x,y)) → ∀z¬(∃xQ(x,y,z))). rendered
+    // with U+FFFD in place of every paren of the two nesting depths.
+    // Confirmed by rendering the page: '\u{10}'/'\u{11}' bracket the whole
+    // parenthesized implication (the outer, taller pair), '\0'/'\u{1}'
+    // bracket each ∃-subexpression (the inner, shorter pair) — all four at
+    // Family::Extensible, 10.91pt. Different codepoints from Blatt11's pair
+    // above: cmex is embedded per document at whatever design size that
+    // document's body text uses, so the same visual glyph can land at a
+    // different raw code in a different font instance — exactly the
+    // per-subset variability `is_integral`'s doc comment already warns
+    // about, confirmed here to actually occur rather than assumed.
+    #[test]
+    fn the_ue9_nested_large_paren_placeholders_become_plain_parens() {
+        assert_eq!(to_latex(&run("\u{10}", Family::Extensible)), "(");
+        assert_eq!(to_latex(&run("\u{11}", Family::Extensible)), ")");
+        assert_eq!(to_latex(&run("\u{0}", Family::Extensible)), "(");
+        assert_eq!(to_latex(&run("\u{1}", Family::Extensible)), ")");
+    }
+
+    #[test]
+    fn ordinary_control_codepoints_outside_the_confirmed_set_are_not_mistaken_for_parens() {
+        assert_eq!(to_latex(&run("\u{2}", Family::Extensible)), "\u{FFFD}");
     }
 
     // Once extract.rs stops collapsing maths-face fallback codepoints to
