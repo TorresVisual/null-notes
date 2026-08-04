@@ -195,6 +195,20 @@ const TABLE_MIN_ROWS: usize = 2;
 // content, so a coincidentally-aligned run of mostly-blank lines is never
 // mistaken for a data grid.
 const TABLE_MIN_FILL_RATIO: f32 = 0.5;
+// A candidate table window whose non-whitespace characters are mostly
+// covered by maths_runs' own per-row detection is a maths expression that
+// happens to have internal alignment gaps (a \binom vector's two rows, a
+// \cases block's value/condition columns, side-by-side binomial-coefficient
+// pairs) rather than real tabular data. The real corpus's genuine tables
+// (ID/Name/Owner-style data) sit at 0% maths-family content, giving real
+// headroom below a majority threshold — needed because a real \cases
+// condition often mixes prose directly into the maths ("1 für t≥b" is only
+// ~43% maths by character count: maths_runs' word-boundary rule correctly
+// refuses to absorb "für" into the run). Confirmed against
+// Analysis_2_Blatt12.pdf's Heaviside definition, whose two condition rows
+// measure ~43%/50% — see
+// docs/specs/pdf-table-fraction-maths-guards-design.md.
+const TABLE_MATHS_GUARD_RATIO: f32 = 0.4;
 
 /// The standalone accent glyphs LaTeX's Computer Modern fonts emit, mapped to
 /// their combining forms. CM has no precomposed "ü": it prints a `u` and then
@@ -670,6 +684,35 @@ struct TableMatch {
     consumed_rows: Vec<usize>,
 }
 
+/// Fraction of `rows`' non-whitespace characters that fall inside some
+/// row's own `maths_runs`-detected span, each row measured independently
+/// at its own font size (the same per-row measure `build_line` uses when
+/// it actually crops maths regions out of a line). High coverage means a
+/// candidate table window is essentially one maths expression rather than
+/// real tabular data, even though it satisfies the gutter/fill-ratio
+/// checks above — see `TABLE_MATHS_GUARD_RATIO`.
+fn maths_coverage_ratio(rows: &[Vec<CharBox>]) -> f32 {
+    let mut total = 0usize;
+    let mut covered = 0usize;
+    for row in rows {
+        let printing = row.iter().filter(|c| !c.ch.is_whitespace()).count();
+        if printing == 0 {
+            continue;
+        }
+        total += printing;
+        let runs = maths_runs(row, row_font_size(row));
+        covered += runs
+            .iter()
+            .map(|&(s, e)| row[s..e].iter().filter(|c| !c.ch.is_whitespace()).count())
+            .sum::<usize>();
+    }
+    if total == 0 {
+        0.0
+    } else {
+        covered as f32 / total as f32
+    }
+}
+
 /// Attempts to grow a table starting at `plain[start]`. Establishes column
 /// gutters from the first two rows, then greedily absorbs subsequent rows:
 /// a row with content in most of the established cells is a new logical
@@ -764,6 +807,11 @@ fn try_table_at(
         .filter(|c| !c.is_empty())
         .count();
     if (filled_count as f32) < total as f32 * TABLE_MIN_FILL_RATIO {
+        return None;
+    }
+    let consumed_plain: Vec<Vec<CharBox>> =
+        consumed_rows.iter().map(|&i| plain[i].clone()).collect();
+    if maths_coverage_ratio(&consumed_plain) >= TABLE_MATHS_GUARD_RATIO {
         return None;
     }
 

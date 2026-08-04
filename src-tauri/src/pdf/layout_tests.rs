@@ -1201,6 +1201,26 @@ fn two_rows_with_no_shared_gutter_produce_no_table_row_lines() {
         .all(|l| !matches!(l.content.as_slice(), [Inline::TableRow(_, _)])));
 }
 
+// A 2x2 grid of maths-italic content — the shape a small \binom/\cases
+// block's aligned "columns" take — must not be mistaken for a real data
+// table just because it happens to satisfy the gutter/fill-ratio checks
+// above. Every character here is maths-family, so maths_coverage_ratio
+// should read close to 1.0 and reject the candidate.
+#[test]
+fn a_maths_heavy_two_by_two_grid_is_not_mistaken_for_a_table() {
+    let mut chars = set("H", 200.0, 700.0, maths_italic());
+    chars.extend(set("K", 260.0, 700.0, maths_italic()));
+    chars.extend(set("L", 200.0, 688.0, maths_italic()));
+    chars.extend(set("M", 260.0, 688.0, maths_italic()));
+
+    let lines = group_lines(&chars);
+
+    assert!(
+        lines.iter().all(|l| !matches!(l.content.as_slice(), [Inline::TableRow(_, _)])),
+        "expected no TableRow lines, got {lines:?}"
+    );
+}
+
 #[test]
 fn consecutive_table_row_lines_merge_into_one_table_block() {
     let mut chars = set("ID", 72.0, 700.0, Style::default());
