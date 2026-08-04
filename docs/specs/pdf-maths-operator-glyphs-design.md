@@ -88,3 +88,25 @@ Any maths-family control-range codepoint that reaches this point — i.e. still 
 - **Exponent/subscript placement** (scripts landing before their base or drifting far from it) — separate spec, despite being the same "one shared root cause across every occurrence" shape as this bug.
 - **Column-vector-as-`\frac` misclassification** (`\binom`-style vectors becoming fractions, sometimes nested) — likely entangled with the table false-positive bug above; scope with that spec, not this one.
 - Multi-column layout and image handling were not exercised by this corpus (no genuinely multi-column or image-bearing document among the 10) and are not touched by this fix.
+
+## Implementation notes (real-corpus re-validation)
+
+What actually shipped, and how it diverged from this spec's predictions — recorded here rather than silently, per the implementation plan's own instruction, so the next pass through this pipeline doesn't have to rediscover it.
+
+**Quantifiers (`∀`/`∃`) were not broken.** The implementation plan's Task 4 assumed Ue9.pdf Beispiel 9.1's garbled prenex-normal-form formula meant the quantifier glyphs themselves were falling back to an unmapped control codepoint. Real-document verification (rendering the page, reading the raw `CharBox` stream) showed `∀`/`∃`/`¬`/`→` all arrive as real Unicode at `Family::Symbol` already — `symbol_command` already handles them, unchanged. The actual corruption in that formula was two nesting depths of large stretchy parentheses (`'\u{10}'`/`'\u{11}'` outer, `'\0'`/`'\u{1}'` inner), which is squarely this spec's territory and got folded into the large-paren work below instead. No quantifier predicate was added — there was nothing to fix.
+
+**Large-delimiter codepoints are not stable across documents, confirmed rather than assumed.** Three independently-confirmed codepoint pairs were needed to cover the corpus's parens, each from a different document/font-size instance:
+- `'\u{12}'`/`'\u{13}'` — Analysis_2_Blatt11.pdf item 6 (11.96pt)
+- `'\u{10}'`/`'\u{11}'` (outer) and `'\0'`/`'\u{1}'` (inner) — Ue9.pdf Beispiel 9.1(a) (10.91pt)
+- `'\u{1a}'` (open brace only, no close) — Analysis_2_Blatt12.pdf's Heaviside `\cases` definition (11.96pt, same document/size as Blatt11 but a distinct glyph slot from its parens)
+
+The Blatt11 paren mapping generalized for free to Analysis_2_Blatt5_2026.pdf's vector-field parens (`( )` now renders correctly there too), consistent with both documents coming from the same "Analysis 2" course template/font instance. This is not guaranteed for other documents outside this corpus — a new document may need its own confirmed codepoint, exactly as `is_integral`'s original doc comment already warned.
+
+**Confirmed fixed, spot-checked against `dump_markdown` on the real PDFs:**
+- Analysis_2_Blatt7_2026.pdf: `$$RR$$` → `$$\int\int$$` (item 1's `∬_S` flux integral)
+- Analysis_2_Blatt5_2026.pdf: `$$R_RR_{2\pi} R_{\pi}$$` → `$$\int_R\int_{2\pi} \int_{\pi}$$`, and `∭` → `\int\int\int`
+- Ue9.pdf Beispiel 9.3: both `Σ` occurrences → `\sum`
+- Analysis_2_Blatt11.pdf item 6, Ue9.pdf Beispiel 9.1(a), Analysis_2_Blatt5_2026.pdf: large parens → `(`/`)`
+- Analysis_2_Blatt12.pdf: `\cases` opening brace → `\{`
+
+**Newly observed, confirmed out of scope, not fixed here:** a bullet-point list marker renders as `U+FFFD` in Analysis_2_Blatt10.pdf, Analysis_2_Blatt11.pdf, and Analysis_2_Blatt12.pdf's "Richtig oder Falsch?" sections. Confirmed via `dump_chars_near` to be `Family::Text` (not a maths face), so it was never affected by this fix's `extract.rs` change in either direction — it collapsed to `U+FFFD` before this work and still does after. It's a list-marker recognition gap in `layout.rs`, unrelated to maths-operator glyph classification; worth its own investigation, not folded in here. Also unchanged and out of scope: body-text ligature `U+FFFD`s (e.g. "di�erenzierbar"), the `ß`→`ÿ` decode bug, and the table/exponent-placement/vector-as-`\frac` bugs already named above.
