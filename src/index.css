@@ -1682,3 +1682,10 @@ body {
 
 .block-handle-menu-item:hover { background: var(--bg-hover); }
 .block-handle-menu-item.danger { color: var(--danger); }
+
+.note-editor .ProseMirror-selectednode,
+.note-editor .ProseMirror-selectednoderange {
+  background: var(--accent-bg);
+  border-radius: 4px;
+  outline: none;
+}

@@ -8,6 +8,7 @@ import { handleEditorKeyDown, handleEditorTextInput } from './extensions/CodeBlo
 import { inkApi } from '../lib/ink'
 import type { InkData } from '../ink/types'
 import { EditorStatusBar } from './EditorStatusBar'
+import { BlockHandle } from './extensions/BlockHandle'
 
 interface NoteEditorProps {
   content: string
@@ -204,6 +205,7 @@ export function NoteEditor({ content, notePath, spellcheck, onChange }: NoteEdit
         aria-multiline="true"
         className="note-editor"
       />
+      {editor && <BlockHandle editor={editor} />}
       {editor && <EditorStatusBar editor={editor} />}
     </div>
   )
