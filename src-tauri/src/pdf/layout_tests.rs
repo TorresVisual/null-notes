@@ -606,7 +606,10 @@ fn a_line_that_is_all_maths_becomes_a_display_equation() {
 
     let markdown = chars_to_markdown(&chars);
 
-    assert!(markdown.contains("$$f(x) = 1$$"), "got: {markdown}");
+    // A lone "$" on its own line, not "$$" — the dialect the editor's own
+    // `BlockMath` extension actually parses as a block (see
+    // `blocks_to_markdown`'s doc comment).
+    assert!(markdown.contains("$\nf(x) = 1\n$"), "got: {markdown}");
 }
 
 // Found on Analysis_2_Blatt12.pdf: "y'(t) + 2y(t) = 4cos(2t) mit y(0) = 1."
@@ -628,7 +631,7 @@ fn a_display_equation_keeps_a_short_connector_word_inside_it() {
     let markdown = chars_to_markdown(&chars);
 
     assert!(
-        markdown.contains(r"$$f(x) = 1 \text{ mit } g(x) = 2$$"),
+        markdown.contains("$\nf(x) = 1 \\text{ mit } g(x) = 2\n$"),
         "got: {markdown}"
     );
 }
@@ -648,7 +651,10 @@ fn a_sentence_that_merely_contains_a_formula_stays_inline_not_display() {
     let markdown = chars_to_markdown(&chars);
 
     assert!(markdown.contains("Die Zahl $x$ ist eine gerade Zahl."), "got: {markdown}");
-    assert!(!markdown.contains("$$"), "should not become a display block: {markdown}");
+    assert!(
+        !markdown.lines().any(|l| l.trim() == "$"),
+        "should not become a display block: {markdown}"
+    );
 }
 
 #[test]

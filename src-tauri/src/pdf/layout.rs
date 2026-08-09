@@ -2044,8 +2044,15 @@ fn render_content(content: &[Inline]) -> String {
     out
 }
 
-/// Renders blocks to Markdown, equations included: `$…$` inline and `$…$$` as
-/// their own block.
+/// Renders blocks to Markdown, equations included: `$…$` inline, and a
+/// display equation as its own block delimited by a lone `$` on its own
+/// line before and after — not the more common `$$…$$` — because that is
+/// the markdown dialect the editor's own `BlockMath` TipTap extension
+/// actually parses (see `src/editor/extensions/BlockMath.tsx`'s markdown-it
+/// rule). `$$…$$` isn't recognized as a block there at all: it falls
+/// through to `InlineMath`'s regex instead, which pairs the first two
+/// (adjacent) `$` as an empty match and renders the equation as small
+/// inline math with stray `$` characters left over.
 pub fn blocks_to_markdown(blocks: &[Block]) -> String {
     let mut parts: Vec<String> = Vec::new();
     for block in blocks {
@@ -2058,7 +2065,7 @@ pub fn blocks_to_markdown(blocks: &[Block]) -> String {
             Block::Code { text } => parts.push(format!("```\n{text}\n```")),
             // Display maths gets its own block so it renders centred, the way
             // the source set it.
-            Block::MathsDisplay { latex } => parts.push(format!("$${latex}$$")),
+            Block::MathsDisplay { latex } => parts.push(format!("$\n{latex}\n$")),
             Block::ListItem {
                 ordered,
                 number,
