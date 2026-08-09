@@ -82,7 +82,7 @@ A completed drag is a single delete-and-reinsert ProseMirror transaction — one
 `NodeRange` provides shift-click-to-extend range selection (confirmed via its `key` option). All blocks in the range get the same `--accent-bg` wash as a single selection, rendered via `getNodeRangeDecorations`.
 
 - Delete removes the entire range in one transaction (one undo step).
-- Dragging a range (grip-drag while a range is active) moving all selected blocks together is the intended behavior, but isn't confirmed to compose for free from `DragHandle` + `NodeRange` alone — verified during implementation; if it needs glue code (e.g. `BlockHandle.tsx` detecting a `NodeRangeSelection` and expanding the drag payload to the whole range), that's a small addition to the same file, not a design change.
+- Dragging a range (grip-drag while a range is active) moves all selected blocks together. Confirmed by reading `@tiptap/extension-drag-handle`'s own compiled source (`helpers/nodeRangeDrop.ts`): it imports `isNodeRangeSelection`/`NodeRangeSelection` from `@tiptap/extension-node-range` directly and captures/restores the active drag range across the drop — no glue code needed in `BlockHandle.tsx`.
 - The handle menu shows only Delete for a range (see Non-Goals).
 
 ### Block math edit workflow
