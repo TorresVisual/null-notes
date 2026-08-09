@@ -35,6 +35,7 @@ import { HTMLBlock } from './HTMLBlock'
 import { DivBlock } from './DivBlock'
 import { Details } from './Details'
 import { TextAlignment } from './TextAlignment'
+import { Divider } from './Divider'
 
 const lowlight = createLowlight(common)
 
@@ -116,7 +117,8 @@ const TaskItemInLists = TaskItem.extend({
 export const coreExtensions = [
   // StarterKit 3 bundles its own Link and Underline; leaving them on registers
   // the name twice and the app's own config is the one that loses.
-  StarterKit.configure({ code: false, codeBlock: false, link: false, underline: false }),
+  StarterKit.configure({ code: false, codeBlock: false, link: false, underline: false, horizontalRule: false }),
+  Divider,
   CodeWithRegexpRule.configure({ HTMLAttributes: NO_SPELLCHECK }),
   CodeBlockEditor.configure({ lowlight, HTMLAttributes: NO_SPELLCHECK }),
   Table.configure({ resizable: false }),

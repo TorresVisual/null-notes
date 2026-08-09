@@ -452,4 +452,26 @@ mod tests {
         }
     }
 
+    /// Column-region boundaries for the page, and the y-range / left-x of the
+    /// lines each region resolves to once regrouped independently — the
+    /// per-region pipeline (`pages_to_markdown`) processes each of these in
+    /// isolation, which can produce a different depth/marker reading than
+    /// grouping the whole page's lines together (`dump_lines`) would.
+    #[test]
+    #[ignore]
+    fn dump_regions_geometry() {
+        let pages = crate::pdf::extract::extract_pages(&pdf_or_skip!()).unwrap();
+        let regions = crate::pdf::columns::segment_regions(&pages[0].chars);
+        println!("{} region(s)", regions.len());
+        for (i, region) in regions.iter().enumerate() {
+            let (x0, x1) = crate::pdf::layout::row_x_extent(region);
+            println!("--- region {i}: x=[{x0:.2}, {x1:.2}], {} chars ---", region.len());
+            for line in crate::pdf::layout::group_lines(region) {
+                println!(
+                    "  y={:8.2} x={:7.2} size={:5.2} | {}",
+                    line.y, line.x, line.font_size, line.text()
+                );
+            }
+        }
+    }
 }

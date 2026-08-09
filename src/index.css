@@ -165,6 +165,7 @@ body {
 .note-editor h2 { font-size: 1.4em; font-weight: 700; letter-spacing: -0.01em; margin: 0.8em 0 0.4em; color: var(--text-primary); }
 .note-editor h3 { font-size: 1.2em; font-weight: 700; margin: 0.8em 0 0.4em; color: var(--text-primary); }
 .note-editor p { margin-bottom: 0.6em; }
+.note-editor hr { border: none; border-top: 1px solid var(--border-strong); margin: 1.5em 0; }
 .note-editor code {
   background: var(--bg-hover);
   padding: 2px 5px;
@@ -316,7 +317,7 @@ body {
   user-select: none;
 }
 
-.block-math .katex { font-size: 4em; }
+.block-math .katex { font-size: 1.4em; }
 
 /* inline-block + relative so the editor popover has something to anchor to */
 .inline-math {

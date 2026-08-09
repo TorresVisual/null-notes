@@ -105,6 +105,12 @@ const COMMANDS: Cmd[] = [
       editor.chain().focus().deleteRange(range).toggleTaskList().run(),
   },
   {
+    title: 'Divider',
+    description: 'Horizontal rule',
+    run: ({ editor, range }) =>
+      editor.chain().focus().deleteRange(range).setHorizontalRule().run(),
+  },
+  {
     title: 'Ink Block',
     description: 'Handwriting canvas',
     run: ({ editor, range }) => {
