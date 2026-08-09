@@ -609,6 +609,48 @@ fn a_line_that_is_all_maths_becomes_a_display_equation() {
     assert!(markdown.contains("$$f(x) = 1$$"), "got: {markdown}");
 }
 
+// Found on Analysis_2_Blatt12.pdf: "y'(t) + 2y(t) = 4cos(2t) mit y(0) = 1."
+// is one centered display-equation line in the source, but the old
+// all-non-maths-must-be-whitespace rule read the short connector word
+// "mit" as disqualifying prose, dropping the whole line into a paragraph
+// as two small inline `$…$` spans instead of one display block.
+// `is_mostly_maths` allows it through by character-count ratio instead,
+// and the connector survives inside the equation as `\text{}`.
+#[test]
+fn a_display_equation_keeps_a_short_connector_word_inside_it() {
+    let mut chars = page(&["Consider the following identity."]);
+    chars.extend(set("f(x) = 1", 150.0, 660.0, maths_italic()));
+    let after_eq = 150.0 + "f(x) = 1".chars().count() as f32 * BODY * ADVANCE;
+    chars.extend(set(" mit ", after_eq, 660.0, Style::default()));
+    let after_mit = after_eq + " mit ".chars().count() as f32 * BODY * ADVANCE;
+    chars.extend(set("g(x) = 2", after_mit, 660.0, maths_italic()));
+
+    let markdown = chars_to_markdown(&chars);
+
+    assert!(
+        markdown.contains(r"$$f(x) = 1 \text{ mit } g(x) = 2$$"),
+        "got: {markdown}"
+    );
+}
+
+// The other side of the same change: an ordinary sentence that merely
+// references one inline formula must not tip into becoming a display
+// block just because it now tolerates *some* non-maths text — text still
+// has to be the small minority, not the majority, of the line.
+#[test]
+fn a_sentence_that_merely_contains_a_formula_stays_inline_not_display() {
+    let mut chars = set("Die Zahl ", 72.0, 700.0, Style::default());
+    let after = 72.0 + "Die Zahl ".chars().count() as f32 * BODY * ADVANCE;
+    chars.extend(set("x", after, 700.0, maths_italic()));
+    let after_x = after + BODY * ADVANCE;
+    chars.extend(set(" ist eine gerade Zahl.", after_x, 700.0, Style::default()));
+
+    let markdown = chars_to_markdown(&chars);
+
+    assert!(markdown.contains("Die Zahl $x$ ist eine gerade Zahl."), "got: {markdown}");
+    assert!(!markdown.contains("$$"), "should not become a display block: {markdown}");
+}
+
 #[test]
 fn maths_inside_a_sentence_stays_inline() {
     let mut chars = set("Sei ", 72.0, 700.0, Style::default());

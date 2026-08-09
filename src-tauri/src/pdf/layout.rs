@@ -132,6 +132,67 @@ fn is_maths(inline: &Inline) -> bool {
     matches!(inline, Inline::Maths(_))
 }
 
+// How much of a line's non-whitespace content has to sit inside `Maths`
+// regions, by character count, before the line counts as a display
+// equation rather than prose that merely contains one. A display equation
+// is allowed a short connector word ("mit", "für") without losing its own
+// block — see `is_mostly_maths`'s doc comment — but an ordinary sentence
+// that just references an inline formula ("Die Zahl $x$ ist gerade.")
+// must not tip into becoming one, so the bar sits well above half.
+const DISPLAY_MATHS_TEXT_RATIO: f32 = 0.75;
+
+/// Whether `content`'s non-whitespace characters are dominated by `Maths`
+/// regions, `Inline::Maths`'s own LaTeX standing in for the glyphs it
+/// replaced (its length is not exact PDF character-for-character, but is
+/// close enough to judge "mostly" by).
+///
+/// Loosened from an earlier all-or-nothing rule ("every non-maths
+/// character must be whitespace") that read a display equation with even
+/// one short connector word on it — "y'(t) + 2y(t) = 4cos(2t) mit
+/// y(0) = 1." — as ordinary prose instead, dropping it into a paragraph as
+/// two small inline `$…$` spans rather than the one centered display
+/// equation the source PDF actually set. `finish_block`'s
+/// `LineKind::MathsDisplay` arm wraps whatever non-whitespace text this
+/// allows through in `\text{}`, LaTeX's own way to embed prose inside
+/// display math, so the connector survives rather than being dropped.
+///
+/// Refuses a line whose text opens with a list marker — "(a) f(z) = z^3."
+/// — even when the equation dominates its character count. `classify`
+/// checks `is_display_maths` before it ever checks for a list marker (a
+/// deliberate order: a real display equation would otherwise misread as a
+/// heading or list item), so without this guard a whole run of labelled
+/// sub-parts — "(a) ...", "(b) ...", "(c) ..." — each individually
+/// display-worthy, collapsed into *one* `MathsDisplay` block spanning all
+/// of them, silently erasing the separate list items a real document
+/// found on Analysis_2_Blatt10.pdf and Ue5.pdf actually has.
+fn is_mostly_maths(content: &[Inline]) -> bool {
+    if content.iter().any(|i| matches!(i, Inline::TableRow(_, _) | Inline::ImageRef(_, _))) {
+        return false;
+    }
+    let text_only: String = content
+        .iter()
+        .filter_map(|i| match i {
+            Inline::Text(span) => Some(span.text.as_str()),
+            _ => None,
+        })
+        .collect();
+    if list_marker(&text_only).is_some() {
+        return false;
+    }
+    let maths_chars: usize = content
+        .iter()
+        .filter_map(|i| match i {
+            Inline::Maths(latex) => Some(latex.chars().count()),
+            _ => None,
+        })
+        .sum();
+    if maths_chars == 0 {
+        return false;
+    }
+    let text_chars: usize = text_only.chars().filter(|c| !c.is_whitespace()).count();
+    maths_chars as f32 >= (maths_chars + text_chars) as f32 * DISPLAY_MATHS_TEXT_RATIO
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum Block {
     Heading { level: u8, content: Vec<Inline> },
@@ -1233,14 +1294,7 @@ fn build_line(mut row: Vec<(usize, CharBox)>) -> Line {
 
     flush_spans(&mut spans, &mut content);
 
-    // Everything outside the maths is whitespace, so the line *is* the
-    // equation rather than a sentence containing one.
-    let is_display_maths = content.iter().any(is_maths)
-        && content.iter().all(|i| match i {
-            Inline::Text(span) => span.text.trim().is_empty(),
-            Inline::Maths(_) => true,
-            Inline::TableRow(_, _) | Inline::ImageRef(_, _) => false,
-        });
+    let is_display_maths = is_mostly_maths(&content);
 
     let right = row
         .iter()
@@ -1840,12 +1894,19 @@ fn finish_block(lines: &[&Line], kind: LineKind) -> Block {
             // One display equation can span several baselines — a radical sign
             // or a fraction bar is set on its own row — so the rows' pieces
             // concatenate into a single expression rather than becoming
-            // separate equations.
+            // separate equations. `is_mostly_maths` now tolerates a short
+            // connector word ("mit", "für") inside an otherwise
+            // maths-dominated line, so that text is wrapped in `\text{}` —
+            // LaTeX's own way to embed prose inside display math — rather
+            // than being dropped the way it used to be.
             latex: lines
                 .iter()
                 .flat_map(|l| l.content.iter())
                 .filter_map(|i| match i {
-                    Inline::Maths(latex) => Some(latex.as_str()),
+                    Inline::Maths(latex) => Some(latex.clone()),
+                    Inline::Text(span) if !span.text.trim().is_empty() => {
+                        Some(format!("\\text{{{}}}", escape_text_for_maths(&span.text)))
+                    }
                     Inline::Text(_) | Inline::TableRow(_, _) | Inline::ImageRef(_, _) => None,
                 })
                 .collect::<Vec<_>>()
@@ -1926,6 +1987,18 @@ fn finish_block(lines: &[&Line], kind: LineKind) -> Block {
 /// contain.
 pub(super) fn escape_table_cell(text: &str) -> String {
     text.replace('|', "\\|")
+}
+
+/// Escapes the characters that would break LaTeX's own `\text{}` parsing —
+/// backslash and braces are structural to LaTeX itself, not this
+/// pipeline's syntax (contrast [`escape_table_cell`], which only escapes
+/// `|`, this pipeline's own table syntax). A connector word lifted
+/// straight off a PDF page is never expected to contain either, but
+/// `finish_block`'s `MathsDisplay` arm feeds arbitrary extracted text
+/// through this, so it must not silently corrupt the equation around it if
+/// one ever does.
+fn escape_text_for_maths(text: &str) -> String {
+    text.replace('\\', "\\textbackslash ").replace('{', "\\{").replace('}', "\\}")
 }
 
 fn render_content(content: &[Inline]) -> String {
