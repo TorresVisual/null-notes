@@ -36,6 +36,7 @@ import { DivBlock } from './DivBlock'
 import { Details } from './Details'
 import { TextAlignment } from './TextAlignment'
 import { Divider } from './Divider'
+import { NodeRange } from '@tiptap/extension-node-range'
 
 const lowlight = createLowlight(common)
 
@@ -119,6 +120,7 @@ export const coreExtensions = [
   // the name twice and the app's own config is the one that loses.
   StarterKit.configure({ code: false, codeBlock: false, link: false, underline: false, horizontalRule: false }),
   Divider,
+  NodeRange.configure({ key: 'Shift' }),
   CodeWithRegexpRule.configure({ HTMLAttributes: NO_SPELLCHECK }),
   CodeBlockEditor.configure({ lowlight, HTMLAttributes: NO_SPELLCHECK }),
   Table.configure({ resizable: false }),
