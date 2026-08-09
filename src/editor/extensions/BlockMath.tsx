@@ -1,18 +1,113 @@
 import { Node } from '@tiptap/core'
 import { ReactNodeViewRenderer, NodeViewWrapper } from '@tiptap/react'
 import type { ReactNodeViewProps } from '@tiptap/react'
+import { useEffect, useRef, useState } from 'react'
 import katex from 'katex'
 
 interface BlockMathAttrs {
   latex: string
 }
 
-function BlockMathView({ node }: ReactNodeViewProps) {
+interface Rendered {
+  html: string
+  error: string | null
+}
+
+function render(latex: string): Rendered {
+  try {
+    return { html: katex.renderToString(latex, { throwOnError: true, displayMode: true }), error: null }
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e)
+    return {
+      html: katex.renderToString(latex, { throwOnError: false, displayMode: true }),
+      error: message.replace(/^KaTeX parse error: /, ''),
+    }
+  }
+}
+
+function BlockMathView({ node, editor, getPos, updateAttributes, deleteNode, selected }: ReactNodeViewProps) {
   const { latex } = node.attrs as unknown as BlockMathAttrs
-  const html = katex.renderToString(latex, { throwOnError: false, displayMode: true })
+  const [editing, setEditing] = useState(() => editor.isEditable && latex === '')
+  const [draft, setDraft] = useState(latex)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  useEffect(() => {
+    if (editing) textareaRef.current?.focus()
+  }, [editing])
+
+  function open() {
+    if (!editor.isEditable) return
+    setDraft(latex)
+    setEditing(true)
+  }
+
+  function close(refocus: boolean) {
+    setEditing(false)
+    if (!refocus) return
+    const pos = getPos()
+    if (pos === undefined) editor.commands.focus()
+    else editor.commands.focus(pos + node.nodeSize)
+  }
+
+  function commit(refocus: boolean) {
+    const next = draft.trim()
+    if (!next) {
+      setEditing(false)
+      deleteNode()
+      if (refocus) editor.commands.focus()
+      return
+    }
+    updateAttributes({ latex: next })
+    close(refocus)
+  }
+
+  function cancel() {
+    if (!latex) {
+      setEditing(false)
+      deleteNode()
+      editor.commands.focus()
+      return
+    }
+    setDraft(latex)
+    close(true)
+  }
+
+  const display = render(latex)
+  const preview = render(draft)
+
   return (
-    <NodeViewWrapper className="block-math" spellCheck={false}>
-      <div dangerouslySetInnerHTML={{ __html: html }} />
+    <NodeViewWrapper
+      className={`block-math${selected ? ' selected' : ''}${editing ? ' editing' : ''}`}
+      spellCheck={false}
+    >
+      {!editing && (
+        <div className="block-math-render" onClick={open} dangerouslySetInnerHTML={{ __html: display.html }} />
+      )}
+      {editing && (
+        <div className="block-math-editor" contentEditable={false} onMouseDown={(e) => e.stopPropagation()}>
+          <textarea
+            ref={textareaRef}
+            className="block-math-editor-input"
+            value={draft}
+            spellCheck={false}
+            placeholder="e^{i\pi} + 1 = 0  (Mod-Enter to apply, Escape to cancel)"
+            onChange={(e) => setDraft(e.target.value)}
+            onBlur={() => commit(false)}
+            onKeyDown={(e) => {
+              e.stopPropagation()
+              if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                e.preventDefault()
+                commit(true)
+              } else if (e.key === 'Escape') {
+                e.preventDefault()
+                cancel()
+              }
+            }}
+          />
+          <div className="block-math-editor-preview" dangerouslySetInnerHTML={{ __html: preview.html }} />
+          {preview.error && <div className="block-math-editor-error">{preview.error}</div>}
+        </div>
+      )}
     </NodeViewWrapper>
   )
 }

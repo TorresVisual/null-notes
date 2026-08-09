@@ -319,6 +319,54 @@ body {
 
 .block-math .katex { font-size: 1.4em; }
 
+.block-math-render { cursor: pointer; border-radius: 4px; display: inline-block; padding: 2px 6px; }
+.block-math-render:hover { background: var(--accent-bg); }
+
+.block-math-editor {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  padding: var(--space-sm);
+  background: var(--bg-raised);
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  text-align: left;
+  user-select: text;
+}
+
+.block-math-editor-input {
+  width: 100%;
+  min-height: 4.5em;
+  padding: var(--space-sm);
+  font-family: 'Cascadia Code', 'Fira Code', monospace;
+  font-size: 13px;
+  color: var(--text-primary);
+  background: var(--bg-sunken);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  outline: none;
+  resize: vertical;
+}
+
+.block-math-editor-input:focus { border-color: var(--accent); }
+
+.block-math-editor-preview {
+  display: block;
+  min-height: 1.6em;
+  padding: var(--space-xs) 2px;
+  overflow-x: auto;
+  text-align: center;
+  color: var(--text-primary);
+}
+
+.block-math-editor-preview .katex { font-size: 1.4em; }
+
+.block-math-editor-error {
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--danger);
+}
+
 /* inline-block + relative so the editor popover has something to anchor to */
 .inline-math {
   display: inline-block;
