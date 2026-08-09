@@ -1650,3 +1650,35 @@ body {
 
 .block-handle-grip:hover { background: var(--bg-hover); color: var(--text-primary); }
 .block-handle-grip:active { cursor: grabbing; }
+
+.block-handle-menu {
+  position: fixed;
+  z-index: 50;
+  min-width: 140px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: var(--bg-raised);
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  padding: 4px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+
+.block-handle-menu-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  width: 100%;
+  padding: 6px var(--space-sm);
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 13px;
+  text-align: left;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.block-handle-menu-item:hover { background: var(--bg-hover); }
+.block-handle-menu-item.danger { color: var(--danger); }
