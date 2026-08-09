@@ -140,11 +140,8 @@ const COMMANDS: Cmd[] = [
   {
     title: 'Block Math',
     description: 'LaTeX block equation',
-    run: ({ editor, range }) => {
-      const latex = window.prompt('LaTeX:')
-      if (!latex) return
-      editor.chain().focus().deleteRange(range).insertContent({ type: 'blockMath', attrs: { latex } }).run()
-    },
+    run: ({ editor, range }) =>
+      editor.chain().focus().deleteRange(range).insertContent({ type: 'blockMath', attrs: { latex: '' } }).run(),
   },
   {
     title: 'Table',
