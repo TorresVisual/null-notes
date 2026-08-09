@@ -8,6 +8,13 @@
 
 use super::layout::{self, CharBox};
 
+/// A row-run, each character still tagged with its position in the page's
+/// own extraction stream — see `flatten`'s doc comment for why that tag has
+/// to survive this module's geometric regrouping.
+type Row = Vec<(usize, CharBox)>;
+/// Rows grouped into left-to-right columns.
+type Columns = Vec<Vec<Row>>;
+
 // How close in `y` two characters must sit to share a row-run, scaled by
 // font size — the same idea `layout.rs`'s own `BASELINE_TOLERANCE` uses,
 // duplicated rather than shared: this module's row-runs only need to be
@@ -58,30 +65,42 @@ fn median(values: &mut [f32]) -> f32 {
 /// with matching line spacing routinely share a baseline, and a naive
 /// baseline-only grouping would erase the gutter between them before
 /// gutter detection ever ran.
-pub(super) fn rough_rows(chars: &[CharBox]) -> Vec<Vec<CharBox>> {
+///
+/// Every character keeps its position in `chars` (the page's own
+/// extraction-stream order) tagged alongside it, all the way through to
+/// `flatten` — see that function's doc comment for why: this module's own
+/// baseline/gutter sorting is not the order `layout::build_line` is
+/// entitled to trust.
+pub(super) fn rough_rows(chars: &[CharBox]) -> Vec<Row> {
     group_by_baseline(chars)
         .into_iter()
         .flat_map(|group| split_by_horizontal_gap(&group))
         .collect()
 }
 
-fn group_by_baseline(chars: &[CharBox]) -> Vec<Vec<CharBox>> {
-    let mut sorted: Vec<CharBox> = chars.to_vec();
-    sorted.sort_by(|a, b| {
+/// Characters only, stripped of their stream-order tag — for the geometry
+/// helpers (`row_x_extent`, `row_font_size`, ...) that don't need it.
+fn plain(row: &[(usize, CharBox)]) -> Vec<CharBox> {
+    row.iter().map(|(_, c)| *c).collect()
+}
+
+fn group_by_baseline(chars: &[CharBox]) -> Vec<Row> {
+    let mut sorted: Vec<(usize, CharBox)> = chars.iter().copied().enumerate().collect();
+    sorted.sort_by(|(_, a), (_, b)| {
         b.y.partial_cmp(&a.y)
             .unwrap_or(std::cmp::Ordering::Equal)
             .then(a.x.partial_cmp(&b.x).unwrap_or(std::cmp::Ordering::Equal))
     });
 
-    let mut groups: Vec<Vec<CharBox>> = Vec::new();
-    for ch in sorted {
-        let same_baseline = groups.last().is_some_and(|g: &Vec<CharBox>| {
-            let scale = g[0].font_size.max(ch.font_size).max(1.0);
-            (g[0].y - ch.y).abs() <= scale * ROW_BASELINE_TOLERANCE
+    let mut groups: Vec<Row> = Vec::new();
+    for (index, ch) in sorted {
+        let same_baseline = groups.last().is_some_and(|g: &Row| {
+            let scale = g[0].1.font_size.max(ch.font_size).max(1.0);
+            (g[0].1.y - ch.y).abs() <= scale * ROW_BASELINE_TOLERANCE
         });
         match groups.last_mut() {
-            Some(g) if same_baseline => g.push(ch),
-            _ => groups.push(vec![ch]),
+            Some(g) if same_baseline => g.push((index, ch)),
+            _ => groups.push(vec![(index, ch)]),
         }
     }
     groups
@@ -93,26 +112,26 @@ fn group_by_baseline(chars: &[CharBox]) -> Vec<Vec<CharBox>> {
 /// `try_column_split` itself judges a real column gutter by, so an
 /// ordinary line of prose (whose widest gap is an ordinary word-space)
 /// never gets split, while two columns sharing a baseline do.
-fn split_by_horizontal_gap(group: &[CharBox]) -> Vec<Vec<CharBox>> {
-    let mut sorted: Vec<CharBox> = group.to_vec();
-    sorted.sort_by(|a, b| a.x.partial_cmp(&b.x).unwrap_or(std::cmp::Ordering::Equal));
+fn split_by_horizontal_gap(group: &[(usize, CharBox)]) -> Vec<Row> {
+    let mut sorted: Vec<(usize, CharBox)> = group.to_vec();
+    sorted.sort_by(|(_, a), (_, b)| a.x.partial_cmp(&b.x).unwrap_or(std::cmp::Ordering::Equal));
 
-    let mut sizes: Vec<f32> = sorted.iter().map(|c| c.font_size).collect();
+    let mut sizes: Vec<f32> = sorted.iter().map(|(_, c)| c.font_size).collect();
     let threshold = median(&mut sizes).max(1.0) * MIN_GUTTER_EMS;
 
-    let mut runs: Vec<Vec<CharBox>> = Vec::new();
-    for ch in sorted {
+    let mut runs: Vec<Row> = Vec::new();
+    for (index, ch) in sorted {
         let gap = runs
             .last()
-            .and_then(|r: &Vec<CharBox>| r.last())
-            .map(|prev: &CharBox| (ch.x - (prev.x + prev.width)).max(0.0));
+            .and_then(|r: &Row| r.last())
+            .map(|(_, prev): &(usize, CharBox)| (ch.x - (prev.x + prev.width)).max(0.0));
         match gap {
             Some(g) if g <= threshold => {
                 if let Some(run) = runs.last_mut() {
-                    run.push(ch);
+                    run.push((index, ch));
                 }
             }
-            _ => runs.push(vec![ch]),
+            _ => runs.push(vec![(index, ch)]),
         }
     }
     runs
@@ -120,23 +139,38 @@ fn split_by_horizontal_gap(group: &[CharBox]) -> Vec<Vec<CharBox>> {
 
 /// The horizontal span of every row combined — left edge of the leftmost
 /// row, right edge of the rightmost.
-pub(super) fn region_extent(rows: &[Vec<CharBox>]) -> (f32, f32) {
+pub(super) fn region_extent(rows: &[Row]) -> (f32, f32) {
     rows.iter()
-        .map(|r| layout::row_x_extent(r))
+        .map(|r| layout::row_x_extent(&plain(r)))
         .fold((f32::MAX, f32::MIN), |(lo, hi), (x0, x1)| (lo.min(x0), hi.max(x1)))
 }
 
 /// The region's dominant font size, read off its rows' own font sizes.
-pub(super) fn region_font_size(rows: &[Vec<CharBox>]) -> f32 {
-    let mut sizes: Vec<f32> = rows.iter().map(|r| layout::row_font_size(r)).collect();
+pub(super) fn region_font_size(rows: &[Row]) -> f32 {
+    let mut sizes: Vec<f32> = rows.iter().map(|r| layout::row_font_size(&plain(r))).collect();
     median(&mut sizes)
 }
 
-/// Collects every row's characters into one `Vec`, in no particular order —
-/// `layout::group_lines` re-sorts by geometry internally regardless, so the
-/// order this hands back never matters to its caller.
-pub(super) fn flatten(rows: &[Vec<CharBox>]) -> Vec<CharBox> {
-    rows.iter().flatten().copied().collect()
+/// Collects every row's characters into one `Vec`, restored to the page's
+/// own extraction-stream order (the tagged index), not whatever order this
+/// module's baseline/gutter sorting happened to leave them in.
+///
+/// `layout::group_lines` re-sorts by geometry to *find* rows, but
+/// `layout::build_line` then sorts each finished row by stream position,
+/// not `x` — deliberately, because a PDF's own synthetic filler can carry
+/// an `x` that makes no visual sense (see that function's comment). This
+/// module's row-runs are coarser than `group_lines`'s own (a raised
+/// derivative prime routinely lands outside `ROW_BASELINE_TOLERANCE` and
+/// gets sorted into an earlier row-run than the letter it modifies, since
+/// baseline groups sort by descending `y`), so handing back rows
+/// concatenated in *that* order silently swapped a prime ahead of its own
+/// base letter — "y'(t)" read back as "'y(t)". Restoring the original
+/// order here is what keeps that promise for `build_line` regardless of
+/// how this module regrouped things internally.
+pub(super) fn flatten(rows: &[Row]) -> Vec<CharBox> {
+    let mut indexed: Vec<(usize, CharBox)> = rows.iter().flatten().copied().collect();
+    indexed.sort_by_key(|(index, _)| *index);
+    indexed.into_iter().map(|(_, c)| c).collect()
 }
 
 /// The gaps left over once every row's horizontal span is merged into the
@@ -144,10 +178,10 @@ pub(super) fn flatten(rows: &[Vec<CharBox>]) -> Vec<CharBox> {
 /// never crossed by any row's own extent, by construction: rows only ever
 /// span multiple columns when `split_by_horizontal_gap` failed to separate
 /// them, which is exactly the failure mode Task 1 exists to prevent.
-fn column_gutters(rows: &[Vec<CharBox>]) -> Vec<(f32, f32)> {
+fn column_gutters(rows: &[Row]) -> Vec<(f32, f32)> {
     let mut intervals: Vec<(f32, f32)> = rows
         .iter()
-        .map(|r| layout::row_x_extent(r))
+        .map(|r| layout::row_x_extent(&plain(r)))
         .filter(|(x0, x1)| x0 <= x1)
         .collect();
     intervals.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
@@ -167,7 +201,7 @@ fn column_gutters(rows: &[Vec<CharBox>]) -> Vec<(f32, f32)> {
 /// gap wide enough, an ambiguous choice among several equally-wide gaps, or
 /// halves that don't come out balanced. Every guard here is deliberately
 /// conservative — see the plan's Global Constraints for why.
-pub(super) fn try_column_split(rows: &[Vec<CharBox>]) -> Option<Vec<Vec<Vec<CharBox>>>> {
+pub(super) fn try_column_split(rows: &[Row]) -> Option<Columns> {
     if rows.len() < MIN_CROSSING_ROWS * 2 {
         return None;
     }
@@ -195,9 +229,9 @@ pub(super) fn try_column_split(rows: &[Vec<CharBox>]) -> Option<Vec<Vec<Vec<Char
     let mut cut_xs: Vec<f32> = cuts.iter().map(|(_, g0, g1)| (g0 + g1) / 2.0).collect();
     cut_xs.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
 
-    let mut columns: Vec<Vec<Vec<CharBox>>> = vec![Vec::new(); cut_xs.len() + 1];
+    let mut columns: Columns = vec![Vec::new(); cut_xs.len() + 1];
     for row in rows {
-        let (x0, _) = layout::row_x_extent(row);
+        let (x0, _) = layout::row_x_extent(&plain(row));
         let column = cut_xs.iter().filter(|&&cx| x0 > cx).count();
         columns[column].push(row.clone());
     }
@@ -227,16 +261,16 @@ pub(super) fn try_column_split(rows: &[Vec<CharBox>]) -> Option<Vec<Vec<Vec<Char
 /// their font size — clearly larger than ordinary line or paragraph
 /// spacing, the shape a genuine structural break (a header above a
 /// multi-column body) takes.
-pub(super) fn split_into_bands(rows: &[Vec<CharBox>]) -> Vec<Vec<Vec<CharBox>>> {
+pub(super) fn split_into_bands(rows: &[Row]) -> Columns {
     if rows.is_empty() {
         return Vec::new();
     }
-    let mut bands: Vec<Vec<Vec<CharBox>>> = Vec::new();
-    let mut current: Vec<Vec<CharBox>> = vec![rows[0].clone()];
+    let mut bands: Columns = Vec::new();
+    let mut current: Vec<Row> = vec![rows[0].clone()];
     for pair in rows.windows(2) {
         let (prev, next) = (&pair[0], &pair[1]);
-        let size = layout::row_font_size(prev).max(layout::row_font_size(next)).max(1.0);
-        let gap = layout::row_y(prev) - layout::row_y(next);
+        let size = layout::row_font_size(&plain(prev)).max(layout::row_font_size(&plain(next))).max(1.0);
+        let gap = layout::row_y(&plain(prev)) - layout::row_y(&plain(next));
         if gap > size * BAND_GAP_EMS {
             bands.push(std::mem::take(&mut current));
         }
@@ -269,8 +303,7 @@ pub fn segment_regions(chars: &[CharBox]) -> Vec<Vec<CharBox>> {
     }
 
     let bands = split_into_bands(&rows);
-    let band_columns: Vec<Option<Vec<Vec<Vec<CharBox>>>>> =
-        bands.iter().map(|b| try_column_split(b)).collect();
+    let band_columns: Vec<Option<Columns>> = bands.iter().map(|b| try_column_split(b)).collect();
 
     if band_columns.iter().all(Option::is_none) {
         return vec![flatten(&rows)];

@@ -49,6 +49,14 @@ fn line(text: &str, x: f32, y: f32) -> Vec<CharBox> {
     set(text, x, y, Style::default())
 }
 
+/// Tags a hand-built row with a local stream index, the shape every row
+/// carries once it comes out of `rough_rows` — the functions under test
+/// here no longer accept bare `CharBox` rows, since losing that tag is
+/// exactly the bug `flatten`'s regression test below guards against.
+fn indexed(row: Vec<CharBox>) -> Vec<(usize, CharBox)> {
+    row.into_iter().enumerate().collect()
+}
+
 #[test]
 fn an_ordinary_line_of_prose_stays_one_row() {
     let chars = line("an ordinary line of single column prose", 72.0, 700.0);
@@ -71,7 +79,7 @@ fn same_baseline_columns_split_into_separate_row_runs() {
     let rows = rough_rows(&chars);
 
     assert_eq!(rows.len(), 2);
-    let texts: Vec<String> = rows.iter().map(|r| r.iter().map(|c| c.ch).collect()).collect();
+    let texts: Vec<String> = rows.iter().map(|r| r.iter().map(|(_, c)| c.ch).collect()).collect();
     assert_eq!(texts, ["left column text", "right column text"]);
 }
 
@@ -85,7 +93,7 @@ fn different_baselines_never_merge() {
 
 #[test]
 fn region_extent_spans_every_row() {
-    let rows = vec![line("left", 100.0, 700.0), line("right side", 300.0, 680.0)];
+    let rows = vec![indexed(line("left", 100.0, 700.0)), indexed(line("right side", 300.0, 680.0))];
     let (x0, x1) = region_extent(&rows);
     assert_eq!(x0, 100.0);
     assert_eq!(x1, 300.0 + "right side".chars().count() as f32 * BODY * ADVANCE);
@@ -93,22 +101,58 @@ fn region_extent_spans_every_row() {
 
 #[test]
 fn flatten_collects_every_row_into_one_vec() {
-    let rows = vec![line("a", 100.0, 700.0), line("b", 100.0, 680.0)];
+    let rows = vec![indexed(line("a", 100.0, 700.0)), indexed(line("b", 100.0, 680.0))];
     assert_eq!(flatten(&rows).len(), 2);
 }
 
 #[test]
 fn rough_rows_on_empty_input_is_empty() {
-    assert_eq!(rough_rows(&[]), Vec::<Vec<CharBox>>::new());
+    assert_eq!(rough_rows(&[]), Vec::<Vec<(usize, CharBox)>>::new());
+}
+
+// The real bug: `rough_rows` regroups characters by baseline/gutter
+// geometry, which is not the page's own extraction-stream order. A raised
+// superscript prime sits far enough above its base letter's baseline to
+// land in a *different*, earlier-sorted baseline group — `flatten` must
+// still hand characters back in their original stream order, not row-run
+// order, or `layout::build_line` (which trusts that order over `x`)
+// silently swaps the prime ahead of the letter it modifies. Found on
+// Analysis_2_Blatt12.pdf: "y'(t) + 2y(t) = 4cos(2t)" imported as
+// "'y(t) + 2y(t) = 4cos(2t))".
+#[test]
+fn flatten_preserves_original_stream_order_across_a_raised_superscript() {
+    let mut chars = set("y", 100.0, 700.0, Style::default());
+    let prime_x = chars.last().map(|c| c.x + c.width).unwrap_or(100.0);
+    chars.push(CharBox {
+        ch: '\'',
+        x: prime_x,
+        y: 706.0,
+        width: 2.0,
+        top: 710.0,
+        bottom: 704.0,
+        font_size: 7.0,
+        bold: false,
+        italic: false,
+        fixed_pitch: false,
+        family: Family::Text,
+    });
+    chars.extend(set("(t)", prime_x + 2.0, 700.0, Style::default()));
+
+    let regions = segment_regions(&chars);
+
+    assert_eq!(regions.len(), 1);
+    let order: Vec<char> = regions[0].iter().map(|c| c.ch).collect();
+    let expected: Vec<char> = chars.iter().map(|c| c.ch).collect();
+    assert_eq!(order, expected);
 }
 
 #[test]
 fn splits_two_evenly_spaced_columns() {
-    let mut rows: Vec<Vec<CharBox>> = Vec::new();
+    let mut rows: Vec<Vec<(usize, CharBox)>> = Vec::new();
     for i in 0..5 {
         let y = 700.0 - i as f32 * 12.0;
-        rows.push(line("left column text", 72.0, y));
-        rows.push(line("right column text", 320.0, y));
+        rows.push(indexed(line("left column text", 72.0, y)));
+        rows.push(indexed(line("right column text", 320.0, y)));
     }
 
     let columns = try_column_split(&rows).expect("expected a confident 2-way split");
@@ -123,12 +167,12 @@ fn splits_two_evenly_spaced_columns() {
 
 #[test]
 fn splits_three_columns_when_two_gutters_clearly_dominate() {
-    let mut rows: Vec<Vec<CharBox>> = Vec::new();
+    let mut rows: Vec<Vec<(usize, CharBox)>> = Vec::new();
     for i in 0..5 {
         let y = 700.0 - i as f32 * 12.0;
-        rows.push(line("first col", 72.0, y));
-        rows.push(line("second col", 300.0, y));
-        rows.push(line("third col", 520.0, y));
+        rows.push(indexed(line("first col", 72.0, y)));
+        rows.push(indexed(line("second col", 300.0, y)));
+        rows.push(indexed(line("third col", 520.0, y)));
     }
 
     let columns = try_column_split(&rows).expect("expected a confident 3-way split");
@@ -139,8 +183,8 @@ fn splits_three_columns_when_two_gutters_clearly_dominate() {
 
 #[test]
 fn refuses_a_split_when_theres_no_gap_at_all() {
-    let rows: Vec<Vec<CharBox>> = (0..8)
-        .map(|i| line("ordinary prose line goes right here", 72.0, 700.0 - i as f32 * 12.0))
+    let rows: Vec<Vec<(usize, CharBox)>> = (0..8)
+        .map(|i| indexed(line("ordinary prose line goes right here", 72.0, 700.0 - i as f32 * 12.0)))
         .collect();
     assert_eq!(try_column_split(&rows), None);
 }
@@ -151,23 +195,23 @@ fn refuses_a_split_when_theres_no_gap_at_all() {
 // column. This is the guard that keeps equation reconstruction untouched.
 #[test]
 fn refuses_a_split_when_one_side_has_too_few_rows() {
-    let mut rows: Vec<Vec<CharBox>> = Vec::new();
+    let mut rows: Vec<Vec<(usize, CharBox)>> = Vec::new();
     for i in 0..6 {
-        rows.push(line("a wide paragraph line here", 72.0, 700.0 - i as f32 * 12.0));
+        rows.push(indexed(line("a wide paragraph line here", 72.0, 700.0 - i as f32 * 12.0)));
     }
-    rows.push(line("num", 400.0, 700.0));
-    rows.push(line("den", 400.0, 688.0));
+    rows.push(indexed(line("num", 400.0, 700.0)));
+    rows.push(indexed(line("den", 400.0, 688.0)));
 
     assert_eq!(try_column_split(&rows), None);
 }
 
 #[test]
 fn refuses_a_split_when_columns_are_very_unequal_width() {
-    let mut rows: Vec<Vec<CharBox>> = Vec::new();
+    let mut rows: Vec<Vec<(usize, CharBox)>> = Vec::new();
     for i in 0..5 {
         let y = 700.0 - i as f32 * 12.0;
-        rows.push(line("a very long wide body paragraph line", 72.0, y));
-        rows.push(line("sb", 500.0, y));
+        rows.push(indexed(line("a very long wide body paragraph line", 72.0, y)));
+        rows.push(indexed(line("sb", 500.0, y)));
     }
     assert_eq!(try_column_split(&rows), None);
 }
@@ -177,13 +221,13 @@ fn refuses_a_split_when_too_many_gutters_are_equally_wide() {
     // Four evenly-spaced blocks make three equally-wide gutters.
     // MAX_COLUMN_CUTS only allows keeping 2, and none of the three
     // candidates stands out as clearly the right ones to keep.
-    let mut rows: Vec<Vec<CharBox>> = Vec::new();
+    let mut rows: Vec<Vec<(usize, CharBox)>> = Vec::new();
     for i in 0..5 {
         let y = 700.0 - i as f32 * 12.0;
-        rows.push(line("aa", 72.0, y));
-        rows.push(line("aa", 172.0, y));
-        rows.push(line("aa", 272.0, y));
-        rows.push(line("aa", 372.0, y));
+        rows.push(indexed(line("aa", 72.0, y)));
+        rows.push(indexed(line("aa", 172.0, y)));
+        rows.push(indexed(line("aa", 272.0, y)));
+        rows.push(indexed(line("aa", 372.0, y)));
     }
     assert_eq!(try_column_split(&rows), None);
 }
@@ -191,12 +235,12 @@ fn refuses_a_split_when_too_many_gutters_are_equally_wide() {
 #[test]
 fn splits_into_bands_wherever_the_gap_exceeds_the_threshold() {
     let rows = vec![
-        line("header", 72.0, 700.0),
-        line("body one", 72.0, 688.0),
-        line("body two", 72.0, 676.0),
+        indexed(line("header", 72.0, 700.0)),
+        indexed(line("body one", 72.0, 688.0)),
+        indexed(line("body two", 72.0, 676.0)),
         // Gap of 40pt from the previous row — well above
         // BAND_GAP_EMS(3.0) * 10pt = 30pt.
-        line("footer", 72.0, 636.0),
+        indexed(line("footer", 72.0, 636.0)),
     ];
     let bands = split_into_bands(&rows);
     assert_eq!(bands.len(), 2);
@@ -206,14 +250,14 @@ fn splits_into_bands_wherever_the_gap_exceeds_the_threshold() {
 
 #[test]
 fn ordinary_line_spacing_stays_in_one_band() {
-    let rows: Vec<Vec<CharBox>> =
-        (0..5).map(|i| line("line", 72.0, 700.0 - i as f32 * 12.0)).collect();
+    let rows: Vec<Vec<(usize, CharBox)>> =
+        (0..5).map(|i| indexed(line("line", 72.0, 700.0 - i as f32 * 12.0))).collect();
     assert_eq!(split_into_bands(&rows).len(), 1);
 }
 
 #[test]
 fn an_empty_row_list_produces_no_bands() {
-    assert_eq!(split_into_bands(&[]), Vec::<Vec<Vec<CharBox>>>::new());
+    assert_eq!(split_into_bands(&[]), Vec::<Vec<Vec<(usize, CharBox)>>>::new());
 }
 
 #[test]
