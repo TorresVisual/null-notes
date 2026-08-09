@@ -64,6 +64,46 @@ describe('block math editing', () => {
     await waitFor(() => expect(getTextarea(container)).toBeNull())
     expect(mathNodes(editor!)).toEqual([{ latex: 'b^3' }])
   })
+
+  it('reverts to the committed latex and closes on Escape', async () => {
+    const user = userEvent.setup()
+    const { container } = mount('$\n\ne^{i\\pi} + 1 = 0\n\n$')
+    await waitFor(() => expect(getRender(container)).toBeInTheDocument())
+    await user.click(getRender(container))
+    const textarea = await waitFor(() => {
+      const el = getTextarea(container)
+      if (!el) throw new Error('editor not open yet')
+      return el
+    })
+    await user.clear(textarea)
+    await user.type(textarea, 'garbage{Escape}')
+    await waitFor(() => expect(getTextarea(container)).toBeNull())
+    expect(mathNodes(editor!)).toEqual([{ latex: 'e^{i\\pi} + 1 = 0' }])
+  })
+
+  it('deletes the node when committing an empty draft', async () => {
+    const user = userEvent.setup()
+    const { container } = mount('$\n\ne^{i\\pi} + 1 = 0\n\n$')
+    await waitFor(() => expect(getRender(container)).toBeInTheDocument())
+    await user.click(getRender(container))
+    const textarea = await waitFor(() => {
+      const el = getTextarea(container)
+      if (!el) throw new Error('editor not open yet')
+      return el
+    })
+    await user.clear(textarea)
+    await user.type(textarea, '{Control>}{Enter}{/Control}')
+    await waitFor(() => expect(mathNodes(editor!)).toHaveLength(0))
+  })
+
+  it('opens directly into edit mode for a freshly inserted empty node, and Escape deletes it', async () => {
+    const { container } = mount('<p></p>')
+    editor!.commands.insertContent({ type: 'blockMath', attrs: { latex: '' } })
+    await waitFor(() => expect(getTextarea(container)).toBeInTheDocument())
+    const user = userEvent.setup()
+    await user.type(getTextarea(container)!, '{Escape}')
+    await waitFor(() => expect(mathNodes(editor!)).toHaveLength(0))
+  })
 })
 
 afterEach(() => {
