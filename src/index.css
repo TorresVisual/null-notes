@@ -1633,3 +1633,20 @@ body {
     break-inside: avoid;
   }
 }
+
+/* ── Block Handle ──────────────────────────────────────────────── */
+.block-handle-grip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  color: var(--text-tertiary);
+  background: transparent;
+  border: none;
+  cursor: grab;
+}
+
+.block-handle-grip:hover { background: var(--bg-hover); color: var(--text-primary); }
+.block-handle-grip:active { cursor: grabbing; }
