@@ -188,6 +188,22 @@ fn render(chars: &[CharBox], base_size: f32, base_y: f32) -> String {
             }
 
             let inner = render(run, inner_size, run[0].y);
+
+            // A derivative prime is not a true exponent: LaTeX (and KaTeX)
+            // render "y'" and "y''" as first/second-derivative notation on
+            // their own, no "^" needed. Emitting one anyway ("y^'") still
+            // renders identically, but it is not what anyone would actually
+            // type, and it stops reading as prime notation the moment a
+            // subscript follows it — "y^'_1" reads as "y, raised to ',
+            // subscript 1", not "y-prime, sub 1".
+            let is_prime_run = level == Level::Super
+                && has_preceding_base
+                && run.iter().all(|c| matches!(c.ch, '\'' | '′'));
+            if is_prime_run {
+                out.push_str(&inner);
+                continue;
+            }
+
             let marker = if level == Level::Super { '^' } else { '_' };
             out.push(marker);
             out.push_str(&brace(&inner));
@@ -616,7 +632,7 @@ mod tests {
     // A regression the fraction fix above introduced and real-document
     // testing caught: "y'_1(t)" on Analysis_2_Blatt12.pdf — a prime
     // superscript immediately followed by a subscript, both on base "y" —
-    // started rendering as `y\frac{'}{1}(t)` instead of `y^'_1(t)`. x-alignment
+    // started rendering as `y\frac{'}{1}(t)` instead of `y'_1(t)`. x-alignment
     // alone doesn't tell a fraction's numerator apart from a real exponent:
     // both the prime and the "1" sit at essentially the same x here too,
     // simply because both attach right where "y" ends. What actually
@@ -629,7 +645,31 @@ mod tests {
         chars.extend(script("′", x, 3.0, Family::Symbol));
         chars.extend(script("1", x, -3.0, Family::Text));
 
-        assert_eq!(to_latex(&chars), "y^'_1");
+        assert_eq!(to_latex(&chars), "y'_1");
+    }
+
+    // A derivative prime is real prime notation, not a genuine exponent:
+    // LaTeX/KaTeX render "y'" on its own, no "^" needed. "y^'" renders
+    // identically but is not what anyone would type by hand.
+    #[test]
+    fn a_prime_superscript_renders_without_a_caret() {
+        let mut chars = run("y", Family::Italic);
+        let x = chars.last().map(|c| c.x + c.width).unwrap_or(100.0);
+        chars.extend(script("′", x, 3.0, Family::Symbol));
+
+        assert_eq!(to_latex(&chars), "y'");
+    }
+
+    // A second derivative's double prime is still prime notation — "y''",
+    // not "y^{''}" — and still needs no braces since it renders as two
+    // plain characters straight after the base.
+    #[test]
+    fn a_double_prime_superscript_renders_without_a_caret_or_braces() {
+        let mut chars = run("y", Family::Italic);
+        let x = chars.last().map(|c| c.x + c.width).unwrap_or(100.0);
+        chars.extend(script("′′", x, 3.0, Family::Symbol));
+
+        assert_eq!(to_latex(&chars), "y''");
     }
 
     #[test]
