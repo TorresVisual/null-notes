@@ -394,6 +394,84 @@ fn a_heaviside_style_cases_block_becomes_one_display_equation() {
     );
 }
 
+// Reconstructs Analysis_2_Blatt11.pdf item 6's real vector field:
+// `⃗v(x, y) = (3x² − 3y² + 2x + 2y, −6xy + 2x − 2y).` — a bracket row with
+// no leading text, two single-column content rows, and a prefix row
+// ("⃗v(x, y) =" ... ".") whose own `y` sits *between* the two content
+// rows — TeX centers it vertically against the whole bracket, the same
+// quirk `reconstruct_cases` already solved for `H(t-b) =`.
+#[test]
+fn a_two_row_vector_becomes_one_pmatrix() {
+    use real_char as real;
+
+    let chars = vec![
+        // "⃗v(x, y) =" — prefix, before the bracket.
+        real('\u{20d7}', 224.934, 7.364, 740.532, 11.96, Family::Italic),
+        real('v', 225.400, 5.655, 740.532, 11.96, Family::Italic),
+        real('(', 231.499, 4.543, 740.532, 11.96, Family::Text),
+        real('x', 236.051, 6.647, 740.532, 11.96, Family::Italic),
+        real(',', 242.698, 3.252, 740.532, 11.96, Family::Italic),
+        real(' ', 247.946, 0.000, 740.532, 11.96, Family::Italic),
+        real('y', 247.946, 5.715, 740.532, 11.96, Family::Italic),
+        real(')', 254.084, 4.543, 740.532, 11.96, Family::Text),
+        real(' ', 261.951, 0.000, 740.532, 11.96, Family::Text),
+        real('=', 261.951, 9.098, 740.532, 11.96, Family::Text),
+        // The bracket row: open paren above the first content row's y.
+        real('\u{12}', 274.383, 8.799, 757.389, 11.96, Family::Extensible),
+        // First content row: "3x^2 - 3y^2 + 2x + 2y".
+        real('3', 283.183, 5.846, 747.854, 11.96, Family::Text),
+        real('x', 289.036, 6.647, 747.854, 11.96, Family::Italic),
+        real('2', 295.688, 4.232, 752.193, 7.97, Family::Text),
+        real('\u{2212}', 303.077, 9.289, 747.854, 11.96, Family::Symbol),
+        real('3', 315.032, 5.846, 747.854, 11.96, Family::Text),
+        real('y', 320.885, 5.715, 747.854, 11.96, Family::Italic),
+        real('2', 327.022, 4.232, 752.193, 7.97, Family::Text),
+        real('+', 334.411, 9.098, 747.854, 11.96, Family::Text),
+        real(' ', 346.163, 0.000, 747.854, 11.96, Family::Text),
+        real('2', 346.163, 5.846, 747.854, 11.96, Family::Text),
+        real('x', 352.025, 6.647, 747.854, 11.96, Family::Italic),
+        real('+', 361.334, 9.098, 747.854, 11.96, Family::Text),
+        real(' ', 373.086, 0.000, 747.854, 11.96, Family::Text),
+        real('2', 373.086, 5.846, 747.854, 11.96, Family::Text),
+        real('y', 378.948, 5.715, 747.854, 11.96, Family::Italic),
+        // Second content row: "-6xy + 2x - 2y".
+        real('\u{2212}', 293.402, 9.289, 733.408, 11.96, Family::Symbol),
+        real('6', 302.700, 5.846, 733.408, 11.96, Family::Text),
+        real('x', 308.553, 6.647, 733.408, 11.96, Family::Italic),
+        real('y', 315.200, 5.715, 733.408, 11.96, Family::Italic),
+        real('+', 323.999, 9.098, 733.408, 11.96, Family::Text),
+        real(' ', 335.751, 0.000, 733.408, 11.96, Family::Text),
+        real('2', 335.751, 5.846, 733.408, 11.96, Family::Text),
+        real('x', 341.613, 6.647, 733.408, 11.96, Family::Italic),
+        real('\u{2212}', 350.922, 9.289, 733.408, 11.96, Family::Symbol),
+        real('2', 362.877, 5.846, 733.408, 11.96, Family::Text),
+        real('y', 368.730, 5.715, 733.408, 11.96, Family::Italic),
+        // Close bracket, and the trailing period after it (same baseline
+        // as the prefix row).
+        real('\u{13}', 385.085, 8.799, 757.389, 11.96, Family::Extensible),
+        real('.', 395.878, 3.252, 740.532, 11.96, Family::Italic),
+    ];
+    // Row grouping (`group_lines`) buckets by y-proximity, not stream
+    // order, so this list's order — prefix, then bracket, then both
+    // content rows, then close bracket and trailing period — intentionally
+    // mirrors the real document's own stream order rather than needing to
+    // be pre-sorted by row.
+
+    let markdown = chars_to_markdown(&chars);
+
+    // A bare `Inline::Maths` line (no leading prose) renders as *display*
+    // maths — its own block, `$` on its own line before and after — rather
+    // than inline `$...$`; that block formatting is `render_content`'s
+    // existing, unrelated concern, so this checks the reconstructed LaTeX
+    // content itself rather than assuming a particular `$` placement.
+    assert!(
+        markdown.contains(
+            r"⃗v(x, y) = \begin{pmatrix} 3x^2 - 3y^2 + 2x + 2y \\ -6xy + 2x - 2y \end{pmatrix}."
+        ),
+        "got: {markdown}"
+    );
+}
+
 // A page footer's own page number can land within the brace's x-alignment
 // tolerance by pure coincidence, however far down the page it actually is
 // — found on the real document: a footer "1" at y=26.8 (74pt below the

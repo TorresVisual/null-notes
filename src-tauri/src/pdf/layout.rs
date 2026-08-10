@@ -1060,6 +1060,8 @@ pub fn group_lines(chars: &[CharBox]) -> Vec<Line> {
 
     merge_extensible_rows(&mut rows);
     let (mut lines, rows) = reconstruct_cases(rows);
+    let (matrix_lines, rows) = reconstruct_matrices(rows);
+    lines.extend(matrix_lines);
     let (frac_lines, rows) = reconstruct_fraction_sums(rows);
     lines.extend(frac_lines);
     let (table_lines, rows) = reconstruct_tables(rows);
@@ -2304,6 +2306,191 @@ fn reconstruct_cases(rows: Vec<Vec<(usize, CharBox)>>) -> (Vec<Line>, Vec<Vec<(u
     (synthesized, remaining)
 }
 
+/// Finds and reconstructs a multi-row vector or matrix: a tall bracket
+/// pair with two or more content rows between them, and — as on
+/// Analysis_2_Blatt11.pdf item 6 — a prefix row (`⃗v(x, y) =`, `.`) whose
+/// own `y` sits *between* the content rows rather than above or below all
+/// of them, the same quirk `reconstruct_cases` already solved for
+/// `H(t-b) =`.
+///
+/// Runs on the raw rows, before `build_line` collapses them into
+/// `Inline`s, for the same reason `reconstruct_cases` does: column
+/// splitting needs each row's own real x-gaps, which a finished `Inline`
+/// string no longer distinguishes from an ordinary internal space. Must
+/// run before `reconstruct_tables`, or a genuine 2+ column matrix's own
+/// rows read exactly like a table.
+///
+/// Column count comes from `table_gutters` run across every content row
+/// together — the same cross-row alignment judgment `reconstruct_tables`
+/// already relies on, not a new algorithm. A single wide expression's own
+/// internal operator spacing never produces a false column split, because
+/// a gutter only counts where *every* content row is simultaneously
+/// empty.
+///
+/// Returns the finished `Line`s for whatever matched, and every row that
+/// didn't — for the caller to run through the remaining reconstruction
+/// passes and finally `build_line`, unchanged.
+fn reconstruct_matrices(rows: Vec<Vec<(usize, CharBox)>>) -> (Vec<Line>, Vec<Vec<(usize, CharBox)>>) {
+    let plain: Vec<Vec<CharBox>> = rows.iter().map(|r| r.iter().map(|(_, c)| *c).collect()).collect();
+    let mut consumed = vec![false; rows.len()];
+    let mut synthesized: Vec<Line> = Vec::new();
+
+    for bracket_i in 0..plain.len() {
+        if consumed[bracket_i] {
+            continue;
+        }
+        let Some((open, close, leading)) = matrix_bracket_row(&plain[bracket_i]) else { continue };
+        let bracket_size = open.font_size.max(1.0);
+        let open_right = open.x + open.width;
+        let close_left = close.x;
+        if open_right >= close_left {
+            continue;
+        }
+
+        let mut content_candidates: Vec<usize> = (0..plain.len())
+            .filter(|&i| i != bracket_i && !consumed[i])
+            .filter(|&i| {
+                let (x0, x1) = row_x_extent(&plain[i]);
+                x0 >= open_right - bracket_size * MATRIX_MAX_COLUMN_GAP
+                    && x1 <= close_left + bracket_size * MATRIX_MAX_COLUMN_GAP
+            })
+            .collect();
+        if content_candidates.len() < 2 {
+            continue;
+        }
+        content_candidates.sort_by(|&a, &b| {
+            row_y(&plain[b]).partial_cmp(&row_y(&plain[a])).unwrap_or(std::cmp::Ordering::Equal)
+        });
+
+        let top_y = row_y(&plain[content_candidates[0]]);
+        let bottom_y = row_y(&plain[*content_candidates.last().unwrap_or(&content_candidates[0])]);
+
+        let prefix_i = (0..plain.len()).find(|&i| {
+            i != bracket_i
+                && !consumed[i]
+                && !content_candidates.contains(&i)
+                && row_y(&plain[i]) <= top_y
+                && row_y(&plain[i]) >= bottom_y
+        });
+
+        let content_plain: Vec<Vec<CharBox>> =
+            content_candidates.iter().map(|&i| plain[i].clone()).collect();
+        let cut_xs = table_gutters(&content_plain).filter(|cuts| {
+            !cuts.is_empty()
+                && content_candidates.iter().all(|&i| !row_crosses_gutters(&plain[i], cuts))
+                && content_candidates.iter().all(|&i| {
+                    split_row_into_cells(&rows[i], cuts).iter().filter(|c| cell_has_content(c)).count()
+                        == cuts.len() + 1
+                })
+        });
+
+        let row_lines: Vec<String> = content_candidates
+            .iter()
+            .map(|&ci| match &cut_xs {
+                Some(cuts) => split_row_into_cells(&rows[ci], cuts)
+                    .into_iter()
+                    .map(|cell| {
+                        let mut cell_chars: Vec<CharBox> = cell.into_iter().map(|(_, c)| c).collect();
+                        cell_chars.sort_by(|a, b| a.x.partial_cmp(&b.x).unwrap_or(std::cmp::Ordering::Equal));
+                        latex::to_latex(&cell_chars)
+                    })
+                    .collect::<Vec<_>>()
+                    .join(" & "),
+                None => {
+                    let mut row_chars = plain[ci].clone();
+                    row_chars.sort_by(|a, b| a.x.partial_cmp(&b.x).unwrap_or(std::cmp::Ordering::Equal));
+                    latex::to_latex(&row_chars)
+                }
+            })
+            .collect();
+
+        let (mut before_chars, mut after_chars): (Vec<CharBox>, Vec<CharBox>) = match prefix_i {
+            Some(pi) => (
+                plain[pi].iter().copied().filter(|c| c.x < open.x).collect(),
+                plain[pi].iter().copied().filter(|c| c.x > close.x + close.width).collect(),
+            ),
+            None => (Vec::new(), Vec::new()),
+        };
+        before_chars.sort_by(|a, b| a.x.partial_cmp(&b.x).unwrap_or(std::cmp::Ordering::Equal));
+        after_chars.sort_by(|a, b| a.x.partial_cmp(&b.x).unwrap_or(std::cmp::Ordering::Equal));
+        let before_latex = latex::to_latex(&before_chars);
+        let after_latex = latex::to_latex(&after_chars);
+
+        let mut latex = String::new();
+        if !before_latex.is_empty() {
+            latex.push_str(&before_latex);
+            latex.push(' ');
+        }
+        latex.push_str("\\begin{pmatrix} ");
+        latex.push_str(&row_lines.join(" \\\\ "));
+        latex.push_str(" \\end{pmatrix}");
+        latex.push_str(&after_latex);
+
+        let mut content: Vec<Inline> = Vec::new();
+        let leading_text: String = leading.iter().map(|c| c.ch).collect();
+        let leading_trimmed = leading_text.trim();
+        if !leading_trimmed.is_empty() {
+            content.push(Inline::Text(Span {
+                text: format!("{leading_trimmed} "),
+                bold: false,
+                italic: false,
+            }));
+        }
+        content.push(Inline::Maths(latex));
+        let is_display_maths = content.iter().all(|i| match i {
+            Inline::Text(span) => span.text.trim().is_empty(),
+            Inline::Maths(_) => true,
+            Inline::TableRow(_, _) | Inline::ImageRef(_, _) => false,
+        });
+
+        let base_size = prefix_i.map(|pi| row_font_size(&plain[pi])).unwrap_or(bracket_size).max(1.0);
+        let mut x = open.x;
+        let mut right = close.x + close.width;
+        for &ci in &content_candidates {
+            let (x0, x1) = row_x_extent(&plain[ci]);
+            x = x.min(x0);
+            right = right.max(x1);
+        }
+        if let Some(leading_x0) =
+            leading.iter().map(|c| c.x).fold(None, |acc: Option<f32>, v| Some(acc.map_or(v, |a| a.min(v))))
+        {
+            x = x.min(leading_x0);
+        }
+        let mut block_top_y = row_y(&plain[bracket_i]).max(top_y);
+        if let Some(pi) = prefix_i {
+            block_top_y = block_top_y.max(row_y(&plain[pi]));
+        }
+
+        synthesized.push(Line {
+            content,
+            x,
+            right,
+            y: block_top_y,
+            font_size: base_size,
+            fixed_pitch: false,
+            is_display_maths,
+            ends_hyphenated: false,
+        });
+
+        consumed[bracket_i] = true;
+        if let Some(pi) = prefix_i {
+            consumed[pi] = true;
+        }
+        for &ci in &content_candidates {
+            consumed[ci] = true;
+        }
+    }
+
+    let remaining: Vec<Vec<(usize, CharBox)>> = rows
+        .into_iter()
+        .enumerate()
+        .filter(|(i, _)| !consumed[*i])
+        .map(|(_, row)| row)
+        .collect();
+
+    (synthesized, remaining)
+}
+
 fn render_content(content: &[Inline]) -> String {
     let mut out = String::new();
     for inline in content {
@@ -2476,6 +2663,12 @@ const FRACTION_MIN_OVERLAP_RATIO: f32 = 0.3;
 // brace" — scaled by the brace's own font size the same way
 // FRACTION_MAX_ROW_GAP scales by a fraction's own body size.
 const CASES_MAX_COLUMN_GAP: f32 = 2.5;
+
+// How far a content row's own x-extent may sit outside the bracket's
+// interior span (open's right edge to close's left edge) and still count
+// as belonging to this matrix — scaled by the bracket's own font size, the
+// same reasoning `CASES_MAX_COLUMN_GAP` already documents.
+const MATRIX_MAX_COLUMN_GAP: f32 = 2.5;
 // How far a case row's left edge may drift from the first case row's own
 // left edge and still count as the same left-aligned column.
 const CASES_COLUMN_TOLERANCE: f32 = 1.0;
