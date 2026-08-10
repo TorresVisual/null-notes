@@ -2347,6 +2347,7 @@ fn reconstruct_matrices(rows: Vec<Vec<(usize, CharBox)>>) -> (Vec<Line>, Vec<Vec
             continue;
         }
 
+        let bracket_y = row_y(&plain[bracket_i]);
         let mut content_candidates: Vec<usize> = (0..plain.len())
             .filter(|&i| i != bracket_i && !consumed[i])
             .filter(|&i| {
@@ -2354,6 +2355,14 @@ fn reconstruct_matrices(rows: Vec<Vec<(usize, CharBox)>>) -> (Vec<Line>, Vec<Vec
                 x0 >= open_right - bracket_size * MATRIX_MAX_COLUMN_GAP
                     && x1 <= close_left + bracket_size * MATRIX_MAX_COLUMN_GAP
             })
+            // Column-proximity alone is not enough: unrelated content far
+            // down the page (a later exercise's own symbol, a page-number
+            // footer) can coincidentally share this x-band — the same
+            // failure `CASES_MAX_ROW_GAP` already guards against for
+            // `reconstruct_cases`. A content row must sit within a few row
+            // heights of the bracket itself, not merely somewhere on the
+            // same page.
+            .filter(|&i| (bracket_y - row_y(&plain[i])).abs() <= bracket_size * MATRIX_MAX_ROW_GAP)
             .collect();
         if content_candidates.len() < 2 {
             continue;
@@ -2669,6 +2678,12 @@ const CASES_MAX_COLUMN_GAP: f32 = 2.5;
 // as belonging to this matrix — scaled by the bracket's own font size, the
 // same reasoning `CASES_MAX_COLUMN_GAP` already documents.
 const MATRIX_MAX_COLUMN_GAP: f32 = 2.5;
+// How far above or below the bracket row (in multiples of its own font
+// size) a row may sit and still be a candidate content row — the same
+// reasoning `CASES_MAX_ROW_GAP` documents: x-band coincidence alone lets a
+// page footer or a later exercise's own symbol pass the column check from
+// anywhere on the page.
+const MATRIX_MAX_ROW_GAP: f32 = 3.0;
 // How far a case row's left edge may drift from the first case row's own
 // left edge and still count as the same left-aligned column.
 const CASES_COLUMN_TOLERANCE: f32 = 1.0;
