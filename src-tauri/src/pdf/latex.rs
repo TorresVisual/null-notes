@@ -336,6 +336,17 @@ fn is_sum(ch: &CharBox) -> bool {
     ch.family == Family::Extensible && ch.ch == 'X'
 }
 
+/// The large opening brace a `\cases`/piecewise definition needs — see
+/// `large_paren_glyph`'s own doc comment for how this codepoint was
+/// confirmed on Analysis_2_Blatt12.pdf. A dedicated predicate (rather than
+/// matching `large_paren_glyph`'s string output) because `layout.rs`'s
+/// `reconstruct_cases` pass needs to identify this specific glyph — not
+/// render it — before any `Line`/`Inline` exists to render into, and
+/// `large_paren_glyph` itself is private to this file.
+pub(super) fn is_cases_brace(ch: &CharBox) -> bool {
+    ch.family == Family::Extensible && ch.ch == '\u{1a}'
+}
+
 /// CMEX's large stretchy parentheses (the delimiters a multi-row vector or
 /// a parenthesized subexpression needs) have no Unicode entry in this font
 /// subset — confirmed on two documents by rendering the page and cropping
@@ -360,10 +371,31 @@ fn large_paren_glyph(ch: &CharBox) -> Option<&'static str> {
     if ch.family != Family::Extensible {
         return None;
     }
+    if is_cases_brace(ch) {
+        return Some("\\{");
+    }
     match ch.ch {
         '\u{12}' | '\u{10}' | '\0' => Some("("),
         '\u{13}' | '\u{11}' | '\u{1}' => Some(")"),
-        '\u{1a}' => Some("\\{"),
+        _ => None,
+    }
+}
+
+/// Whether `ch` is one of the confirmed large stretchy bracket glyphs
+/// `large_paren_glyph` already maps to plain ASCII parens — and if so,
+/// whether it is the open or close half of the pair. A dedicated predicate
+/// (rather than matching `large_paren_glyph`'s string output) because
+/// `layout.rs`'s `reconstruct_matrices` pass needs to identify a row that
+/// holds exactly one open and one close bracket glyph — not render them —
+/// before any `Line`/`Inline` exists to render into. Same visibility
+/// pattern as `is_cases_brace`, for the same reason.
+pub(super) fn bracket_glyph(ch: &CharBox) -> Option<bool> {
+    if ch.family != Family::Extensible {
+        return None;
+    }
+    match ch.ch {
+        '\u{12}' | '\u{10}' | '\0' => Some(true),
+        '\u{13}' | '\u{11}' | '\u{1}' => Some(false),
         _ => None,
     }
 }
@@ -565,6 +597,22 @@ mod tests {
         }
     }
 
+    #[test]
+    fn recognises_the_cases_brace_placeholder_and_nothing_else_at_that_codepoint() {
+        let brace = ch('\u{1a}', 300.0, 700.0, 12.0, Family::Extensible);
+        assert!(is_cases_brace(&brace));
+
+        // Same codepoint in a non-maths face is not the brace — it is
+        // whatever ordinary character U+001A happens to be in that
+        // document's body font, the same reasoning every other
+        // placeholder-glyph predicate in this file already applies.
+        let not_extensible = ch('\u{1a}', 300.0, 700.0, 12.0, Family::Text);
+        assert!(!is_cases_brace(&not_extensible));
+
+        let different_glyph = ch('\u{10}', 300.0, 700.0, 12.0, Family::Extensible);
+        assert!(!is_cases_brace(&different_glyph));
+    }
+
     /// Lays a string out on the baseline in one face.
     fn run(text: &str, family: Family) -> Vec<CharBox> {
         let mut out = Vec::new();
@@ -598,6 +646,54 @@ mod tests {
             cursor += size * 0.5;
         }
         out
+    }
+
+    // Exact geometry captured from Analysis_2_Blatt12.pdf's "e^{-bs}/s ." (the
+    // Laplace transform of the Heaviside step), via dump_chars_range. The
+    // numerator "e^{-bs}" is itself two script levels deep — "e" is a script
+    // relative to the body row, and "-bs" a further, smaller script relative
+    // to "e" — which used to come out as "e^{-bs}s" (a bare superscript, the
+    // denominator glued on after as plain text) once `group_lines` correctly
+    // grouped every character into one row; this is `to_latex`'s own share
+    // of that fix, using real widths (not the `.5*size` approximation `ch()`
+    // gives every glyph) since gap synthesis is width-sensitive.
+    //
+    // The trailing "." is not decoration: `maths_runs` (`layout.rs`) grows a
+    // region backward and forward over non-letter punctuation, so the real
+    // region this function is ever called with includes it — and it is what
+    // makes "e" itself body-size-relatively-small enough to read as the
+    // numerator's own script in the first place. A numerator-only slice with
+    // no period has no full-size character anywhere in it, so its own
+    // `base_size` collapses to "e"'s size and there is nothing left for "e"
+    // to be a script *of* — a shape `to_latex` is never actually called with
+    // on a real document, which is why this test includes the period rather
+    // than testing the fraction glyphs in isolation.
+    #[test]
+    fn a_compact_fraction_whose_numerator_has_its_own_nested_exponent() {
+        fn real(c: char, x: f32, w: f32, y: f32, size: f32, family: Family) -> CharBox {
+            CharBox {
+                ch: c,
+                x,
+                y,
+                width: w,
+                top: y + size * 0.75,
+                bottom: y - size * 0.25,
+                font_size: size,
+                bold: false,
+                italic: false,
+                fixed_pitch: false,
+                family,
+            }
+        }
+        let chars = vec![
+            real('e', 484.506, 3.921, 369.074, 7.97, Family::Italic),
+            real('\u{2212}', 488.434, 5.756, 371.887, 5.98, Family::Symbol),
+            real('b', 494.190, 3.270, 371.887, 5.98, Family::Italic),
+            real('s', 497.460, 3.491, 371.887, 5.98, Family::Italic),
+            real('s', 491.023, 3.913, 360.245, 7.97, Family::Italic),
+            real('.', 502.651, 3.252, 364.367, 11.96, Family::Text),
+        ];
+        assert_eq!(to_latex(&chars), r"\frac{e^{-bs}}{s} .");
     }
 
     #[test]
@@ -857,6 +953,24 @@ mod tests {
     fn the_blatt11_large_paren_placeholders_become_plain_parens() {
         assert_eq!(to_latex(&run("\u{12}", Family::Extensible)), "(");
         assert_eq!(to_latex(&run("\u{13}", Family::Extensible)), ")");
+    }
+
+    #[test]
+    fn bracket_glyph_identifies_open_and_close_placeholders() {
+        let open = ch('\u{12}', 300.0, 700.0, 11.96, Family::Extensible);
+        let close = ch('\u{13}', 300.0, 700.0, 11.96, Family::Extensible);
+        assert_eq!(bracket_glyph(&open), Some(true));
+        assert_eq!(bracket_glyph(&close), Some(false));
+
+        // The second confirmed codepoint pair (Ue9.pdf's outer nesting level).
+        assert_eq!(bracket_glyph(&ch('\u{10}', 300.0, 700.0, 11.96, Family::Extensible)), Some(true));
+        assert_eq!(bracket_glyph(&ch('\u{11}', 300.0, 700.0, 11.96, Family::Extensible)), Some(false));
+
+        // The cases-brace glyph is a real Extensible glyph but not a bracket.
+        assert_eq!(bracket_glyph(&ch('\u{1a}', 300.0, 700.0, 11.96, Family::Extensible)), None);
+
+        // Same codepoint outside Family::Extensible is not a bracket at all.
+        assert_eq!(bracket_glyph(&ch('\u{12}', 300.0, 700.0, 11.96, Family::Text)), None);
     }
 
     // Ue9.pdf Beispiel 9.1(a): ¬∀y((∃xP(x,y)) → ∀z¬(∃xQ(x,y,z))). rendered
