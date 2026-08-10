@@ -389,13 +389,24 @@ fn large_paren_glyph(ch: &CharBox) -> Option<&'static str> {
 /// holds exactly one open and one close bracket glyph — not render them —
 /// before any `Line`/`Inline` exists to render into. Same visibility
 /// pattern as `is_cases_brace`, for the same reason.
+///
+/// A second confirmed pair, `'\u{f8eb}'`/`'\u{f8f6}'` and
+/// `'\u{f8ed}'`/`'\u{f8f8}'`, comes from Analysis_2_Blatt7_2026.pdf: a
+/// pmatrix tall enough to need its bracket assembled from two half-height
+/// Private-Use-Area glyph pieces per side (confirmed by rendering the page
+/// and reading exact geometry — same x, same width, a fixed 21.519pt
+/// vertical offset, identical across all six real instances). Both pieces
+/// of both sides are mapped, not just one, because `layout.rs`'s
+/// `reconstruct_matrices` needs to recognise and strip *either* piece
+/// wherever it lands, not only the one that happens to sit on the
+/// bracket's own row.
 pub(super) fn bracket_glyph(ch: &CharBox) -> Option<bool> {
     if ch.family != Family::Extensible {
         return None;
     }
     match ch.ch {
-        '\u{12}' | '\u{10}' | '\0' => Some(true),
-        '\u{13}' | '\u{11}' | '\u{1}' => Some(false),
+        '\u{12}' | '\u{10}' | '\0' | '\u{f8eb}' | '\u{f8ed}' => Some(true),
+        '\u{13}' | '\u{11}' | '\u{1}' | '\u{f8f6}' | '\u{f8f8}' => Some(false),
         _ => None,
     }
 }
@@ -971,6 +982,22 @@ mod tests {
 
         // Same codepoint outside Family::Extensible is not a bracket at all.
         assert_eq!(bracket_glyph(&ch('\u{12}', 300.0, 700.0, 11.96, Family::Text)), None);
+    }
+
+    #[test]
+    fn bracket_glyph_identifies_the_assembled_delimiter_pieces() {
+        // Analysis_2_Blatt7_2026.pdf item 1: a pmatrix tall enough that its
+        // bracket is assembled from two half-height pieces per side, confirmed
+        // by rendering the page (dump_render_page0) and reading exact
+        // geometry (dump_chars_range) — the top piece ('\u{f8eb}'/'\u{f8f6}')
+        // lands alone on its own row, the bottom piece ('\u{f8ed}'/'\u{f8f8}')
+        // lands glued to the vector's own prefix/content row. Both pieces of
+        // both sides must be recognised, so the bottom piece can be stripped
+        // from whatever row it lands on.
+        assert_eq!(bracket_glyph(&ch('\u{f8eb}', 313.0, 649.0, 11.96, Family::Extensible)), Some(true));
+        assert_eq!(bracket_glyph(&ch('\u{f8ed}', 313.0, 627.0, 11.96, Family::Extensible)), Some(true));
+        assert_eq!(bracket_glyph(&ch('\u{f8f6}', 361.0, 649.0, 11.96, Family::Extensible)), Some(false));
+        assert_eq!(bracket_glyph(&ch('\u{f8f8}', 361.0, 627.0, 11.96, Family::Extensible)), Some(false));
     }
 
     // Ue9.pdf Beispiel 9.1(a): ¬∀y((∃xP(x,y)) → ∀z¬(∃xQ(x,y,z))). rendered
