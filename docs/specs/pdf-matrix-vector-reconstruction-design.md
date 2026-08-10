@@ -26,7 +26,17 @@ y=183.46  content row 2: Maths("x - y")
 ```
 Same codepoints as Blatt11. This is the same detection target as `reconstruct_cases`'s own brace row (which already tolerates leading text, e.g. "ist " before its brace) — not a new shape, just confirmation the same tolerance is needed here.
 
-**Analysis_2_Blatt7_2026.pdf** — six 3-row column vectors (`⃗v(x,y,z) = (a, b, c)` stacked), confirmed real but **not yet usable as a verification anchor**: they use an unconfirmed codepoint set (`'\u{f8eb}'`/`'\u{f8f6}'`, Private Use Area — not yet in `large_paren_glyph`) and the raw dump shows what looks like a second, smaller bracket pair (`'\u{f8ed}'`/`'\u{f8f8}'`) hugging the middle row specifically. Every existing glyph mapping in `latex.rs` was confirmed by rendering the page and cropping the glyph (`dump_render_page0`) before being trusted — this needs the same treatment, which belongs in the implementation plan as its own investigation task, not guessed at here.
+**Analysis_2_Blatt7_2026.pdf** — six 3-row column vectors (`⃗v(x,y,z) = \begin{pmatrix} a \\ b \\ c \end{pmatrix}`), now fully confirmed by rendering the page (`dump_render_page0`) and reading exact per-character geometry (`dump_chars_range`) — not guessed at. Item 1's exact coordinates:
+
+```
+[110] '\u{f8eb}' x=313.007 y=649.288  (open, top piece)
+[111] '\u{f8ed}' x=313.007 y=627.769  (open, bottom piece — SAME x, 21.519pt below)
+...
+[123] '\u{f8f6}' x=361.260 y=649.288  (close, top piece)
+[124] '\u{f8f8}' x=361.260 y=627.769  (close, bottom piece)
+```
+
+Visually this is one seamless `\begin{pmatrix}` bracket per side — the font assembles it from two half-height Private-Use-Area glyph pieces (same x, identical width, a fixed 21.519pt vertical offset — confirmed identical across all six instances) rather than one precomposed glyph, because the 3-row height falls outside whatever single glyph sizes this font subset embeds. `group_lines`' baseline-tolerance row bucketing puts the two pieces on *different* rows: the top pieces (`\u{f8eb}`/`\u{f8f6}`) land alone on their own row — the same shape `matrix_bracket_row` already detects, once these codepoints are added — but the bottom pieces (`\u{f8ed}`/`\u{f8f8}`) land glued directly onto the *middle* content row, immediately touching both the row's own content and its prefix text: `"⃗v(x, y, z) = \u{f8ed}x + 2y² \u{f8f8}"`, all one baseline. That row is simultaneously prefix text, real matrix content, *and* two stray bracket-piece glyphs — a shape neither `matrix_bracket_row` nor the original content/prefix split anticipated. See **Architecture §7** for the fix.
 
 **No genuine multi-column (2+ column) matrix appears anywhere in the current corpus.** The N>1 path can only be verified against generated fixtures (see Testing).
 
@@ -77,16 +87,26 @@ For the anchor case: `⃗v(x, y) = \begin{pmatrix} 3x^2 - 3y^2 + 2x + 2y \\ -6xy
 
 Empty `before`/`after` degrade cleanly — a bracket row with no surrounding equation just emits the bare `pmatrix`.
 
+### 7. Assembled (multi-piece) delimiters and a fused prefix/content row (Blatt7_2026.pdf)
+
+Two independent generalizations, both needed for this shape:
+
+**Stray bracket-piece glyphs are stripped wherever they land.** A real matrix's content never legitimately contains a bracket placeholder glyph — those only ever exist as delimiters. So before any content row is rendered, `bracket_glyph`-matching characters are filtered out of it first. This handles an assembled delimiter's second piece landing anywhere, without needing to model *why* the font split it into two (or, in principle, more) pieces — no piece-counting, no offset-pattern matching.
+
+**A row can be both prefix and content at once.** Today's prefix row (§4) only ever contributes `before`/`after` text. Once found, its own characters are *also* split into the same `inside` zone content rows use (bracket-glyph-stripped, per above). If that `inside` slice is non-empty, the row contributes a content row too — inserted into the content set at its sorted `y` position, same as any other. Blatt11/Blatt5's prefix rows are unaffected (their `inside` slice is always empty, since their prefix genuinely is a separate row from all content); Blatt7's fused row now correctly yields both its `x + 2y²` content *and* its `⃗v(x, y, z) =`/`.` prefix fragments from the one row.
+
+Internally, this means each content row's actual characters get resolved once — the whole row for an ordinary content row, the filtered `inside` subset for the fused row — into a uniform character list before column-splitting and rendering run, rather than carrying raw row indices through and special-casing at each use site.
+
 ## Testing
 
 - **Unit tests** in `layout_tests.rs`, mirroring `reconstruct_cases`'s own test shape: the Blatt11 geometry as a real-coordinate fixture (not the `set()` helper — same reasoning `reconstruct_cases`'s own test documents, gap-ratio splitting needs real gap-width proportions), plus a Blatt5-style bracket-row-with-leading-text variant, plus a synthetic N>1 case to prove `table_gutters` wiring.
 - **Real-document regression**: Blatt11 item 6 and Blatt5_2026 item 3 via `dump_markdown`, plus a full sweep of all seven existing real sheets to confirm nothing else shifts (same discipline as every prior P4-2c entry).
-- **Blatt7_2026 codepoint confirmation**: a separate implementation task — `dump_render_page0` + crop to identify what `'\u{f8eb}'`/`'\u{f8f6}'`/`'\u{f8ed}'`/`'\u{f8f8}'` actually are before adding them to `bracket_glyph`. If the "double bracket" turns out to be a real distinct shape (not covered by this design), it's recorded as a follow-up, not forced into this pass.
-- **N>1 columns**: genuine `pdflatex`-compiled fixtures (MiKTeX, installed for this work), not a mock PDF library — the detection this design adds keys off real CMEX placeholder glyphs that only a real LaTeX engine's maths mode produces; a `reportlab`-style generator (as `notes/tests/table_test.pdf` already is) would never exercise it. Small `.tex` sources under a scratch/build location, compiled to PDF and dropped into `notes/tests/` (e.g. `matrix_2x2_test.pdf`, `matrix_3x1_inline_test.pdf` — the latter proving the before/after-prefix split on a genuinely compiled document rather than only synthetically).
+- **Blatt7_2026 real-document regression**: all six vector fields (4 on page 0, 2 on page 1) via `dump_markdown`, plus a synthetic unit test for the fused-row shape using item 1's real captured coordinates (§7).
+- **N>1 columns**: genuine `pdflatex`-compiled fixtures (MiKTeX, installed for this work), not a mock PDF library — the detection this design adds keys off real CMEX placeholder glyphs that only a real LaTeX engine's maths mode produces; a `reportlab`-style generator (as `notes/tests/table_test.pdf` already is) would never exercise it. A small `.tex` source under a scratch/build location, compiled to PDF and dropped into `notes/tests/` (`matrix_2x2_test.pdf`).
 
 ## Out of scope
 
 - **`bmatrix`/other delimiter styles** — no confirmed codepoint in the corpus; add when one appears, same as every other glyph mapping here.
 - **Row vectors written inline on one row** (`(a, b, c)` all on one baseline) — already render correctly today via existing per-row maths handling; this pass only exists for content genuinely split across rows.
 - **Augmented matrices (`|` divider), nested matrices, or matrices whose bracket row itself spans more than the two glyphs** (e.g. Blatt12's `( ) ( ) ( )` row — confirmed real but not clearly a matrix/vector at all; a separate investigation if it turns out to matter) — not addressed here.
-- **Blatt7_2026's unconfirmed second bracket pair** — resolved by implementation-time glyph confirmation, not designed around speculatively.
+- **A delimiter assembled from three or more pieces**, or a fused row contributing content at more than one point — no confirmed real example needs it; the stray-glyph-stripping approach in §7 would likely extend to it without change, but that's not verified here.
