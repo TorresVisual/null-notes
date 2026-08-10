@@ -472,6 +472,52 @@ fn a_two_row_vector_becomes_one_pmatrix() {
     );
 }
 
+// Reconstructs a genuine 2x2 matrix compiled with pdflatex
+// (notes/tests/matrix_2x2_test.pdf: `A = \begin{pmatrix} a_{11} & a_{12}
+// \\ a_{21} & a_{22} \end{pmatrix}.`) — the only way to verify the N>1
+// column path, since no real document in the corpus carries a genuine
+// multi-column matrix. Real captured coordinates throughout
+// (`dump_chars_range`), for the same reason `a_two_row_vector_becomes_one_pmatrix`
+// uses them: column detection depends on the real gap-width proportions
+// between the two columns' cells.
+#[test]
+fn a_two_by_two_matrix_becomes_two_pmatrix_columns() {
+    use real_char as real;
+
+    let chars = vec![
+        // "A =" — prefix, before the bracket.
+        real('A', 261.350, 8.775, 685.705, 11.96, Family::Italic),
+        real('=', 273.449, 9.098, 685.705, 11.96, Family::Text),
+        // The bracket row: no leading text.
+        real('\u{12}', 285.871, 8.799, 702.562, 11.96, Family::Extensible),
+        // First content row: "a_{11}  a_{12}".
+        real('a', 294.672, 6.145, 693.028, 11.96, Family::Italic),
+        real('1', 300.817, 4.232, 691.235, 7.97, Family::Text),
+        real('1', 305.049, 4.232, 691.235, 7.97, Family::Text),
+        real('a', 319.746, 6.145, 693.028, 11.96, Family::Italic),
+        real('1', 325.891, 4.232, 691.235, 7.97, Family::Text),
+        real('2', 330.123, 4.232, 691.235, 7.97, Family::Text),
+        // Second content row: "a_{21}  a_{22}".
+        real('a', 294.672, 6.145, 678.582, 11.96, Family::Italic),
+        real('2', 300.817, 4.232, 676.789, 7.97, Family::Text),
+        real('1', 305.049, 4.232, 676.789, 7.97, Family::Text),
+        real('a', 319.746, 6.145, 678.582, 11.96, Family::Italic),
+        real('2', 325.891, 4.232, 676.789, 7.97, Family::Text),
+        real('2', 330.123, 4.232, 676.789, 7.97, Family::Text),
+        // Close bracket, and the trailing period after it (same baseline
+        // as the prefix row).
+        real('\u{13}', 334.857, 8.799, 702.562, 11.96, Family::Extensible),
+        real('.', 345.650, 3.252, 685.705, 11.96, Family::Italic),
+    ];
+
+    let markdown = chars_to_markdown(&chars);
+
+    assert!(
+        markdown.contains(r"A = \begin{pmatrix} a_{11} & a_{12} \\ a_{21} & a_{22} \end{pmatrix}."),
+        "got: {markdown}"
+    );
+}
+
 // A page footer's own page number can land within the brace's x-alignment
 // tolerance by pure coincidence, however far down the page it actually is
 // — found on the real document: a footer "1" at y=26.8 (74pt below the
