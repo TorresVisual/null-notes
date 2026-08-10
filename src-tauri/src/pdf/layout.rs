@@ -1003,13 +1003,31 @@ pub fn group_lines(chars: &[CharBox]) -> Vec<Line> {
         // silently dropping it.
         rows = scripts.into_iter().map(|c| vec![c]).collect();
     } else {
+        // Largest (shallowest-nested) scripts first: a compact fraction's
+        // numerator base ("e" in "e^{-bs}") is itself a script relative to
+        // the body row, but its own exponent ("-bs") is a script relative to
+        // *it* — smaller again, per the same convention TeX itself uses for
+        // nested script sizes. Placing "e" before "-bs" gives "-bs" a real
+        // sibling already sitting in the row by the time it's placed, which
+        // the tolerance check below can then measure against directly.
+        scripts.sort_by(|(_, a), (_, b)| b.font_size.partial_cmp(&a.font_size).unwrap_or(std::cmp::Ordering::Equal));
+
         for (index, ch) in scripts {
             let best_row = rows
                 .iter()
                 .enumerate()
                 .filter_map(|(row_index, row)| {
-                    let anchor = row.iter().max_by(|(_, a), (_, b)| {
-                        a.font_size.partial_cmp(&b.font_size).unwrap_or(std::cmp::Ordering::Equal)
+                    // Whichever member already in the row sits closest to
+                    // `ch` in `y`, not always the row's single tallest
+                    // character — a nested exponent ("-bs") sits far enough
+                    // above the row's own body text to fail tolerance
+                    // against it, but well within tolerance of "e", the
+                    // script that's already in the row and is `ch`'s actual
+                    // base. Using only the tallest anchor made every row a
+                    // flat, single-level thing; real nesting needs whichever
+                    // member is actually `ch`'s neighbour.
+                    let anchor = row.iter().min_by(|(_, a), (_, b)| {
+                        (a.y - ch.y).abs().partial_cmp(&(b.y - ch.y).abs()).unwrap_or(std::cmp::Ordering::Equal)
                     })?;
                     let y_ok = baseline_tolerance_ok(&anchor.1, &ch)
                         || fits_below_big_operator(row, &ch);
@@ -1041,7 +1059,9 @@ pub fn group_lines(chars: &[CharBox]) -> Vec<Line> {
     }
 
     merge_extensible_rows(&mut rows);
-    let (mut lines, rows) = reconstruct_fraction_sums(rows);
+    let (mut lines, rows) = reconstruct_cases(rows);
+    let (frac_lines, rows) = reconstruct_fraction_sums(rows);
+    lines.extend(frac_lines);
     let (table_lines, rows) = reconstruct_tables(rows);
     lines.extend(table_lines);
     lines.extend(rows.into_iter().map(build_line));
@@ -1756,6 +1776,16 @@ fn join_lines(lines: &[&Line]) -> Vec<Inline> {
             }
         }
     }
+    // Run only now, after hyphenated halves have rejoined into one span above
+    // (`resumes_word`): a word pdfium split across a line wrap — e.g.
+    // "di\u{FFFD}eren" / "zierbaren)" either side of a soft hyphen — needs
+    // its full spelling to resolve a ligature or quote correctly, and isn't
+    // whole yet at the per-row level `flush_spans` runs at.
+    for inline in &mut out {
+        if let Inline::Text(span) = inline {
+            span.text = super::ligatures::disambiguate(&span.text);
+        }
+    }
     trim_content(&out)
 }
 
@@ -2001,6 +2031,279 @@ fn escape_text_for_maths(text: &str) -> String {
     text.replace('\\', "\\textbackslash ").replace('{', "\\{").replace('}', "\\}")
 }
 
+/// Renders a case row's condition half ("für t ≥ b") as LaTeX: each maximal
+/// run of non-maths-family characters is real prose and gets `\text{}`
+/// wrapped (`to_latex` on its own only recognises a fixed, ASCII-only list
+/// of operator names as upright text — a German connector word like "für"
+/// falls through that and would otherwise render as bare, implicitly
+/// italicised maths variables), each maths-family run renders through
+/// `to_latex` exactly as it already does anywhere else in this pipeline.
+///
+/// A literal space is inserted between two consecutive pieces only when the
+/// source's own horizontal gap between them is wide enough to have been a
+/// real word-space (mirrors `SPACE_GAP`, the same threshold `build_line`
+/// and `latex::to_latex` already use) — never unconditionally, which would
+/// insert spaces a tightly-kerned run never had.
+pub(super) fn render_condition(chars: &[CharBox]) -> String {
+    let em = chars.iter().map(|c| c.font_size).fold(0.0_f32, f32::max).max(1.0);
+    let mut out = String::new();
+    let mut previous_end: Option<f32> = None;
+    let mut index = 0;
+
+    while index < chars.len() {
+        let is_maths = chars[index].is_maths();
+        let start = index;
+        while index < chars.len() && chars[index].is_maths() == is_maths {
+            index += 1;
+        }
+        let run = &chars[start..index];
+
+        let piece = if is_maths {
+            let latex = latex::to_latex(run);
+            (!latex.is_empty()).then_some(latex)
+        } else {
+            let text: String = run.iter().map(|c| c.ch).collect();
+            let trimmed = text.trim();
+            (!trimmed.is_empty()).then(|| format!("\\text{{{}}}", escape_text_for_maths(trimmed)))
+        };
+
+        let Some(piece) = piece else { continue };
+
+        let run_start = run.iter().map(|c| c.x).fold(f32::MAX, f32::min);
+        if let Some(end) = previous_end {
+            if run_start - end > em * SPACE_GAP && !out.ends_with(' ') {
+                out.push(' ');
+            }
+        }
+        out.push_str(&piece);
+        previous_end = Some(run.iter().map(|c| c.x + c.width).fold(f32::MIN, f32::max));
+    }
+
+    out
+}
+
+/// The single cases-brace glyph in `row`, and every character before it —
+/// the "ist " that shares its row, whitespace kept in place so a
+/// multi-word leading phrase stays correctly spaced — as long as the brace
+/// is the last *printing* character on the row (never followed by
+/// anything but trailing whitespace, which is the only shape a real
+/// `\cases` block's opening brace takes). `None` when the row has no
+/// brace, more than one, or real content after it — any of those means
+/// this row is not a plausible cases-brace row at all.
+fn cases_brace_row(row: &[CharBox]) -> Option<(CharBox, Vec<CharBox>)> {
+    let mut sorted: Vec<CharBox> = row.to_vec();
+    sorted.sort_by(|a, b| a.x.partial_cmp(&b.x).unwrap_or(std::cmp::Ordering::Equal));
+
+    if sorted.iter().filter(|c| latex::is_cases_brace(c)).count() != 1 {
+        return None;
+    }
+    let last_printing = sorted.iter().rev().find(|c| !c.ch.is_whitespace())?;
+    if !latex::is_cases_brace(last_printing) {
+        return None;
+    }
+    let brace_pos = sorted.iter().position(latex::is_cases_brace)?;
+    let brace = sorted[brace_pos];
+    sorted.truncate(brace_pos);
+    Some((brace, sorted))
+}
+
+/// The open and close bracket-glyph pair in `row`, and every character
+/// before the open bracket — leading prose like "3. Gegeben ist das
+/// Vektorfeld " (Analysis_2_Blatt5_2026.pdf item 3), kept in place so a
+/// leading phrase stays correctly spaced, the same reasoning
+/// `cases_brace_row` already documents for its own leading text. `None`
+/// unless the row's last printing character is the close bracket and
+/// nothing but whitespace sits between the open and close bracket — the
+/// row's only real content, besides whatever leads the open bracket, is
+/// this one bracket pair.
+pub(super) fn matrix_bracket_row(row: &[CharBox]) -> Option<(CharBox, CharBox, Vec<CharBox>)> {
+    let mut sorted: Vec<CharBox> = row.to_vec();
+    sorted.sort_by(|a, b| a.x.partial_cmp(&b.x).unwrap_or(std::cmp::Ordering::Equal));
+
+    if sorted.iter().filter(|c| latex::bracket_glyph(c) == Some(true)).count() != 1
+        || sorted.iter().filter(|c| latex::bracket_glyph(c) == Some(false)).count() != 1
+    {
+        return None;
+    }
+    let last_printing = sorted.iter().rev().find(|c| !c.ch.is_whitespace())?;
+    if latex::bracket_glyph(last_printing) != Some(false) {
+        return None;
+    }
+    let open_pos = sorted.iter().position(|c| latex::bracket_glyph(c) == Some(true))?;
+    let close_pos = sorted.iter().position(|c| latex::bracket_glyph(c) == Some(false))?;
+    if open_pos >= close_pos || sorted[open_pos + 1..close_pos].iter().any(|c| !c.ch.is_whitespace()) {
+        return None;
+    }
+
+    let open = sorted[open_pos];
+    let close = sorted[close_pos];
+    let leading = sorted[..open_pos].to_vec();
+    Some((open, close, leading))
+}
+
+/// Finds and reconstructs a piecewise ("cases") function definition: a
+/// prefix ("H(t-b) ="), a tall opening brace, and two or more case rows
+/// beneath it, each splitting into a value and a condition — the shape
+/// Analysis_2_Blatt12.pdf's Heaviside step function definition sets.
+///
+/// Runs on the raw rows, before `build_line` collapses them into `Inline`s,
+/// for the same reason `reconstruct_fraction_sums` does: splitting a case
+/// row into its value and condition needs the row's own real x-gap, which a
+/// finished `Inline` string no longer distinguishes from an ordinary
+/// internal space. It also has to run *before* `reconstruct_tables`, or two
+/// left-aligned case rows read exactly like a two-row table.
+///
+/// The prefix row cannot be found by `y`-order the way every other row in
+/// this file is processed: TeX sets it vertically centered against the
+/// whole cases block, so it sits *between* the case rows in `y`, not above
+/// or below them. It is identified purely by `x` instead — the one
+/// unconsumed row whose right edge sits flush against the brace's own left
+/// edge.
+///
+/// Returns the finished `Line`s for whatever matched, and every row that
+/// didn't — for the caller to run through the remaining reconstruction
+/// passes and finally `build_line`, unchanged.
+fn reconstruct_cases(rows: Vec<Vec<(usize, CharBox)>>) -> (Vec<Line>, Vec<Vec<(usize, CharBox)>>) {
+    let plain: Vec<Vec<CharBox>> = rows.iter().map(|r| r.iter().map(|(_, c)| *c).collect()).collect();
+    let mut consumed = vec![false; rows.len()];
+    let mut synthesized: Vec<Line> = Vec::new();
+
+    for brace_i in 0..plain.len() {
+        if consumed[brace_i] {
+            continue;
+        }
+        let Some((brace, leading)) = cases_brace_row(&plain[brace_i]) else { continue };
+        let brace_size = brace.font_size.max(1.0);
+        let brace_left = brace.x;
+        let brace_right = brace.x + brace.width;
+
+        let mut case_candidates: Vec<usize> = (0..plain.len())
+            .filter(|&i| i != brace_i && !consumed[i])
+            .filter(|&i| row_y(&plain[i]) < brace.y)
+            .filter(|&i| brace.y - row_y(&plain[i]) <= brace_size * CASES_MAX_ROW_GAP)
+            .filter(|&i| (row_x_extent(&plain[i]).0 - brace_right).abs() <= brace_size * CASES_MAX_COLUMN_GAP)
+            .collect();
+        if case_candidates.len() < 2 {
+            continue;
+        }
+        case_candidates.sort_by(|&a, &b| row_y(&plain[b]).partial_cmp(&row_y(&plain[a])).unwrap_or(std::cmp::Ordering::Equal));
+
+        let column_x = row_x_extent(&plain[case_candidates[0]]).0;
+        let aligned = case_candidates
+            .iter()
+            .all(|&i| (row_x_extent(&plain[i]).0 - column_x).abs() <= brace_size * CASES_COLUMN_TOLERANCE);
+        if !aligned {
+            continue;
+        }
+
+        let top_y = row_y(&plain[case_candidates[0]]);
+        let bottom_y = row_y(&plain[*case_candidates.last().unwrap_or(&case_candidates[0])]);
+        let prefix_i = (0..plain.len()).find(|&i| {
+            i != brace_i
+                && !consumed[i]
+                && !case_candidates.contains(&i)
+                && (row_x_extent(&plain[i]).1 - brace_left).abs() <= brace_size * CASES_MAX_COLUMN_GAP
+                && row_y(&plain[i]) <= top_y
+                && row_y(&plain[i]) >= bottom_y
+        });
+        let Some(prefix_i) = prefix_i else { continue };
+
+        let mut case_lines: Vec<String> = Vec::with_capacity(case_candidates.len());
+        let mut split_failed = false;
+        for &ci in &case_candidates {
+            let Some(parts) = split_into_terms(&plain[ci], 2) else {
+                split_failed = true;
+                break;
+            };
+            let value = latex::to_latex(&parts[0]);
+            let condition = render_condition(&parts[1]);
+            case_lines.push(format!("{value} & {condition}"));
+        }
+        if split_failed {
+            continue;
+        }
+
+        let prefix_latex = latex::to_latex(&plain[prefix_i]);
+        let latex = format!(
+            "{prefix_latex} \\begin{{cases}} {} \\end{{cases}}",
+            case_lines.join(" \\\\ ")
+        );
+
+        let base_size = row_font_size(&plain[prefix_i]).max(1.0);
+        let mut x = row_x_extent(&plain[prefix_i]).0.min(brace_left);
+        let mut right = brace_right;
+        for &ci in &case_candidates {
+            let (x0, x1) = row_x_extent(&plain[ci]);
+            x = x.min(x0);
+            right = right.max(x1);
+        }
+        if let Some(leading_x0) = leading.iter().map(|c| c.x).fold(None, |acc: Option<f32>, v| {
+            Some(acc.map_or(v, |a| a.min(v)))
+        }) {
+            x = x.min(leading_x0);
+        }
+
+        // The word(s) introducing the definition ("ist ") stay as ordinary
+        // text ahead of the equation, the same way `reconstruct_fraction_sums`
+        // keeps a baseline's own enumeration label ahead of its fractions —
+        // it is prose, not part of the LaTeX. The trailing space is
+        // synthesized rather than read off `leading`'s own characters, the
+        // same reasoning `baseline_label` already documents: a PDF often
+        // places the next glyph via a bare cursor jump, no space character
+        // at all, between a word and what follows it.
+        let mut content: Vec<Inline> = Vec::new();
+        let leading_text: String = leading.iter().map(|c| c.ch).collect();
+        let leading_trimmed = leading_text.trim();
+        if !leading_trimmed.is_empty() {
+            content.push(Inline::Text(Span {
+                text: format!("{leading_trimmed} "),
+                bold: false,
+                italic: false,
+            }));
+        }
+        content.push(Inline::Maths(latex));
+        let is_display_maths = content.iter().all(|i| match i {
+            Inline::Text(span) => span.text.trim().is_empty(),
+            Inline::Maths(_) => true,
+            Inline::TableRow(_, _) | Inline::ImageRef(_, _) => false,
+        });
+
+        // Not `top_y` (the topmost *case* row): the brace's own row — "ist
+        // {" — sits visually above every case, and using only the cases'
+        // own top understated the block's real height, reading as a much
+        // larger gap than normal to whatever paragraph line precedes it and
+        // wrongly starting a new one (found against the real document,
+        // where "Dabei" and this block's own "ist" are one sentence).
+        let block_top_y = row_y(&plain[brace_i]).max(top_y).max(row_y(&plain[prefix_i]));
+
+        synthesized.push(Line {
+            content,
+            x,
+            right,
+            y: block_top_y,
+            font_size: base_size,
+            fixed_pitch: false,
+            is_display_maths,
+            ends_hyphenated: false,
+        });
+
+        consumed[brace_i] = true;
+        consumed[prefix_i] = true;
+        for &ci in &case_candidates {
+            consumed[ci] = true;
+        }
+    }
+
+    let remaining: Vec<Vec<(usize, CharBox)>> = rows
+        .into_iter()
+        .enumerate()
+        .filter(|(i, _)| !consumed[*i])
+        .map(|(_, row)| row)
+        .collect();
+
+    (synthesized, remaining)
+}
+
 fn render_content(content: &[Inline]) -> String {
     let mut out = String::new();
     for inline in content {
@@ -2167,6 +2470,23 @@ const FRACTION_MAX_ROW_GAP: f32 = 4.0;
 // How much of the narrower line's width the two must share to count as
 // "stacked on the same column" rather than merely nearby.
 const FRACTION_MIN_OVERLAP_RATIO: f32 = 0.3;
+
+// How far a case row's own left edge, or a prefix row's own right edge, may
+// sit from the brace's edge and still count as "that row belongs to this
+// brace" — scaled by the brace's own font size the same way
+// FRACTION_MAX_ROW_GAP scales by a fraction's own body size.
+const CASES_MAX_COLUMN_GAP: f32 = 2.5;
+// How far a case row's left edge may drift from the first case row's own
+// left edge and still count as the same left-aligned column.
+const CASES_COLUMN_TOLERANCE: f32 = 1.0;
+// How far below the brace (in multiples of its own font size) a row may
+// sit and still be a candidate case row. Column-proximity alone is not
+// enough: a page footer's page number can land within `CASES_MAX_COLUMN_GAP`
+// of the brace's own x by pure coincidence, however far down the page it
+// actually is — found on Analysis_2_Blatt12.pdf, where the footer "1" at
+// y=26.8 (the brace sits at y=348.3) passed the x-proximity filter and broke
+// the column-alignment check for the two real case rows above it.
+const CASES_MAX_ROW_GAP: f32 = 3.0;
 
 fn range_overlap(a0: f32, a1: f32, b0: f32, b1: f32) -> f32 {
     (a1.min(b1) - a0.max(b0)).max(0.0)

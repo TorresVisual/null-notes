@@ -80,6 +80,27 @@ fn set(text: &str, x: f32, y: f32, style: Style) -> Vec<CharBox> {
     out
 }
 
+/// Builds one `CharBox` from exact captured geometry (`dump_chars_range`),
+/// width included — unlike `set()`, which gives every glyph in a call the
+/// same synthetic `size * ADVANCE` width. Some tests (`split_into_terms`'s
+/// gap-ratio margin, in particular) are sensitive to real width variation
+/// that a uniform approximation doesn't reproduce.
+fn real_char(c: char, x: f32, w: f32, y: f32, size: f32, family: Family) -> CharBox {
+    CharBox {
+        ch: c,
+        x,
+        y,
+        width: w,
+        top: y + size * 0.75,
+        bottom: y - size * 0.25,
+        font_size: size,
+        bold: false,
+        italic: false,
+        fixed_pitch: false,
+        family,
+    }
+}
+
 /// Lays out consecutive body-text lines downward from `top`.
 fn page_at(top: f32, lines: &[&str]) -> Vec<CharBox> {
     let mut out = Vec::new();
@@ -157,6 +178,32 @@ fn a_single_term_is_the_whole_row_unsplit() {
     assert_eq!(groups[0].len(), row.iter().filter(|c| !c.ch.is_whitespace()).count());
 }
 
+// "für t ≥ b" — a German connector word followed by a maths comparison, the
+// shape a piecewise condition takes. "für" needs \text{} (it is prose, not
+// a maths variable a bare `f`, `ü`, `r` triplet would garble into); "t \geq
+// b" needs none. Each gap here (100 * ADVANCE = 5.0pt at this BODY size) is
+// comfortably past both `render_condition`'s own SPACE_GAP threshold and
+// `to_latex`'s internal one, so every one becomes one literal space in the
+// output — not zero, not two.
+#[test]
+fn a_condition_wraps_its_prose_word_but_leaves_the_maths_bare() {
+    let mut chars = set("für", 100.0, 700.0, Style::default());
+    chars.extend(set("t", 120.0, 700.0, maths_italic()));
+    chars.extend(set("\u{2265}", 130.0, 700.0, maths()));
+    chars.extend(set("b", 140.0, 700.0, maths_italic()));
+
+    assert_eq!(render_condition(&chars), r"\text{für} t \geq b");
+}
+
+// A condition with no prose at all (an English-language document might set
+// "if" upright in the maths face already, leaving nothing that needs
+// \text{}) still renders through cleanly.
+#[test]
+fn a_purely_mathematical_condition_needs_no_text_wrapping() {
+    let chars = set("t=0", 100.0, 700.0, maths_italic());
+    assert_eq!(render_condition(&chars), "t=0");
+}
+
 #[test]
 fn a_labelled_row_of_only_connectors_and_a_period_is_a_connector_baseline() {
     let mut row = set("(b) ", 90.0, 590.0, Style::default());
@@ -208,6 +255,203 @@ fn a_row_with_only_a_trailing_period_is_not_a_connector_baseline() {
 fn ordinary_prose_is_not_a_connector_baseline() {
     let row = set("(a) some words here", 90.0, 590.0, Style::default());
     assert_eq!(connector_baseline(&row), None);
+}
+
+// The plain shape (Analysis_2_Blatt11.pdf item 6): a row holding nothing
+// but the open and close bracket glyphs, with real whitespace between them
+// (the gap the matrix's own content will occupy).
+#[test]
+fn a_bare_bracket_pair_row_has_no_leading_text() {
+    let mut row = set("\u{12}", 274.383, 757.389, extensible());
+    row.extend(set(" ", 283.183, 757.389, Style::default()));
+    row.extend(set("\u{13}", 385.085, 757.389, extensible()));
+
+    let (open, close, leading) = matrix_bracket_row(&row).expect("expected a bracket-pair row");
+    assert_eq!(open.ch, '\u{12}');
+    assert_eq!(close.ch, '\u{13}');
+    assert!(leading.is_empty());
+}
+
+// The Analysis_2_Blatt5_2026.pdf item 3 shape: the bracket row also carries
+// the sentence's own leading prose ahead of the open bracket.
+#[test]
+fn a_bracket_pair_row_keeps_its_leading_prose() {
+    let mut row = set("3. Gegeben ist das Vektorfeld ", 71.00, 211.34, Style::default());
+    row.extend(set("\u{12}", 320.53, 211.34, extensible()));
+    row.extend(set(" ", 329.33, 211.34, Style::default()));
+    row.extend(set("\u{13}", 347.32, 211.34, extensible()));
+
+    let (open, close, leading) = matrix_bracket_row(&row).expect("expected a bracket-pair row");
+    assert_eq!(open.ch, '\u{12}');
+    assert_eq!(close.ch, '\u{13}');
+    let leading_text: String = leading.iter().map(|c| c.ch).collect();
+    assert_eq!(leading_text, "3. Gegeben ist das Vektorfeld ");
+}
+
+// A row with real content between the open and close bracket (an ordinary
+// inline parenthesized expression, not a matrix's own dedicated bracket
+// row) must not match — that shape already renders correctly today via
+// per-row maths handling and this pass must leave it alone.
+#[test]
+fn a_row_with_content_between_the_brackets_is_not_a_bracket_pair_row() {
+    let mut row = set("\u{12}", 100.0, 700.0, extensible());
+    row.extend(set("x + y", 110.0, 700.0, maths_italic()));
+    row.extend(set("\u{13}", 160.0, 700.0, extensible()));
+
+    assert_eq!(matrix_bracket_row(&row), None);
+}
+
+// A row with only one bracket glyph (no matching partner) is not a
+// bracket-pair row — the shape `reconstruct_cases`'s own single-glyph brace
+// row takes, which this predicate must not also match.
+#[test]
+fn a_row_with_only_one_bracket_glyph_is_not_a_bracket_pair_row() {
+    let row = set("\u{12}", 100.0, 700.0, extensible());
+    assert_eq!(matrix_bracket_row(&row), None);
+}
+
+// Reconstructs Analysis_2_Blatt12.pdf's Heaviside step function definition:
+// a leading word ("ist ") sharing the brace glyph's own row, a prefix
+// ("H(t-b) ="), and two cases each split into a value and a "für
+// <condition>" half. The prefix row's own y (331.49) sits *between* the two
+// case rows (338.81 and 324.37) — TeX centers "H(t-b) =" vertically against
+// the whole two-line cases block — which is exactly the shape that broke
+// every reconstruction pass that assumed a prefix always precedes its
+// content in `y`.
+//
+// Real per-character geometry throughout (`dump_chars_range` on
+// Analysis_2_Blatt12.pdf), not the file's `set()` helper: `set()` gives
+// every glyph in one call the same synthetic width (`size * ADVANCE`), but
+// `split_into_terms`'s value/condition split depends on the *real*
+// gap-width ratios between "1"/"0" and "für" being clearly wider than any
+// gap inside "für t ≥ b" itself — an artificial uniform width doesn't
+// reproduce that margin, and the split would fail for a reason that has
+// nothing to do with `reconstruct_cases` itself.
+#[test]
+fn a_heaviside_style_cases_block_becomes_one_display_equation() {
+    use real_char as real;
+
+    // Prefix: "H(t-b) =" — already one clean maths run on its own row.
+    let mut chars = vec![
+        real('H', 241.289, 10.258, 331.491, 11.96, Family::Italic),
+        real('(', 251.912, 4.543, 331.491, 11.96, Family::Text),
+        real('t', 256.464, 4.220, 331.491, 11.96, Family::Italic),
+        real('\u{2212}', 263.348, 9.289, 331.491, 11.96, Family::Symbol),
+        real('b', 275.303, 4.973, 331.491, 11.96, Family::Italic),
+        real(')', 280.280, 4.543, 331.491, 11.96, Family::Text),
+        real('=', 288.146, 9.098, 331.491, 11.96, Family::Text),
+    ];
+
+    // The brace's own row: "ist" (the word introducing the definition,
+    // body-sized like the brace itself, so it shares its row the normal
+    // way any two same-baseline body-text characters would — even though,
+    // as on the real document, it sits far to this row's left while the
+    // brace itself sits far to its right) then the CMEX glyph, above both
+    // cases.
+    chars.extend([
+        real('i', 85.958, 3.252, 349.921, 11.96, Family::Text),
+        real('s', 89.210, 4.615, 349.921, 11.96, Family::Text),
+        real('t', 93.825, 4.555, 349.921, 11.96, Family::Text),
+        real('\u{1a}', 300.579, 8.966, 348.347, 11.96, Family::Extensible),
+    ]);
+
+    // First case: "1 für t ≥ b" — value, then condition, at y=338.813.
+    chars.extend([
+        real('1', 314.527, 5.846, 338.813, 11.96, Family::Text),
+        real('f', 330.342, 4.316, 338.813, 11.96, Family::Text),
+        real('ü', 333.917, 6.504, 338.813, 11.96, Family::Text),
+        real('r', 340.420, 4.555, 338.813, 11.96, Family::Text),
+        real('t', 348.872, 4.220, 338.813, 11.96, Family::Italic),
+        real('\u{2265}', 356.420, 9.289, 338.813, 11.96, Family::Symbol),
+        real('b', 369.040, 4.973, 338.813, 11.96, Family::Italic),
+    ]);
+
+    // Second case: "0 für t < b." — value, then condition, at y=324.367.
+    chars.extend([
+        real('0', 314.527, 5.846, 324.367, 11.96, Family::Text),
+        real('f', 330.342, 4.316, 324.367, 11.96, Family::Text),
+        real('ü', 333.917, 6.504, 324.367, 11.96, Family::Text),
+        real('r', 340.420, 4.555, 324.367, 11.96, Family::Text),
+        real('t', 348.872, 4.220, 324.367, 11.96, Family::Italic),
+        real('<', 356.416, 9.098, 324.367, 11.96, Family::Italic),
+        real('b', 368.837, 4.973, 324.367, 11.96, Family::Italic),
+        real('.', 373.811, 3.252, 324.367, 11.96, Family::Italic),
+    ]);
+
+    let markdown = chars_to_markdown(&chars);
+
+    // "H(t - b) =", spaces and all: the same gap-synthesis threshold
+    // `to_latex` always applies decides these particular gaps (2.66pt,
+    // just over the 2.63pt `SPACE_GAP` cutoff at this size) are word-spaces
+    // — matching the real document's own `dump_line_pieces` output for
+    // this exact prefix, `Maths("H(t - b) =")`, not a hand-picked
+    // convenience.
+    assert!(
+        markdown.contains(
+            r"ist $H(t - b) = \begin{cases} 1 & \text{für} t \geq b \\ 0 & \text{für} t < b. \end{cases}$"
+        ),
+        "got: {markdown}"
+    );
+}
+
+// A page footer's own page number can land within the brace's x-alignment
+// tolerance by pure coincidence, however far down the page it actually is
+// — found on the real document: a footer "1" at y=26.8 (74pt below the
+// second case row, `bottom_y`) passed the horizontal-proximity filter and
+// joined `case_candidates`, and the resulting three-way column-alignment
+// check then failed for all three, breaking the reconstruction entirely.
+// `CASES_MAX_ROW_GAP` bounds how far below the brace a row may sit before
+// it stops being a plausible case at all.
+#[test]
+fn a_coincidentally_aligned_row_far_down_the_page_is_not_mistaken_for_a_third_case() {
+    // Real per-character geometry again (see the previous test's own note
+    // on why `set()`'s uniform synthetic widths aren't safe for a case
+    // row's value/condition split).
+    use real_char as real;
+
+    let mut chars = vec![
+        real('H', 241.289, 10.258, 331.491, 11.96, Family::Italic),
+        real('(', 251.912, 4.543, 331.491, 11.96, Family::Text),
+        real('t', 256.464, 4.220, 331.491, 11.96, Family::Italic),
+        real('\u{2212}', 263.348, 9.289, 331.491, 11.96, Family::Symbol),
+        real('b', 275.303, 4.973, 331.491, 11.96, Family::Italic),
+        real(')', 280.280, 4.543, 331.491, 11.96, Family::Text),
+        real('=', 288.146, 9.098, 331.491, 11.96, Family::Text),
+    ];
+    chars.extend([
+        real('i', 85.958, 3.252, 349.921, 11.96, Family::Text),
+        real('s', 89.210, 4.615, 349.921, 11.96, Family::Text),
+        real('t', 93.825, 4.555, 349.921, 11.96, Family::Text),
+        real('\u{1a}', 300.579, 8.966, 348.347, 11.96, Family::Extensible),
+    ]);
+    chars.extend([
+        real('1', 314.527, 5.846, 338.813, 11.96, Family::Text),
+        real('f', 330.342, 4.316, 338.813, 11.96, Family::Text),
+        real('ü', 333.917, 6.504, 338.813, 11.96, Family::Text),
+        real('r', 340.420, 4.555, 338.813, 11.96, Family::Text),
+        real('t', 348.872, 4.220, 338.813, 11.96, Family::Italic),
+        real('\u{2265}', 356.420, 9.289, 338.813, 11.96, Family::Symbol),
+        real('b', 369.040, 4.973, 338.813, 11.96, Family::Italic),
+    ]);
+    chars.extend([
+        real('0', 314.527, 5.846, 324.367, 11.96, Family::Text),
+        real('f', 330.342, 4.316, 324.367, 11.96, Family::Text),
+        real('ü', 333.917, 6.504, 324.367, 11.96, Family::Text),
+        real('r', 340.420, 4.555, 324.367, 11.96, Family::Text),
+        real('t', 348.872, 4.220, 324.367, 11.96, Family::Italic),
+        real('<', 356.416, 9.098, 324.367, 11.96, Family::Italic),
+        real('b', 368.837, 4.973, 324.367, 11.96, Family::Italic),
+        real('.', 373.811, 3.252, 324.367, 11.96, Family::Italic),
+    ]);
+
+    // The page footer — same x-neighbourhood as the brace, but 74pt further
+    // down the page than the last real case row.
+    chars.push(real('1', 294.712, 5.846, 26.805, 11.96, Family::Text));
+
+    let markdown = chars_to_markdown(&chars);
+
+    assert!(markdown.contains(r"\begin{cases}"), "got: {markdown}");
+    assert!(markdown.trim_end().ends_with('1'), "the footer must survive as its own line: got {markdown:?}");
 }
 
 // A subscript or inline-maths glyph sits off the baseline but belongs to the
@@ -520,20 +764,56 @@ fn a_heading_accent_deferred_far_past_its_word_still_finds_its_letter() {
 // Found against Analysis_2_Blatt12.pdf: pdfium reports the "ff" ligature of
 // "Differentialgleichung" as a real, body-sized glyph with no usable Unicode
 // value (extract.rs replaces it with U+FFFD rather than dropping it — see
-// the comment there for why dropping is unsafe). This is the consequence
-// that actually matters at this layer: whatever extract.rs hands over for an
-// unrepresentable glyph must keep its geometric slot in the row, or the gap
-// where a real character used to be reads as a word boundary and
-// "Differentialgleichung" silently becomes the two plausible-looking words
-// "Di erentialgleichung" — a worse failure than an ugly placeholder, because
-// nothing about it looks broken.
+// the comment there for why dropping is unsafe). The invariant that matters
+// at this layer: whatever extract.rs hands over for an unrepresentable glyph
+// must keep its geometric slot in the row, or the gap where a real character
+// used to be reads as a word boundary and "Differentialgleichung" silently
+// becomes the two plausible-looking words "Di erentialgleichung" — a worse
+// failure than an ugly placeholder, because nothing about it looks broken.
+// `pdf::ligatures::disambiguate` (called from `flush_spans`) now goes one
+// step further and recovers the real letters for this specific case, since
+// "Differentialgleichung" is the only dictionary word "Di\u{FFFD}erentialgleichung"
+// can resolve to — but that is `ligatures`' own concern, covered by its own
+// tests; what this test guards is still just the word staying one word.
 #[test]
 fn an_unrepresentable_glyph_stays_inside_its_word_not_a_false_space() {
     let markdown = chars_to_markdown(&page(&["Di\u{FFFD}erentialgleichung"]));
     assert!(
-        markdown.contains("Di\u{FFFD}erentialgleichung"),
+        markdown.contains("Differentialgleichung"),
         "an undecodable mid-word glyph must not read as a word break: got {markdown:?}"
     );
+}
+
+// Found against Analysis_2_Blatt12.pdf: the Laplace transform of the
+// Heaviside step, "ist e^{-bs}/s.", typeset as a compact inline fraction
+// small enough that neither the numerator nor the denominator gets its own
+// separate physical row — except the numerator's base ("e") *also* carries
+// its own further-reduced exponent ("-bs"), a second script level nested
+// inside the first. `group_lines`'s script-attachment pass used to measure
+// every script glyph's baseline tolerance only against a row's single
+// tallest (body-text) anchor, so "e" — within tolerance of both its own
+// exponent (touching it, distance ~0) and the true body row a few points
+// below — lost the horizontal-distance tie-break to its exponent and
+// stranded the whole numerator on an isolated row, away from the
+// denominator that (correctly) landed in the body row below it: the
+// denominator then rendered as a bare, baseless "_s" inside the prose.
+// Real coordinates via dump_chars_range on Analysis_2_Blatt12.pdf.
+#[test]
+fn a_compact_fraction_survives_when_its_numerator_has_a_nested_exponent() {
+    let body = Style { size: 11.96, ..Style::default() };
+    let script_e = Style { size: 7.97, family: Family::Italic, ..Style::default() };
+    let script_exp = Style { size: 5.98, ..Style::default() };
+
+    let mut chars = set("Kontext: ist ", 85.96, 364.367, body);
+    chars.push(CharBox { ch: 'e', x: 484.506, y: 369.074, width: 3.921, top: 373.0, bottom: 367.0, font_size: script_e.size, bold: false, italic: false, fixed_pitch: false, family: script_e.family });
+    chars.push(CharBox { ch: '\u{2212}', x: 488.434, y: 371.887, width: 5.756, top: 375.0, bottom: 369.0, font_size: script_exp.size, bold: false, italic: false, fixed_pitch: false, family: Family::Symbol });
+    chars.push(CharBox { ch: 'b', x: 494.190, y: 371.887, width: 3.270, top: 375.0, bottom: 369.0, font_size: script_exp.size, bold: false, italic: false, fixed_pitch: false, family: Family::Italic });
+    chars.push(CharBox { ch: 's', x: 497.460, y: 371.887, width: 3.491, top: 375.0, bottom: 369.0, font_size: script_exp.size, bold: false, italic: false, fixed_pitch: false, family: Family::Italic });
+    chars.push(CharBox { ch: 's', x: 491.023, y: 360.245, width: 3.913, top: 364.0, bottom: 358.0, font_size: script_e.size, bold: false, italic: false, fixed_pitch: false, family: Family::Italic });
+    chars.extend(set(". Dabei", 502.651, 364.367, body));
+
+    let markdown = chars_to_markdown(&chars);
+    assert!(markdown.contains(r"\frac{e^{-bs}}{s}"), "got: {markdown:?}");
 }
 
 #[test]
