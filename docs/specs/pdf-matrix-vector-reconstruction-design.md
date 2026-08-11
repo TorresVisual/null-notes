@@ -97,16 +97,35 @@ Two independent generalizations, both needed for this shape:
 
 Internally, this means each content row's actual characters get resolved once — the whole row for an ordinary content row, the filtered `inside` subset for the fused row — into a uniform character list before column-splitting and rendering run, rather than carrying raw row indices through and special-casing at each use site.
 
+### 8. Multiple independent bracket-pairs on one line (Analysis_2_Blatt12.pdf items 4/5)
+
+A system of equations can place several small, unrelated matrices/vectors inline in one sentence: `⃗y'(t) = Ay(t) + b(t), mit ⃗y(0) = y₀` — confirmed real via exact geometry on both items 4 and 5, each with three independent bracket-pairs (a 2×2 matrix, then two 2×1 vectors) sharing one bracket row, separated only by spaces. This generalizes every part of §1–§7 from "exactly one bracket pair" to "one or more," in place — N=1 degenerates to exactly today's behavior, so the existing Blatt11/Blatt5/Blatt7 cases are the regression baseline for this change, not a separate code path.
+
+**Bracket-row detection** (`matrix_bracket_row`) generalizes from `(open, close, leading)` to `(Vec<(open, close)>, leading)`: after any leading text, every remaining printing character must itself be a bracket glyph, strictly alternating open/close/open/close/…, with only whitespace between any two of them — whether within one pair or between two adjacent pairs. Confirmed on item 5: the bracket row also carries leading prose (`"Ordnung: "`), the same tolerance already needed for Blatt5_2026 item 3.
+
+**Content rows are still found once and shared across every bracket** — the x-containment check now spans from the *first* bracket's open to the *last* bracket's close, rather than one bracket's own span. **Per-bracket slicing then runs today's single-bracket algorithm once per bracket**: each shared content row gets cut down to just that bracket's own column (stripping stray bracket-glyph pieces, exactly as today), and `table_gutters`/`split_row_into_cells` runs independently on each bracket's own slice — so the 2×2 matrix gets its own column split without affecting the two 1-column vectors sharing its rows.
+
+**The prefix generalizes from 2 fragments (`before`/`after`) to N+1**: text before bracket 1, text between each adjacent pair of brackets, text after the last bracket — same x-filtering as today's `before`/`after`, just evaluated at N+1 boundaries instead of 2. The fused-row case (§7) still applies per-bracket.
+
+**Assembly interleaves fragments and `pmatrix`es left to right.** For item 4:
+
+```
+⃗y'(t) = \begin{pmatrix} 1 & 2 \\ 2 & 1 \end{pmatrix} ⃗y(t) + \begin{pmatrix} e^{2t} \\ 0 \end{pmatrix} mit ⃗y(0) = \begin{pmatrix} 1 \\ -1 \end{pmatrix}.
+```
+
+The Extensible-content guard (added after this design's initial implementation — see `TODO.md`'s P4-2c entry, not restated here) still applies unchanged: it rejects the whole match, all brackets included, if any shared content row carries a big-operator character.
+
 ## Testing
 
 - **Unit tests** in `layout_tests.rs`, mirroring `reconstruct_cases`'s own test shape: the Blatt11 geometry as a real-coordinate fixture (not the `set()` helper — same reasoning `reconstruct_cases`'s own test documents, gap-ratio splitting needs real gap-width proportions), plus a Blatt5-style bracket-row-with-leading-text variant, plus a synthetic N>1 case to prove `table_gutters` wiring.
 - **Real-document regression**: Blatt11 item 6 and Blatt5_2026 item 3 via `dump_markdown`, plus a full sweep of all seven existing real sheets to confirm nothing else shifts (same discipline as every prior P4-2c entry).
 - **Blatt7_2026 real-document regression**: all six vector fields (4 on page 0, 2 on page 1) via `dump_markdown`, plus a synthetic unit test for the fused-row shape using item 1's real captured coordinates (§7).
 - **N>1 columns**: genuine `pdflatex`-compiled fixtures (MiKTeX, installed for this work), not a mock PDF library — the detection this design adds keys off real CMEX placeholder glyphs that only a real LaTeX engine's maths mode produces; a `reportlab`-style generator (as `notes/tests/table_test.pdf` already is) would never exercise it. A small `.tex` source under a scratch/build location, compiled to PDF and dropped into `notes/tests/` (`matrix_2x2_test.pdf`).
+- **Multiple inline brackets (§8)**: Analysis_2_Blatt12.pdf items 4 and 5 via `dump_markdown` (both confirmed real, exact geometry captured), plus a unit test using item 4's real captured coordinates.
 
 ## Out of scope
 
 - **`bmatrix`/other delimiter styles** — no confirmed codepoint in the corpus; add when one appears, same as every other glyph mapping here.
 - **Row vectors written inline on one row** (`(a, b, c)` all on one baseline) — already render correctly today via existing per-row maths handling; this pass only exists for content genuinely split across rows.
-- **Augmented matrices (`|` divider), nested matrices, or matrices whose bracket row itself spans more than the two glyphs** (e.g. Blatt12's `( ) ( ) ( )` row — confirmed real but not clearly a matrix/vector at all; a separate investigation if it turns out to matter) — not addressed here.
+- **Augmented matrices (`|` divider) or nested matrices** — no confirmed real example.
 - **A delimiter assembled from three or more pieces**, or a fused row contributing content at more than one point — no confirmed real example needs it; the stray-glyph-stripping approach in §7 would likely extend to it without change, but that's not verified here.
