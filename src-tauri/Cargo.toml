@@ -35,6 +35,7 @@ pdfium-render = { version = "0.9", optional = true }
 notify = "8.2.0"
 base64 = "0.22"
 unicode-normalization = "0.1.25"
+random_word = { version = "0.5", features = ["de", "en"] }
 
 [features]
 default = ["pdf-native"]
