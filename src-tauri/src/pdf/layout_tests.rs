@@ -725,7 +725,11 @@ fn a_content_row_with_a_big_operator_is_not_reconstructed_as_a_matrix() {
 // joined `case_candidates`, and the resulting three-way column-alignment
 // check then failed for all three, breaking the reconstruction entirely.
 // `CASES_MAX_ROW_GAP` bounds how far below the brace a row may sit before
-// it stops being a plausible case at all.
+// it stops being a plausible case at all — kept as defense in depth for a
+// footer shape `strip_page_furniture` doesn't recognize, even though this
+// fixture's own bare "1" is now removed outright before `reconstruct_cases`
+// ever runs (see `strip_page_furniture`), rather than merely being excluded
+// from the case search and left dangling in the output.
 #[test]
 fn a_coincidentally_aligned_row_far_down_the_page_is_not_mistaken_for_a_third_case() {
     // Real per-character geometry again (see the previous test's own note
@@ -775,7 +779,10 @@ fn a_coincidentally_aligned_row_far_down_the_page_is_not_mistaken_for_a_third_ca
     let markdown = chars_to_markdown(&chars);
 
     assert!(markdown.contains(r"\begin{cases}"), "got: {markdown}");
-    assert!(markdown.trim_end().ends_with('1'), "the footer must survive as its own line: got {markdown:?}");
+    assert!(
+        markdown.trim_end().ends_with(r"\end{cases}$"),
+        "the footer must not survive as a stray trailing line: got {markdown:?}"
+    );
 }
 
 // A subscript or inline-maths glyph sits off the baseline but belongs to the
@@ -2080,4 +2087,56 @@ fn two_images_never_merge_into_one_block() {
 fn no_images_behaves_exactly_like_chars_to_markdown() {
     let chars = set("ordinary text", 72.0, 700.0, Style::default());
     assert_eq!(chars_and_images_to_markdown(&chars, &[]), chars_to_markdown(&chars));
+}
+
+#[test]
+fn strips_an_isolated_bare_number_footer() {
+    let mut chars = page(&["Body text on the page."]);
+    // 40pt below the body line (10pt font * 3.0 gap ratio = 30pt threshold).
+    chars.extend(set("3", 72.0, 700.0 - 12.0 - 40.0, Style::default()));
+
+    let markdown = chars_to_markdown(&chars);
+
+    assert_eq!(markdown, "Body text on the page.\n");
+}
+
+#[test]
+fn strips_an_isolated_labelled_footer() {
+    let mut chars = page(&["Body text on the page."]);
+    chars.extend(set("Page 3 of 10", 72.0, 700.0 - 12.0 - 40.0, Style::default()));
+
+    let markdown = chars_to_markdown(&chars);
+
+    assert_eq!(markdown, "Body text on the page.\n");
+}
+
+#[test]
+fn a_number_at_normal_line_spacing_is_kept() {
+    // "3" sits right below its paragraph at ordinary line spacing (12pt),
+    // well under the isolation threshold — it reads as real content (e.g.
+    // the last line of a short answer), not a footer.
+    let chars = page(&["The answer is:", "3"]);
+
+    let markdown = chars_to_markdown(&chars);
+
+    assert!(markdown.contains('3'), "markdown was: {markdown:?}");
+}
+
+#[test]
+fn a_numbered_list_item_is_never_mistaken_for_a_page_number() {
+    let mut chars = page(&["Body paragraph here."]);
+    chars.extend(set("1. Aufgabe", 72.0, 700.0 - 12.0 - 40.0, Style::default()));
+
+    let markdown = chars_to_markdown(&chars);
+
+    assert!(markdown.contains("Aufgabe"), "markdown was: {markdown:?}");
+}
+
+#[test]
+fn a_single_row_page_is_left_untouched() {
+    let chars = set("3", 72.0, 700.0, Style::default());
+
+    let markdown = chars_to_markdown(&chars);
+
+    assert_eq!(markdown, "3\n");
 }

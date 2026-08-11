@@ -270,6 +270,10 @@ const TABLE_MIN_FILL_RATIO: f32 = 0.5;
 // measure ~43%/50% — see
 // docs/specs/pdf-table-fraction-maths-guards-design.md.
 const TABLE_MATHS_GUARD_RATIO: f32 = 0.4;
+// A vertical gap this many times a row's own font size marks it as
+// detached from its neighbor — clearly more than an ordinary paragraph
+// break (`BLOCK_GAP_RATIO`, 1.5x), the way a page's margin always is.
+const PAGE_FURNITURE_MIN_GAP: f32 = 3.0;
 
 /// The standalone accent glyphs LaTeX's Computer Modern fonts emit, mapped to
 /// their combining forms. CM has no precomposed "ü": it prints a `u` and then
@@ -1059,6 +1063,7 @@ pub fn group_lines(chars: &[CharBox]) -> Vec<Line> {
     }
 
     merge_extensible_rows(&mut rows);
+    let rows = strip_page_furniture(rows);
     let (mut lines, rows) = reconstruct_cases(rows);
     let (matrix_lines, rows) = reconstruct_matrices(rows);
     lines.extend(matrix_lines);
@@ -1069,6 +1074,58 @@ pub fn group_lines(chars: &[CharBox]) -> Vec<Line> {
     lines.extend(rows.into_iter().map(build_line));
     lines.sort_by(|a, b| b.y.partial_cmp(&a.y).unwrap_or(std::cmp::Ordering::Equal));
     lines
+}
+
+/// Drops an isolated page-number footer/header — see
+/// `looks_like_page_number` — from a page region's outermost row(s).
+///
+/// Only the topmost and bottommost row are ever candidates: page
+/// furniture is always the outermost content on the page. A region with
+/// fewer than two rows has no neighbor to be isolated from and is left
+/// untouched entirely — and in practice never reaches this code anyway,
+/// since a page whose only content is a footer fails
+/// `ExtractedPage::is_effectively_empty`'s character-count floor upstream.
+///
+/// Runs before every other row-level reconstruction pass in `group_lines`
+/// (`reconstruct_cases`, `reconstruct_matrices`, ...) so a page-footer
+/// digit is gone before it can coincidentally land inside one of their own
+/// row searches — the exact failure `CASES_MAX_ROW_GAP`/
+/// `MATRIX_MAX_ROW_GAP` had to be added to guard against (see their
+/// comments): this removes the footer itself instead of only bounding its
+/// blast radius.
+fn strip_page_furniture(rows: Vec<Vec<(usize, CharBox)>>) -> Vec<Vec<(usize, CharBox)>> {
+    if rows.len() < 2 {
+        return rows;
+    }
+
+    let mut start = 0;
+    let mut end = rows.len();
+
+    if is_isolated_page_number(&rows[0], &rows[1]) {
+        start = 1;
+    }
+    if end - start >= 2 && is_isolated_page_number(&rows[end - 1], &rows[end - 2]) {
+        end -= 1;
+    }
+
+    rows[start..end].to_vec()
+}
+
+/// Whether `row` is both a recognized page-number shape and detached from
+/// `neighbor` by more than `PAGE_FURNITURE_MIN_GAP` times its own font
+/// size. Rendered through `build_line`/`render_content` — the same space-
+/// synthesis and text assembly every ordinary line already goes through —
+/// rather than a second, ad-hoc text-extraction routine.
+fn is_isolated_page_number(row: &[(usize, CharBox)], neighbor: &[(usize, CharBox)]) -> bool {
+    let plain: Vec<CharBox> = row.iter().map(|(_, c)| *c).collect();
+    let text = render_content(&build_line(row.to_vec()).content);
+    if !looks_like_page_number(text.trim()) {
+        return false;
+    }
+
+    let neighbor_plain: Vec<CharBox> = neighbor.iter().map(|(_, c)| *c).collect();
+    let size = row_font_size(&plain).max(1.0);
+    (row_y(&plain) - row_y(&neighbor_plain)).abs() > size * PAGE_FURNITURE_MIN_GAP
 }
 
 /// Recognizes a row's full rendered text as nothing but a page-number
