@@ -199,6 +199,21 @@ fn resolve_fallback_char(value: char, family: super::maths::Family, hyphenation_
     }
 }
 
+/// Some documents' own font data decodes `ß` (germandbls) as `ÿ` (U+00FF) —
+/// confirmed via `text_object().font()` to be the font's own encoding, not an
+/// artifact of this extraction path (see `TODO.md`). The font carries no name
+/// to key a per-document fix off of, so this can't be scoped tighter than "any
+/// body-text `ÿ`" — but `ÿ` has no legitimate occurrence in this app's actual
+/// content (German or English CS lecture notes), so treating every body-text
+/// `ÿ` as this misdecode is a safe, deliberate substitution, not a guess.
+fn correct_known_font_misdecode(value: char, family: super::maths::Family) -> char {
+    if value == '\u{FF}' && !family.is_maths() {
+        '\u{DF}'
+    } else {
+        value
+    }
+}
+
 #[cfg(feature = "pdf-native")]
 fn extract_pages_native(pdf_path: &Path) -> Result<Vec<ExtractedPage>> {
     use pdfium_render::prelude::{PdfFontWeight, PdfPageObject, PdfPageObjectsCommon};
@@ -261,7 +276,7 @@ fn extract_pages_native(pdf_path: &Path) -> Result<Vec<ExtractedPage>> {
             // the sentence as broken. Keeping it as U+FFFD keeps the glyph's
             // geometry in its row, so the word stays one word, and makes the
             // loss visible instead of silent.
-            let value = resolve_fallback_char(value, family, hyphenation_break);
+            let value = correct_known_font_misdecode(resolve_fallback_char(value, family, hyphenation_break), family);
             // loose_bounds covers the glyph's advance box rather than its inked
             // extent, which is what the space-detection gap logic needs — a
             // comma's tight bounds would leave a gap wide enough to fake a
@@ -412,6 +427,27 @@ mod tests {
             resolve_fallback_char('\u{2}', super::super::maths::Family::Text, true),
             '\u{2}'
         );
+    }
+
+    #[test]
+    fn a_body_text_yuml_is_corrected_to_eszett() {
+        assert_eq!(
+            correct_known_font_misdecode('\u{FF}', super::super::maths::Family::Text),
+            '\u{DF}'
+        );
+    }
+
+    #[test]
+    fn a_maths_face_yuml_is_left_alone() {
+        assert_eq!(
+            correct_known_font_misdecode('\u{FF}', super::super::maths::Family::Italic),
+            '\u{FF}'
+        );
+    }
+
+    #[test]
+    fn ordinary_characters_are_never_touched_by_the_misdecode_correction() {
+        assert_eq!(correct_known_font_misdecode('a', super::super::maths::Family::Text), 'a');
     }
 
     fn char_at(ch: char, x: f32, y: f32) -> CharBox {
