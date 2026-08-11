@@ -1071,6 +1071,78 @@ pub fn group_lines(chars: &[CharBox]) -> Vec<Line> {
     lines
 }
 
+/// Recognizes a row's full rendered text as nothing but a page-number
+/// shape: a bare number ("3"), a dashed number ("- 3 -"), a labelled
+/// number ("Seite 4", "Page 3", "S. 4", "p. 4"), a number/total pair
+/// ("3/10", "3 von 10", "3 of 10"), or a labelled pair ("Seite 3 von 10",
+/// "Page 3 of 10"). Deliberately hand-written, not `regex` — this file
+/// stays free of it, following `list_marker`/`is_cases_brace`'s existing
+/// style of small manual parsers for a fixed set of shapes.
+///
+/// Whole-row match only: "1. Aufgabe" fails this (its own trailing content
+/// after the number rules it out) the same way a genuine page number never
+/// carries a trailing word — this is what keeps a numbered list item or
+/// exercise heading from ever being mistaken for a footer.
+fn looks_like_page_number(text: &str) -> bool {
+    let text = text.trim();
+    if text.is_empty() {
+        return false;
+    }
+
+    if let Some(inner) = strip_dashes(text) {
+        return is_bare_number(inner.trim());
+    }
+
+    let tokens: Vec<&str> = text.split_whitespace().collect();
+    match tokens.as_slice() {
+        [only] => is_bare_number(only) || is_number_pair_no_space(only),
+        [prefix, number] if is_page_word(prefix) => is_bare_number(number),
+        [number, sep, total] => is_bare_number(number) && is_pair_separator(sep) && is_bare_number(total),
+        [prefix, number, sep, total] => {
+            is_page_word(prefix) && is_bare_number(number) && is_pair_separator(sep) && is_bare_number(total)
+        }
+        _ => false,
+    }
+}
+
+/// "- 3 -" / "– 3 –" / "— 3 —" — the leading and trailing character must
+/// both be a dash variant, with something between them, or a genuine
+/// hyphenated word or a maths minus sign would match on either end alone.
+fn strip_dashes(text: &str) -> Option<&str> {
+    const DASHES: [char; 3] = ['-', '\u{2013}', '\u{2014}'];
+    let first = text.chars().next()?;
+    let last = text.chars().last()?;
+    if text.chars().count() > 2 && DASHES.contains(&first) && DASHES.contains(&last) {
+        Some(&text[first.len_utf8()..text.len() - last.len_utf8()])
+    } else {
+        None
+    }
+}
+
+/// A page number is never more than 4 digits (this app's PDFs are lecture
+/// sheets, not book-length documents) — bounding the length keeps a stray
+/// long numeral (a formula's constant, a year in prose) from ever reading
+/// as a page number on digit-shape alone.
+fn is_bare_number(s: &str) -> bool {
+    !s.is_empty() && s.len() <= 4 && s.chars().all(|c| c.is_ascii_digit())
+}
+
+/// "3/10" as a single token (no spaces around the slash).
+fn is_number_pair_no_space(s: &str) -> bool {
+    match s.split_once('/') {
+        Some((a, b)) => is_bare_number(a) && is_bare_number(b),
+        None => false,
+    }
+}
+
+fn is_page_word(s: &str) -> bool {
+    matches!(s.to_lowercase().trim_end_matches('.'), "seite" | "page" | "s" | "p")
+}
+
+fn is_pair_separator(s: &str) -> bool {
+    matches!(s.to_lowercase().as_str(), "von" | "of" | "/")
+}
+
 /// Folds a row made only of extensible glyphs into the row beneath it.
 ///
 /// A radical sign is set on its own baseline, above the expression it covers, so
