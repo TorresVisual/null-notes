@@ -2914,7 +2914,15 @@ pub fn blocks_to_markdown(blocks: &[Block]) -> String {
                 depth,
                 content,
             } => {
-                let indent = "  ".repeat(*depth);
+                // CommonMark list continuation needs the child indented at
+                // least to the parent marker's own content column — a fixed
+                // 2 spaces falls short of that for any real marker width and
+                // markdown-it (this app's parser) flattens the "nested" item
+                // into a sibling top-level list instead of nesting it (see
+                // dividerNestedList.test.ts). 4 spaces per level is the
+                // conventional safe indent that clears every marker width
+                // this pipeline emits.
+                let indent = "    ".repeat(*depth);
                 let marker = match (ordered, number) {
                     (true, Some(n)) => format!("{n}."),
                     (true, None) => "1.".to_string(),

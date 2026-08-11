@@ -1044,8 +1044,8 @@ fn a_lettered_sub_part_nests_under_its_digit_numbered_parent() {
     let markdown = chars_to_markdown(&chars);
 
     assert!(markdown.contains("1. Solve the system:"), "got: {markdown}");
-    assert!(markdown.contains("  1. find the fixed points"), "got: {markdown}");
-    assert!(markdown.contains("  2. classify each one"), "got: {markdown}");
+    assert!(markdown.contains("    1. find the fixed points"), "got: {markdown}");
+    assert!(markdown.contains("    2. classify each one"), "got: {markdown}");
 }
 
 #[test]
@@ -1060,8 +1060,8 @@ fn each_digit_items_own_sub_list_restarts_its_own_numbering() {
 
     let markdown = chars_to_markdown(&chars);
 
-    assert_eq!(markdown.matches("  1. part one").count(), 2, "got: {markdown}");
-    assert_eq!(markdown.matches("  2. part two").count(), 2, "got: {markdown}");
+    assert_eq!(markdown.matches("    1. part one").count(), 2, "got: {markdown}");
+    assert_eq!(markdown.matches("    2. part two").count(), 2, "got: {markdown}");
 }
 
 #[test]
@@ -1243,7 +1243,7 @@ fn an_indented_item_nests_under_the_one_above() {
     let markdown = chars_to_markdown(&chars);
 
     assert!(markdown.contains("- outer"), "got: {markdown}");
-    assert!(markdown.contains("  - inner"), "got: {markdown}");
+    assert!(markdown.contains("    - inner"), "got: {markdown}");
 }
 
 // A hyphen followed by a digit is a minus sign, and an asterisk hugging a word
