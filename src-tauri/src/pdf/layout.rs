@@ -2382,21 +2382,70 @@ fn reconstruct_matrices(rows: Vec<Vec<(usize, CharBox)>>) -> (Vec<Line>, Vec<Vec
                 && row_y(&plain[i]) >= bottom_y
         });
 
+        // A row this pipeline classifies as a bracket glyph is always a
+        // delimiter piece, never real matrix content — stripping it before
+        // rendering handles a delimiter assembled from more than one glyph
+        // (Analysis_2_Blatt7_2026.pdf: a taller pmatrix needs two stacked
+        // half-height pieces per side, and the second piece lands wherever
+        // its own baseline happens to bucket, not necessarily on the
+        // bracket's own row) without needing to model why. For the prefix
+        // row specifically, also restrict to the bracket's own column: that
+        // row's `before`/`after` text sits outside it by definition, and
+        // only characters inside the column are ever this row's own
+        // contribution to the matrix's content.
+        let inside_of = |row_index: usize| -> Vec<(usize, CharBox)> {
+            // The bracket's own physical edges, not the wider
+            // `MATRIX_MAX_COLUMN_GAP` tolerance used to judge whether an
+            // *entire other row* counts as content — that tolerance would
+            // overlap the `before`/`after` zones `before_chars`/
+            // `after_chars` compute from the same `open.x`/`close.x +
+            // close.width` edges, double-counting a character (Analysis_2_-
+            // Blatt7_2026.pdf: the fused row's own "=" sign, ~27pt left of
+            // `open_right`, still fell inside that wider tolerance) as both
+            // prefix and content.
+            let restrict_to_column = Some(row_index) == prefix_i;
+            rows[row_index]
+                .iter()
+                .copied()
+                .filter(|(_, c)| latex::bracket_glyph(c).is_none())
+                .filter(|(_, c)| !restrict_to_column || (c.x >= open.x && c.x <= close.x + close.width))
+                .collect()
+        };
+
+        // The prefix row can also carry real matrix content on the same
+        // baseline — Analysis_2_Blatt7_2026.pdf's assembled delimiter lands
+        // its second piece glued directly to the prefix line, immediately
+        // touching that row's own content (`⃗v(x, y, z) = [piece]x + 2y²[piece]`).
+        // When that happens, this row is both the prefix *and* one more
+        // content row, so it's folded into `content_candidates` at its
+        // sorted position rather than only ever contributing text outside
+        // the bracket.
+        if let Some(pi) = prefix_i {
+            if !inside_of(pi).is_empty() {
+                content_candidates.push(pi);
+                content_candidates.sort_by(|&a, &b| {
+                    row_y(&plain[b]).partial_cmp(&row_y(&plain[a])).unwrap_or(std::cmp::Ordering::Equal)
+                });
+            }
+        }
+
+        let content_rows: Vec<Vec<(usize, CharBox)>> =
+            content_candidates.iter().map(|&ci| inside_of(ci)).collect();
         let content_plain: Vec<Vec<CharBox>> =
-            content_candidates.iter().map(|&i| plain[i].clone()).collect();
+            content_rows.iter().map(|row| row.iter().map(|(_, c)| *c).collect()).collect();
         let cut_xs = table_gutters(&content_plain).filter(|cuts| {
             !cuts.is_empty()
-                && content_candidates.iter().all(|&i| !row_crosses_gutters(&plain[i], cuts))
-                && content_candidates.iter().all(|&i| {
-                    split_row_into_cells(&rows[i], cuts).iter().filter(|c| cell_has_content(c)).count()
+                && content_plain.iter().all(|row| !row_crosses_gutters(row, cuts))
+                && content_rows.iter().all(|row| {
+                    split_row_into_cells(row, cuts).iter().filter(|c| cell_has_content(c)).count()
                         == cuts.len() + 1
                 })
         });
 
-        let row_lines: Vec<String> = content_candidates
+        let row_lines: Vec<String> = content_rows
             .iter()
-            .map(|&ci| match &cut_xs {
-                Some(cuts) => split_row_into_cells(&rows[ci], cuts)
+            .map(|row| match &cut_xs {
+                Some(cuts) => split_row_into_cells(row, cuts)
                     .into_iter()
                     .map(|cell| {
                         let mut cell_chars: Vec<CharBox> = cell.into_iter().map(|(_, c)| c).collect();
@@ -2406,7 +2455,7 @@ fn reconstruct_matrices(rows: Vec<Vec<(usize, CharBox)>>) -> (Vec<Line>, Vec<Vec
                     .collect::<Vec<_>>()
                     .join(" & "),
                 None => {
-                    let mut row_chars = plain[ci].clone();
+                    let mut row_chars: Vec<CharBox> = row.iter().map(|(_, c)| *c).collect();
                     row_chars.sort_by(|a, b| a.x.partial_cmp(&b.x).unwrap_or(std::cmp::Ordering::Equal));
                     latex::to_latex(&row_chars)
                 }
@@ -2415,8 +2464,16 @@ fn reconstruct_matrices(rows: Vec<Vec<(usize, CharBox)>>) -> (Vec<Line>, Vec<Vec
 
         let (mut before_chars, mut after_chars): (Vec<CharBox>, Vec<CharBox>) = match prefix_i {
             Some(pi) => (
-                plain[pi].iter().copied().filter(|c| c.x < open.x).collect(),
-                plain[pi].iter().copied().filter(|c| c.x > close.x + close.width).collect(),
+                plain[pi]
+                    .iter()
+                    .copied()
+                    .filter(|c| c.x < open.x && latex::bracket_glyph(c).is_none())
+                    .collect(),
+                plain[pi]
+                    .iter()
+                    .copied()
+                    .filter(|c| c.x > close.x + close.width && latex::bracket_glyph(c).is_none())
+                    .collect(),
             ),
             None => (Vec::new(), Vec::new()),
         };
@@ -2455,8 +2512,8 @@ fn reconstruct_matrices(rows: Vec<Vec<(usize, CharBox)>>) -> (Vec<Line>, Vec<Vec
         let base_size = prefix_i.map(|pi| row_font_size(&plain[pi])).unwrap_or(bracket_size).max(1.0);
         let mut x = open.x;
         let mut right = close.x + close.width;
-        for &ci in &content_candidates {
-            let (x0, x1) = row_x_extent(&plain[ci]);
+        for row in &content_plain {
+            let (x0, x1) = row_x_extent(row);
             x = x.min(x0);
             right = right.max(x1);
         }
@@ -2682,8 +2739,15 @@ const MATRIX_MAX_COLUMN_GAP: f32 = 2.5;
 // size) a row may sit and still be a candidate content row — the same
 // reasoning `CASES_MAX_ROW_GAP` documents: x-band coincidence alone lets a
 // page footer or a later exercise's own symbol pass the column check from
-// anywhere on the page.
-const MATRIX_MAX_ROW_GAP: f32 = 3.0;
+// anywhere on the page. Measured from the bracket's own row, which for an
+// assembled two-piece delimiter is anchored at its top piece — so this has
+// to cover a whole matrix's height, not just one row's worth. Confirmed
+// against Analysis_2_Blatt7_2026.pdf's 3-row vectors, whose bottom row
+// sits 3.21 bracket-heights below the top piece (3.0 was calibrated only
+// against Analysis_2_Blatt11.pdf's 2-row case and excluded it); still an
+// order of magnitude below the hundreds-of-points distance of genuinely
+// unrelated page content this guard exists to reject.
+const MATRIX_MAX_ROW_GAP: f32 = 5.0;
 // How far a case row's left edge may drift from the first case row's own
 // left edge and still count as the same left-aligned column.
 const CASES_COLUMN_TOLERANCE: f32 = 1.0;

@@ -518,6 +518,64 @@ fn a_two_by_two_matrix_becomes_two_pmatrix_columns() {
     );
 }
 
+// Reconstructs Analysis_2_Blatt7_2026.pdf item 1's vector field:
+// `⃗v(x, y, z) = \begin{pmatrix} x+y \\ x+2y² \\ yz \end{pmatrix}` — a
+// 3-row column vector whose bracket is assembled from two glyph pieces
+// per side (a font artifact for this taller pmatrix, not two logical
+// brackets). The bottom piece lands glued directly onto the middle row,
+// which is *also* this vector's own prefix ("⃗v(x, y, z) =") *and* its
+// own second content row ("x + 2y²") — one row serving three roles at
+// once. Real captured coordinates throughout (`dump_chars_range`), same
+// reasoning as every other real-document fixture in this file.
+#[test]
+fn an_assembled_delimiter_vector_with_a_fused_prefix_row_becomes_one_pmatrix() {
+    use real_char as real;
+
+    let chars = vec![
+        // "⃗v(x, y, z) =" — prefix, before the bracket.
+        real('\u{20d7}', 252.343, 7.364, 625.258, 11.96, Family::Italic),
+        real('v', 252.809, 5.655, 625.258, 11.96, Family::Italic),
+        real('(', 258.908, 4.543, 625.258, 11.96, Family::Text),
+        real('x', 263.460, 6.647, 625.258, 11.96, Family::Italic),
+        real(',', 270.107, 3.252, 625.258, 11.96, Family::Italic),
+        real(' ', 275.355, 0.000, 625.258, 11.96, Family::Italic),
+        real('y', 275.355, 5.715, 625.258, 11.96, Family::Italic),
+        real(',', 281.488, 3.252, 625.258, 11.96, Family::Italic),
+        real(' ', 286.725, 0.000, 625.258, 11.96, Family::Italic),
+        real('z', 286.725, 5.499, 625.258, 11.96, Family::Italic),
+        real(')', 292.708, 4.543, 625.258, 11.96, Family::Text),
+        real(' ', 300.574, 0.000, 625.258, 11.96, Family::Text),
+        real('=', 300.574, 9.098, 625.258, 11.96, Family::Text),
+        // Open bracket, both pieces.
+        real('\u{f8eb}', 313.007, 10.461, 649.288, 11.96, Family::Extensible),
+        real('\u{f8ed}', 313.007, 10.461, 627.769, 11.96, Family::Extensible),
+        // First content row: "x + y".
+        real('x', 328.760, 6.647, 639.804, 11.96, Family::Italic),
+        real('+', 338.069, 9.098, 639.804, 11.96, Family::Text),
+        real('y', 349.830, 5.715, 639.804, 11.96, Family::Italic),
+        // Second content row: "x + 2y^2" — same baseline as the prefix.
+        real('x', 323.468, 6.647, 625.358, 11.96, Family::Italic),
+        real('+', 332.776, 9.098, 625.358, 11.96, Family::Text),
+        real(' ', 344.528, 0.000, 625.358, 11.96, Family::Text),
+        real('2', 344.528, 5.846, 625.358, 11.96, Family::Text),
+        real('y', 350.391, 5.715, 625.358, 11.96, Family::Italic),
+        real('2', 356.527, 4.232, 629.696, 7.97, Family::Text),
+        // Third content row: "yz".
+        real('y', 336.310, 5.715, 610.912, 11.96, Family::Italic),
+        real('z', 342.443, 5.499, 610.912, 11.96, Family::Italic),
+        // Close bracket, both pieces.
+        real('\u{f8f6}', 361.260, 10.461, 649.288, 11.96, Family::Extensible),
+        real('\u{f8f8}', 361.260, 10.461, 627.769, 11.96, Family::Extensible),
+    ];
+
+    let markdown = chars_to_markdown(&chars);
+
+    assert!(
+        markdown.contains(r"⃗v(x, y, z) = \begin{pmatrix} x + y \\ x + 2y^2 \\ yz \end{pmatrix}"),
+        "got: {markdown}"
+    );
+}
+
 // A page footer's own page number can land within the brace's x-alignment
 // tolerance by pure coincidence, however far down the page it actually is
 // — found on the real document: a footer "1" at y=26.8 (74pt below the
