@@ -1,4 +1,4 @@
-# PDF lettered/roman sub-list markers
+# PDF list-marker recognition fixes
 
 ## Problem
 
@@ -13,6 +13,17 @@ Worse, even the form it does recognize is broken downstream. `Marker.number` is 
 ```
 
 The same document also shows that these sub-parts sit at the **same x-indent** as their parent `6.` in the source PDF — no extra geometric indent. Since this pipeline's nesting depth (`LIST_INDENT_EMS`, `layout.rs:1972`) is purely geometric, correcting only the numbering still leaves `(a)`/`(b)` flat and indistinguishable from the sheet's own top-level `1.`–`6.` list.
+
+The same document's later "Richtig oder Falsch" section has a third, unrelated gap in the same function. Its four true/false statements each open with a custom bullet symbol that pdfium can only report as the control codepoint `U+0088` — a real, body-sized glyph with no `ToUnicode` entry, not a synthetic pdfium marker. `extract::resolve_fallback_char` already collapses that (correctly, and deliberately — see `ligatures.rs`) to `U+FFFD` before `layout.rs` ever sees it, since which real symbol it represents is font-specific and unsafe to guess. But `list_marker()`'s bullet branch doesn't include `U+FFFD` in its recognized character set, so all four lines fall through to `Prose` and merge into one run-on paragraph instead of a 4-item bullet list. Confirmed via `dump_lines` on the real PDF (page 2) — each `�` sits alone at the start of its own line, at a deeper indent (`x=74.25`) than the section's intro paragraph (`x=56.69`), immediately followed by a space and, on two of the four, a wrapped continuation line at a deeper indent still (`x=85.96`) — geometrically identical to every other recognized bullet:
+
+```
+x= 56.69 | Richtig oder Falsch? Geben Sie eine kurze Begründung...
+x= 74.25 | � Wenn alle Eigenwerte einer Systemmatrix ...
+x= 85.96 | die Ruhelage ... asymptotisch stabil.        (wrapped continuation)
+x= 74.25 | � Die Laplace-Transformation ist ein linearer Operator...
+x= 74.25 | � Wenn die Determinante einer Matrix ...
+x= 74.25 | � Das Produkt zweier Laplace-transformierter Funktionen...
+```
 
 ## Design
 
@@ -61,6 +72,16 @@ Unordered (bullet) items are left untouched by this pass entirely — they alrea
 
 No new fields on `Marker` or `Block::ListItem` — this reuses `ordered`, `number`, and `depth` exactly as they exist today. `blocks_to_markdown`'s existing `(true, None) => "1."` fallback is untouched (kept as the same defensive default described in CLAUDE.md — every ordered item has a `Some` number after this pass runs, but nothing here should panic if that invariant is ever violated).
 
+### 3. Recognize the unresolved-placeholder bullet (`U+FFFD`)
+
+`list_marker()`'s bullet branch (`layout.rs:1781`) gains `'\u{FFFD}'` alongside its existing bullet characters:
+
+```rust
+if matches!(first, '•' | '●' | '▪' | '◦' | '‣' | '·' | '−' | '–' | '-' | '*' | '\u{FFFD}') {
+```
+
+Safe by construction, for the same reason the existing bullet check already is: this branch only ever fires on the first character of a line, and only when it's immediately followed by whitespace (`rest.get(1).filter(is_whitespace)`, already present). A standalone `U+FFFD` meeting both conditions can't collide with `ligatures.rs`'s own resolution — a ligature is never a whole one-character "word" (it always sits *embedded*, with real letters on both sides), and the quote heuristic already requires a letter, not whitespace, on the touching side. `list_marker()` runs on the raw line text at `classify()` time, before `join_lines`'s later call into `ligatures::disambiguate` — the two never race for the same character.
+
 ### Known limitation (accepted, not fixed)
 
 If an unrelated bullet item sits between a digit item and a later, geometrically-unrelated lettered list at the same depth, the lettered list will still be force-nested under the earlier digit item (bullets don't reset `last_was_digit`). No real document in this corpus does this; not worth the added state to guard against speculatively.
@@ -74,8 +95,11 @@ Added to `layout_tests.rs`, following the file's existing `chars_to_markdown`/`g
 - A digit item (`1. Aufgabe`) followed by `(a)` / `(b)` sub-parts at the *same* geometric x as the digit item: the sub-parts render nested (one indent level deeper) and numbered `1. / 2.` independently of the parent's own number.
 - Two digit items, each with its own `(a)`/`(b)` sub-parts: each sub-list independently restarts at `1.` (proves the depth-scoped counter reset on returning to a shallower item).
 - A `Heading` between two unrelated bare-letter lists: the second list restarts at `1.` rather than continuing the first's count.
+- A leading `U+FFFD` followed by whitespace becomes a bullet list item, marker stripped, same as an existing `•` test already checks.
+- A `U+FFFD` embedded mid-word (not at the start of a line) is untouched by `list_marker` and still resolves the way `ligatures.rs`'s own existing tests already cover — no new test needed here, since `list_marker` is only ever consulted at a line's leading position and this case never reaches it.
 
 ## Out of scope
 
 - Preserving the literal letter/roman text in the rendered output (e.g. emitting `a.`/`b.` markers) — GFM ordered-list syntax is digits-only; a non-numeric marker would either fail to parse as a list at all or (if indented) risk being read as a code block. Per the answered design question, auto-numbering is the intended behavior.
 - Resetting on a bullet item, or on any boundary other than `Heading` — see Known limitation above.
+- Recovering what the `U+0088` glyph actually *is* (a real bullet symbol, most likely a Wingdings-style dingbat) — out of scope per `ligatures.rs`'s existing design: the letter/symbol a font-specific control codepoint represents is unsafe to guess, so it stays `U+FFFD` in the text and is only ever *classified* as a bullet, never rendered as a specific character.
