@@ -1013,7 +1013,52 @@ fn a_sub_part_label_becomes_a_list_item() {
     let markdown = chars_to_markdown(&chars);
 
     assert!(markdown.contains("1. the first part"), "got: {markdown}");
-    assert!(markdown.contains("1. the second part"), "got: {markdown}");
+    assert!(markdown.contains("2. the second part"), "got: {markdown}");
+}
+
+#[test]
+fn a_lettered_sub_part_nests_under_its_digit_numbered_parent() {
+    let mut chars = page(&["Answer the following."]);
+    chars.extend(set("1. Solve the system:", 72.0, 660.0, Style::default()));
+    chars.extend(set("(a) find the fixed points", 72.0, 648.0, Style::default()));
+    chars.extend(set("(b) classify each one", 72.0, 636.0, Style::default()));
+
+    let markdown = chars_to_markdown(&chars);
+
+    assert!(markdown.contains("1. Solve the system:"), "got: {markdown}");
+    assert!(markdown.contains("  1. find the fixed points"), "got: {markdown}");
+    assert!(markdown.contains("  2. classify each one"), "got: {markdown}");
+}
+
+#[test]
+fn each_digit_items_own_sub_list_restarts_its_own_numbering() {
+    let mut chars = page(&["Two exercises, each with two sub-parts."]);
+    chars.extend(set("1. First exercise", 72.0, 660.0, Style::default()));
+    chars.extend(set("(a) part one", 72.0, 648.0, Style::default()));
+    chars.extend(set("(b) part two", 72.0, 636.0, Style::default()));
+    chars.extend(set("2. Second exercise", 72.0, 624.0, Style::default()));
+    chars.extend(set("(a) part one", 72.0, 612.0, Style::default()));
+    chars.extend(set("(b) part two", 72.0, 600.0, Style::default()));
+
+    let markdown = chars_to_markdown(&chars);
+
+    assert_eq!(markdown.matches("  1. part one").count(), 2, "got: {markdown}");
+    assert_eq!(markdown.matches("  2. part two").count(), 2, "got: {markdown}");
+}
+
+#[test]
+fn a_heading_resets_running_list_numbering() {
+    let mut chars = set("Warm-up", 72.0, 700.0, Style { size: 15.0, ..Style::default() });
+    chars.extend(set("(a) first warm-up part", 72.0, 680.0, Style::default()));
+    chars.extend(set("(b) second warm-up part", 72.0, 668.0, Style::default()));
+    chars.extend(set("Main Task", 72.0, 648.0, Style { size: 15.0, ..Style::default() }));
+    chars.extend(set("(a) first main part", 72.0, 628.0, Style::default()));
+    chars.extend(set("(b) second main part", 72.0, 616.0, Style::default()));
+
+    let markdown = chars_to_markdown(&chars);
+
+    assert_eq!(markdown.matches("1. first").count(), 2, "got: {markdown}");
+    assert_eq!(markdown.matches("2. second").count(), 2, "got: {markdown}");
 }
 
 #[test]

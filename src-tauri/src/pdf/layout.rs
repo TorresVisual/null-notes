@@ -11,6 +11,7 @@
 
 use super::latex;
 use super::maths::Family;
+use std::collections::BTreeMap;
 use unicode_normalization::UnicodeNormalization;
 
 /// Marks where a word was broken across a line. Set by extraction from
@@ -2046,7 +2047,58 @@ pub fn group_blocks(lines: &[Line]) -> Vec<Block> {
         blocks.push(finish_block(&current, current_kind));
     }
 
+    assign_list_numbers(&mut blocks);
     blocks
+}
+
+/// Assigns sequential numbers to ordered list items that arrived with none
+/// — a letter or roman-numeral marker (`(a)`, `iv)`) carries no numeric
+/// value of its own, unlike a digit marker's source-preserved `number` — and
+/// nests a letter-marked item under the digit-numbered item it immediately
+/// follows when the source PDF gave it no extra indent to signal that on its
+/// own. See docs/specs/pdf-lettered-list-markers-design.md.
+fn assign_list_numbers(blocks: &mut [Block]) {
+    // depth -> next number to auto-assign at that depth.
+    let mut counters: BTreeMap<usize, u32> = BTreeMap::new();
+    // depth -> whether the most recent ordered item seen at that depth
+    // carried its own explicit source number, or was itself a letter marker.
+    let mut last_was_digit: BTreeMap<usize, bool> = BTreeMap::new();
+
+    for block in blocks.iter_mut() {
+        match block {
+            // A heading is a topic boundary: two unrelated lettered lists on
+            // either side of one should not share a running count.
+            Block::Heading { .. } => {
+                counters.clear();
+                last_was_digit.clear();
+            }
+            Block::ListItem { ordered: true, number, depth, .. } => {
+                let orig_depth = *depth;
+                let bump = number.is_none() && last_was_digit.get(&orig_depth) == Some(&true);
+                let effective_depth = if bump { orig_depth + 1 } else { orig_depth };
+
+                // A new item at this depth ends whatever was nested under
+                // whatever came before it at a deeper level.
+                counters.retain(|&d, _| d <= effective_depth);
+                last_was_digit.retain(|&d, _| d <= effective_depth);
+
+                match number {
+                    Some(n) => {
+                        counters.insert(effective_depth, *n + 1);
+                        last_was_digit.insert(effective_depth, true);
+                    }
+                    None => {
+                        let next = counters.remove(&effective_depth).unwrap_or(1);
+                        *number = Some(next);
+                        counters.insert(effective_depth, next + 1);
+                        last_was_digit.insert(effective_depth, false);
+                    }
+                }
+                *depth = effective_depth;
+            }
+            _ => {}
+        }
+    }
 }
 
 fn finish_block(lines: &[&Line], kind: LineKind) -> Block {
