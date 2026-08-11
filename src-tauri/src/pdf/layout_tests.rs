@@ -990,6 +990,24 @@ fn bulleted_lines_become_list_items_with_the_marker_removed() {
     assert!(!markdown.contains('•'), "marker survived: {markdown}");
 }
 
+// Analysis_2_Blatt12.pdf's "Richtig oder Falsch" section: pdfium can only
+// decode this bullet symbol as the control codepoint U+0088, which
+// extract::resolve_fallback_char already (deliberately) collapses to
+// U+FFFD before layout.rs ever sees it — see docs/specs/
+// pdf-lettered-list-markers-design.md.
+#[test]
+fn an_unresolved_placeholder_glyph_becomes_a_bullet() {
+    let mut chars = page(&["Prove the following statements about the set."]);
+    chars.extend(set("\u{FFFD} first claim", 72.0, 660.0, Style::default()));
+    chars.extend(set("\u{FFFD} second claim", 72.0, 648.0, Style::default()));
+
+    let markdown = chars_to_markdown(&chars);
+
+    assert!(markdown.contains("- first claim"), "got: {markdown}");
+    assert!(markdown.contains("- second claim"), "got: {markdown}");
+    assert!(!markdown.contains('\u{FFFD}'), "marker survived: {markdown}");
+}
+
 #[test]
 fn numbered_lines_become_an_ordered_list() {
     let mut chars = page(&["Answer each of the parts below in turn."]);

@@ -1779,7 +1779,7 @@ fn list_marker(text: &str) -> Option<Marker> {
     let rest = &chars[leading..];
     let first = *rest.first()?;
 
-    if matches!(first, '•' | '●' | '▪' | '◦' | '‣' | '·' | '−' | '–' | '-' | '*') {
+    if matches!(first, '•' | '●' | '▪' | '◦' | '‣' | '·' | '−' | '–' | '-' | '*' | '\u{FFFD}') {
         // A bullet is only a bullet when something separates it from the text,
         // or "-3 degrees" and "*emphasis*" become list items.
         return rest.get(1).filter(|c| c.is_whitespace()).map(|_| Marker {
