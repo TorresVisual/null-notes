@@ -2109,6 +2109,9 @@ fn cases_brace_row(row: &[CharBox]) -> Option<(CharBox, Vec<CharBox>)> {
     Some((brace, sorted))
 }
 
+/// One open/close bracket-glyph pair, left to right within its row.
+pub(super) type BracketPair = (CharBox, CharBox);
+
 /// Every bracket-glyph pair in `row`, left to right, and every character
 /// before the first open bracket — leading prose like "3. Gegeben ist das
 /// Vektorfeld " (Analysis_2_Blatt5_2026.pdf item 3) or "Ordnung: "
@@ -2121,7 +2124,7 @@ fn cases_brace_row(row: &[CharBox]) -> Option<(CharBox, Vec<CharBox>)> {
 /// (Analysis_2_Blatt12.pdf items 4/5: three independent small matrices
 /// share one bracket row, separated only by spaces). A single bracket
 /// pair is just the `N = 1` case of this same rule.
-pub(super) fn matrix_bracket_row(row: &[CharBox]) -> Option<(Vec<(CharBox, CharBox)>, Vec<CharBox>)> {
+pub(super) fn matrix_bracket_row(row: &[CharBox]) -> Option<(Vec<BracketPair>, Vec<CharBox>)> {
     let mut sorted: Vec<CharBox> = row.to_vec();
     sorted.sort_by(|a, b| a.x.partial_cmp(&b.x).unwrap_or(std::cmp::Ordering::Equal));
 
@@ -2131,7 +2134,7 @@ pub(super) fn matrix_bracket_row(row: &[CharBox]) -> Option<(Vec<(CharBox, CharB
         .filter(|(_, c)| latex::bracket_glyph(c).is_some())
         .map(|(i, _)| i)
         .collect();
-    if bracket_positions.is_empty() || bracket_positions.len() % 2 != 0 {
+    if bracket_positions.is_empty() || !bracket_positions.len().is_multiple_of(2) {
         return None;
     }
     let last_printing = sorted.iter().rev().find(|c| !c.ch.is_whitespace())?;
@@ -2151,7 +2154,7 @@ pub(super) fn matrix_bracket_row(row: &[CharBox]) -> Option<(Vec<(CharBox, CharB
     }
 
     let first_pos = bracket_positions[0];
-    let brackets: Vec<(CharBox, CharBox)> =
+    let brackets: Vec<BracketPair> =
         bracket_positions.chunks_exact(2).map(|pair| (sorted[pair[0]], sorted[pair[1]])).collect();
     let leading = sorted[..first_pos].to_vec();
     Some((brackets, leading))
@@ -2380,6 +2383,20 @@ fn reconstruct_matrices(rows: Vec<Vec<(usize, CharBox)>>) -> (Vec<Line>, Vec<Vec
             // heights of the bracket itself, not merely somewhere on the
             // same page.
             .filter(|&i| (bracket_y - row_y(&plain[i])).abs() <= bracket_size * MATRIX_MAX_ROW_GAP)
+            // The *overall* envelope (first bracket's open to last
+            // bracket's close) can span most of the line once several
+            // brackets sit on one row, so falling inside it is not enough
+            // either — a row must actually touch at least one bracket's
+            // own physical column. Found on Ue9.pdf Beispiel 9.2: four
+            // consecutive `\binom{}{}`s (the same bracket-plus-two-rows
+            // shape a real vector takes) left a gap between bracket 2 and
+            // bracket 3 wide enough for the surrounding sentence's own
+            // "als auch als" (German "sowohl ... als auch ...", both...
+            // and) to sit at a y between the numerator/denominator rows
+            // and pass the checks above without ever touching a bracket.
+            .filter(|&i| {
+                brackets.iter().any(|b| plain[i].iter().any(|c| c.x >= b.0.x && c.x <= b.1.x + b.1.width))
+            })
             .collect();
         if content_candidates.len() < 2 {
             continue;
@@ -2410,7 +2427,7 @@ fn reconstruct_matrices(rows: Vec<Vec<(usize, CharBox)>>) -> (Vec<Line>, Vec<Vec
         // span); with several brackets sharing one row, every ordinary
         // content row spans *all* of them, and only this per-bracket
         // slice is what belongs to any one pmatrix.
-        let inside_of = |row_index: usize, bracket: &(CharBox, CharBox)| -> Vec<(usize, CharBox)> {
+        let inside_of = |row_index: usize, bracket: &BracketPair| -> Vec<(usize, CharBox)> {
             rows[row_index]
                 .iter()
                 .copied()
@@ -2446,6 +2463,30 @@ fn reconstruct_matrices(rows: Vec<Vec<(usize, CharBox)>>) -> (Vec<Line>, Vec<Vec
             plain[i].iter().any(|c| c.family == Family::Extensible && latex::bracket_glyph(c).is_none())
         }) {
             continue;
+        }
+
+        // Several independent brackets sharing one row is also exactly
+        // the shape a run of `\binom{}{}`s takes — each one column-pair
+        // tall content, no big operator inside either. What tells the two
+        // apart is *introduction*: every confirmed real system of
+        // equations (Analysis_2_Blatt12.pdf items 4/5) names the object
+        // it's assigning into right before the first bracket
+        // (`⃗y'(t) =`), while a `\binom` is plugged into a sentence or
+        // formula with nothing of the kind (Ue9.pdf Beispiel 9.2: neither
+        // the four combinatorial `\binom`s in "sowohl ... als auch ..."
+        // nor the three in the lottery formula have any text — on the
+        // bracket row or the prefix row — before their first bracket).
+        // Only checked for N > 1: a single bracket already has its own
+        // real-document evidence (Blatt11/Blatt5/Blatt7) that no
+        // introduction is required.
+        if brackets.len() > 1 {
+            let leading_present = !leading.is_empty();
+            let before_present = prefix_i.is_some_and(|pi| {
+                plain[pi].iter().any(|c| c.x < brackets[0].0.x && !c.ch.is_whitespace())
+            });
+            if !leading_present && !before_present {
+                continue;
+            }
         }
 
         // Each bracket gets its own pmatrix, built from the shared
