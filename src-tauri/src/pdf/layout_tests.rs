@@ -576,6 +576,30 @@ fn an_assembled_delimiter_vector_with_a_fused_prefix_row_becomes_one_pmatrix() {
     );
 }
 
+// A candidate content row that itself contains a big operator (not a
+// bracket-piece glyph) means this bracket doesn't actually delimit a
+// matrix — it's some other maths construct that happens to share the
+// bracket's tolerance band. Found on Ue9.pdf Beispiel 9.3: the
+// inclusion-exclusion formula's own large `\left(\right)` delimiter
+// (assembled from four glyph pieces) was swallowing its nested Σ
+// operators and their sub/superscript limit rows as if they were matrix
+// rows. `reconstruct_matrices` must decline entirely rather than guess
+// which rows to keep.
+#[test]
+fn a_content_row_with_a_big_operator_is_not_reconstructed_as_a_matrix() {
+    let mut chars = set("\u{12}", 100.0, 120.0, extensible());
+    chars.extend(set(" ", 105.0, 120.0, Style::default()));
+    chars.extend(set("\u{13}", 140.0, 120.0, extensible()));
+    chars.extend(set("x+y", 105.0, 110.0, maths_italic()));
+    // The sum placeholder glyph (see `is_sum`) — the shape a nested Σ's
+    // own limit row takes on the real document, not a real matrix row.
+    chars.extend(set("X", 105.0, 100.0, extensible()));
+
+    let markdown = chars_to_markdown(&chars);
+
+    assert!(!markdown.contains("pmatrix"), "got: {markdown}");
+}
+
 // A page footer's own page number can land within the brace's x-alignment
 // tolerance by pure coincidence, however far down the page it actually is
 // — found on the real document: a footer "1" at y=26.8 (74pt below the

@@ -2429,6 +2429,30 @@ fn reconstruct_matrices(rows: Vec<Vec<(usize, CharBox)>>) -> (Vec<Line>, Vec<Vec
             }
         }
 
+        // A genuine matrix's own content rows are simple algebraic
+        // expressions — every real example in the corpus lacks big
+        // operators of its own. A candidate row carrying an
+        // Extensible-family character that isn't a bracket-piece glyph
+        // (already stripped by `inside_of`, but checked here against the
+        // raw row) belongs to some other maths construct that merely
+        // shares this bracket's x/y tolerance band — the same
+        // false-positive risk `TABLE_MATHS_GUARD_RATIO` exists to catch for
+        // `reconstruct_tables`. Found on Ue9.pdf Beispiel 9.3: the
+        // inclusion-exclusion formula's own large `\left(\right)`
+        // delimiter (assembled from four glyph pieces, taller even than
+        // Blatt7_2026's two-piece case) was swallowing the formula's
+        // nested Σ operators and their sub/superscript limit rows as if
+        // they were matrix rows. Bailing out entirely (rather than only
+        // dropping the offending row) is deliberate: a "matrix" that
+        // claims a big operator as one of its own rows isn't a matrix,
+        // and guessing which of its rows to keep would be exactly the
+        // kind of forced fix this pipeline's own practice warns against.
+        if content_candidates.iter().any(|&i| {
+            plain[i].iter().any(|c| c.family == Family::Extensible && latex::bracket_glyph(c).is_none())
+        }) {
+            continue;
+        }
+
         let content_rows: Vec<Vec<(usize, CharBox)>> =
             content_candidates.iter().map(|&ci| inside_of(ci)).collect();
         let content_plain: Vec<Vec<CharBox>> =
