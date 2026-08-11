@@ -53,6 +53,30 @@ describe('inline math', () => {
     expect(mathNodes(e)).toHaveLength(0)
   })
 
+  // CommonMark treats `\\` as an escaped literal backslash — a real risk
+  // for LaTeX, which uses `\\` as a matrix/cases row separator and `\{`,
+  // `\_`, `\%` etc. constantly. If the equation's raw source passes through
+  // markdown-it's ordinary backslash-escape processing before this node's
+  // own parsing sees it, one of the two backslashes silently disappears.
+  it('preserves a literal double backslash inside the equation', () => {
+    const source = String.raw`$\begin{cases} 1 & a \\ 0 & b \end{cases}$`
+    const e = mount(source)
+    expect(mathNodes(e)).toEqual([{ latex: String.raw`\begin{cases} 1 & a \\ 0 & b \end{cases}` }])
+  })
+
+  // The real note that surfaced this: Analysis_2_Blatt12.pdf's Heaviside
+  // step function, imported by the PDF pipeline (reconstruct_cases) with a
+  // leading word sharing the equation's own sentence.
+  it('preserves the row separator in an imported Heaviside cases block', () => {
+    const source =
+      'ist ' +
+      String.raw`$H(t - b) = \begin{cases} 1 & \text{für} t \geq b \\ 0 & \text{für} t < b. \end{cases}$`
+    const e = mount(source)
+    expect(mathNodes(e)).toEqual([
+      { latex: String.raw`H(t - b) = \begin{cases} 1 & \text{für} t \geq b \\ 0 & \text{für} t < b. \end{cases}` },
+    ])
+  })
+
   // The node view writes latex back through updateAttributes when the popover
   // commits; the edited value has to survive the next save.
   it('serializes an edited equation', () => {

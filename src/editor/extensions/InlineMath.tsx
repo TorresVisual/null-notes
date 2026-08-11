@@ -193,33 +193,57 @@ export const InlineMath = Node.create({
           s.write(`$${node.attrs.latex}$`)
         },
         parse: {
-          setup(markdownit: { core: { ruler: { push: (name: string, fn: (state: unknown) => void) => void } } }) {
-            markdownit.core.ruler.push('inline_math', (state: unknown) => {
-              const st = state as { tokens: Array<{ type: string; children: Array<{ type: string; content: string }> | null }> }
-              for (const token of st.tokens) {
-                if (token.type !== 'inline' || !token.children) continue
-                const newChildren: typeof token.children = []
-                for (const child of token.children) {
-                  if (child.type !== 'text') {
-                    newChildren.push(child)
-                    continue
-                  }
-                  const parts = child.content.split(/\$([^$\n]{1,200})\$/)
-                  if (parts.length === 1) {
-                    newChildren.push(child)
-                    continue
-                  }
-                  for (let i = 0; i < parts.length; i++) {
-                    const part = parts[i] ?? ''
-                    if (i % 2 === 0) {
-                      if (part) newChildren.push({ type: 'text', content: part })
-                    } else {
-                      newChildren.push({ type: 'html_inline', content: `<span data-type="inline-math" data-latex="${encodeAttr(part)}"></span>` })
-                    }
-                  }
-                }
-                token.children = newChildren
+          // An *inline*-ruler rule, not a core-ruler post-process: markdown-it's
+          // own text/escape rules already run inside the built-in "inline" core
+          // rule, before any custom core rule ever sees `token.children`. A
+          // core-ruler rule (the previous approach here) inspects text that has
+          // already been through CommonMark's backslash-escape processing —
+          // and `\\` is itself a valid CommonMark escape for a literal `\`, so
+          // a LaTeX matrix/cases row separator (or `\{`, `\_`, `\%`, …) silently
+          // lost one backslash before this node's own parsing ever ran. Hooking
+          // in *before* the built-in `escape` rule, and reading straight from
+          // `state.src`, claims the raw span first — the same reasoning
+          // `BlockMath.tsx`'s block-level rule already follows by reading
+          // `state.src` directly instead of post-processing tokens.
+          setup(markdownit: {
+            inline: {
+              ruler: {
+                before: (ref: string, name: string, fn: (state: unknown, silent: boolean) => boolean) => void
               }
+            }
+          }) {
+            markdownit.inline.ruler.before('escape', 'inline_math', (state: unknown, silent: boolean): boolean => {
+              const st = state as {
+                src: string
+                pos: number
+                posMax: number
+                push: (type: string, tag: string, nesting: number) => { content: string }
+              }
+
+              if (st.src.charCodeAt(st.pos) !== 0x24 /* $ */) return false
+
+              const max = st.posMax
+              let pos = st.pos + 1
+              while (pos < max) {
+                const code = st.src.charCodeAt(pos)
+                if (code === 0x24 /* $ */) break
+                if (code === 0x0a /* \n */) return false
+                pos++
+              }
+              // No closing `$` on this line, or nothing between the two — a
+              // lone dollar sign is a price, not the start of an equation,
+              // matching the previous regex's `{1,200}` (at least one char).
+              if (pos >= max || st.src.charCodeAt(pos) !== 0x24) return false
+              const len = pos - st.pos - 1
+              if (len < 1 || len > 200) return false
+
+              if (!silent) {
+                const latex = st.src.slice(st.pos + 1, pos)
+                const token = st.push('html_inline', '', 0)
+                token.content = `<span data-type="inline-math" data-latex="${encodeAttr(latex)}"></span>`
+              }
+              st.pos = pos + 1
+              return true
             })
           },
         },
