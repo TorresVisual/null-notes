@@ -266,9 +266,10 @@ fn a_bare_bracket_pair_row_has_no_leading_text() {
     row.extend(set(" ", 283.183, 757.389, Style::default()));
     row.extend(set("\u{13}", 385.085, 757.389, extensible()));
 
-    let (open, close, leading) = matrix_bracket_row(&row).expect("expected a bracket-pair row");
-    assert_eq!(open.ch, '\u{12}');
-    assert_eq!(close.ch, '\u{13}');
+    let (brackets, leading) = matrix_bracket_row(&row).expect("expected a bracket-pair row");
+    assert_eq!(brackets.len(), 1);
+    assert_eq!(brackets[0].0.ch, '\u{12}');
+    assert_eq!(brackets[0].1.ch, '\u{13}');
     assert!(leading.is_empty());
 }
 
@@ -281,9 +282,10 @@ fn a_bracket_pair_row_keeps_its_leading_prose() {
     row.extend(set(" ", 329.33, 211.34, Style::default()));
     row.extend(set("\u{13}", 347.32, 211.34, extensible()));
 
-    let (open, close, leading) = matrix_bracket_row(&row).expect("expected a bracket-pair row");
-    assert_eq!(open.ch, '\u{12}');
-    assert_eq!(close.ch, '\u{13}');
+    let (brackets, leading) = matrix_bracket_row(&row).expect("expected a bracket-pair row");
+    assert_eq!(brackets.len(), 1);
+    assert_eq!(brackets[0].0.ch, '\u{12}');
+    assert_eq!(brackets[0].1.ch, '\u{13}');
     let leading_text: String = leading.iter().map(|c| c.ch).collect();
     assert_eq!(leading_text, "3. Gegeben ist das Vektorfeld ");
 }
@@ -307,6 +309,42 @@ fn a_row_with_content_between_the_brackets_is_not_a_bracket_pair_row() {
 #[test]
 fn a_row_with_only_one_bracket_glyph_is_not_a_bracket_pair_row() {
     let row = set("\u{12}", 100.0, 700.0, extensible());
+    assert_eq!(matrix_bracket_row(&row), None);
+}
+
+// Analysis_2_Blatt12.pdf items 4/5: several independent small matrices
+// share one bracket row, separated only by spaces.
+#[test]
+fn a_row_with_two_bracket_pairs_is_recognized() {
+    let mut row = set("\u{12}", 219.397, 220.271, extensible());
+    row.extend(set(" ", 228.0, 220.271, Style::default()));
+    row.extend(set("\u{13}", 249.866, 220.271, extensible()));
+    row.extend(set(" ", 258.0, 220.271, Style::default()));
+    row.extend(set("\u{12}", 294.546, 220.271, extensible()));
+    row.extend(set(" ", 303.0, 220.271, Style::default()));
+    row.extend(set("\u{13}", 316.562, 220.271, extensible()));
+
+    let (brackets, leading) = matrix_bracket_row(&row).expect("expected a bracket-pair row");
+    assert_eq!(brackets.len(), 2);
+    assert_eq!(brackets[0].0.ch, '\u{12}');
+    assert_eq!(brackets[0].1.ch, '\u{13}');
+    assert_eq!(brackets[1].0.ch, '\u{12}');
+    assert_eq!(brackets[1].1.ch, '\u{13}');
+    assert!(leading.is_empty());
+}
+
+// Real content strictly *between* two bracket pairs (not just within one
+// pair) must also reject the row — the same reasoning
+// `a_row_with_content_between_the_brackets_is_not_a_bracket_pair_row`
+// already establishes for content within one pair.
+#[test]
+fn a_row_with_content_between_two_bracket_pairs_is_not_a_bracket_pair_row() {
+    let mut row = set("\u{12}", 100.0, 700.0, extensible());
+    row.extend(set("\u{13}", 120.0, 700.0, extensible()));
+    row.extend(set("x", 130.0, 700.0, maths_italic()));
+    row.extend(set("\u{12}", 150.0, 700.0, extensible()));
+    row.extend(set("\u{13}", 170.0, 700.0, extensible()));
+
     assert_eq!(matrix_bracket_row(&row), None);
 }
 
@@ -514,6 +552,86 @@ fn a_two_by_two_matrix_becomes_two_pmatrix_columns() {
 
     assert!(
         markdown.contains(r"A = \begin{pmatrix} a_{11} & a_{12} \\ a_{21} & a_{22} \end{pmatrix}."),
+        "got: {markdown}"
+    );
+}
+
+// Reconstructs Analysis_2_Blatt12.pdf item 4's system of equations:
+// `⃗y'(t) = Ay(t) + b(t), mit ⃗y(0) = y₀` with `A=[[1,2],[2,1]]`,
+// `b(t)=[e^{2t},0]ᵀ`, `y₀=[1,-1]ᵀ` — three independent bracket pairs
+// sharing one bracket row, with both content rows holding all three
+// matrices'/vectors' values interleaved. Real captured coordinates
+// throughout (`dump_chars_range`), same reasoning as every other
+// real-document fixture in this file.
+#[test]
+fn a_system_of_equations_with_three_inline_brackets_becomes_three_pmatrices() {
+    use real_char as real;
+
+    let chars = vec![
+        // "⃗y'(t) =" — before bracket 1.
+        real('\u{20d7}', 181.260, 7.364, 203.414, 11.96, Family::Italic),
+        real('y', 181.380, 5.715, 203.414, 11.96, Family::Italic),
+        real('′', 187.524, 2.295, 208.350, 7.97, Family::Symbol),
+        real('(', 190.319, 4.543, 203.414, 11.96, Family::Text),
+        real('t', 194.872, 4.220, 203.414, 11.96, Family::Italic),
+        real(')', 199.099, 4.543, 203.414, 11.96, Family::Text),
+        real(' ', 206.965, 0.000, 203.414, 11.96, Family::Text),
+        real('=', 206.965, 9.098, 203.414, 11.96, Family::Text),
+        // Bracket 1 (A).
+        real('\u{12}', 219.397, 8.799, 220.271, 11.96, Family::Extensible),
+        real('\u{13}', 249.866, 8.799, 220.271, 11.96, Family::Extensible),
+        // A's content: row1 "1 2", row2 "2 1".
+        real('1', 228.198, 5.846, 210.736, 11.96, Family::Text),
+        real('2', 244.003, 5.846, 210.736, 11.96, Family::Text),
+        real('2', 228.198, 5.846, 196.291, 11.96, Family::Text),
+        real('1', 244.003, 5.846, 196.291, 11.96, Family::Text),
+        // "⃗y(t) +" — between bracket 1 and bracket 2.
+        real('\u{20d7}', 260.532, 7.364, 203.414, 11.96, Family::Italic),
+        real('y', 260.652, 5.715, 203.414, 11.96, Family::Italic),
+        real('(', 266.796, 4.543, 203.414, 11.96, Family::Text),
+        real('t', 271.348, 4.220, 203.414, 11.96, Family::Italic),
+        real(')', 275.575, 4.543, 203.414, 11.96, Family::Text),
+        real(' ', 282.772, 0.000, 203.414, 11.96, Family::Text),
+        real('+', 282.772, 9.098, 203.414, 11.96, Family::Text),
+        // Bracket 2 (b(t)).
+        real('\u{12}', 294.546, 8.799, 220.271, 11.96, Family::Extensible),
+        real('\u{13}', 316.562, 8.799, 220.271, 11.96, Family::Extensible),
+        // b(t)'s content: row1 "e^{2t}", row2 "0".
+        real('e', 303.346, 5.416, 210.737, 11.96, Family::Italic),
+        real('2', 308.771, 4.232, 215.075, 7.97, Family::Text),
+        real('t', 313.006, 3.053, 215.075, 7.97, Family::Italic),
+        real('0', 307.027, 5.846, 196.291, 11.96, Family::Text),
+        // "mit ⃗y(0) =" — between bracket 2 and bracket 3.
+        real('m', 339.058, 9.755, 203.414, 11.96, Family::Text),
+        real('i', 348.813, 3.252, 203.414, 11.96, Family::Text),
+        real('t', 352.065, 4.555, 203.414, 11.96, Family::Text),
+        real('\u{20d7}', 368.189, 7.364, 203.414, 11.96, Family::Italic),
+        real('y', 368.309, 5.715, 203.414, 11.96, Family::Italic),
+        real('(', 374.453, 4.543, 203.414, 11.96, Family::Text),
+        real('0', 378.996, 5.846, 203.414, 11.96, Family::Text),
+        real(')', 384.842, 4.543, 203.414, 11.96, Family::Text),
+        real(' ', 392.709, 0.000, 203.414, 11.96, Family::Text),
+        real('=', 392.709, 9.098, 203.414, 11.96, Family::Text),
+        // Bracket 3 (y₀).
+        real('\u{12}', 405.157, 8.799, 220.271, 11.96, Family::Extensible),
+        real('\u{13}', 429.108, 8.799, 220.271, 11.96, Family::Extensible),
+        // y₀'s content: row1 "1", row2 "-1".
+        real('1', 418.606, 5.846, 210.737, 11.96, Family::Text),
+        real('−', 413.957, 9.289, 196.291, 11.96, Family::Symbol),
+        real('1', 423.255, 5.846, 196.291, 11.96, Family::Text),
+        // "." — after bracket 3.
+        real('.', 439.901, 3.252, 203.414, 11.96, Family::Italic),
+    ];
+
+    let markdown = chars_to_markdown(&chars);
+
+    // "mit" renders as `\mathrm{mit}` — existing, unrelated `to_latex`
+    // behavior for a short upright-word run, not something this pass
+    // controls.
+    assert!(
+        markdown.contains(
+            r"⃗y'(t) = \begin{pmatrix} 1 & 2 \\ 2 & 1 \end{pmatrix} ⃗y(t) + \begin{pmatrix} e^{2t} \\ 0 \end{pmatrix} \mathrm{mit} ⃗y(0) = \begin{pmatrix} 1 \\ -1 \end{pmatrix}."
+        ),
         "got: {markdown}"
     );
 }

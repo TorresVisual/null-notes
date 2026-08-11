@@ -2109,38 +2109,52 @@ fn cases_brace_row(row: &[CharBox]) -> Option<(CharBox, Vec<CharBox>)> {
     Some((brace, sorted))
 }
 
-/// The open and close bracket-glyph pair in `row`, and every character
-/// before the open bracket — leading prose like "3. Gegeben ist das
-/// Vektorfeld " (Analysis_2_Blatt5_2026.pdf item 3), kept in place so a
-/// leading phrase stays correctly spaced, the same reasoning
-/// `cases_brace_row` already documents for its own leading text. `None`
-/// unless the row's last printing character is the close bracket and
-/// nothing but whitespace sits between the open and close bracket — the
-/// row's only real content, besides whatever leads the open bracket, is
-/// this one bracket pair.
-pub(super) fn matrix_bracket_row(row: &[CharBox]) -> Option<(CharBox, CharBox, Vec<CharBox>)> {
+/// Every bracket-glyph pair in `row`, left to right, and every character
+/// before the first open bracket — leading prose like "3. Gegeben ist das
+/// Vektorfeld " (Analysis_2_Blatt5_2026.pdf item 3) or "Ordnung: "
+/// (Analysis_2_Blatt12.pdf item 5), kept in place so a leading phrase
+/// stays correctly spaced. `None` unless the row's last printing
+/// character is a close bracket and every printing character from the
+/// first bracket glyph onward is itself a bracket glyph, strictly
+/// alternating open/close/open/close/…, with only whitespace between any
+/// two of them — whether within one pair or between two adjacent pairs
+/// (Analysis_2_Blatt12.pdf items 4/5: three independent small matrices
+/// share one bracket row, separated only by spaces). A single bracket
+/// pair is just the `N = 1` case of this same rule.
+pub(super) fn matrix_bracket_row(row: &[CharBox]) -> Option<(Vec<(CharBox, CharBox)>, Vec<CharBox>)> {
     let mut sorted: Vec<CharBox> = row.to_vec();
     sorted.sort_by(|a, b| a.x.partial_cmp(&b.x).unwrap_or(std::cmp::Ordering::Equal));
 
-    if sorted.iter().filter(|c| latex::bracket_glyph(c) == Some(true)).count() != 1
-        || sorted.iter().filter(|c| latex::bracket_glyph(c) == Some(false)).count() != 1
-    {
+    let bracket_positions: Vec<usize> = sorted
+        .iter()
+        .enumerate()
+        .filter(|(_, c)| latex::bracket_glyph(c).is_some())
+        .map(|(i, _)| i)
+        .collect();
+    if bracket_positions.is_empty() || bracket_positions.len() % 2 != 0 {
         return None;
     }
     let last_printing = sorted.iter().rev().find(|c| !c.ch.is_whitespace())?;
     if latex::bracket_glyph(last_printing) != Some(false) {
         return None;
     }
-    let open_pos = sorted.iter().position(|c| latex::bracket_glyph(c) == Some(true))?;
-    let close_pos = sorted.iter().position(|c| latex::bracket_glyph(c) == Some(false))?;
-    if open_pos >= close_pos || sorted[open_pos + 1..close_pos].iter().any(|c| !c.ch.is_whitespace()) {
-        return None;
+    for (i, &pos) in bracket_positions.iter().enumerate() {
+        if latex::bracket_glyph(&sorted[pos]) != Some(i % 2 == 0) {
+            return None;
+        }
+        if i > 0 {
+            let prev_pos = bracket_positions[i - 1];
+            if sorted[prev_pos + 1..pos].iter().any(|c| !c.ch.is_whitespace()) {
+                return None;
+            }
+        }
     }
 
-    let open = sorted[open_pos];
-    let close = sorted[close_pos];
-    let leading = sorted[..open_pos].to_vec();
-    Some((open, close, leading))
+    let first_pos = bracket_positions[0];
+    let brackets: Vec<(CharBox, CharBox)> =
+        bracket_positions.chunks_exact(2).map(|pair| (sorted[pair[0]], sorted[pair[1]])).collect();
+    let leading = sorted[..first_pos].to_vec();
+    Some((brackets, leading))
 }
 
 /// Finds and reconstructs a piecewise ("cases") function definition: a
@@ -2339,10 +2353,13 @@ fn reconstruct_matrices(rows: Vec<Vec<(usize, CharBox)>>) -> (Vec<Line>, Vec<Vec
         if consumed[bracket_i] {
             continue;
         }
-        let Some((open, close, leading)) = matrix_bracket_row(&plain[bracket_i]) else { continue };
-        let bracket_size = open.font_size.max(1.0);
-        let open_right = open.x + open.width;
-        let close_left = close.x;
+        let Some((brackets, leading)) = matrix_bracket_row(&plain[bracket_i]) else { continue };
+        let bracket_size = brackets[0].0.font_size.max(1.0);
+        // The overall span from the first bracket's own interior to the
+        // last bracket's own interior — content rows are found once and
+        // shared across every bracket, then sliced per-bracket below.
+        let open_right = brackets[0].0.x + brackets[0].0.width;
+        let close_left = brackets[brackets.len() - 1].1.x;
         if open_right >= close_left {
             continue;
         }
@@ -2382,46 +2399,32 @@ fn reconstruct_matrices(rows: Vec<Vec<(usize, CharBox)>>) -> (Vec<Line>, Vec<Vec
                 && row_y(&plain[i]) >= bottom_y
         });
 
-        // A row this pipeline classifies as a bracket glyph is always a
-        // delimiter piece, never real matrix content — stripping it before
-        // rendering handles a delimiter assembled from more than one glyph
-        // (Analysis_2_Blatt7_2026.pdf: a taller pmatrix needs two stacked
-        // half-height pieces per side, and the second piece lands wherever
-        // its own baseline happens to bucket, not necessarily on the
-        // bracket's own row) without needing to model why. For the prefix
-        // row specifically, also restrict to the bracket's own column: that
-        // row's `before`/`after` text sits outside it by definition, and
-        // only characters inside the column are ever this row's own
-        // contribution to the matrix's content.
-        let inside_of = |row_index: usize| -> Vec<(usize, CharBox)> {
-            // The bracket's own physical edges, not the wider
-            // `MATRIX_MAX_COLUMN_GAP` tolerance used to judge whether an
-            // *entire other row* counts as content — that tolerance would
-            // overlap the `before`/`after` zones `before_chars`/
-            // `after_chars` compute from the same `open.x`/`close.x +
-            // close.width` edges, double-counting a character (Analysis_2_-
-            // Blatt7_2026.pdf: the fused row's own "=" sign, ~27pt left of
-            // `open_right`, still fell inside that wider tolerance) as both
-            // prefix and content.
-            let restrict_to_column = Some(row_index) == prefix_i;
+        // A row's contribution to one bracket's own column: bracket-glyph
+        // pieces stripped (a delimiter piece is never real content,
+        // wherever it lands — Analysis_2_Blatt7_2026.pdf's assembled
+        // delimiter), and always restricted to that one bracket's own
+        // physical edges — not the wider `MATRIX_MAX_COLUMN_GAP`
+        // tolerance used to judge whether an entire other row counts as
+        // content at all. With a single bracket this restriction is a
+        // no-op (real content always sits well inside the bracket's own
+        // span); with several brackets sharing one row, every ordinary
+        // content row spans *all* of them, and only this per-bracket
+        // slice is what belongs to any one pmatrix.
+        let inside_of = |row_index: usize, bracket: &(CharBox, CharBox)| -> Vec<(usize, CharBox)> {
             rows[row_index]
                 .iter()
                 .copied()
                 .filter(|(_, c)| latex::bracket_glyph(c).is_none())
-                .filter(|(_, c)| !restrict_to_column || (c.x >= open.x && c.x <= close.x + close.width))
+                .filter(|(_, c)| c.x >= bracket.0.x && c.x <= bracket.1.x + bracket.1.width)
                 .collect()
         };
 
         // The prefix row can also carry real matrix content on the same
-        // baseline — Analysis_2_Blatt7_2026.pdf's assembled delimiter lands
-        // its second piece glued directly to the prefix line, immediately
-        // touching that row's own content (`⃗v(x, y, z) = [piece]x + 2y²[piece]`).
-        // When that happens, this row is both the prefix *and* one more
-        // content row, so it's folded into `content_candidates` at its
-        // sorted position rather than only ever contributing text outside
-        // the bracket.
+        // baseline (Analysis_2_Blatt7_2026.pdf's assembled delimiter) —
+        // checked against every bracket's own column, since any one of
+        // them might be the one whose second piece landed here.
         if let Some(pi) = prefix_i {
-            if !inside_of(pi).is_empty() {
+            if brackets.iter().any(|b| !inside_of(pi, b).is_empty()) {
                 content_candidates.push(pi);
                 content_candidates.sort_by(|&a, &b| {
                     row_y(&plain[b]).partial_cmp(&row_y(&plain[a])).unwrap_or(std::cmp::Ordering::Equal)
@@ -2431,90 +2434,117 @@ fn reconstruct_matrices(rows: Vec<Vec<(usize, CharBox)>>) -> (Vec<Line>, Vec<Vec
 
         // A genuine matrix's own content rows are simple algebraic
         // expressions — every real example in the corpus lacks big
-        // operators of its own. A candidate row carrying an
-        // Extensible-family character that isn't a bracket-piece glyph
-        // (already stripped by `inside_of`, but checked here against the
-        // raw row) belongs to some other maths construct that merely
-        // shares this bracket's x/y tolerance band — the same
-        // false-positive risk `TABLE_MATHS_GUARD_RATIO` exists to catch for
-        // `reconstruct_tables`. Found on Ue9.pdf Beispiel 9.3: the
-        // inclusion-exclusion formula's own large `\left(\right)`
-        // delimiter (assembled from four glyph pieces, taller even than
-        // Blatt7_2026's two-piece case) was swallowing the formula's
-        // nested Σ operators and their sub/superscript limit rows as if
-        // they were matrix rows. Bailing out entirely (rather than only
-        // dropping the offending row) is deliberate: a "matrix" that
-        // claims a big operator as one of its own rows isn't a matrix,
-        // and guessing which of its rows to keep would be exactly the
-        // kind of forced fix this pipeline's own practice warns against.
+        // operators of its own. Found on Ue9.pdf Beispiel 9.3: an
+        // unrelated tall delimiter wrapping a nested formula is
+        // geometrically indistinguishable from a real matrix's bracket
+        // row. Bailing out entirely (rather than only dropping the
+        // offending row) is deliberate: a "matrix" that claims a big
+        // operator as one of its own rows isn't a matrix, and guessing
+        // which of its rows to keep would be exactly the kind of forced
+        // fix this pipeline's own practice warns against.
         if content_candidates.iter().any(|&i| {
             plain[i].iter().any(|c| c.family == Family::Extensible && latex::bracket_glyph(c).is_none())
         }) {
             continue;
         }
 
-        let content_rows: Vec<Vec<(usize, CharBox)>> =
-            content_candidates.iter().map(|&ci| inside_of(ci)).collect();
-        let content_plain: Vec<Vec<CharBox>> =
-            content_rows.iter().map(|row| row.iter().map(|(_, c)| *c).collect()).collect();
-        let cut_xs = table_gutters(&content_plain).filter(|cuts| {
-            !cuts.is_empty()
-                && content_plain.iter().all(|row| !row_crosses_gutters(row, cuts))
-                && content_rows.iter().all(|row| {
-                    split_row_into_cells(row, cuts).iter().filter(|c| cell_has_content(c)).count()
-                        == cuts.len() + 1
-                })
-        });
-
-        let row_lines: Vec<String> = content_rows
-            .iter()
-            .map(|row| match &cut_xs {
-                Some(cuts) => split_row_into_cells(row, cuts)
-                    .into_iter()
-                    .map(|cell| {
-                        let mut cell_chars: Vec<CharBox> = cell.into_iter().map(|(_, c)| c).collect();
-                        cell_chars.sort_by(|a, b| a.x.partial_cmp(&b.x).unwrap_or(std::cmp::Ordering::Equal));
-                        latex::to_latex(&cell_chars)
+        // Each bracket gets its own pmatrix, built from the shared
+        // content rows sliced down to that bracket's own column — the
+        // same single-bracket column-splitting algorithm as before, run
+        // once per bracket, so a 2-column matrix and two 1-column vectors
+        // sharing the same rows each get their own independent split.
+        let mut pmatrices: Vec<String> = Vec::with_capacity(brackets.len());
+        let mut x = brackets[0].0.x;
+        let mut right = brackets[brackets.len() - 1].1.x + brackets[brackets.len() - 1].1.width;
+        for bracket in &brackets {
+            let content_rows: Vec<Vec<(usize, CharBox)>> =
+                content_candidates.iter().map(|&ci| inside_of(ci, bracket)).collect();
+            let content_plain: Vec<Vec<CharBox>> =
+                content_rows.iter().map(|row| row.iter().map(|(_, c)| *c).collect()).collect();
+            let cut_xs = table_gutters(&content_plain).filter(|cuts| {
+                !cuts.is_empty()
+                    && content_plain.iter().all(|row| !row_crosses_gutters(row, cuts))
+                    && content_rows.iter().all(|row| {
+                        split_row_into_cells(row, cuts).iter().filter(|c| cell_has_content(c)).count()
+                            == cuts.len() + 1
                     })
-                    .collect::<Vec<_>>()
-                    .join(" & "),
-                None => {
-                    let mut row_chars: Vec<CharBox> = row.iter().map(|(_, c)| *c).collect();
-                    row_chars.sort_by(|a, b| a.x.partial_cmp(&b.x).unwrap_or(std::cmp::Ordering::Equal));
-                    latex::to_latex(&row_chars)
-                }
-            })
-            .collect();
+            });
 
-        let (mut before_chars, mut after_chars): (Vec<CharBox>, Vec<CharBox>) = match prefix_i {
-            Some(pi) => (
-                plain[pi]
-                    .iter()
-                    .copied()
-                    .filter(|c| c.x < open.x && latex::bracket_glyph(c).is_none())
-                    .collect(),
-                plain[pi]
-                    .iter()
-                    .copied()
-                    .filter(|c| c.x > close.x + close.width && latex::bracket_glyph(c).is_none())
-                    .collect(),
-            ),
-            None => (Vec::new(), Vec::new()),
+            let row_lines: Vec<String> = content_rows
+                .iter()
+                .map(|row| match &cut_xs {
+                    Some(cuts) => split_row_into_cells(row, cuts)
+                        .into_iter()
+                        .map(|cell| {
+                            let mut cell_chars: Vec<CharBox> = cell.into_iter().map(|(_, c)| c).collect();
+                            cell_chars.sort_by(|a, b| a.x.partial_cmp(&b.x).unwrap_or(std::cmp::Ordering::Equal));
+                            latex::to_latex(&cell_chars)
+                        })
+                        .collect::<Vec<_>>()
+                        .join(" & "),
+                    None => {
+                        let mut row_chars: Vec<CharBox> = row.iter().map(|(_, c)| *c).collect();
+                        row_chars.sort_by(|a, b| a.x.partial_cmp(&b.x).unwrap_or(std::cmp::Ordering::Equal));
+                        latex::to_latex(&row_chars)
+                    }
+                })
+                .collect();
+
+            for row in &content_plain {
+                let (x0, x1) = row_x_extent(row);
+                x = x.min(x0);
+                right = right.max(x1);
+            }
+
+            pmatrices.push(format!("\\begin{{pmatrix}} {} \\end{{pmatrix}}", row_lines.join(" \\\\ ")));
+        }
+
+        // The prefix splits into one fragment more than there are
+        // brackets: before the first, between each adjacent pair, and
+        // after the last — generalizing the single-bracket before/after
+        // split the same way.
+        let fragments: Vec<String> = if let Some(pi) = prefix_i {
+            // Strict inequalities at both ends, matching exactly what the
+            // single-bracket `before`/`after` split used (`c.x < open.x`,
+            // `c.x > close.x + close.width`) — `w == 0`/`w == brackets.len()`
+            // carry no bound at all on that side, rather than an inclusive
+            // one, so this degrades to byte-identical behavior at `N = 1`.
+            (0..=brackets.len())
+                .map(|w| {
+                    let mut fragment_chars: Vec<CharBox> = plain[pi]
+                        .iter()
+                        .copied()
+                        .filter(|c| {
+                            let after_prev =
+                                w == 0 || c.x > brackets[w - 1].1.x + brackets[w - 1].1.width;
+                            let before_next = w == brackets.len() || c.x < brackets[w].0.x;
+                            after_prev && before_next && latex::bracket_glyph(c).is_none()
+                        })
+                        .collect();
+                    fragment_chars.sort_by(|a, b| a.x.partial_cmp(&b.x).unwrap_or(std::cmp::Ordering::Equal));
+                    latex::to_latex(&fragment_chars)
+                })
+                .collect()
+        } else {
+            vec![String::new(); brackets.len() + 1]
         };
-        before_chars.sort_by(|a, b| a.x.partial_cmp(&b.x).unwrap_or(std::cmp::Ordering::Equal));
-        after_chars.sort_by(|a, b| a.x.partial_cmp(&b.x).unwrap_or(std::cmp::Ordering::Equal));
-        let before_latex = latex::to_latex(&before_chars);
-        let after_latex = latex::to_latex(&after_chars);
 
         let mut latex = String::new();
-        if !before_latex.is_empty() {
-            latex.push_str(&before_latex);
-            latex.push(' ');
+        for (i, pmatrix) in pmatrices.iter().enumerate() {
+            let frag = &fragments[i];
+            if !frag.is_empty() {
+                if i > 0 {
+                    latex.push(' ');
+                }
+                latex.push_str(frag);
+                latex.push(' ');
+            }
+            latex.push_str(pmatrix);
         }
-        latex.push_str("\\begin{pmatrix} ");
-        latex.push_str(&row_lines.join(" \\\\ "));
-        latex.push_str(" \\end{pmatrix}");
-        latex.push_str(&after_latex);
+        let last_frag = &fragments[brackets.len()];
+        if !last_frag.is_empty() {
+            latex.push_str(last_frag);
+        }
 
         let mut content: Vec<Inline> = Vec::new();
         let leading_text: String = leading.iter().map(|c| c.ch).collect();
@@ -2534,13 +2564,6 @@ fn reconstruct_matrices(rows: Vec<Vec<(usize, CharBox)>>) -> (Vec<Line>, Vec<Vec
         });
 
         let base_size = prefix_i.map(|pi| row_font_size(&plain[pi])).unwrap_or(bracket_size).max(1.0);
-        let mut x = open.x;
-        let mut right = close.x + close.width;
-        for row in &content_plain {
-            let (x0, x1) = row_x_extent(row);
-            x = x.min(x0);
-            right = right.max(x1);
-        }
         if let Some(leading_x0) =
             leading.iter().map(|c| c.x).fold(None, |acc: Option<f32>, v| Some(acc.map_or(v, |a| a.min(v))))
         {
