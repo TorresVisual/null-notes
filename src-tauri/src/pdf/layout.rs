@@ -1825,6 +1825,23 @@ fn list_marker(text: &str) -> Option<Marker> {
         }
     }
 
+    // "a)" / "iv)" — the same sub-part convention as "(a)", without the
+    // parens some sheets omit.
+    if first.is_ascii_alphabetic() {
+        let letters = rest.iter().take_while(|c| c.is_ascii_alphabetic()).count();
+        if letters > 0
+            && letters <= 4
+            && rest.get(letters) == Some(&')')
+            && rest.get(letters + 1).is_some_and(|c| c.is_whitespace())
+        {
+            return Some(Marker {
+                ordered: true,
+                number: None,
+                len: leading + letters + 2,
+            });
+        }
+    }
+
     None
 }
 

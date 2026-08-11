@@ -1062,6 +1062,30 @@ fn a_heading_resets_running_list_numbering() {
 }
 
 #[test]
+fn a_bare_letter_marker_becomes_a_list_item() {
+    let mut chars = page(&["Answer each of the parts below in turn."]);
+    chars.extend(set("a) the first part", 72.0, 660.0, Style::default()));
+    chars.extend(set("b) the second part", 72.0, 648.0, Style::default()));
+    chars.extend(set("c) the third part", 72.0, 636.0, Style::default()));
+
+    let markdown = chars_to_markdown(&chars);
+
+    assert!(markdown.contains("1. the first part"), "got: {markdown}");
+    assert!(markdown.contains("2. the second part"), "got: {markdown}");
+    assert!(markdown.contains("3. the third part"), "got: {markdown}");
+    assert!(!markdown.contains("a) the first part"), "marker survived: {markdown}");
+}
+
+// "Solution) ..." is a real word directly followed by a parenthesis, not
+// this convention's marker — the length cap (matching the existing "(a)"
+// form's own cap) keeps an 8-letter word from being mistaken for one.
+#[test]
+fn a_long_word_directly_followed_by_a_parenthesis_does_not_start_a_list() {
+    let markdown = chars_to_markdown(&page(&["Solution) this stays prose"]));
+    assert!(markdown.starts_with("Solution)"), "got: {markdown}");
+}
+
+#[test]
 fn a_standalone_accent_glyph_recomposes_with_its_letter() {
     // Computer Modern prints "für" as u + a separate diaeresis positioned
     // over it, which arrives as "fu¨r" unless it is put back together.
