@@ -2001,7 +2001,18 @@ pub fn group_blocks(lines: &[Line]) -> Vec<Block> {
     }
 
     let body = body_size_of(&lines);
-    let left_margin = lines.iter().map(|l| l.x).fold(f32::INFINITY, f32::min);
+    // The median, not the minimum: a single outlier line sets the minimum
+    // for the whole region, and a numbered heading like "12. Übungsblatt" is
+    // exactly that — LaTeX's enumerate right-aligns marker digits within a
+    // fixed-width label box, so a two-digit marker's glyph starts measurably
+    // further left than every one-digit exercise marker below it, though
+    // none of them are actually nested under it. Found on
+    // Analysis_2_Blatt12.pdf: that ~1.2em gap alone was enough to misread
+    // every exercise as one nesting level deep. The median tracks the
+    // region's dominant left edge instead of whatever single line happens to
+    // reach furthest left.
+    let mut xs: Vec<f32> = lines.iter().map(|l| l.x).collect();
+    let left_margin = median(&mut xs);
 
     let mut gaps: Vec<f32> = lines
         .windows(2)
@@ -2886,6 +2897,42 @@ fn render_content(content: &[Inline]) -> String {
     out
 }
 
+/// Which indent level, if any, a non-`ListItem` block needs so it stays
+/// inside the list it visually sits between. CommonMark closes a list at
+/// the first unindented line, so a display equation (or any other block)
+/// sitting unindented between a digit item and its deeper lettered
+/// sub-parts — the shape a problem statement followed by its equation then
+/// takes — closes the list before the sub-parts' own indent ever gets a
+/// chance to nest under it; downstream, that stray indent reads as an
+/// indented code block instead. Indenting the run of blocks between two
+/// list items to the *later* item's depth only when that depth actually
+/// increased keeps the common same-depth case (an equation and follow-up
+/// prose between two ordinary exercises) untouched — see
+/// docs/specs/pdf-intervening-block-indent-design.md.
+fn intervening_block_indent(blocks: &[Block]) -> Vec<usize> {
+    let mut indent = vec![0usize; blocks.len()];
+    let mut i = 0;
+    while i < blocks.len() {
+        let Block::ListItem { depth, .. } = &blocks[i] else {
+            i += 1;
+            continue;
+        };
+        let mut j = i + 1;
+        while j < blocks.len() && !matches!(blocks[j], Block::ListItem { .. } | Block::Heading { .. }) {
+            j += 1;
+        }
+        if let Some(Block::ListItem { depth: next_depth, .. }) = blocks.get(j) {
+            if next_depth > depth {
+                for slot in indent.iter_mut().take(j).skip(i + 1) {
+                    *slot = *next_depth;
+                }
+            }
+        }
+        i = j;
+    }
+    indent
+}
+
 /// Renders blocks to Markdown, equations included: `$…$` inline, and a
 /// display equation as its own block delimited by a lone `$` on its own
 /// line before and after — not the more common `$$…$$` — because that is
@@ -2956,6 +3003,22 @@ pub fn blocks_to_markdown(blocks: &[Block]) -> String {
             }
         }
     }
+
+    // ListItem already indents itself via its own `depth`; every other
+    // block type renders at column 0 and needs this pass to stay inside
+    // whatever list it sits between.
+    for (idx, level) in intervening_block_indent(blocks).into_iter().enumerate() {
+        if level == 0 || matches!(blocks[idx], Block::ListItem { .. }) {
+            continue;
+        }
+        let indent = "    ".repeat(level);
+        parts[idx] = parts[idx]
+            .lines()
+            .map(|line| format!("{indent}{line}"))
+            .collect::<Vec<_>>()
+            .join("\n");
+    }
+
     let mut out = parts.join("\n\n");
     if !out.is_empty() {
         out.push('\n');

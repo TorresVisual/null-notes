@@ -1079,6 +1079,65 @@ fn a_heading_resets_running_list_numbering() {
     assert_eq!(markdown.matches("2. second").count(), 2, "got: {markdown}");
 }
 
+// The real shape on Analysis_2_Blatt12.pdf's exercise 6: a digit item, a
+// display equation, then lettered sub-parts at the same geometric x as the
+// digit item (so they get force-nested one level deeper). Confirmed via a
+// live editor round-trip (mathBetweenListItems.test.ts) that an unindented
+// equation here closes the list and the sub-parts land in a codeBlock
+// instead of nesting — this is the fix.
+#[test]
+fn an_equation_between_a_digit_item_and_its_deeper_sub_parts_is_indented_to_match() {
+    let mut chars = page(&["Answer the following."]);
+    chars.extend(set("6. Solve the system:", 72.0, 660.0, Style::default()));
+    chars.extend(set("y = 1", 200.0, 636.0, maths()));
+    chars.extend(set("(a) find the fixed points", 72.0, 612.0, Style::default()));
+    chars.extend(set("(b) classify each one", 72.0, 600.0, Style::default()));
+
+    let markdown = chars_to_markdown(&chars);
+
+    assert!(markdown.contains("    $\n    y = 1\n    $"), "got: {markdown}");
+    assert!(markdown.contains("    1. find the fixed points"), "got: {markdown}");
+    assert!(markdown.contains("    2. classify each one"), "got: {markdown}");
+}
+
+// The other real shape on the same sheet: an equation and follow-up prose
+// between two ordinary, same-depth exercises. Must stay flat, or the second
+// exercise would misnest under the first.
+#[test]
+fn an_equation_between_two_same_depth_digit_items_is_not_indented() {
+    let mut chars = page(&["Two problems in a row."]);
+    chars.extend(set("3. First problem:", 72.0, 660.0, Style::default()));
+    chars.extend(set("y = 1", 200.0, 636.0, maths()));
+    chars.extend(set("Some follow-up prose.", 72.0, 612.0, Style::default()));
+    chars.extend(set("4. Second problem", 72.0, 588.0, Style::default()));
+
+    let markdown = chars_to_markdown(&chars);
+
+    assert!(markdown.contains("$\ny = 1\n$"), "got: {markdown}");
+    assert!(!markdown.contains("    $\n    y = 1\n    $"), "got: {markdown}");
+    assert!(markdown.contains("Some follow-up prose."), "got: {markdown}");
+    assert!(!markdown.contains("    Some follow-up prose."), "got: {markdown}");
+}
+
+// A heading always ends a list (assign_list_numbers's own reset rule) — but
+// depth itself is computed geometrically, independent of that reset, so a
+// genuinely indented item after a heading can still read as deeper than
+// whatever list item preceded the heading. The intervening equation must
+// not be indented across that heading either.
+#[test]
+fn a_heading_between_a_list_item_and_a_deeper_item_prevents_indenting() {
+    let mut chars = page(&["Two unrelated sections."]);
+    chars.extend(set("• outer bullet", 72.0, 660.0, Style::default()));
+    chars.extend(set("y = 1", 200.0, 636.0, maths()));
+    chars.extend(set("Unrelated Heading", 72.0, 612.0, Style { size: 15.0, ..Style::default() }));
+    chars.extend(set("• inner bullet", 72.0 + 2.0 * BODY, 588.0, Style::default()));
+
+    let markdown = chars_to_markdown(&chars);
+
+    assert!(markdown.contains("$\ny = 1\n$"), "got: {markdown}");
+    assert!(!markdown.contains("    $\n    y = 1\n    $"), "got: {markdown}");
+}
+
 #[test]
 fn a_bare_letter_marker_becomes_a_list_item() {
     let mut chars = page(&["Answer each of the parts below in turn."]);
