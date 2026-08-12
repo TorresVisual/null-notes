@@ -504,7 +504,7 @@ fn a_two_row_vector_becomes_one_pmatrix() {
     // content itself rather than assuming a particular `$` placement.
     assert!(
         markdown.contains(
-            r"⃗v(x, y) = \begin{pmatrix} 3x^2 - 3y^2 + 2x + 2y \\ -6xy + 2x - 2y \end{pmatrix}."
+            r"\vec{v}(x, y) = \begin{pmatrix} 3x^2 - 3y^2 + 2x + 2y \\ -6xy + 2x - 2y \end{pmatrix}."
         ),
         "got: {markdown}"
     );
@@ -630,7 +630,7 @@ fn a_system_of_equations_with_three_inline_brackets_becomes_three_pmatrices() {
     // controls.
     assert!(
         markdown.contains(
-            r"⃗y'(t) = \begin{pmatrix} 1 & 2 \\ 2 & 1 \end{pmatrix} ⃗y(t) + \begin{pmatrix} e^{2t} \\ 0 \end{pmatrix} \mathrm{mit} ⃗y(0) = \begin{pmatrix} 1 \\ -1 \end{pmatrix}."
+            r"\vec{y}'(t) = \begin{pmatrix} 1 & 2 \\ 2 & 1 \end{pmatrix} \vec{y}(t) + \begin{pmatrix} e^{2t} \\ 0 \end{pmatrix} \mathrm{mit} \vec{y}(0) = \begin{pmatrix} 1 \\ -1 \end{pmatrix}."
         ),
         "got: {markdown}"
     );
@@ -689,7 +689,7 @@ fn an_assembled_delimiter_vector_with_a_fused_prefix_row_becomes_one_pmatrix() {
     let markdown = chars_to_markdown(&chars);
 
     assert!(
-        markdown.contains(r"⃗v(x, y, z) = \begin{pmatrix} x + y \\ x + 2y^2 \\ yz \end{pmatrix}"),
+        markdown.contains(r"\vec{v}(x, y, z) = \begin{pmatrix} x + y \\ x + 2y^2 \\ yz \end{pmatrix}"),
         "got: {markdown}"
     );
 }
@@ -1507,6 +1507,35 @@ fn an_operator_name_touching_its_variable_with_no_space_is_still_absorbed() {
     }
 }
 
+// Found on Analysis_2_Blatt5_2026.pdf: "Potenzialfunktion Φ(x, y)" left Φ
+// stranded as plain prose — TeX sets an upright Greek capital like Φ in the
+// same upright text font prose uses, and with *no* space glyph between the
+// German word and the symbol (unlike the "log"/"n" case above, which at
+// least has real word gaps elsewhere), the fixed known-operator-name list's
+// backward word scan can't isolate Φ as its own run at all: `is_alphabetic`
+// makes no distinction between the two, so a lone-symbol check has to peel
+// it off one character at a time instead of matching a whole word.
+#[test]
+fn a_lone_greek_symbol_touching_its_word_is_still_absorbed() {
+    let mut chars = set("Potenzialfunktion", 150.0, 700.0, Style::default());
+    // Directly against "Potenzialfunktion" — zero gap, the case that broke.
+    chars.extend(set("\u{3a6}", 215.0, 700.0, Style::default()));
+    chars.extend(set("(x, y)", 220.0, 700.0, maths_italic()));
+
+    let lines = group_lines(&chars);
+
+    let regions: Vec<_> = lines[0]
+        .content
+        .iter()
+        .filter(|i| matches!(i, Inline::Maths(_)))
+        .collect();
+    assert_eq!(regions.len(), 1, "expected one region, got {:?}", lines[0].content);
+    if let Inline::Maths(latex) = regions[0] {
+        assert!(latex.contains("\\Phi"), "got: {latex}");
+    }
+    assert!(lines[0].text().contains("Potenzialfunktion"), "prose lost: {}", lines[0].text());
+}
+
 // Found on Assignment10_DA.pdf: two single-letter maths variables close
 // enough in x for `MATHS_BRIDGE_EMS` to bridge — but the word sitting
 // between them is ordinary prose ("to"), not an operator name, and must
@@ -1678,6 +1707,29 @@ fn a_numerator_and_denominator_on_separate_lines_become_one_fraction() {
     assert!(markdown.contains(r"\frac{a + b}{c + d}"), "got: {markdown}");
 }
 
+// A big operator's limit (`\iiint_K`) is geometrically the same shape as a
+// bar-less fraction: an operator row stacked above a limit row, both
+// straddled by a baseline. Found on a real sheet reconstructing as
+// `\frac{\int\int\int}{K}` instead — `find_stacked_pair` must not let a
+// big-operator-only row act as a fraction's numerator.
+#[test]
+fn a_big_operator_stacked_over_its_limit_becomes_a_subscript_not_a_fraction() {
+    let mut chars = set("\u{222b}\u{222b}\u{222b}", 300.0, 700.0, extensible());
+    // "M =" and "a + b" sit far enough apart to read as two separate maths
+    // regions on the same baseline — the shape a real equation's own prefix
+    // and integrand take (`M =` ... `(y + 1)dxdydz.`), which is what lets
+    // the operator's subscript splice in between them rather than only at
+    // the row's end.
+    chars.extend(set("M =", 250.0, 690.0, maths_italic()));
+    chars.extend(set("a + b", 300.0, 690.0, maths_italic()));
+    chars.extend(set("K", 305.0, 680.0, maths_italic()));
+
+    let markdown = chars_to_markdown(&chars);
+
+    assert!(markdown.contains(r"M = \iiint_{K} a + b"), "got: {markdown}");
+    assert!(!markdown.contains("\\frac"), "misread as a fraction: {markdown}");
+}
+
 // Trailing content beside a fraction ("dz" after an integral) sits close to
 // the fraction's own column and can extend past its right edge — but it
 // never *starts* before the fraction the way a real baseline prefix
@@ -1742,7 +1794,7 @@ fn a_baseline_shaped_line_is_never_mistaken_for_the_other_half_of_a_fraction() {
 fn a_binom_flanked_pair_of_lines_is_not_mistaken_for_a_bare_fraction() {
     // Ordinary paragraph text elsewhere, for the same reason
     // a_baseline_shaped_line_is_never_mistaken_for_the_other_half_of_a_fraction
-    // needs it: find_fraction_pair scopes pairing to one paragraph using a
+    // needs it: find_stacked_pair scopes pairing to one paragraph using a
     // *median* line gap, and the delimiter row is itself an extra line that
     // feeds that median. Placing it 20pt above the numerator (matching the
     // numerator-denominator gap itself, rather than an arbitrary smaller

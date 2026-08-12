@@ -210,6 +210,19 @@ fn render(chars: &[CharBox], base_size: f32, base_y: f32) -> String {
             continue;
         }
 
+        // A vector arrow (Computer Modern draws \vec by placing the
+        // combining right-arrow accent U+20D7 directly before its base
+        // letter, not after — the opposite of Unicode's own convention, and
+        // with no precomposed codepoint for layout.rs's `combining_form` to
+        // fall back on) has to be recognised before the per-character path
+        // too: unhandled, it renders as the literal accent character glued
+        // onto the letter it belongs over ("⃗v" instead of "\vec{v}").
+        if chars[index].ch == '\u{20D7}' && index + 1 < chars.len() {
+            push_latex(&mut out, &format!("\\vec{{{}}}", glyph(&chars[index + 1])));
+            index += 2;
+            continue;
+        }
+
         // A radical swallows the rest of the region, so it has to be handled
         // before the per-character path.
         if is_radical(&chars[index]) && RADICAL_TAKES_REST {
@@ -496,7 +509,7 @@ fn glyph(ch: &CharBox) -> String {
 ///
 /// The text layer hands over real Unicode for most symbols, so this is a
 /// translation rather than a guess.
-fn symbol_command(ch: char) -> Option<&'static str> {
+pub(super) fn symbol_command(ch: char) -> Option<&'static str> {
     Some(match ch {
         // Relations
         '→' | '⟶' => "\\to",
@@ -813,6 +826,19 @@ mod tests {
         assert_eq!(to_latex(&run("∈", Family::Symbol)), r"\in");
         assert_eq!(to_latex(&run("≤", Family::Symbol)), r"\leq");
         assert_eq!(to_latex(&run("α", Family::Italic)), r"\alpha");
+    }
+
+    // Computer Modern draws \vec by placing the combining right-arrow accent
+    // (U+20D7) directly *before* its base letter — confirmed on
+    // Analysis_2_Blatt5_2026.pdf's own char stream — the opposite of
+    // Unicode's own convention, and with no precomposed codepoint the way
+    // layout.rs's `combining_form` has for "ü". Unhandled, it rendered as
+    // the literal accent glued onto the letter it belongs over: "⃗v" instead
+    // of "\vec{v}".
+    #[test]
+    fn a_vector_arrow_accent_becomes_vec() {
+        let chars = run("\u{20D7}v", Family::Italic);
+        assert_eq!(to_latex(&chars), r"\vec{v}");
     }
 
     // Found against a real document: "αf+βg" rendered as `\alphaf+\betag` —

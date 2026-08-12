@@ -620,7 +620,7 @@ pub(super) fn baseline_label(row: &[CharBox]) -> String {
 /// Consumes rows nearest-baseline-first: every row is examined once as a
 /// potential connector baseline, and whichever still-unconsumed numerator
 /// and denominator row match it (by vertical gap and horizontal overlap,
-/// the same tolerances `find_fraction_pair` uses) are claimed.
+/// the same tolerances `find_stacked_pair` uses) are claimed.
 ///
 /// Returns the finished `Line`s for whatever matched, and every row that
 /// didn't — for the caller to run through the normal `build_line` path.
@@ -1522,6 +1522,23 @@ fn operator_word_ending_at(row: &[CharBox], end: usize) -> Option<usize> {
         .then_some(start)
 }
 
+/// Whether `ch` is a lone symbol character that carries its own known LaTeX
+/// command (an upright Greek capital like `Φ`, which TeX sets in the same
+/// upright text font as prose rather than the maths-italic face a lower-case
+/// Greek variable gets) — bridgeable into an adjacent maths region one
+/// character at a time, unlike [`operator_word_at`]/[`operator_word_ending_at`],
+/// which match a whole *word* against a fixed list. Restricted to non-ASCII:
+/// `symbol_command` maps no ASCII letter, so this can never fire on an
+/// ordinary Latin word — including one that happens to end right where a
+/// bridgeable symbol begins with no space glyph between them, which would
+/// otherwise make `operator_word_ending_at`'s backward-alphabetic scan run
+/// straight through the symbol into the whole preceding prose word (found on
+/// Analysis_2_Blatt5_2026.pdf: `\Phi(x, y)` — no space character separates
+/// "Potenzialfunktion" from `Φ` in the text layer at all).
+fn is_bridgeable_symbol(ch: char) -> bool {
+    !ch.is_ascii() && latex::symbol_command(ch).is_some()
+}
+
 /// Whether every alphabetic run strictly between `from` and `to` (both
 /// indices into `row`) is a whole, known operator name — i.e. whether the
 /// stretch between two nearby maths seeds is safe to fuse into one run.
@@ -1593,6 +1610,10 @@ fn maths_runs(row: &[CharBox], font_size: f32) -> Vec<(usize, usize)> {
     };
     for run in &mut runs {
         while run.0 > 0 && gap_ok(run.0 - 1, run.0) {
+            if is_bridgeable_symbol(row[run.0 - 1].ch) {
+                run.0 -= 1;
+                continue;
+            }
             if row[run.0 - 1].ch.is_alphabetic() {
                 // An upright word is normally where an equation ends — but
                 // "cos" in "cos(z)" is a known operator name, set upright,
@@ -1626,6 +1647,10 @@ fn maths_runs(row: &[CharBox], font_size: f32) -> Vec<(usize, usize)> {
             run.0 -= 1;
         }
         while run.1 < row.len() && gap_ok(run.1 - 1, run.1) {
+            if is_bridgeable_symbol(row[run.1].ch) {
+                run.1 += 1;
+                continue;
+            }
             if row[run.1].ch.is_alphabetic() {
                 // The forward-growth counterpart of the operator-name case
                 // above — "log" in "O(m log n)".
@@ -3028,7 +3053,8 @@ pub fn blocks_to_markdown(blocks: &[Block]) -> String {
 
 /// The whole pipeline: characters in, Markdown out.
 pub fn chars_to_markdown(chars: &[CharBox]) -> String {
-    blocks_to_markdown(&group_blocks(&reconstruct_fractions(group_lines(chars))))
+    let lines = reconstruct_fractions(reconstruct_operator_limits(group_lines(chars)));
+    blocks_to_markdown(&group_blocks(&lines))
 }
 
 /// One page image, ready to be interleaved into reading order. `left`/
@@ -3070,7 +3096,8 @@ pub fn chars_and_images_to_markdown(chars: &[CharBox], images: &[ImageRef]) -> S
         ends_hyphenated: false,
     }));
     lines.sort_by(|a, b| b.y.partial_cmp(&a.y).unwrap_or(std::cmp::Ordering::Equal));
-    blocks_to_markdown(&group_blocks(&reconstruct_fractions(lines)))
+    let lines = reconstruct_fractions(reconstruct_operator_limits(lines));
+    blocks_to_markdown(&group_blocks(&lines))
 }
 
 // How far apart (in multiples of the larger line's font size) two maths-only
@@ -3164,15 +3191,16 @@ fn is_single_region(line: &Line) -> bool {
 }
 
 /// The closest vertically-stacked, horizontally-overlapping pair of
-/// single-region maths lines still left to reconstruct, read as (numerator
-/// index, denominator index).
+/// single-region maths lines still left to reconstruct, read as (top index,
+/// bottom index) — a fraction's (numerator, denominator) or a big operator's
+/// (operator, limit), depending on `top_ok`.
 ///
 /// Pairing is scoped to one paragraph: without that, a generous vertical
 /// window meant to span a fraction's own numerator/baseline/denominator rows
 /// just as easily reaches across an actual paragraph break to the *next*
 /// exercise's own equation, pairing unrelated content — found happening
 /// exactly that way on the real document this was built against.
-fn find_fraction_pair(lines: &[Line]) -> Option<(usize, usize)> {
+fn find_stacked_pair(lines: &[Line], top_ok: impl Fn(&Line) -> bool) -> Option<(usize, usize)> {
     let mut gaps: Vec<f32> = lines
         .windows(2)
         .map(|w| (w[0].y - w[1].y).abs())
@@ -3181,7 +3209,7 @@ fn find_fraction_pair(lines: &[Line]) -> Option<(usize, usize)> {
 
     let mut best: Option<(usize, usize, f32)> = None;
     for i in 0..lines.len() {
-        if !is_single_region(&lines[i]) {
+        if !is_single_region(&lines[i]) || !top_ok(&lines[i]) {
             continue;
         }
         for j in (i + 1)..lines.len() {
@@ -3226,7 +3254,8 @@ fn find_fraction_pair(lines: &[Line]) -> Option<(usize, usize)> {
 }
 
 /// Inserts `frac` into a baseline line's own content, at the gap that its
-/// numerator and denominator were found to leave — see [`reconstruct_fractions`].
+/// numerator and denominator were found to leave — see
+/// [`reconstruct_stacked_pairs`].
 ///
 /// Best-effort rather than exact: a baseline's `Vec<Inline>` carries no
 /// per-piece position, only the order pieces were assembled in, so the split
@@ -3246,12 +3275,62 @@ fn splice_into_baseline(line: &mut Line, frac: Inline) {
     line.content.insert(insert_at, frac);
 }
 
-/// Reconstructs a bar-less fraction: the vinculum LaTeX draws between a
-/// numerator and denominator is a graphics path, not a character, so it is
-/// invisible to the text layer and the two arrive as separate lines with
-/// nothing connecting them. Detected by geometry alone — vertical stacking
-/// and horizontal column overlap between two otherwise-unrelated maths-only
+/// The big-operator LaTeX commands `latex::glyph` can produce — see
+/// [`is_repeated_operator_token`].
+const BIG_OPERATOR_LATEX_TOKENS: &[&str] = &["\\int", "\\oint", "\\sum", "\\prod"];
+
+/// Whether `latex`, with whitespace removed, is one or more repetitions of a
+/// single known big-operator token — the shape a big-operator region takes
+/// before it's collapsed. `latex.rs`'s own space-synthesis puts a space
+/// between the three glyphs of a wide-kerned `∫∫∫` (`"\int \int \int"`) but
+/// not a tightly-kerned one (`"\int\int\int"`), so both have to match; a
+/// real triple integral is three separate glyphs either way, never one
+/// ligature. Comes back with the token and its repeat count.
+fn is_repeated_operator_token(latex: &str) -> Option<(&'static str, usize)> {
+    let stripped: String = latex.chars().filter(|c| !c.is_whitespace()).collect();
+    if stripped.is_empty() {
+        return None;
+    }
+    BIG_OPERATOR_LATEX_TOKENS.iter().find_map(|&tok| {
+        (stripped.len().is_multiple_of(tok.len())
+            && stripped.as_bytes().chunks(tok.len()).all(|c| c == tok.as_bytes()))
+        .then(|| (tok, stripped.len() / tok.len()))
+    })
+}
+
+/// Whether `line`'s content is nothing but a run of big-operator glyphs
+/// (see [`is_repeated_operator_token`]) — the shape `\iiint_K` takes before
+/// its operator and its limit are reconstructed: three separate `∫` glyphs
+/// stacked above a `K` a row below. Geometrically this is indistinguishable
+/// from a bar-less fraction's numerator sitting above a denominator (see
+/// `find_stacked_pair`), but it is a subscripted limit, not a fraction — a
+/// mass integral $M = \iiint_K (y+1)\,dx\,dy\,dz$ was reconstructing as
+/// $M = \frac{\int\int\int}{K}(y+1)\,dx\,dy\,dz$ before this was checked for.
+fn is_big_operator_only_line(line: &Line) -> bool {
+    is_repeated_operator_token(&combined_maths_latex(line)).is_some()
+}
+
+/// Collapses a run of identical big-operator tokens ("\int \int \int" or
+/// "\int\int\int") into the single command LaTeX actually uses for it
+/// ("\iiint") — mirrors how `latex.rs` never emits three separate `\int`s
+/// for one triple integral glyph run either.
+fn collapse_operator_run(op: &str) -> String {
+    match is_repeated_operator_token(op) {
+        Some((token, count)) if count > 1 => format!("\\{}{}", "i".repeat(count - 1), &token[1..]),
+        Some((token, _)) => token.to_string(),
+        None => op.split_whitespace().collect::<Vec<_>>().concat(),
+    }
+}
+
+/// Reconstructs a bar-less fraction or a big operator's subscripted limit:
+/// LaTeX draws a fraction's vinculum, and positions an operator's limit,
+/// with a graphics path or pure geometry rather than a character, so neither
+/// is visible to the text layer — both arrive as separate lines with nothing
+/// connecting them. Detected by geometry alone — vertical stacking and
+/// horizontal column overlap between two otherwise-unrelated maths-only
 /// lines — and spliced into whichever baseline row (if any) straddles them.
+/// `top_ok` and `combine` are what distinguish the two shapes; see
+/// [`reconstruct_fractions`] and [`reconstruct_operator_limits`].
 ///
 /// Best-effort in the same spirit as `RADICAL_TAKES_REST`: a fully general
 /// reconstruction needs the drawn vinculum itself, which this pipeline does
@@ -3259,10 +3338,13 @@ fn splice_into_baseline(line: &mut Line, frac: Inline) {
 /// directly above the fraction, trailing content like `dz` beside it —
 /// surrounding lines are ordered by which side of the fraction's own column
 /// they fall on rather than spliced into a specific gap.
-fn reconstruct_fractions(mut lines: Vec<Line>) -> Vec<Line> {
-    while let Some((num_i, den_i)) = find_fraction_pair(&lines) {
-        let frac = Inline::Maths(format!(
-            "\\frac{{{}}}{{{}}}",
+fn reconstruct_stacked_pairs(
+    mut lines: Vec<Line>,
+    top_ok: impl Fn(&Line) -> bool,
+    combine: impl Fn(&str, &str) -> String,
+) -> Vec<Line> {
+    while let Some((num_i, den_i)) = find_stacked_pair(&lines, &top_ok) {
+        let frac = Inline::Maths(combine(
             combined_maths_latex(&lines[num_i]).trim(),
             combined_maths_latex(&lines[den_i]).trim(),
         ));
@@ -3309,4 +3391,27 @@ fn reconstruct_fractions(mut lines: Vec<Line>) -> Vec<Line> {
         }
     }
     lines
+}
+
+/// Reconstructs a bar-less fraction — see [`reconstruct_stacked_pairs`].
+/// Excludes a big-operator-only top row (`is_big_operator_only_line`) from
+/// ever pairing as a numerator: that shape belongs to
+/// [`reconstruct_operator_limits`] instead.
+fn reconstruct_fractions(lines: Vec<Line>) -> Vec<Line> {
+    reconstruct_stacked_pairs(
+        lines,
+        |line| !is_big_operator_only_line(line),
+        |num, den| format!("\\frac{{{num}}}{{{den}}}"),
+    )
+}
+
+/// Reconstructs a big operator's subscripted limit (`\iiint_K`) from an
+/// operator-only row stacked above its limit row — see
+/// [`reconstruct_stacked_pairs`] and [`is_big_operator_only_line`].
+fn reconstruct_operator_limits(lines: Vec<Line>) -> Vec<Line> {
+    reconstruct_stacked_pairs(
+        lines,
+        is_big_operator_only_line,
+        |op, limit| format!("{}_{{{limit}}}", collapse_operator_run(op)),
+    )
 }
