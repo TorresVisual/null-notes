@@ -83,11 +83,21 @@ Each exercise becomes:
 
 The exercise number comes from the source (`Beispiel 9.2` → `## Task 9.2`), not from a counter, so a sheet whose exercises start at 3 or skip a number still reads against the paper on the desk. Anything before the first exercise — the sheet title, the header, the date — stays where it is, above the first `## Task`.
 
-The `### Solution` section is deliberately empty. A placeholder line is text the user has to delete before writing, every single time.
+### The solution is a handwriting canvas
+
+**This is the point of the feature, not a detail of it.** Solutions to a maths exercise sheet are written by hand — that is what the ink subsystem exists for — so a scaffold that leaves an empty `### Solution` heading has done the easy half and left the part that matters: inserting a canvas by hand, once per exercise, six times a sheet.
+
+Each empty `### Solution` therefore gets a blank ink block, backed by its own SVG in the note's existing `NoteName.ink/` sidecar. The sidecars are written *before* the document is rewritten, so a failure leaves the note untouched rather than holding blocks pointing at files that were never created.
+
+The canvas starts **400px, not a full page**. `useInkCanvas` already grows a canvas by a page whenever a stroke approaches its bottom, so a two-line answer stays two lines tall and a long derivation still has room — where six full-page canvases in one note would make the sheet unscrollable before a single stroke was drawn.
+
+A solution that already holds something — typed text, or a canvas from an earlier run — is left exactly as it is. Running the command twice must never bury the first run's handwriting under a second blank canvas.
+
+No text placeholder is added. A placeholder line is text to delete before writing, every single time.
 
 ### Add next task
 
-An editor command appending `## Task N+1` / `### Solution` at the end of the note, where `N` is the highest task number already present. On a note with no tasks it appends `## Task 1`. This is the brief's explicit ask: space per task is never something to plan in advance.
+An editor command appending `## Task N+1` / `### Solution` — **with its own blank canvas**, so a sheet stays the same shape however it grew — at the end of the note, where `N` is the last task number already present. On a note with no tasks it appends `## Task 1`. This is the brief's explicit ask: space per task is never something to plan in advance.
 
 ### Failure is plain conversion
 

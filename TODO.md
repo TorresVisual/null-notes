@@ -136,7 +136,8 @@ Bugs found after the freeze that do not clear the bar above. Recorded so they ar
 
 ### P4-3 Exercise splitting & solution scaffold — **M** ✅ — *step 3, closes M4*
 - [x] Split on exercise headings (`Aufgabe N`, `Beispiel N.M`, `Task N`, `Exercise N`, `Problem N`, `N.`) into `## Task N` + `### Solution` pairs — **on request only**, via *Split Into Tasks* in the slash menu and File menu
-- [x] **"Add next task"** command — appends the next correctly-numbered pair, so space per task is never planned in advance
+- [x] **"Add next task"** command — appends the next correctly-numbered pair, **with its own canvas**, so space per task is never planned in advance
+- [x] **Every `### Solution` holds a handwriting canvas** — the actual point of the workflow; an empty heading left you inserting ink by hand once per exercise
 - [x] No heading match → convert as one unsplit document; never drop content
 
 > **Importing a PDF never does this.** The first cut ran splitting unconditionally inside `pages_to_markdown`, which was wrong: asserting a document *is* an exercise sheet is a claim only the reader can make, and a lecture script or a paper would have been rewritten just as readily. A Markdown import now produces plain Markdown and `extract.rs` has a test pinning that; the splitter moved out of `pdf/` to `src/exercises.rs`, since the pipeline no longer calls it and a hand-written note is as valid an input. Nothing is remembered — a remembered "always split" setting would be the same automatic behaviour wearing a checkbox.

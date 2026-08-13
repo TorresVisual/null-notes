@@ -5,8 +5,8 @@ import { ReactRenderer } from '@tiptap/react'
 import { forwardRef, useEffect, useImperativeHandle, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { inkApi } from '../../lib/ink'
-import { api } from '../../lib/tauri'
 import { nextTaskLabel } from '../../lib/taskScaffold'
+import { splitIntoTasks, addNextTask } from '../splitIntoTasks'
 import type { InkData } from '../../ink/types'
 
 const INK_WIDTH = 700
@@ -152,24 +152,22 @@ const COMMANDS: Cmd[] = [
   },
   {
     title: 'Split Into Tasks',
-    description: 'Rewrite this note as Task / Solution sections',
+    description: 'Rewrite this note as Task / Solution sections with a canvas each',
     // Never happens on its own. A PDF import produces a plain note, because
     // "this document is an exercise sheet" is a claim about the document that
     // only the reader can make — a lecture script is not one.
     run: ({ editor, range }) => {
       editor.chain().focus().deleteRange(range).run()
-      void api.notes.splitIntoTasks(getMarkdown(editor)).then((after) => {
-        if (after === getMarkdown(editor)) {
+      void splitIntoTasks(editor).then((outcome) => {
+        if (outcome === 'no-structure') {
           alert('No exercise structure found in this note — nothing was changed.')
-          return
         }
-        editor.commands.setContent(after)
       })
     },
   },
   {
     title: 'Add Next Task',
-    description: 'Append the next numbered Task and Solution pair',
+    description: 'Append the next numbered Task and Solution pair, ready to write in',
     // Appended at the end of the note rather than at the cursor: the point is
     // that room for one more exercise is never something to plan in advance,
     // and the next task belongs after the last one wherever you happen to be.
@@ -177,16 +175,8 @@ const COMMANDS: Cmd[] = [
     // `nextTaskLabel` will read back on the following invocation.
     run: ({ editor, range }) => {
       const label = nextTaskLabel(getMarkdown(editor))
-      editor
-        .chain()
-        .focus()
-        .deleteRange(range)
-        .insertContentAt(editor.state.doc.content.size, [
-          { type: 'heading', attrs: { level: 2 }, content: [{ type: 'text', text: `Task ${label}` }] },
-          { type: 'heading', attrs: { level: 3 }, content: [{ type: 'text', text: 'Solution' }] },
-          { type: 'paragraph' },
-        ])
-        .run()
+      editor.chain().focus().deleteRange(range).run()
+      void addNextTask(editor, label)
     },
   },
   {
