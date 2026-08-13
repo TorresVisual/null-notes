@@ -1,18 +1,31 @@
 # null-notes — TODO
 
-## Issues Discovered
-
-* [ ] Spellcheck for German
-* [ ] Derivatives like y' get parsed to ^'y
-* [ ] Math doesnt get rendered in block maths
-
 Feature checklist. **The [roadmap](docs/ROADMAP.md) holds the reasoning and the Definitions of Done; this file holds the boxes.** If the two disagree, the roadmap wins.
 
 Effort: **S** ≈ hours · **M** ≈ a day or two · **L** ≈ several days.
 
-**Now:** M2 closed; P4-1 and P4-2 done. Next: P4-3 (exercise splitting), which closes M4.
+**Now (revised 2026-08-13 — see [`docs/specs/roadmap-revision-design.md`](docs/specs/roadmap-revision-design.md)):** finish ruled fractions → freeze the PDF pipeline → triage the three open bugs → P4-3 (closes M4) → the dogfood slice. **Phase numbers are identity, not order.**
 
-**Two decisions owed before their phase starts:** split-pane editing (during P4) and spaced-repetition storage (before any P9-3 code).
+| # | Work | Size |
+|---|---|---|
+| 0 | Finish ruled fractions *(in flight, `c72a24e`)* | — |
+| 1 | Freeze the PDF pipeline under P4-2e | S |
+| 2 | Triage the three open bugs below | S |
+| 3 | **P4-3** → **M4** | M |
+| 4 | Dogfood slice — P7-3 ignore list → P7-3 → P7-4 + P7-1 → P8-1 | M/L |
+| 5 | Re-derive P5, P6, P9 from real use | — |
+
+**Three decisions owed:** `<details open>` — collapse state in the file or presentation-only (before ticking P6-1); split-pane editing (during P4); spaced-repetition storage (before any P9-3 code).
+
+---
+
+## ▸ Step 2 — Open bugs
+
+**All three are reported but unverified — triage begins by reproducing them.** They sit on the daily-use path and are owned by no phase, which is why they had drifted to the top of this file with no place in the order.
+
+- [ ] **Math doesn't get rendered in block maths.** Do this one first — if it reproduces, it is a broken core feature sitting above the entire plan.
+- [ ] **Derivatives like `y'` get parsed to `^'y`.** PDF pipeline. Note that `e62b560` and the compact-fraction fix both touched prime handling, so check whether this predates them.
+- [ ] **Spellcheck for German.** Per P2-3, whether squiggles appear at all is a WebView2/OS capability, not something this code controls — establish which side the failure is on before writing any code.
 
 ---
 
@@ -24,7 +37,7 @@ Effort: **S** ≈ hours · **M** ≈ a day or two · **L** ≈ several days.
 | P1 Everyday-use completeness | M1 — I don't reach for another app | ✅ |
 | P2 Feel & ergonomics | M2 — a pleasure to use for hours | ✅ |
 | P3 Headline features | M3 — the CS superpowers land | ✅ |
-| P4 PDF→Markdown & exercise sheets | M4 — a sheet becomes a workable note | 2/3 |
+| P4 PDF→Markdown & exercise sheets | M4 — a sheet becomes a workable note | 2/4 |
 | P5 Versioned workspaces (Git) | M5 — my notes commit themselves | |
 | P6 STEM authoring | M6 — fastest place to write maths | |
 | P7 IDE integration | M7 — notes and code are one workflow | |
@@ -34,7 +47,7 @@ Effort: **S** ≈ hours · **M** ≈ a day or two · **L** ≈ several days.
 
 ---
 
-## ▸ P4 — PDF → Markdown & exercise sheets (M4) — next up
+## ▸ P4 — PDF → Markdown & exercise sheets (M4) — *steps 0–3*
 
 Both import modes, chosen at import time, the way Notion does it. **No OCR** — typeset sheets carry a real text layer, and `pdfium-render` (already a default dep) hands over per-character bounding boxes and font metrics.
 
@@ -103,7 +116,18 @@ A closer read of a document already in the corpus (P4-2c's multi-bracket general
 - [x] **An upright Greek capital touching its word with no space glyph at all stayed stranded as plain prose.** `Potenzialfunktion Φ(x, y)` left `Φ` outside any equation — TeX sets an upright Greek capital in the same upright text font prose uses, so it's indistinguishable from a word by family alone, and unlike the `O(m log n)`/`cos(z)` case, there's no real word gap anywhere to anchor a whole-word match against; the fixed known-operator-name scan only ever matched a complete word, never a single bridgeable symbol glued straight onto one. New `is_bridgeable_symbol` (`layout.rs`) peels off one non-ASCII character at a time when it has its own known `latex::symbol_command` — restricted to non-ASCII so it can never fire mid-word on ordinary Latin prose.
 - [x] **A big operator's subscripted limit (`\iiint_K`) reconstructed as a bar-less fraction instead.** Geometrically identical to a fraction's numerator/denominator pair — a maths-only row stacked above another, straddled by a baseline — so `find_fraction_pair` was pairing a triple-integral row with its limit row and emitting `\frac{\int\int\int}{K}` in place of `M = \iiint_K (y+1)\,dx\,dy\,dz`. Generalized `find_fraction_pair` into `find_stacked_pair` (shared geometry search, parameterized by which rows are eligible as the top half and how the two combine) with two callers: `reconstruct_fractions` (unchanged behaviour, now explicitly excluding a big-operator-only top row) and the new `reconstruct_operator_limits`, which collapses a run of identical operator glyphs (`is_repeated_operator_token`/`collapse_operator_run` — `\int \int \int` → `\iiint`) into the limit form instead.
 
-### P4-3 Exercise splitting & solution scaffold — **M**
+### P4-2e Pipeline completion criteria — **S**, docs only — *step 1*
+
+> The only subsystem here with no natural end. ~120 commits in the two weeks after P4-2 was declared done, none wrong individually, none bounded collectively. **Ruled fractions (`c72a24e`, in flight) is the last 2D shape**; the freeze takes effect on its completion. Full reasoning in [ROADMAP.md](docs/ROADMAP.md) §Phase 4.
+
+- [ ] Finish ruled fractions — the one named, finite carve-out
+- [ ] **Corpus frozen** at the documents already in it; adding one is a deliberate decision, not a reflex
+- [ ] **Bar is "faster than transcribing by hand," not "correct"** — M4's own DoD
+- [ ] **A new bug earns work only if it is whole-document** (prose loss, mid-word tearing) **or recurs across ≥2 corpus documents.** Single-document cosmetic bugs get recorded here and left — *the load-bearing rule, and the one that will feel wrong to apply*
+- [ ] **2D-layout reconstruction closed** — matrices, `\cases`, stacked fractions, operator limits, tables, ruled fractions is the complete set. Anything else renders as glyph text; `throwOnError: false` contains it
+- [ ] **Re-entry only** when real coursework use produces a document failing the by-hand bar — not from a diagnostic sweep
+
+### P4-3 Exercise splitting & solution scaffold — **M** — *step 3, closes M4*
 - [ ] Split on exercise headings (`Aufgabe N`, `Task N`, `Exercise N`, `Problem N`, `N.`) into `## Task N` + `### Solution` pairs
 - [ ] **"Add next task"** command — appends the next correctly-numbered pair, so space per task is never planned in advance
 - [ ] No heading match → convert as one unsplit document; never drop content
@@ -160,15 +184,25 @@ Two modes, different defaults — everything here follows from this:
 
 ---
 
-## ▸ P6 — STEM authoring (M6)
+## ▸ P6 — STEM authoring (M6) — ***rescope at step 5, don't re-plan before***
 
 > ⚠️ Every new node needs `addStorage().markdown.serialize/parse`. Without one it serialises as escaped plain text — silent data loss.
 
+> **Finding, 2026-08-13: a stream of editor work has no roadmap representation at all.** `BlockHandle`, `Divider`, `TextAlignment`, `Highlight`, `Kbd`, `HTMLBlock`, `HTMLInline`, `SpanStyle`, `Superscript`/`Subscript` and `NoteImage` all exist in `src/editor/extensions/` and correspond to no phase or task here. The Notion half of the app — which [ROADMAP.md](docs/ROADMAP.md) §1 now names as a pillar — is being built off-book.
+>
+> Not an argument to stop; an argument that **P6's scope is wrong**. It was written as "STEM authoring" when the work actually happening is "Notion parity," and the two overlap only partly. Rescope it at step 5, informed by what the dogfood slice shows is missing, rather than re-planning now from the current guesses.
+>
+> Still genuinely unbuilt: proof/theorem blocks, algorithm blocks (P6-2), templates (P6-3), equation snippets (P6-4), search refinement (P6-5), outline panel (P6-6).
+
 ### P6-1 Proof blocks + collapsible sections — **M**
 - [ ] Theorem / Lemma / Corollary / Proof / Definition / Example blocks, optional numbering + title
-- [ ] Collapsible sections; collapse state is presentation-only, never touches the `.md`
+- [~] Collapsible sections — **built, but not meeting this DoD.** See the two findings below
 - [ ] Build on the existing `Callout` node pattern — don't invent a second block mechanism
 - [ ] Round-trips through save→reload; prints correctly in PDF export
+
+> **Reconciliation, 2026-08-13.** `src/editor/extensions/Details.tsx` is a real collapsible node with `summary`/`open` attributes — but it is **absent from the slash menu**, so "inserts from `/`" is not met: it is built and unreachable. And it **serializes collapse state into the file** (`<details open>`), while this DoD says collapse state is presentation-only and never touches the `.md`.
+>
+> The second is a genuine open decision, not a bug to fix silently. `<details open>` is standard, portable HTML that renders in GitHub and every other Markdown viewer — an argument for keeping it. Against: collapsing a section then dirties the buffer and triggers a write, and under P5 it produces an auto-commit, which is the exact churn the DoD was written to prevent. **Decide before ticking P6-1.**
 
 ### P6-2 Algorithm blocks — **M** *(after P6-1, reuse its machinery)*
 - [ ] Complexity / Pseudocode / Implementation / References slots
@@ -197,9 +231,19 @@ Two modes, different defaults — everything here follows from this:
 
 ---
 
-## ▸ P7 — IDE integration (M7)
+## ▸ P7 — IDE integration (M7) — ***step 4: the dogfood slice, moved ahead of P5 and P6***
 
 The brief's second pillar. Notes stay plain `.md` — a deep link is ordinary Markdown that degrades to readable text elsewhere.
+
+> **Why this moved ahead of P5 and P6 (2026-08-13).** It is the only item on the board that changes what *future* planning is based on — everything else produces a feature, this produces evidence. The roadmap prioritizes by `daily-use value × friction ÷ effort` and nobody is currently supplying the daily-use term: the maintainer has been building, not using. This project's own `docs/` — 18 specs, a plans folder, a 735-line roadmap — is a real daily Markdown workflow being done in another editor right now.
+>
+> **Milestone for the slice: this repo's `docs/` lives in null-notes and gets edited there.** Order within it: ignore list → P7-3 → P7-4 + P7-1 together → P8-1.
+
+### P7-3a Scan ignore list — **S** — *do this first; it is the whole unlock*
+- [ ] Exclude `node_modules`, `target`, `dist`, `build` in `is_excluded_dir` (`src-tauri/src/commands/notes.rs:113`) — today it skips only `.ink` and dot-directories
+- [ ] DoD: opening this repo as a workspace lists `docs/` and nothing from `node_modules/` or `target/`, as fast as a notes-only workspace
+
+> A workspace is just a folder scanned for `.md`, so "open a code repo as a workspace" **already works** — the scan simply drowns in dependencies first. P7-3 was scheduled **M** behind three phases; the part that actually unblocks daily use is hours.
 
 > 🔒 First feature to launch external processes **using text taken from note content.** Pass paths as arguments to a configured command, never through a shell; refuse paths escaping the workspace/project root.
 

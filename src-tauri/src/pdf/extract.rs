@@ -8,6 +8,7 @@
 use super::columns;
 use super::layout::{self, CharBox};
 use super::models;
+use super::rules::{self, RuleBox};
 use anyhow::Result;
 use std::path::Path;
 
@@ -49,6 +50,10 @@ pub struct ExtractedPage {
     pub index: usize,
     pub chars: Vec<CharBox>,
     pub images: Vec<ExtractedImage>,
+    /// The horizontal rules this page draws — a fraction bar is one, and is
+    /// the only record that the row above and below it are a numerator and a
+    /// denominator. See [`super::rules`].
+    pub rules: Vec<RuleBox>,
 }
 
 impl ExtractedPage {
@@ -313,19 +318,59 @@ fn extract_pages_native(pdf_path: &Path) -> Result<Vec<ExtractedPage>> {
         }
 
         let mut images = Vec::new();
+        let mut rules = Vec::new();
         for object in page.objects().iter() {
-            let PdfPageObject::Image(ref image_object) = object else {
-                continue;
-            };
-            if let Some(extracted) = extract_image(image_object, &doc) {
-                images.push(extracted);
+            match object {
+                PdfPageObject::Image(ref image_object) => {
+                    if let Some(extracted) = extract_image(image_object, &doc) {
+                        images.push(extracted);
+                    }
+                }
+                PdfPageObject::Path(ref path_object) => {
+                    if let Some(rule) = extract_rule(path_object) {
+                        rules.push(rule);
+                    }
+                }
+                _ => {}
             }
         }
+        if rules.len() > rules::MAX_RULES_PER_PAGE {
+            rules.clear();
+        }
 
-        pages.push(ExtractedPage { index, chars, images });
+        pages.push(ExtractedPage { index, chars, images, rules });
     }
 
     Ok(pages)
+}
+
+/// One drawn path as a horizontal rule, or `None` when it isn't one.
+///
+/// Geometry comes from `bounds()` and never from `segments()`: pdfium reports
+/// segment coordinates in the path's own object space (a full-width page rule
+/// reads `0,0 → 595.3,0` whatever its position on the page), so they are
+/// meaningless as page positions. The segments are read only to reject curves
+/// — a Bezier's bounding box can be thin and wide while the shape itself is
+/// nothing like a rule.
+#[cfg(feature = "pdf-native")]
+fn extract_rule(path: &pdfium_render::prelude::PdfPagePathObject) -> Option<RuleBox> {
+    use pdfium_render::prelude::{PdfPageObjectCommon, PdfPathSegmentType, PdfPathSegments};
+
+    if path
+        .segments()
+        .iter()
+        .any(|segment| segment.segment_type() == PdfPathSegmentType::BezierTo)
+    {
+        return None;
+    }
+
+    let bounds = path.bounds().ok()?;
+    rules::horizontal_rule(
+        bounds.left().value,
+        bounds.right().value,
+        bounds.bottom().value,
+        bounds.top().value,
+    )
 }
 
 /// Pulls one embedded raster image's bytes and page bounds out of an image
@@ -475,13 +520,14 @@ mod tests {
                 .map(|(i, c)| char_at(c, 72.0 + i as f32 * 5.0, 700.0))
                 .collect(),
             images: Vec::new(),
+            rules: Vec::new(),
         }
     }
 
     #[test]
     fn a_page_with_almost_no_text_reads_as_empty() {
         assert!(page_of("Fig. 1").is_effectively_empty());
-        assert!(ExtractedPage { index: 0, chars: vec![], images: Vec::new() }.is_effectively_empty());
+        assert!(ExtractedPage { index: 0, chars: vec![], images: Vec::new(), rules: Vec::new() }.is_effectively_empty());
     }
 
     #[test]
@@ -509,7 +555,7 @@ mod tests {
     fn a_blank_page_does_not_leave_a_hole_in_the_document() {
         let pages = vec![
             page_of("Real content."),
-            ExtractedPage { index: 1, chars: vec![], images: Vec::new() },
+            ExtractedPage { index: 1, chars: vec![], images: Vec::new(), rules: Vec::new() },
             page_of("More content."),
         ];
 
@@ -539,7 +585,7 @@ mod tests {
 
     #[test]
     fn a_page_that_is_only_an_image_still_keeps_it() {
-        let mut page = ExtractedPage { index: 0, chars: vec![], images: Vec::new() };
+        let mut page = ExtractedPage { index: 0, chars: vec![], images: Vec::new(), rules: Vec::new() };
         page.images.push(image_at(72.0, 690.0, 300.0, 710.0));
 
         let result = pages_to_markdown(&[page]);
@@ -550,7 +596,7 @@ mod tests {
 
     #[test]
     fn a_page_with_no_text_and_no_images_produces_nothing() {
-        let page = ExtractedPage { index: 0, chars: vec![], images: Vec::new() };
+        let page = ExtractedPage { index: 0, chars: vec![], images: Vec::new(), rules: Vec::new() };
         let result = pages_to_markdown(&[page]);
         assert_eq!(result.markdown, "");
         assert!(result.images.is_empty());

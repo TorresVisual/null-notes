@@ -487,4 +487,28 @@ mod tests {
             }
         }
     }
+
+    /// Every horizontal rule the pipeline extracts, per page. A fraction bar
+    /// is a drawn rule and invisible to the text layer, so this is the only
+    /// way to see what `reconstruct_ruled_fractions` is actually working
+    /// from. Analysis_2_Blatt11.pdf page 0 should report eleven: one
+    /// full-width header rule and ten fraction bars.
+    #[test]
+    #[ignore]
+    fn dump_rules() {
+        let pages = crate::pdf::extract::extract_pages(&pdf_or_skip!()).unwrap();
+        for page in &pages {
+            println!("=== page {}: {} rule(s) ===", page.index, page.rules.len());
+            for rule in &page.rules {
+                println!(
+                    "  x=[{:7.2},{:7.2}] w={:7.2} y={:8.2} thickness={:.2}",
+                    rule.x0,
+                    rule.x1,
+                    rule.width(),
+                    rule.y,
+                    rule.thickness
+                );
+            }
+        }
+    }
 }

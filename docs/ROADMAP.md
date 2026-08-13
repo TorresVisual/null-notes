@@ -1,6 +1,8 @@
 # null-notes — Product & Technical Roadmap
 
-**Last updated:** 2026-07-30 (**M0–M3 all reached** — P2-3 closed M2; **P4-1 + P4-2 done** — PDF→Markdown converts from the embedded text layer with no OCR, and equations are cropped from the rendered page rather than mangled into text; re-scoped against `notes/Plan.md`; **Phases 5 "Versioned Workspaces" and 9 "Study & Revision" added** — the first features that go beyond the original brief. **Next: P4-3, which closes M4.**)
+**Last updated:** 2026-08-13 (**roadmap revision** — see [`specs/roadmap-revision-design.md`](specs/roadmap-revision-design.md). The two weeks since the last update went almost entirely into PDF pipeline refinement, which the roadmap had no boundary for; this revision adds one (§Phase 4, "Pipeline completion criteria"), records the app's actual identity and two closed questions (§1), and **replaces the execution order in §6** — phase numbers are now identity, not order. **Next: finish ruled fractions → freeze the pipeline → triage the three open bugs → P4-3 → the dogfood slice.**)
+
+*Previously, 2026-07-30: M0–M3 all reached — P2-3 closed M2; P4-1 + P4-2 done — PDF→Markdown converts from the embedded text layer with no OCR, and equations are rebuilt as LaTeX rather than mangled into text; re-scoped against `notes/Plan.md`; Phases 5 "Versioned Workspaces" and 9 "Study & Revision" added — the first features that go beyond the original brief.*
 **Audience of this doc:** the maintainer (solo dev).
 **Product audience:** you — a personal, offline, daily-driver note app for CS coursework. This is **not** aimed at public distribution yet, which deliberately pushes packaging, cross-platform, auto-update, branding, and onboarding *down* the priority list. Correctness, data integrity, and the editor/ink/PDF workflow come first.
 
@@ -20,6 +22,25 @@
 ## 1. Product vision
 
 > A Markdown-first, WYSIWYG desktop note app for a CS student who writes math and code daily, sketches diagrams by hand with a stylus, and never wants their notes locked into a proprietary format.
+
+### What it's modelled on (2026-08-13)
+
+The line above describes the app without saying what it is *shaped like*, which left the block editor looking like an implementation detail rather than a pillar. Stated properly:
+
+**null-notes is Notion's editor on Obsidian's storage model**, plus the features this maintainer needs for CS coursework, built partly as a learning exercise. "OneNote" in the original framing meant *handwriting inside notes* — which exists and is done — not a spatial surface.
+
+**Enjoyment and learning are legitimate terms in the prioritization formula.** §3 prioritizes by `daily-use value × friction ÷ effort`, which silently classifies interesting-but-low-ROI work as a mistake. That is not the actual goal function. Naming these makes them budgetable instead of spent undeclared.
+
+#### Closed questions
+
+Recorded so they are not silently reopened.
+
+| Question | Verdict | Date |
+|---|---|---|
+| Freeform 2D canvas (true OneNote) | **Won't build.** Ink-in-flow is the answer; principle #1 below stands unamended. | 2026-08-13 |
+| Does the maintainer currently supply the daily-use signal §3 prioritizes by? | **No** — building, not using. Every priority call below M4 is an estimate. This is the argument for the dogfood slice in §6. | 2026-08-13 |
+
+The canvas verdict connects to Phase 4's completion criteria: a canvas — objects at x/y — has no Markdown representation, which is exactly why principle #1 blocks it. That is the *same problem* the PDF pipeline keeps hitting. Matrices, `\cases`, stacked fractions and multi-column layout are all "2D layout has no linear representation." One problem, two places — so closing the canvas half while leaving the PDF half open would be inconsistent.
 
 **Non-negotiable principles (already honored by the architecture — keep them):**
 
@@ -131,7 +152,7 @@ Given "personal daily driver," priority = **`(daily-use value) × (risk of data 
 | **P1** | Everyday-use completeness | **M1:** I don't reach for another app | ✅ | Small gaps that break flow (links, refresh, quick-switch) |
 | **P2** | Feel & ergonomics | **M2:** it's a pleasure to use for hours | ✅ | Compounding daily quality-of-life |
 | **P3** | Headline features & power tools | **M3:** the CS-specific superpowers land | ✅ | PDF-as-reference, export, graph |
-| **P4** | PDF→Markdown & exercise sheets | **M4:** an exercise sheet becomes a workable note in one step | 2/3 | The brief's own flagship; the biggest single time-saver |
+| **P4** | PDF→Markdown & exercise sheets | **M4:** an exercise sheet becomes a workable note in one step | 2/4 | The brief's own flagship; the biggest single time-saver |
 | **P5** | Versioned workspaces (Git automation) | **M5:** my notes commit themselves, in both kinds of repo | | The next tier of P0's data safety — a commit is a recoverable backup |
 | **P6** | STEM authoring | **M6:** writing maths/algorithms is faster here than anywhere else | | Compounds on every note; cheap, since the infra exists |
 | **P7** | IDE integration | **M7:** notes and code are one workflow, not two | | The brief's second pillar — "integrate, don't replace" |
@@ -345,7 +366,7 @@ Sync is out of scope as a *feature* (principle #2), but since files are plain `.
 
 ---
 
-## Phase 4 — PDF → Markdown & the Exercise-Sheet Workflow (P4) — P4-1 + P4-2 done, P4-3 closes M4
+## Phase 4 — PDF → Markdown & the Exercise-Sheet Workflow (P4) — P4-1 + P4-2 done; P4-2e bounds the pipeline, P4-3 closes M4
 
 **Milestone M4:** *I can drop an exercise sheet into the app and immediately start writing solutions into it — as text I can edit, not a picture.*
 
@@ -415,6 +436,22 @@ The two ways P4-1 can produce garbage. Both must fail visibly, never silently.
 - ***Ordinary prose was getting torn apart mid-word with no maths or line break anywhere near it*** *(`wird jeweils` → `wirdj eweils`). A generated space's own `x` coordinate landed **inside** the following letter's advance box — sorting a row by raw `x`, which every fix up to this point had assumed was reliable, is exactly wrong when one character's own geometry lies. A row is now ordered by each character's position in the page's own extraction stream instead, which pdfium never gets wrong regardless of what an individual glyph's coordinate says. `x` is unchanged for everything else — gaps, script detection, region bounds.*
 
 *Four smaller gaps that document also exposed, diagnosed but not attempted — detail and reasoning in `TODO.md`'s P4-2b: **fractions** (same root cause as the matrix/vector limitation — a numerator and denominator are separate physical lines with the bar drawn as an invisible-to-text-layer graphics path — but far more disruptive in a fraction-heavy sheet), **`∮`** (pdfium hands back an ASCII placeholder instead of a real Unicode value; a blind family-scoped guess was deliberately not added, since CMEX overloads ASCII codepoints per sub-font and a wrong guess would silently corrupt some other symbol elsewhere), **an enumeration-label boundary artifact** (`(a$) C$`), and **`ß` decoding to `ÿ`**, confirmed to be pdfium's own decoding of this specific font and not fixable from here.*
+
+### P4-2e — Pipeline completion criteria (2026-08-13) — **S**, docs only
+
+**This subsystem is the only one on the roadmap with no natural end.** There is always another real document with another 2D-layout bug, and the two weeks after P4-2 was declared done proved it: ~120 commits, none of them wrong individually, none of them bounded collectively. A boundary has to be written as a rule, because "P4-2 is done" plainly was not one.
+
+**Ruled fractions (in flight as of `c72a24e`) is the last 2D shape.** The freeze takes effect on its completion — a rule with a carve-out for work already underway is still a real rule, provided the carve-out is named and finite, and abandoning a half-built feature costs more than finishing it.
+
+Once it lands:
+
+- **The corpus is frozen** at the documents already in it. It is the regression suite. Adding a document is a deliberate decision, not a reflex.
+- **The bar is M4's own DoD — "faster than transcribing by hand" — not "correct."** A converted sheet needing three manual fixes still saved forty minutes. Correctness past that bar is not what this feature is for.
+- **A new bug earns work only if it is whole-document** (prose loss, mid-word tearing — the P4-2b class, where output is silently wrong rather than visibly incomplete) **or recurs across two or more corpus documents.** Single-document, single-instance cosmetic bugs are recorded in `TODO.md` and left. *This is the load-bearing rule — the one that would have ended most of the last fortnight, and the one that will feel wrong to apply in the moment.*
+- **2D-layout reconstruction is closed.** Matrices, `\cases`, stacked fractions, operator limits, tables and ruled fractions are the complete set. No new shapes. Anything outside it renders as glyph-order text, and `throwOnError: false` on both maths nodes contains the failure to that one equation.
+- **Re-entry condition:** the pipeline reopens when *real coursework use* produces a document that fails the by-hand bar. Not before, and not from a diagnostic sweep.
+
+- **DoD:** the rules above are recorded here and in `TODO.md`; the next 2D shape encountered is filed rather than fixed.
 
 ### P4-3 — Exercise splitting, solution scaffold, and "add next task" — **M**
 The part the brief says "would save students hours every semester."
@@ -552,10 +589,13 @@ The brief's second pillar — **"IDE integration instead of IDE replacement"** �
 - **Dependency:** P7-1 (same launcher, same path resolution, same guardrails).
 - **DoD:** The action appears only on blocks that actually have a resolvable path — never a dead button.
 
-### P7-3 — Project awareness & project notes — **M**
+### P7-3 — Project awareness & project notes — **S/M** *(smaller than it looks — see the scan note)*
+- **Scan ignore list — S. Do this first; it is the whole unlock.** A workspace is just a folder scanned for `.md`, so opening a code repo as a workspace *already works* — except `is_excluded_dir` (`src-tauri/src/commands/notes.rs:113`) skips only `.ink` and dot-directories, so the scan walks `node_modules/` and `src-tauri/target/` and drowns. Exclude the standard build/dependency directories (`node_modules`, `target`, `dist`, `build`; `.git` is already covered by the dot rule).
 - Open a code project as a workspace and surface its existing `README.md` / `docs/` / `notes/` directly, with no import step (the brief: "No importing").
 - Optionally scaffold a `notes/` folder (Architecture / Meeting / Research / Todo) on request — **on request only**, never automatically, and never writing into source folders.
-- **DoD:** Pointing the app at a code repo shows its Markdown immediately and correctly; scaffolding is opt-in and creates only inside `notes/`.
+- **DoD:** Pointing the app at this repo lists the files in `docs/` and nothing from `node_modules/` or `target/`, and does so as fast as a notes-only workspace; scaffolding is opt-in and creates only inside `notes/`.
+
+*Why this moved up (2026-08-13): it is the cheapest path to the maintainer becoming a **user** of the app, which §1's second closed question identifies as the missing input to the whole prioritization formula. This project's own `docs/` — 18 specs, a plans folder, this roadmap — is a real daily Markdown workflow currently being done in another editor. See §6.*
 
 ### P7-4 — Editor command setting — **S**
 - A configurable launch command template (VS Code, JetBrains, Neovim…) in the P2-1 settings panel, with sensible detection of what's installed.
@@ -706,9 +746,24 @@ P9-3 storage fork ──> P9-3 implementation ──> (frontmatter decision reso
 P10-* gated behind M9
 ```
 
-**Suggested execution order:** ~~P2-3 → **M2**~~ (done) → P4-1 → P4-2 → P4-3 → **M4** → P5-1 → P5-2 → P5-3 → P5-4 → P5-5 → **M5** → P6-1 → P6-2 → P6-3 → P6-4 → P6-5 → P6-6 → **M6** → P7-1 + P7-4 together → P7-2 → P7-3 → **M7** → P8-1 → **M8** → P9-1 → P9-2 → P9-3 fork → P9-3 → **M9** → (only then) P10.
+### Execution order (revised 2026-08-13)
 
-Four orderings are deliberate and worth not reshuffling:
+**Phase numbers are identity, not order.** They are referenced across commit messages and 18 design specs, so renumbering would churn all of it for no gain. The order below is what changes; the numbering does not.
+
+| # | Work | Size | Why here |
+|---|---|---|---|
+| 0 | Finish ruled fractions | — | In flight (`c72a24e`). The named carve-out in P4-2e. |
+| 1 | **Freeze the pipeline** under P4-2e | S | Docs, not code. The next 2D shape is the rule's first real application. |
+| 2 | Triage the three "Issues Discovered" in `TODO.md` | S | Reported defects on the daily-use path, owned by no phase, sitting above a 371-line plan. Reproduce first — all three are unverified. |
+| 3 | **P4-3** → **M4** | M | Closes the milestone. Converts the PDF work from an open hunt into a shut phase. |
+| 4 | **Dogfood slice:** P7-3's ignore list → P7-3 → P7-4 + P7-1 together → P8-1 | M/L | *Milestone: this project's own `docs/` lives in null-notes and gets edited there.* |
+| 5 | Re-derive P5, P6 and P9 from real use | — | Their current priorities are estimates. Do not plan them further until step 4 has run for a couple of weeks. |
+
+**Why the dogfood slice outranks P5 and P6.** It is the only item on the board that changes what *future* planning is based on — everything else produces a feature, this produces evidence. §1's second closed question records that the daily-use term in §3's formula currently has no supplier; this is the fix. P6 in particular should not be re-planned before it, because §4 of the revision spec found that a whole stream of editor work (`BlockHandle`, `Divider`, `TextAlignment`, `Highlight`, `Kbd`, `HTMLBlock`, `SpanStyle`, `NoteImage`) is happening off-book, which suggests P6's "STEM authoring" scope is the wrong frame for what is actually being built.
+
+*Superseded order, kept for reference: P4-1 → P4-2 → P4-3 → **M4** → P5-* → **M5** → P6-* → **M6** → P7-1 + P7-4 → P7-2 → P7-3 → **M7** → P8-1 → **M8** → P9-* → **M9** → P10.*
+
+Five orderings are deliberate and worth not reshuffling:
 - **P4-2 before P4-3** — splitting a sheet whose equations are garbage produces confidently-wrong output.
 - **P7-4 alongside P7-1** — a hardcoded editor path would be an immediate rewrite.
 - **P5-4 is fast-forward-only, permanently** — the moment auto-pull is allowed to merge, a `.md` can acquire conflict markers that the editor renders as ordinary content. There is no version of "smarter merging" that is worth this.
