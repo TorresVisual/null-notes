@@ -6,6 +6,7 @@ pub mod ligatures;
 pub mod maths;
 pub mod models;
 pub mod renderer;
+pub mod rules;
 
 #[cfg(test)]
 mod columns_tests;
