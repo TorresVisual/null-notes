@@ -11,8 +11,8 @@ Effort: **S** ≈ hours · **M** ≈ a day or two · **L** ≈ several days.
 | 0 | Finish ruled fractions *(`c72a24e`…`851bfff`)* | — | ✅ |
 | 1 | Freeze the PDF pipeline under P4-2e | S | ✅ |
 | 2 | Triage the three open bugs below | S | ✅ |
-| 3 | **P4-3** → **M4** | M | ← |
-| 4 | Dogfood slice — P7-3 ignore list → P7-3 → P7-4 + P7-1 → P8-1 | M/L | |
+| 3 | **P4-3** → **M4** | M | ✅ |
+| 4 | Dogfood slice — P7-3 ignore list → P7-3 → P7-4 + P7-1 → P8-1 | M/L | ← |
 | 5 | Re-derive P5, P6, P9 from real use | — | |
 
 > **The PDF pipeline is frozen** as of 2026-08-13. The corpus is the regression suite; a new bug earns work only if it is whole-document or recurs across ≥2 corpus documents; 2D-layout reconstruction is closed. See P4-2e.
@@ -39,7 +39,7 @@ Effort: **S** ≈ hours · **M** ≈ a day or two · **L** ≈ several days.
 | P1 Everyday-use completeness | M1 — I don't reach for another app | ✅ |
 | P2 Feel & ergonomics | M2 — a pleasure to use for hours | ✅ |
 | P3 Headline features | M3 — the CS superpowers land | ✅ |
-| P4 PDF→Markdown & exercise sheets | M4 — a sheet becomes a workable note | 2/4 |
+| P4 PDF→Markdown & exercise sheets | M4 — a sheet becomes a workable note | ✅ |
 | P5 Versioned workspaces (Git) | M5 — my notes commit themselves | |
 | P6 STEM authoring | M6 — fastest place to write maths | |
 | P7 IDE integration | M7 — notes and code are one workflow | |
@@ -134,12 +134,18 @@ Bugs found after the freeze that do not clear the bar above. Recorded so they ar
 
 - *(none yet)*
 
-### P4-3 Exercise splitting & solution scaffold — **M** — *step 3, closes M4*
-- [ ] Split on exercise headings (`Aufgabe N`, `Task N`, `Exercise N`, `Problem N`, `N.`) into `## Task N` + `### Solution` pairs
-- [ ] **"Add next task"** command — appends the next correctly-numbered pair, so space per task is never planned in advance
-- [ ] No heading match → convert as one unsplit document; never drop content
+### P4-3 Exercise splitting & solution scaffold — **M** ✅ — *step 3, closes M4*
+- [x] Split on exercise headings (`Aufgabe N`, `Beispiel N.M`, `Task N`, `Exercise N`, `Problem N`, `N.`) into `## Task N` + `### Solution` pairs
+- [x] **"Add next task"** command — appends the next correctly-numbered pair, so space per task is never planned in advance
+- [x] No heading match → convert as one unsplit document; never drop content
 
-- [ ] **Decide:** split-pane editing (sheet | solution) — deferred until now, and this is the first case with a concrete argument for it
+> **The pattern is chosen once per document, not per block.** Ue5/6/9 name their exercises `Beispiel N.M.` and use *top-level ordered items as sub-parts*, numbered continuously across exercises and restarting partway; the Analysis sheets do the exact opposite. Splitting either by the other's rule cuts inside every exercise it has, so the keyword pattern claims the document outright when it matches twice and ordered items are used only when it does not. Ordered items are then narrowed to the **longest consecutive run starting at 1** — which is what excludes the `11. Übungsblatt` line every Analysis sheet opens with, without a list of title words that would only be a guess about the next document.
+>
+> Bodies are copied verbatim, because a sub-part sits four spaces under its parent's marker and stripping the marker would leave the children as an indented code block. The cost is a visible `## Task 1` above a `1.` — cosmetic, and cheaper than the nesting damage the alternative risks. The one exception is an opener that is *itself* indented: Ue6's `Beispiel 6.3.` arrives eight spaces in and was silently missed while its four siblings split, costing the sheet an exercise. It is dedented along with its body.
+>
+> Measured across all ten corpus sheets: every one splits completely, labels taken from the source (`1`…`6`, or `5.1`…`5.5`), no gaps. `pdf/exercises.rs` runs on the assembled Markdown rather than on `Block`s — an exercise routinely spans a page break, and blocks only ever exist one page (one *region*) at a time.
+
+- [ ] **Decide:** split-pane editing (sheet | solution) — *still owed.* Explicitly out of scope for P4-3 and not a dependency of anything shipped above; the scaffold works in one pane. See `docs/specs/pdf-exercise-splitting-design.md`.
 
 ---
 

@@ -5,6 +5,7 @@ import { ReactRenderer } from '@tiptap/react'
 import { forwardRef, useEffect, useImperativeHandle, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { inkApi } from '../../lib/ink'
+import { nextTaskLabel } from '../../lib/taskScaffold'
 import type { InkData } from '../../ink/types'
 
 const INK_WIDTH = 700
@@ -16,6 +17,11 @@ interface Cmd {
   title: string
   description: string
   run: (params: { editor: Editor; range: Range }) => void
+}
+
+function getMarkdown(editor: Editor): string {
+  const storage = editor.storage as unknown as { markdown: { getMarkdown: () => string } }
+  return storage.markdown.getMarkdown()
 }
 
 const COMMANDS: Cmd[] = [
@@ -142,6 +148,28 @@ const COMMANDS: Cmd[] = [
     description: 'LaTeX block equation',
     run: ({ editor, range }) =>
       editor.chain().focus().deleteRange(range).insertContent({ type: 'blockMath', attrs: { latex: '' } }).run(),
+  },
+  {
+    title: 'Add Next Task',
+    description: 'Append the next numbered Task and Solution pair',
+    // Appended at the end of the note rather than at the cursor: the point is
+    // that room for one more exercise is never something to plan in advance,
+    // and the next task belongs after the last one wherever you happen to be.
+    // Built as nodes rather than Markdown so the heading text is exactly what
+    // `nextTaskLabel` will read back on the following invocation.
+    run: ({ editor, range }) => {
+      const label = nextTaskLabel(getMarkdown(editor))
+      editor
+        .chain()
+        .focus()
+        .deleteRange(range)
+        .insertContentAt(editor.state.doc.content.size, [
+          { type: 'heading', attrs: { level: 2 }, content: [{ type: 'text', text: `Task ${label}` }] },
+          { type: 'heading', attrs: { level: 3 }, content: [{ type: 'text', text: 'Solution' }] },
+          { type: 'paragraph' },
+        ])
+        .run()
+    },
   },
   {
     title: 'Table',

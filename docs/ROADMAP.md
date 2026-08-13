@@ -1,6 +1,6 @@
 # null-notes — Product & Technical Roadmap
 
-**Last updated:** 2026-08-13 (**roadmap revision** — see [`specs/roadmap-revision-design.md`](specs/roadmap-revision-design.md). The two weeks since the last update went almost entirely into PDF pipeline refinement, which the roadmap had no boundary for; this revision adds one (§Phase 4, "Pipeline completion criteria"), records the app's actual identity and two closed questions (§1), and **replaces the execution order in §6** — phase numbers are now identity, not order. **Next: ~~finish ruled fractions~~ → ~~freeze the pipeline~~ → triage the three open bugs → P4-3 → the dogfood slice.** Ruled fractions landed and **the pipeline is frozen** as of 2026-08-13 — see §Phase 4, P4-2e.)
+**Last updated:** 2026-08-13 (**roadmap revision** — see [`specs/roadmap-revision-design.md`](specs/roadmap-revision-design.md). The two weeks since the last update went almost entirely into PDF pipeline refinement, which the roadmap had no boundary for; this revision adds one (§Phase 4, "Pipeline completion criteria"), records the app's actual identity and two closed questions (§1), and **replaces the execution order in §6** — phase numbers are now identity, not order. **Next: ~~finish ruled fractions~~ → ~~freeze the pipeline~~ → ~~triage the three open bugs~~ → ~~P4-3~~ → the dogfood slice.** As of 2026-08-13 ruled fractions landed, **the pipeline is frozen** (§Phase 4, P4-2e), all three bugs are triaged — two fixed in the editor, one did not reproduce — and **P4-3 closed M4**. The next work is the dogfood slice: P7-3a's scan ignore list, then P7-3, then P7-4 + P7-1, then P8-1.)
 
 *Previously, 2026-07-30: M0–M3 all reached — P2-3 closed M2; P4-1 + P4-2 done — PDF→Markdown converts from the embedded text layer with no OCR, and equations are rebuilt as LaTeX rather than mangled into text; re-scoped against `notes/Plan.md`; Phases 5 "Versioned Workspaces" and 9 "Study & Revision" added — the first features that go beyond the original brief.*
 **Audience of this doc:** the maintainer (solo dev).
@@ -152,7 +152,7 @@ Given "personal daily driver," priority = **`(daily-use value) × (risk of data 
 | **P1** | Everyday-use completeness | **M1:** I don't reach for another app | ✅ | Small gaps that break flow (links, refresh, quick-switch) |
 | **P2** | Feel & ergonomics | **M2:** it's a pleasure to use for hours | ✅ | Compounding daily quality-of-life |
 | **P3** | Headline features & power tools | **M3:** the CS-specific superpowers land | ✅ | PDF-as-reference, export, graph |
-| **P4** | PDF→Markdown & exercise sheets | **M4:** an exercise sheet becomes a workable note in one step | 2/4 | The brief's own flagship; the biggest single time-saver |
+| **P4** | PDF→Markdown & exercise sheets | **M4:** an exercise sheet becomes a workable note in one step | ✅ | The brief's own flagship; the biggest single time-saver |
 | **P5** | Versioned workspaces (Git automation) | **M5:** my notes commit themselves, in both kinds of repo | | The next tier of P0's data safety — a commit is a recoverable backup |
 | **P6** | STEM authoring | **M6:** writing maths/algorithms is faster here than anywhere else | | Compounds on every note; cheap, since the infra exists |
 | **P7** | IDE integration | **M7:** notes and code are one workflow, not two | | The brief's second pillar — "integrate, don't replace" |
@@ -451,14 +451,26 @@ The two ways P4-1 can produce garbage. Both must fail visibly, never silently.
 
 - **DoD:** the rules above are recorded here and in `TODO.md`; the next 2D shape encountered is filed rather than fixed. ✅ — `TODO.md`'s P4-2e now carries a **"Filed, not fixed"** list, which is where a post-freeze bug goes instead of into a commit. An empty list is the feature working, not a gap.
 
-### P4-3 — Exercise splitting, solution scaffold, and "add next task" — **M**
+### P4-3 — Exercise splitting, solution scaffold, and "add next task" — **M** ✅
 The part the brief says "would save students hours every semester."
 - Split the converted sheet on an exercise-heading pattern (`Aufgabe 3`, `Task 3`, `Exercise 3`, `Problem 3`, `3.`) into `## Task N` sections, each followed by a `### Solution` block.
 - **"Add next task"** — a command/button that appends the next correctly-numbered Task/Solution pair, so space per task is never something to plan in advance (the brief's explicit ask).
 - **Dependency:** P4-1. Independent of P4-2.
 - **DoD:** A sheet with 5 exercises converts to 5 `## Task N` + `### Solution` pairs; "add next task" appends a correctly-numbered sixth. Where the heading pattern doesn't match, the note converts as one unsplit document — a miss degrades to plain conversion, never to dropped content.
 
-**Exit check for M4:** both import modes work and are chosen at import; a real exercise sheet from a real course converts into a note that is genuinely faster to work in than transcribing by hand.
+*Done. `pdf/exercises.rs` runs on the assembled Markdown, not on `Block`s — an exercise routinely spans a page break, and blocks only ever exist one page (one region) at a time.*
+
+***The one real decision: the splitting pattern is chosen once per document, never per block.*** *The corpus holds two shapes that invert each other. The Analysis sheets number exercises as top-level ordered items with indented sub-parts; Ue5/6/9 name theirs `Beispiel N.M.` and use top-level ordered items as the sub-parts — numbered continuously across exercises, and restarting partway. Splitting either one by the other's rule cuts inside every exercise on the sheet, so the keyword pattern claims the document outright when it matches at least twice (one match is a mention in prose, not a structure), and ordered items are consulted only when it does not.*
+
+*Two things the real documents forced:*
+- ***The sheet's own number is indistinguishable from an exercise.** Every Analysis sheet opens with `11. Übungsblatt` — a digit, a dot, and some text. Taking only the longest consecutive run starting at 1 excludes it, and does so without a list of title words ("Übungsblatt", "Sheet", "Assignment"), which would be a guess about the next document rather than a fact about this one.*
+- ***An exercise opener can be indented.** Ue6's `Beispiel 6.3.` arrives eight spaces in and was silently missed while its four siblings split — the sheet quietly lost an exercise. A keyword opener is unambiguous at any indentation, so indentation is now allowed there (and only there; an indented `1.` genuinely is a sub-part). Its body is dedented with it, since under a `## Task` heading there is no enclosing list left and eight spaces would make the whole exercise a code block.*
+
+*Bodies are otherwise copied verbatim, list markers included: a sub-part sits four spaces under its parent's marker, so stripping the marker would strand the children as an indented code block. The cost is a visible `## Task 1` sitting above a `1.` — cosmetic, and cheaper than the nesting damage the alternative risks.*
+
+*Measured across all ten corpus sheets: every one splits completely, labels taken from the source, no gaps. "Add next task" is a slash command building nodes rather than Markdown, so the heading text is exactly what `nextTaskLabel` reads back next time; it counts from the last heading rather than the numerically highest, because what "the next one" means to a reader is positional.*
+
+**Exit check for M4:** both import modes work and are chosen at import ✅; a real exercise sheet from a real course converts into a note that is genuinely faster to work in than transcribing by hand — **the remaining half of this check is the one thing code cannot supply.** Ten sheets convert correctly and split correctly, but the judgement "faster than by hand" is a use judgement, and §1's second closed question records that the maintainer is building rather than using. **M4 is reached on the evidence available; the dogfood slice is what confirms it.**
 
 ---
 
