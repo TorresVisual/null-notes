@@ -88,7 +88,7 @@ pub fn pages_to_markdown(pages: &[ExtractedPage]) -> models::PdfMarkdownImport {
                 continue;
             }
             let image_refs = take_images_as_refs(&page.images, &mut pending, &mut next_placeholder);
-            let markdown = layout::chars_and_images_to_markdown(&[], &image_refs);
+            let markdown = layout::chars_rules_and_images_to_markdown(&[], &[], &image_refs);
             if !markdown.trim().is_empty() {
                 chunks.push(markdown.trim_end().to_string());
             }
@@ -113,10 +113,12 @@ pub fn pages_to_markdown(pages: &[ExtractedPage]) -> models::PdfMarkdownImport {
             }
         }
 
-        for (region, imgs) in regions.iter().zip(images_by_region) {
+        for ((region, bounds), imgs) in regions.iter().zip(&region_bounds).zip(images_by_region) {
             let owned: Vec<ExtractedImage> = imgs.into_iter().cloned().collect();
             let image_refs = take_images_as_refs(&owned, &mut pending, &mut next_placeholder);
-            let markdown = layout::chars_and_images_to_markdown(region, &image_refs);
+            let region_rules = columns::rules_for_region(&page.rules, *bounds);
+            let markdown =
+                layout::chars_rules_and_images_to_markdown(region, &region_rules, &image_refs);
             if !markdown.trim().is_empty() {
                 chunks.push(markdown.trim_end().to_string());
             }

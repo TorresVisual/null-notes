@@ -2338,3 +2338,21 @@ fn a_single_row_page_is_left_untouched() {
 
     assert_eq!(markdown, "3\n");
 }
+
+// Rules reach the row stage without changing anything on their own: the
+// rule-free default has to stay byte-identical to today's output, because
+// that is what makes "the existing geometric passes handle the leftovers" a
+// structural property rather than a promise.
+#[test]
+fn a_page_with_no_rules_converts_exactly_as_before() {
+    let chars = page_at(700.0, &["Hello world", "a second line of prose"]);
+
+    assert_eq!(chars_and_rules_to_markdown(&chars, &[]), chars_to_markdown(&chars));
+}
+
+#[test]
+fn group_lines_with_no_rules_matches_group_lines() {
+    let chars = page_at(700.0, &["Hello world", "a second line of prose"]);
+
+    assert_eq!(group_lines_with_rules(&chars, &[]), group_lines(&chars));
+}

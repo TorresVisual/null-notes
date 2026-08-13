@@ -7,6 +7,7 @@
 //! `CharBox` geometry, fully unit-testable without the native library.
 
 use super::layout::{self, CharBox};
+use super::rules::RuleBox;
 
 /// A row-run, each character still tagged with its position in the page's
 /// own extraction stream — see `flatten`'s doc comment for why that tag has
@@ -316,5 +317,18 @@ pub fn segment_regions(chars: &[CharBox]) -> Vec<Vec<CharBox>> {
             Some(cols) => cols.iter().map(|c| flatten(c)).collect::<Vec<_>>(),
             None => vec![flatten(band_rows)],
         })
+        .collect()
+}
+
+/// The rules belonging to a region spanning `bounds`, by horizontal overlap.
+/// A rule overlapping no region at all is dropped rather than forced into the
+/// nearest one: unlike an image, a rule that does not sit over a column's own
+/// content cannot be a fraction bar for it.
+pub fn rules_for_region(rules: &[RuleBox], bounds: (f32, f32)) -> Vec<RuleBox> {
+    let (x0, x1) = bounds;
+    rules
+        .iter()
+        .filter(|rule| layout::range_overlap(rule.x0, rule.x1, x0, x1) > 0.0)
+        .copied()
         .collect()
 }

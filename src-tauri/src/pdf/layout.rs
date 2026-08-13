@@ -11,6 +11,7 @@
 
 use super::latex;
 use super::maths::Family;
+use super::rules::RuleBox;
 use std::collections::BTreeMap;
 use unicode_normalization::UnicodeNormalization;
 
@@ -604,6 +605,17 @@ pub(super) fn baseline_label(row: &[CharBox]) -> String {
     label
 }
 
+/// Reconstructs fractions from the rules the PDF draws — see
+/// `docs/specs/pdf-ruled-fraction-reconstruction-design.md`. Filled in by
+/// Task 4 of the implementation plan; passes every row through untouched
+/// until then.
+fn reconstruct_ruled_fractions(
+    rows: Vec<Vec<(usize, CharBox)>>,
+    _rules: &[RuleBox],
+) -> (Vec<Line>, Vec<Vec<(usize, CharBox)>>) {
+    (Vec::new(), rows)
+}
+
 /// Finds and reconstructs a "sum of stacked fractions" — several fractions
 /// joined by `+`/`-`, with every numerator on one row and every denominator
 /// on another, the way exercise 1(b) on Analysis_1_Blatt2_2025.pdf sets
@@ -937,6 +949,15 @@ fn reconstruct_tables(rows: Vec<Vec<(usize, CharBox)>>) -> (Vec<Line>, Vec<Vec<(
 
 /// Groups characters into lines by baseline, then into styled spans.
 pub fn group_lines(chars: &[CharBox]) -> Vec<Line> {
+    group_lines_with_rules(chars, &[])
+}
+
+/// As [`group_lines`], but also given the horizontal rules the page draws, so
+/// [`reconstruct_ruled_fractions`] can read a fraction's term count and term
+/// boundaries off the bars instead of inferring them. A rule-free call is
+/// exactly today's behaviour, which is what keeps the existing geometric
+/// passes in charge of every document whose producer draws no rules.
+pub fn group_lines_with_rules(chars: &[CharBox], rules: &[RuleBox]) -> Vec<Line> {
     if chars.is_empty() {
         return Vec::new();
     }
@@ -1068,6 +1089,8 @@ pub fn group_lines(chars: &[CharBox]) -> Vec<Line> {
     let (mut lines, rows) = reconstruct_cases(rows);
     let (matrix_lines, rows) = reconstruct_matrices(rows);
     lines.extend(matrix_lines);
+    let (ruled_lines, rows) = reconstruct_ruled_fractions(rows, rules);
+    lines.extend(ruled_lines);
     let (frac_lines, rows) = reconstruct_fraction_sums(rows);
     lines.extend(frac_lines);
     let (table_lines, rows) = reconstruct_tables(rows);
@@ -3053,8 +3076,13 @@ pub fn blocks_to_markdown(blocks: &[Block]) -> String {
 
 /// The whole pipeline: characters in, Markdown out.
 pub fn chars_to_markdown(chars: &[CharBox]) -> String {
-    let lines = reconstruct_fractions(reconstruct_operator_limits(group_lines(chars)));
-    blocks_to_markdown(&group_blocks(&lines))
+    chars_rules_and_images_to_markdown(chars, &[], &[])
+}
+
+/// As [`chars_to_markdown`], with the page's drawn rules — see
+/// [`group_lines_with_rules`].
+pub fn chars_and_rules_to_markdown(chars: &[CharBox], rules: &[RuleBox]) -> String {
+    chars_rules_and_images_to_markdown(chars, rules, &[])
 }
 
 /// One page image, ready to be interleaved into reading order. `left`/
@@ -3084,7 +3112,17 @@ pub struct ImageRef {
 /// silently collapse the page's computed left margin and inflate every
 /// list item's indent depth on any page containing an image.
 pub fn chars_and_images_to_markdown(chars: &[CharBox], images: &[ImageRef]) -> String {
-    let mut lines = group_lines(chars);
+    chars_rules_and_images_to_markdown(chars, &[], images)
+}
+
+/// The full entry point: characters, the rules the page draws, and its
+/// images. The other three are this one with empty slices.
+pub fn chars_rules_and_images_to_markdown(
+    chars: &[CharBox],
+    rules: &[RuleBox],
+    images: &[ImageRef],
+) -> String {
+    let mut lines = group_lines_with_rules(chars, rules);
     lines.extend(images.iter().map(|img| Line {
         content: vec![Inline::ImageRef(img.placeholder.clone(), img.alt.clone())],
         x: img.left,
@@ -3144,7 +3182,7 @@ const CASES_COLUMN_TOLERANCE: f32 = 1.0;
 // the column-alignment check for the two real case rows above it.
 const CASES_MAX_ROW_GAP: f32 = 3.0;
 
-fn range_overlap(a0: f32, a1: f32, b0: f32, b1: f32) -> f32 {
+pub(super) fn range_overlap(a0: f32, a1: f32, b0: f32, b1: f32) -> f32 {
     (a1.min(b1) - a0.max(b0)).max(0.0)
 }
 

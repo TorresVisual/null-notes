@@ -325,3 +325,31 @@ fn a_header_above_a_two_column_body_becomes_three_regions_in_order() {
 fn segment_regions_on_empty_input_is_empty() {
     assert_eq!(segment_regions(&[]), Vec::<Vec<CharBox>>::new());
 }
+
+use super::rules::RuleBox;
+
+fn rule_at(x0: f32, x1: f32, y: f32) -> RuleBox {
+    RuleBox { x0, x1, y, thickness: 0.96 }
+}
+
+// A rule joins the column its span overlaps, so a two-column page's fraction
+// bars reach the region that actually contains their numerator.
+#[test]
+fn a_rule_joins_the_region_it_overlaps() {
+    let rules = [rule_at(80.0, 120.0, 500.0), rule_at(320.0, 360.0, 500.0)];
+
+    let left = rules_for_region(&rules, (72.0, 280.0));
+    let right = rules_for_region(&rules, (300.0, 520.0));
+
+    assert_eq!(left.len(), 1);
+    assert_eq!(left[0].x0, 80.0);
+    assert_eq!(right.len(), 1);
+    assert_eq!(right[0].x0, 320.0);
+}
+
+#[test]
+fn a_rule_overlapping_nothing_joins_no_region() {
+    let rules = [rule_at(80.0, 120.0, 500.0)];
+
+    assert!(rules_for_region(&rules, (300.0, 520.0)).is_empty());
+}
