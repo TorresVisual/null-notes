@@ -110,6 +110,20 @@ Glyphs are not the only input. A fraction bar is a **drawn rule**, not a charact
 
 Judging this pipeline means looking at real output: `pdf/dump.rs` holds `#[ignore]`d diagnostics driven by `NULL_NOTES_PDF`. Every bug found so far was invisible in synthetic fixtures.
 
+**The pipeline is frozen** (roadmap §P4-2e). The ten sheets in `notes/exercise_sheets/` are the regression suite and adding one is a deliberate decision. A new bug earns work only if it is whole-document — silent prose loss, mid-word tearing — or recurs across two or more of them; single-document cosmetic bugs get recorded in `TODO.md` under "Filed, not fixed" and left. 2D-layout reconstruction is closed: matrices, `\cases`, stacked fractions, operator limits, tables and ruled fractions are the complete set, and anything else renders as glyph-order text. `pdf/exercises.rs` is the one part still open to change, and it works on the assembled Markdown rather than on `Block`s because an exercise spans page breaks while blocks exist one region at a time.
+
+---
+
+## Launching external processes
+
+`commands/editor_launch.rs` runs the user's editor on a path **taken from note text**, and a note is a hand-editable file that may arrive by Git pull, by Syncthing, or out of a converted PDF. The target is attacker-influenced and the sink is process execution, so three properties are structural rather than checks:
+
+- **No shell.** `std::process::Command` with one `.arg()` per argument. Never `sh -c` or `cmd /c`.
+- **Tokenize the command template *before* substitution, never after.** Splitting a filled-in string back into words reintroduces exactly the injection this prevents. The tokenizer never sees a resolved path.
+- **Refuse any path component that is not `Component::Normal`** — as written, never normalised and then compared. Normalising opens a gap between the string that was checked and the string that runs. `commands/assets.rs`'s `resolve_relative` is the same rule for file reads.
+
+Anything that resolves must also exist; an unresolvable link renders inert rather than launching. A failed existence lookup marks its targets unresolved, so this fails inert and never open.
+
 ## TypeScript Guidelines
 
 ### Config
