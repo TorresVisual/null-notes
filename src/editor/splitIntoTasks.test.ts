@@ -104,6 +104,17 @@ describe('splitting a sheet into tasks', () => {
     expect(writeInk).not.toHaveBeenCalled()
   })
 
+  // Both entry points used to fire this as a bare `void promise.then(...)`, so
+  // a backend that had not been rebuilt — and therefore did not carry the
+  // command at all — produced no message, no change, and no clue. The failure
+  // has to reach the caller.
+  it('rejects rather than swallowing a backend failure', async () => {
+    const e = mount('<p>1. Erste</p>')
+    splitIntoTasksIpc.mockRejectedValue(new Error('command split_into_tasks not found'))
+
+    await expect(splitIntoTasks(e)).rejects.toThrow('not found')
+  })
+
   it('reports no-structure and changes nothing when the splitter found none', async () => {
     const e = mount('<p>ordinary prose</p>')
     splitIntoTasksIpc.mockImplementation((md) => Promise.resolve(md))

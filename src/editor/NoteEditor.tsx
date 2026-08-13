@@ -6,7 +6,7 @@ import { coreExtensions } from './extensions'
 import { rememberPosition, recallPosition } from '../lib/notePositions'
 import { handleEditorKeyDown, handleEditorTextInput } from './extensions/CodeBlockEditor'
 import { inkApi } from '../lib/ink'
-import { splitIntoTasks } from './splitIntoTasks'
+import { splitIntoTasks, report } from './splitIntoTasks'
 import type { InkData } from '../ink/types'
 import { EditorStatusBar } from './EditorStatusBar'
 import { BlockHandle } from './extensions/BlockHandle'
@@ -152,11 +152,15 @@ export function NoteEditor({ content, notePath, spellcheck, spellcheckLanguage, 
     async function onSplitTasks() {
       if (!editor) return
       if (!confirm('Rewrite this note into Task / Solution sections, each with a handwriting canvas?')) return
-      if ((await splitIntoTasks(editor)) === 'no-structure') {
-        alert('No exercise structure found in this note — nothing was changed.')
-        return
+      try {
+        if ((await splitIntoTasks(editor)) === 'no-structure') {
+          alert('No exercise structure found in this note — nothing was changed.')
+          return
+        }
+        onChange(getMarkdown(editor.storage))
+      } catch (error) {
+        report(error)
       }
-      onChange(getMarkdown(editor.storage))
     }
     // Named, so the removal targets the same function the addition registered.
     const handler = () => void onSplitTasks()

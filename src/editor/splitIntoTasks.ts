@@ -11,6 +11,20 @@ import type { InkData } from '../ink/types'
 
 export type SplitOutcome = 'split' | 'no-structure'
 
+/**
+ * Reports a failed command instead of letting it vanish.
+ *
+ * Both entry points used to fire this work as a bare `void promise.then(…)`,
+ * so anything that rejected — a backend that has not been rebuilt and so does
+ * not carry the command at all, a sidecar that could not be written — did
+ * nothing whatsoever: no message, no change, no clue. The same rule the save
+ * path has had since P0-2 applies here; a command that fails has to say so.
+ */
+export function report(error: unknown): void {
+  const message = error instanceof Error ? error.message : String(error)
+  alert(`Split Into Tasks failed: ${message}`)
+}
+
 function emptyInk(): InkData {
   return { width: SOLUTION_INK_WIDTH, height: SOLUTION_INK_HEIGHT, strokes: [], shapes: [] }
 }

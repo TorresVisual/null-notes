@@ -6,7 +6,7 @@ import { forwardRef, useEffect, useImperativeHandle, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { inkApi } from '../../lib/ink'
 import { nextTaskLabel } from '../../lib/taskScaffold'
-import { splitIntoTasks, addNextTask } from '../splitIntoTasks'
+import { splitIntoTasks, addNextTask, report } from '../splitIntoTasks'
 import type { InkData } from '../../ink/types'
 
 const INK_WIDTH = 700
@@ -158,11 +158,13 @@ const COMMANDS: Cmd[] = [
     // only the reader can make — a lecture script is not one.
     run: ({ editor, range }) => {
       editor.chain().focus().deleteRange(range).run()
-      void splitIntoTasks(editor).then((outcome) => {
-        if (outcome === 'no-structure') {
-          alert('No exercise structure found in this note — nothing was changed.')
-        }
-      })
+      void splitIntoTasks(editor)
+        .then((outcome) => {
+          if (outcome === 'no-structure') {
+            alert('No exercise structure found in this note — nothing was changed.')
+          }
+        })
+        .catch(report)
     },
   },
   {
@@ -176,7 +178,7 @@ const COMMANDS: Cmd[] = [
     run: ({ editor, range }) => {
       const label = nextTaskLabel(getMarkdown(editor))
       editor.chain().focus().deleteRange(range).run()
-      void addNextTask(editor, label)
+      void addNextTask(editor, label).catch(report)
     },
   },
   {
