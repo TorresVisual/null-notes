@@ -2,7 +2,7 @@
 
 ## Problem
 
-A converted sheet is one flat document. The brief calls the exercise workflow "a flagship feature" worth "hours every semester," and the missing half is that there is nowhere to *write* — you convert the sheet, then hand-build a heading and a gap under every exercise before you can start solving. P4-3 closes M4 by doing that automatically, and by making "I need room for one more" a single command rather than a formatting job.
+A converted sheet is one flat document. The brief calls the exercise workflow "a flagship feature" worth "hours every semester," and the missing half is that there is nowhere to *write* — you convert the sheet, then hand-build a heading and a gap under every exercise before you can start solving. P4-3 closes M4 by making that one command, and by making "I need room for one more" another — both run when you ask, never on their own (see *When it runs*).
 
 The whole feature is one question: **where does one exercise end and the next begin?** Everything else follows.
 
@@ -93,16 +93,28 @@ An editor command appending `## Task N+1` / `### Solution` at the end of the not
 
 If neither pattern wins, the note converts exactly as it does today — one unsplit document. A miss costs the scaffold, never a line of content. The transform only ever *inserts* headings and blank lines between blocks that already exist; there is no path on which it drops or rewrites the exercise text itself, and that is the property the tests assert.
 
+## When it runs — never on its own
+
+**Splitting is always an explicit request, never part of an import.** The first implementation ran it unconditionally inside `pages_to_markdown`, and that was wrong: turning a document into an exercise sheet asserts *what the document is*, and a lecture script, a paper, or a problem set already written up would all be rewritten just as readily. Only the reader can make that claim, so only the reader triggers it.
+
+Concretely: a Markdown import produces plain Markdown, exactly as it did before P4-3. **Split Into Tasks** — in the slash menu and the File menu — rewrites the note in front of you, on demand. Deciding after conversion is also the better moment, because you can see what you actually got. A note with no exercise structure says so and changes nothing, rather than silently rewriting or silently doing nothing.
+
+Nothing is remembered. A remembered "always split" setting would be the automatic behaviour again, wearing a checkbox.
+
+`pdf/extract.rs` carries a test asserting that an import of a numbered document produces no `## Task` headings — the regression guard for exactly this.
+
 ## Where it lives
 
-`pdf/exercises.rs`, a new pdfium-free module operating on the rendered block list, called from the same place `blocks_to_markdown` is. Pdfium-free for the reason `layout.rs`, `columns.rs` and `rules.rs` are: it is the only way the corpus can be a regression suite on a machine with no native library.
+`src/exercises.rs` — a top-level module, deliberately **not** under `pdf/`, because the PDF pipeline does not call it and a hand-written note is as valid an input as a converted sheet. It is pdfium-free for the reason `layout.rs`, `columns.rs` and `rules.rs` are: that is what lets the corpus be a regression suite on a machine with no native library.
 
-**This is not a reopening of the frozen pipeline.** The P4-2e freeze closes 2D-layout reconstruction and bounds bug-chasing against the corpus; P4-3 is the planned feature the same revision put immediately after it. Nothing here touches geometry — it reads structure `layout.rs` has already decided.
+The Tauri command takes and returns Markdown rather than a note path: the caller is the open editor, whose buffer may hold edits that have not reached disk, and rewriting the file underneath it would fight the save path.
+
+**Neither this nor P4-3 reopens the frozen pipeline.** The P4-2e freeze closes 2D-layout reconstruction and bounds bug-chasing against the corpus; nothing here touches geometry — it reads structure `layout.rs` has already decided.
 
 The "add next task" half is a TipTap command in the editor, not Rust: it operates on the open document, and a note the user has since edited by hand is the only thing it can sensibly count tasks from.
 
 ## Out of scope
 
-- **Detecting where a solution ends.** The scaffold is created once, at import. Nothing re-parses or re-numbers a note afterwards; a note that rewrites itself behind the user is exactly what the plain-`.md` principle exists to prevent.
+- **Detecting where a solution ends.** The scaffold is created once, when you run the command. Nothing re-parses or re-numbers a note afterwards; a note that rewrites itself behind the user is exactly what the plain-`.md` principle exists to prevent.
 - **Split-pane editing (sheet | solution).** A separate, still-owed decision — recorded in `TODO.md` — and not a dependency of anything above.
 - **Sub-part scaffolding.** A `### Solution` per lettered sub-part is plausible and unrequested; three similar things is not a pattern yet.

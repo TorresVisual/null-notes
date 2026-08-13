@@ -32,6 +32,8 @@ export const api = {
       invoke<NoteMetadata[]>('backlinks_for', { workspace, title }),
     createFolder: (parent: string, name: string) =>
       invoke<string>('create_folder', { parent, name }),
+    splitIntoTasks: (markdown: string) =>
+      invoke<string>('split_into_tasks', { markdown }),
     scaffoldProjectNotes: (workspace: string) =>
       invoke<NoteMetadata[]>('scaffold_project_notes', { workspace }),
     resolveCodeLinks: (workspace: string, targets: string[]) =>

@@ -5,6 +5,7 @@ import { ReactRenderer } from '@tiptap/react'
 import { forwardRef, useEffect, useImperativeHandle, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { inkApi } from '../../lib/ink'
+import { api } from '../../lib/tauri'
 import { nextTaskLabel } from '../../lib/taskScaffold'
 import type { InkData } from '../../ink/types'
 
@@ -148,6 +149,23 @@ const COMMANDS: Cmd[] = [
     description: 'LaTeX block equation',
     run: ({ editor, range }) =>
       editor.chain().focus().deleteRange(range).insertContent({ type: 'blockMath', attrs: { latex: '' } }).run(),
+  },
+  {
+    title: 'Split Into Tasks',
+    description: 'Rewrite this note as Task / Solution sections',
+    // Never happens on its own. A PDF import produces a plain note, because
+    // "this document is an exercise sheet" is a claim about the document that
+    // only the reader can make — a lecture script is not one.
+    run: ({ editor, range }) => {
+      editor.chain().focus().deleteRange(range).run()
+      void api.notes.splitIntoTasks(getMarkdown(editor)).then((after) => {
+        if (after === getMarkdown(editor)) {
+          alert('No exercise structure found in this note — nothing was changed.')
+          return
+        }
+        editor.commands.setContent(after)
+      })
+    },
   },
   {
     title: 'Add Next Task',

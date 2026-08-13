@@ -6,6 +6,7 @@ import { coreExtensions } from './extensions'
 import { rememberPosition, recallPosition } from '../lib/notePositions'
 import { handleEditorKeyDown, handleEditorTextInput } from './extensions/CodeBlockEditor'
 import { inkApi } from '../lib/ink'
+import { api } from '../lib/tauri'
 import type { InkData } from '../ink/types'
 import { EditorStatusBar } from './EditorStatusBar'
 import { BlockHandle } from './extensions/BlockHandle'
@@ -142,6 +143,29 @@ export function NoteEditor({ content, notePath, spellcheck, spellcheckLanguage, 
     window.addEventListener('command:insert-ink', onInsertInk)
     return () => window.removeEventListener('command:insert-ink', onInsertInk)
   }, [editor, notePath])
+
+  // Same shape, for "Split Into Tasks". Confirmed before it runs: this
+  // rewrites the whole note, and asserting that a document *is* an exercise
+  // sheet is a claim only the reader can make — which is why no import path
+  // does it automatically.
+  useEffect(() => {
+    async function onSplitTasks() {
+      if (!editor) return
+      const before = getMarkdown(editor.storage)
+      const after = await api.notes.splitIntoTasks(before)
+      if (after === before) {
+        alert('No exercise structure found in this note — nothing was changed.')
+        return
+      }
+      if (!confirm('Rewrite this note into Task / Solution sections?')) return
+      editor.commands.setContent(after)
+      onChange(getMarkdown(editor.storage))
+    }
+    // Named, so the removal targets the same function the addition registered.
+    const handler = () => void onSplitTasks()
+    window.addEventListener('command:split-tasks', handler)
+    return () => window.removeEventListener('command:split-tasks', handler)
+  }, [editor, onChange])
 
   const codeLanguage = editor?.getAttributes('codeBlock')['language']
   const selectedCodeLanguage = typeof codeLanguage === 'string' ? codeLanguage : ''

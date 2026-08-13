@@ -135,10 +135,12 @@ Bugs found after the freeze that do not clear the bar above. Recorded so they ar
 - *(none yet)*
 
 ### P4-3 Exercise splitting & solution scaffold — **M** ✅ — *step 3, closes M4*
-- [x] Split on exercise headings (`Aufgabe N`, `Beispiel N.M`, `Task N`, `Exercise N`, `Problem N`, `N.`) into `## Task N` + `### Solution` pairs
+- [x] Split on exercise headings (`Aufgabe N`, `Beispiel N.M`, `Task N`, `Exercise N`, `Problem N`, `N.`) into `## Task N` + `### Solution` pairs — **on request only**, via *Split Into Tasks* in the slash menu and File menu
 - [x] **"Add next task"** command — appends the next correctly-numbered pair, so space per task is never planned in advance
 - [x] No heading match → convert as one unsplit document; never drop content
 
+> **Importing a PDF never does this.** The first cut ran splitting unconditionally inside `pages_to_markdown`, which was wrong: asserting a document *is* an exercise sheet is a claim only the reader can make, and a lecture script or a paper would have been rewritten just as readily. A Markdown import now produces plain Markdown and `extract.rs` has a test pinning that; the splitter moved out of `pdf/` to `src/exercises.rs`, since the pipeline no longer calls it and a hand-written note is as valid an input. Nothing is remembered — a remembered "always split" setting would be the same automatic behaviour wearing a checkbox.
+>
 > **The pattern is chosen once per document, not per block.** Ue5/6/9 name their exercises `Beispiel N.M.` and use *top-level ordered items as sub-parts*, numbered continuously across exercises and restarting partway; the Analysis sheets do the exact opposite. Splitting either by the other's rule cuts inside every exercise it has, so the keyword pattern claims the document outright when it matches twice and ordered items are used only when it does not. Ordered items are then narrowed to the **longest consecutive run starting at 1** — which is what excludes the `11. Übungsblatt` line every Analysis sheet opens with, without a list of title words that would only be a guess about the next document.
 >
 > Bodies are copied verbatim, because a sub-part sits four spaces under its parent's marker and stripping the marker would leave the children as an indented code block. The cost is a visible `## Task 1` above a `1.` — cosmetic, and cheaper than the nesting damage the alternative risks. The one exception is an opener that is *itself* indented: Ue6's `Beispiel 6.3.` arrives eight spaces in and was silently missed while its four siblings split, costing the sheet an exercise. It is dedented along with its body.

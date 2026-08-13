@@ -125,9 +125,7 @@ pub fn pages_to_markdown(pages: &[ExtractedPage]) -> models::PdfMarkdownImport {
         }
     }
 
-    // Splitting runs on the whole joined document, not per page: an exercise
-    // routinely starts on one page and finishes on the next.
-    let mut markdown = super::exercises::split_into_tasks(&chunks.join("\n\n"));
+    let mut markdown = chunks.join("\n\n");
     if !markdown.is_empty() {
         markdown.push('\n');
     }
@@ -553,6 +551,25 @@ mod tests {
 
         assert_eq!(result.markdown, "First page text here.\n\nSecond page text.\n");
         assert!(result.images.is_empty());
+    }
+
+    // Importing a PDF never decides it is an exercise sheet. Splitting is a
+    // claim about what the document *is*, and only the reader can make it — a
+    // lecture script or a paper would be rewritten just as readily. The
+    // splitter lives in `crate::exercises` and runs from a command on the open
+    // note; nothing in this module may call it.
+    #[test]
+    fn importing_a_numbered_document_does_not_turn_it_into_a_task_sheet() {
+        let pages = vec![
+            page_of("1. Berechnen Sie das Kurvenintegral."),
+            page_of("2. Gegeben ist die komplexe Funktion."),
+        ];
+
+        let markdown = pages_to_markdown(&pages).markdown;
+
+        assert!(!markdown.contains("## Task"), "import split it: {markdown}");
+        assert!(!markdown.contains("### Solution"), "import scaffolded it: {markdown}");
+        assert!(markdown.contains("1. Berechnen Sie das Kurvenintegral."));
     }
 
     #[test]

@@ -1,5 +1,6 @@
 pub mod commands;
 pub mod db;
+pub mod exercises;
 pub mod models;
 pub mod pdf;
 
@@ -22,6 +23,11 @@ fn build_menu(handle: &tauri::AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
             // A menu item and nothing else: scaffolding is on request only, so
             // it must never be reachable by opening a workspace.
             &MenuItem::with_id(handle, "scaffold-notes", "Scaffold Project Notes", true, None::<&str>)?,
+            &PredefinedMenuItem::separator(handle)?,
+            // On request only: a PDF import never does this on its own, because
+            // "this document is an exercise sheet" is a claim about the
+            // document that only the reader can make.
+            &MenuItem::with_id(handle, "split-tasks", "Split Into Tasks", true, None::<&str>)?,
             &PredefinedMenuItem::separator(handle)?,
             &MenuItem::with_id(handle, "export-pdf", "Export to PDF…", true, None::<&str>)?,
             &PredefinedMenuItem::separator(handle)?,
@@ -112,6 +118,7 @@ pub fn run() {
             commands::notes::graph_tags,
             commands::notes::create_folder,
             commands::notes::scaffold_project_notes,
+            commands::notes::split_into_tasks,
             commands::editor_launch::open_in_editor,
             commands::editor_launch::resolve_code_links,
             commands::notes::rename_folder,

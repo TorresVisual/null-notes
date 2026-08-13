@@ -1,11 +1,14 @@
-//! Splitting a converted sheet into `## Task N` / `### Solution` pairs.
+//! Splitting a note into `## Task N` / `### Solution` pairs.
 //!
-//! Runs on the assembled Markdown rather than on `layout::Block`s, because an
-//! exercise routinely spans a page break and blocks only ever exist one page —
-//! one *region* — at a time (see `extract::pages_to_markdown`).
+//! **Never automatic.** Turning a document into an exercise sheet is a claim
+//! about what it is, and a lecture script or a paper is not one — so this runs
+//! only when the user asks for it, on the note in front of them. It lives
+//! outside `pdf/` for that reason: the PDF pipeline does not call it, and a
+//! hand-written note is as valid an input as a converted sheet.
 //!
-//! Pdfium-free, like [`super::layout`] and [`super::rules`], so the corpus can
-//! stay a regression suite on a machine with no native library.
+//! Works on assembled Markdown rather than on `pdf::layout::Block`s, which is
+//! also what lets it run on any note at all — blocks only ever exist one page,
+//! one region, at a time.
 //!
 //! Design: `docs/specs/pdf-exercise-splitting-design.md`.
 

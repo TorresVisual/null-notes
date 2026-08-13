@@ -586,6 +586,16 @@ async fn scaffold_project_notes_at(
     Ok(created)
 }
 
+/// Rewrites a note into `## Task N` / `### Solution` pairs, on request.
+///
+/// Deliberately takes and returns Markdown rather than a note path: the caller
+/// is the open editor, whose buffer may hold edits that have not reached disk
+/// yet, and rewriting the file underneath it would fight the save path.
+#[tauri::command]
+pub fn split_into_tasks(markdown: String) -> String {
+    crate::exercises::split_into_tasks(&markdown)
+}
+
 #[tauri::command]
 pub async fn scaffold_project_notes(
     workspace: String,
