@@ -75,9 +75,21 @@ pub struct AppSettings {
     // code, maths, diagrams, tags and link targets opt out in the editor.
     #[serde(default)]
     pub spellcheck: bool,
+    /// BCP-47 tag the editor puts on its `lang` attribute, which is the only
+    /// way to tell the WebView which dictionary to check against. Without it
+    /// the note inherits `index.html`'s `lang="en"` and German prose is
+    /// checked against English — every word underlined, which reads as the
+    /// feature being broken. Whether *any* squiggle appears is still the OS
+    /// language pack's call, not this app's.
+    #[serde(default = "default_spellcheck_language")]
+    pub spellcheck_language: String,
     /// Remembered so the import dialog opens on whichever mode was used last.
     #[serde(default)]
     pub pdf_import_mode: PdfImportMode,
+}
+
+fn default_spellcheck_language() -> String {
+    "de".to_string()
 }
 
 impl Default for AppSettings {
@@ -86,6 +98,7 @@ impl Default for AppSettings {
             autosave_debounce_ms: 600,
             editor_max_width_px: 800,
             spellcheck: false,
+            spellcheck_language: default_spellcheck_language(),
             pdf_import_mode: PdfImportMode::Pages,
         }
     }

@@ -10,8 +10,8 @@ Effort: **S** ≈ hours · **M** ≈ a day or two · **L** ≈ several days.
 |---|---|---|---|
 | 0 | Finish ruled fractions *(`c72a24e`…`851bfff`)* | — | ✅ |
 | 1 | Freeze the PDF pipeline under P4-2e | S | ✅ |
-| 2 | Triage the three open bugs below | S | ← |
-| 3 | **P4-3** → **M4** | M | |
+| 2 | Triage the three open bugs below | S | ✅ |
+| 3 | **P4-3** → **M4** | M | ← |
 | 4 | Dogfood slice — P7-3 ignore list → P7-3 → P7-4 + P7-1 → P8-1 | M/L | |
 | 5 | Re-derive P5, P6, P9 from real use | — | |
 
@@ -21,13 +21,13 @@ Effort: **S** ≈ hours · **M** ≈ a day or two · **L** ≈ several days.
 
 ---
 
-## ▸ Step 2 — Open bugs
+## ▸ Step 2 — Open bugs ✅ *all three triaged 2026-08-13*
 
-**All three are reported but unverified — triage begins by reproducing them.** They sit on the daily-use path and are owned by no phase, which is why they had drifted to the top of this file with no place in the order.
+**All three were reported but unverified — triage began by reproducing them.** They sat on the daily-use path and were owned by no phase, which is why they had drifted to the top of this file with no place in the order. Two were real and are fixed; one did not reproduce.
 
 - [x] **Math doesn't get rendered in block maths.** Reproduced, and it was two defects in `BlockMath.tsx`'s markdown-it rule — parsing, not KaTeX or the node view. **`$$…$$` was not recognised at all** (it landed as literal paragraph text), though it is what Obsidian, Notion, GitHub and plain LaTeX habit all write; and **a `$` fence directly under a prose line was swallowed into that paragraph**, because the rule never registered as one that can terminate a paragraph — `prose\n$\nx^2\n$` read as the single run of text `prose $ x^2 $`. Now parsed liberally (`$`, `$$`, and one-line `$$…$$`) and still serialized conservatively as the lone `$` this app has always written. The silent-mode return had to move *after* validation: markdown-it asks in silent mode whether a line ends the paragraph above, and saying yes to an unclosed fence would cut a paragraph in half and render neither half as maths. Covered by `blockMathParsing.test.ts` — nine cases, four of them guard rails that already passed.
-- [ ] **Derivatives like `y'` get parsed to `^'y`.** PDF pipeline. Note that `e62b560` and the compact-fraction fix both touched prime handling, so check whether this predates them.
-- [ ] **Spellcheck for German.** Per P2-3, whether squiggles appear at all is a WebView2/OS capability, not something this code controls — establish which side the failure is on before writing any code.
+- [x] **Derivatives like `y'` get parsed to `^'y`.** **Does not reproduce** — it did predate the fixes, as suspected. Converting all ten corpus sheets yields zero occurrences of `^'`, and every prime renders correctly: `y'`, `y''`, `y'_1`, `y'_2`, `\vec{y}'(t)`. `latex.rs`'s `is_prime_run` (added by the compact-fraction work) emits a prime run without a caret whenever it follows a base character. Closed as already fixed rather than fixed again; under the P4-2e freeze a bug that reproduces on no corpus document earns no work.
+- [x] **Spellcheck for German.** **App side, and now fixed.** The WebView chooses its dictionary from the nearest `lang` attribute; the editor set `spellcheck` but never a `lang`, so a note inherited `index.html`'s `lang="en"` and German prose was checked against English — every word underlined, which reads as the feature being broken. Added `spellcheckLanguage` to `AppSettings` (BCP-47, defaults to `de`, `#[serde(default = …)]` so a `settings.json` from an older build loads with `de` rather than `String::default()`'s empty string) and it now drives `lang` on both the TipTap root and the raw `<textarea>`. **The P2-3 caveat still stands and is not fixed by this:** whether any squiggle appears at all needs the OS's German language pack installed — WebView2 uses that, not Hunspell dictionaries of its own. This change is what makes the pack *usable* once present.
 
 ---
 

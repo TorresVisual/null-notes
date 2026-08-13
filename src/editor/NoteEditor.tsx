@@ -14,6 +14,7 @@ interface NoteEditorProps {
   content: string
   notePath: string
   spellcheck: boolean
+  spellcheckLanguage: string
   onChange: (markdown: string) => void
 }
 
@@ -33,22 +34,25 @@ const INK_HEIGHT = 900
 
 const EMPTY_INK: InkData = { width: INK_WIDTH, height: INK_HEIGHT, strokes: [], shapes: [] }
 
-function buildEditorProps(spellcheck: boolean) {
+// `lang` is the only thing that tells the WebView which dictionary to check
+// against; without it the note inherits index.html's `lang="en"`, and German
+// prose comes back underlined word for word.
+function buildEditorProps(spellcheck: boolean, language: string) {
   return {
-    attributes: { spellcheck: String(spellcheck) },
+    attributes: { spellcheck: String(spellcheck), lang: language },
     handleKeyDown: handleEditorKeyDown,
     handleTextInput: handleEditorTextInput,
   }
 }
 
-export function NoteEditor({ content, notePath, spellcheck, onChange }: NoteEditorProps) {
+export function NoteEditor({ content, notePath, spellcheck, spellcheckLanguage, onChange }: NoteEditorProps) {
   const isProgrammaticUpdate = useRef(false)
   const [, setEditorVersion] = useState(0)
 
   const editor = useEditor({
     extensions: coreExtensions,
     content,
-    editorProps: buildEditorProps(spellcheck),
+    editorProps: buildEditorProps(spellcheck, spellcheckLanguage),
     onUpdate({ editor }) {
       if (isProgrammaticUpdate.current) return
       onChange(getMarkdown(editor.storage))
@@ -60,8 +64,8 @@ export function NoteEditor({ content, notePath, spellcheck, onChange }: NoteEdit
   // keystroke — the option itself has to change. setOptions rather than
   // useEditor deps, which would rebuild the editor and drop the cursor.
   useEffect(() => {
-    editor?.setOptions({ editorProps: buildEditorProps(spellcheck) })
-  }, [editor, spellcheck])
+    editor?.setOptions({ editorProps: buildEditorProps(spellcheck, spellcheckLanguage) })
+  }, [editor, spellcheck, spellcheckLanguage])
 
   useEffect(() => {
     if (!editor) return

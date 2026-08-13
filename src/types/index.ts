@@ -29,6 +29,8 @@ export interface AppSettings {
   autosaveDebounceMs: number
   editorMaxWidthPx: number
   spellcheck: boolean
+  /** BCP-47 tag; becomes the editor's `lang`, which is what picks the dictionary. */
+  spellcheckLanguage: string
   pdfImportMode: PdfImportMode
 }
 

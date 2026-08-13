@@ -83,6 +83,24 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
           </span>
         </label>
 
+        <label className="settings-row">
+          <span>
+            Spellcheck language
+            <small>
+              A BCP-47 tag (<code>de</code>, <code>en</code>, <code>en-GB</code>). Whether squiggles appear at
+              all is the OS language pack's call, not this app's.
+            </small>
+          </span>
+          <span className="settings-row-control">
+            <input
+              type="text"
+              className="settings-text"
+              value={settings.spellcheckLanguage}
+              onChange={(e) => void update({ spellcheckLanguage: e.target.value.trim() })}
+            />
+          </span>
+        </label>
+
         {error && <p className="settings-error">{error}</p>}
 
         <button

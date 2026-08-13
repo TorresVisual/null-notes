@@ -198,6 +198,7 @@ export function Layout() {
                 content={content}
                 notePath={activeTab}
                 spellcheck={settings.spellcheck}
+                spellcheckLanguage={settings.spellcheckLanguage}
                 onChange={(md) => void save(md)}
               />
             )}
@@ -205,6 +206,7 @@ export function Layout() {
               <RawEditor
                 content={content}
                 spellcheck={settings.spellcheck}
+                spellcheckLanguage={settings.spellcheckLanguage}
                 onChange={(md) => void save(md)}
               />
             )}

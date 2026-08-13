@@ -1359,6 +1359,12 @@ body {
   cursor: pointer;
 }
 
+/* Same inheritance trap as the checkbox above: 72px suits a three-digit number
+   but clips a language tag like en-GB. */
+.settings-row-control input.settings-text {
+  width: 96px;
+}
+
 .settings-unit {
   font-size: 11px;
   color: var(--text-tertiary);

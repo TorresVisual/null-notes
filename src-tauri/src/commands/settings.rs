@@ -52,6 +52,7 @@ mod tests {
             autosave_debounce_ms: 1200,
             editor_max_width_px: 960,
             spellcheck: true,
+            spellcheck_language: "en".to_string(),
             pdf_import_mode: crate::models::PdfImportMode::Markdown,
         };
         save_settings_to_dir(dir.path(), &original).await.unwrap();
@@ -59,6 +60,7 @@ mod tests {
         assert_eq!(loaded.autosave_debounce_ms, 1200);
         assert_eq!(loaded.editor_max_width_px, 960);
         assert!(loaded.spellcheck);
+        assert_eq!(loaded.spellcheck_language, "en");
         assert_eq!(loaded.pdf_import_mode, crate::models::PdfImportMode::Markdown);
     }
 
@@ -79,6 +81,10 @@ mod tests {
         assert_eq!(loaded.autosave_debounce_ms, 900);
         assert!(!loaded.spellcheck);
         assert_eq!(loaded.pdf_import_mode, crate::models::PdfImportMode::Pages);
+        // Not the empty string String::default() would give: an absent tag has
+        // to mean the same as a fresh install, or an older settings.json comes
+        // back with no dictionary chosen at all.
+        assert_eq!(loaded.spellcheck_language, "de");
     }
 
     #[tokio::test]
