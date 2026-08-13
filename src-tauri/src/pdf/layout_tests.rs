@@ -2450,3 +2450,49 @@ fn three_bars_on_one_row_become_three_separate_fractions() {
     assert!(markdown.contains(r"\frac{b}{y}"), "got: {markdown}");
     assert!(markdown.contains(r"\frac{c}{z}"), "got: {markdown}");
 }
+
+// Analysis_2_Blatt11.pdf item 4: a contour integral whose integrand is a sum
+// of three fractions. Every numerator shares one row, every denominator
+// another, and the baseline carries both the `+` connectors and the
+// integral's own `dz,`. That trailing `dz,` is why `connector_baseline`
+// rejects the row and the geometric pass never fires — it demands a baseline
+// of nothing but connectors.
+#[test]
+fn three_bars_on_one_row_become_three_fractions_around_their_connectors() {
+    let mut chars = set("a", 245.0, 248.0, maths_italic());
+    chars.extend(set("b", 295.0, 248.0, maths_italic()));
+    chars.extend(set("c", 355.0, 248.0, maths_italic()));
+
+    chars.extend(set("+", 275.0, 240.0, maths()));
+    chars.extend(set("+", 335.0, 240.0, maths()));
+    chars.extend(set("dz", 375.0, 240.0, maths_italic()));
+
+    chars.extend(set("x", 245.0, 234.0, maths_italic()));
+    chars.extend(set("y", 295.0, 234.0, maths_italic()));
+    chars.extend(set("z", 355.0, 234.0, maths_italic()));
+
+    let rules = [
+        rule_at(240.0, 270.0, 242.0),
+        rule_at(290.0, 330.0, 242.0),
+        rule_at(350.0, 370.0, 242.0),
+    ];
+
+    let markdown = chars_and_rules_to_markdown(&chars, &rules);
+
+    assert!(markdown.contains(r"\frac{a}{x}"), "got: {markdown}");
+    assert!(markdown.contains(r"\frac{b}{y}"), "got: {markdown}");
+    assert!(markdown.contains(r"\frac{c}{z}"), "got: {markdown}");
+    let frac_lines: Vec<&str> = markdown.lines().filter(|l| l.contains(r"\frac")).collect();
+    assert_eq!(frac_lines.len(), 1, "all three belong to one line: {markdown}");
+    // Order is the whole point. Leaving the baseline row unconsumed already
+    // gets its content onto this line — `group_blocks` merges the two rows
+    // into one display block — but strands it all at the end, reading
+    // `\frac{a}{x} \frac{b}{y} \frac{c}{z} + + dz`. Each connector belongs
+    // between the two fractions it actually joins, which is knowable only
+    // from where it sits relative to the bars.
+    assert_eq!(
+        frac_lines[0].trim(),
+        r"\frac{a}{x} + \frac{b}{y} + \frac{c}{z} dz",
+        "got: {markdown}"
+    );
+}

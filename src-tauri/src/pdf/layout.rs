@@ -657,13 +657,30 @@ fn reconstruct_ruled_fractions(
             continue;
         };
 
-        let content: Vec<Inline> = num_groups
-            .iter()
-            .zip(den_groups.iter())
-            .map(|(n, d)| {
-                Inline::Maths(format!("\\frac{{{}}}{{{}}}", latex::to_latex(n), latex::to_latex(d)))
-            })
-            .collect();
+        let baseline_i = baseline_row(&plain, &consumed, &bars, band_y, num_i, den_i);
+
+        let mut content: Vec<Inline> = Vec::new();
+        for (i, (n, d)) in num_groups.iter().zip(den_groups.iter()).enumerate() {
+            if let Some(b) = baseline_i {
+                let from = if i == 0 { f32::NEG_INFINITY } else { bars[i - 1].x1 };
+                content.extend(baseline_segment(&rows[b], from, bars[i].x0));
+            }
+            content.push(Inline::Maths(format!(
+                "\\frac{{{}}}{{{}}}",
+                latex::to_latex(n),
+                latex::to_latex(d)
+            )));
+        }
+        if let Some(b) = baseline_i {
+            let last = bars.last().map(|bar| bar.x1).unwrap_or(f32::NEG_INFINITY);
+            content.extend(baseline_segment(&rows[b], last, f32::INFINITY));
+        }
+
+        let is_display_maths = content.iter().all(|i| match i {
+            Inline::Text(span) => span.text.trim().is_empty(),
+            Inline::Maths(_) => true,
+            Inline::TableRow(_, _) | Inline::ImageRef(_, _) => false,
+        });
 
         let (num_x0, num_x1) = row_x_extent(&plain[num_i]);
         let (den_x0, den_x1) = row_x_extent(&plain[den_i]);
@@ -675,12 +692,15 @@ fn reconstruct_ruled_fractions(
             y: band_y,
             font_size: row_font_size(&plain[num_i]).max(1.0),
             fixed_pitch: false,
-            is_display_maths: true,
+            is_display_maths,
             ends_hyphenated: false,
         });
 
         consumed[num_i] = true;
         consumed[den_i] = true;
+        if let Some(b) = baseline_i {
+            consumed[b] = true;
+        }
     }
 
     let remaining: Vec<Vec<(usize, CharBox)>> = rows
@@ -724,6 +744,52 @@ fn flanking_row(
         (super::rules::chars_inside_spans(&plain[i], bars, slack) > RULE_ROW_INSIDE_RATIO)
             .then_some(i)
     })
+}
+
+/// The band's baseline row: the nearest unconsumed row to the band that is
+/// neither its numerator nor its denominator and whose content sits mostly
+/// *outside* the bars — the `+` connectors between them, an integrand's `dz`
+/// past the last one. `None` when the band's fractions stand alone.
+fn baseline_row(
+    plain: &[Vec<CharBox>],
+    consumed: &[bool],
+    bars: &[RuleBox],
+    band_y: f32,
+    num_i: usize,
+    den_i: usize,
+) -> Option<usize> {
+    let mut candidates: Vec<(usize, f32)> = plain
+        .iter()
+        .enumerate()
+        .filter(|(i, row)| !consumed[*i] && *i != num_i && *i != den_i && !row.is_empty())
+        .map(|(i, row)| (i, (row_y(row) - band_y).abs()))
+        .filter(|(i, gap)| *gap <= row_font_size(&plain[*i]).max(1.0) * FRACTION_MAX_ROW_GAP)
+        .collect();
+    candidates.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
+
+    candidates.into_iter().find_map(|(i, _)| {
+        let slack = row_font_size(&plain[i]).max(1.0) * SPAN_SLACK_EMS;
+        (super::rules::chars_inside_spans(&plain[i], bars, slack) <= RULE_ROW_INSIDE_RATIO)
+            .then_some(i)
+    })
+}
+
+/// The baseline row's own content between two x positions, classified by the
+/// normal `build_line` path so an operator, a connector and an integrand's
+/// `dz` each read exactly as they would anywhere else.
+fn baseline_segment(row: &[(usize, CharBox)], from: f32, to: f32) -> Vec<Inline> {
+    let segment: Vec<(usize, CharBox)> = row
+        .iter()
+        .filter(|(_, c)| {
+            let centre = c.x + c.width / 2.0;
+            centre > from && centre < to
+        })
+        .copied()
+        .collect();
+    if segment.is_empty() {
+        return Vec::new();
+    }
+    build_line(segment).content
 }
 
 /// A row's characters split into one group per bar, by which span each falls
