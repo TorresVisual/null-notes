@@ -32,6 +32,8 @@ export interface AppSettings {
   /** BCP-47 tag; becomes the editor's `lang`, which is what picks the dictionary. */
   spellcheckLanguage: string
   pdfImportMode: PdfImportMode
+  /** Launch template for code deep links, with {file} and {line} placeholders. */
+  editorCommand: string
 }
 
 export interface GraphLink {

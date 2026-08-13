@@ -101,6 +101,24 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
           </span>
         </label>
 
+        <label className="settings-row">
+          <span>
+            Editor command
+            <small>
+              Launched when you click a <code>src/main.rs:58</code> link. <code>{'{file}'}</code> and{' '}
+              <code>{'{line}'}</code> are filled in; run without a shell. Detected on first load.
+            </small>
+          </span>
+          <span className="settings-row-control">
+            <input
+              type="text"
+              className="settings-text settings-text-wide"
+              value={settings.editorCommand}
+              onChange={(e) => void update({ editorCommand: e.target.value })}
+            />
+          </span>
+        </label>
+
         {error && <p className="settings-error">{error}</p>}
 
         <button

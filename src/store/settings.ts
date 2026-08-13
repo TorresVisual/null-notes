@@ -7,6 +7,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   spellcheck: false,
   spellcheckLanguage: 'de',
   pdfImportMode: 'pages',
+  editorCommand: 'code -g {file}:{line}',
 }
 
 interface SettingsStore {

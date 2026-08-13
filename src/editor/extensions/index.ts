@@ -20,6 +20,7 @@ import { BlockMath } from './BlockMath'
 import { MermaidBlock } from './MermaidBlock'
 import { Callout } from './Callout'
 import { WikiLink } from './WikiLink'
+import { CodeLink } from './CodeLink'
 import { Tag } from './Tag'
 import { NoteContext } from './NoteContext'
 import { SlashCommands } from './SlashCommands'
@@ -153,6 +154,7 @@ export const coreExtensions = [
   Callout,
   WikiLink,
   Tag,
+  CodeLink,
   NoteContext,
   SlashCommands,
   // Typography marks

@@ -588,11 +588,22 @@ The brief's second pillar — **"IDE integration instead of IDE replacement"** �
 
 **Design constraint:** the note stays plain `.md`. A deep link is ordinary Markdown that degrades to readable text in any other editor — never a proprietary token.
 
-### P7-1 — Code deep links — **M**
+### P7-1 — Code deep links — **M** ✅
 - Recognise `src/main.cpp:58` (and `path/file.rs#L20-L30`) in note text and make it clickable; clicking opens the configured editor at that file and line.
 - Resolve paths relative to the workspace root, or to a project root if the workspace is inside one.
 - **Security:** this executes an external process using text taken from a note. The launcher must pass the path as an argument to a configured command, never through a shell, and must refuse paths that escape the workspace/project root. Do not build the naive version.
 - **DoD:** Clicking a `file:line` reference opens the right file at the right line in the configured editor; an unresolvable path renders as inert text with a clear "not found" affordance, exactly like an unresolved wiki-link; a path containing shell metacharacters cannot cause command execution, and a test covers that.
+
+*Done, with P7-4, per its own note. Design: `specs/code-deep-links-design.md`.*
+
+***The security posture is three structural properties, not three checks**, because a check is something a later edit can forget:*
+- ***No shell, ever.** `std::process::Command` with one `.arg()` per argument. A target containing `; rm -rf ~` is then an argument naming no file.*
+- ***The template is tokenized before substitution, never after.** Splitting after substituting would reintroduce word-splitting one layer up — the same injection — so the tokenizer never sees a resolved path at all. The test that pins this is a path with spaces staying a single argument.*
+- ***A target is refused unless every component is `Component::Normal`**, following `assets.rs`'s `resolve_relative`: refused **as written**, never normalised and then compared, because normalising is what opens a gap between the string that was checked and the string that runs.*
+
+*Recognition is deliberately narrow — both a separator and a file extension are required. Without that, `Analysis 2:` in prose, a `10:30` timestamp and a bare `README` all become links, and a wrong link that launches an editor is worse than no link at all. Same judgement as the PDF pipeline's exercise patterns, same answer: prefer a miss.*
+
+*Existence is answered by a batched, workspace-cached `resolve_code_links` rather than per link per render, and a **failed** lookup marks its targets unresolved — the feature fails inert, never open. The project-root half of the DoD is deferred: it needs P5-1's repo detection, so today the workspace root is the only root and a link outside it is inert rather than wrong.*
 
 ### P7-2 — "Open in IDE" on code blocks — **S**
 - A code block that carries a source path gets an "Open in IDE" action.
@@ -611,10 +622,12 @@ The brief's second pillar — **"IDE integration instead of IDE replacement"** �
 
 *The scaffold is a File-menu item behind a confirm naming the folder, and is deliberately unreachable from anywhere else: it is the only command in the app that can write into somebody's source repository, so "on request only" has to be a structural property rather than an intention. It never overwrites — a repo already keeping `notes/Todo.md` gets the missing three — and a test asserts a sibling `src/` is untouched byte for byte, because that is the property whose violation would end the feature.*
 
-### P7-4 — Editor command setting — **S**
+### P7-4 — Editor command setting — **S** ✅
 - A configurable launch command template (VS Code, JetBrains, Neovim…) in the P2-1 settings panel, with sensible detection of what's installed.
 - **Dependency:** P2-1. Land this **with** P7-1 — a hardcoded editor path would be an immediate rewrite.
 - **DoD:** Switching the configured editor changes where deep links open, with no code change.
+
+*Done. One template string with `{file}` and `{line}` placeholders, defaulting by probing `PATH` for `code`, `idea`, `nvim` and `subl` in that order. Detection runs **only when the template is empty**, so it fills in on a fresh install or a machine that gains an editor, and never overwrites something the user typed — silently replacing a chosen template on any machine that also has VS Code would make the setting feel broken.*
 
 ---
 

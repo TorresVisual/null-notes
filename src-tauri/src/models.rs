@@ -86,6 +86,13 @@ pub struct AppSettings {
     /// Remembered so the import dialog opens on whichever mode was used last.
     #[serde(default)]
     pub pdf_import_mode: PdfImportMode,
+    /// The command a code deep link launches, with `{file}` and `{line}`
+    /// placeholders. Tokenized before substitution and run without a shell —
+    /// see `commands::editor_launch`. Empty means "detect on next load", so a
+    /// machine that gains VS Code stops defaulting without the user editing
+    /// anything.
+    #[serde(default)]
+    pub editor_command: String,
 }
 
 fn default_spellcheck_language() -> String {
@@ -100,6 +107,7 @@ impl Default for AppSettings {
             spellcheck: false,
             spellcheck_language: default_spellcheck_language(),
             pdf_import_mode: PdfImportMode::Pages,
+            editor_command: String::new(),
         }
     }
 }

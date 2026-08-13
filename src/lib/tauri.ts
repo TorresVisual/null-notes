@@ -34,6 +34,10 @@ export const api = {
       invoke<string>('create_folder', { parent, name }),
     scaffoldProjectNotes: (workspace: string) =>
       invoke<NoteMetadata[]>('scaffold_project_notes', { workspace }),
+    resolveCodeLinks: (workspace: string, targets: string[]) =>
+      invoke<boolean[]>('resolve_code_links', { workspace, targets }),
+    openInEditor: (workspace: string, target: string, line: number | null, template: string) =>
+      invoke<void>('open_in_editor', { workspace, target, line, template }),
     renameFolder: (oldPath: string, newPath: string) =>
       invoke<void>('rename_folder', { oldPath, newPath }),
     deleteFolder: (path: string) =>

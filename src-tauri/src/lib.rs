@@ -112,6 +112,8 @@ pub fn run() {
             commands::notes::graph_tags,
             commands::notes::create_folder,
             commands::notes::scaffold_project_notes,
+            commands::editor_launch::open_in_editor,
+            commands::editor_launch::resolve_code_links,
             commands::notes::rename_folder,
             commands::notes::delete_folder,
             commands::notes::move_note,

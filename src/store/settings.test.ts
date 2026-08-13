@@ -15,6 +15,7 @@ describe('useSettingsStore', () => {
       spellcheck: true,
       spellcheckLanguage: 'en',
       pdfImportMode: 'markdown',
+      editorCommand: 'nvim +{line} {file}',
     })
     expect(useSettingsStore.getState().settings).toEqual({
       autosaveDebounceMs: 1200,
@@ -22,6 +23,7 @@ describe('useSettingsStore', () => {
       spellcheck: true,
       spellcheckLanguage: 'en',
       pdfImportMode: 'markdown',
+      editorCommand: 'nvim +{line} {file}',
     })
   })
 })

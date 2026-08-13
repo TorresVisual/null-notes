@@ -6,11 +6,18 @@ const SETTINGS_FILE: &str = "settings.json";
 
 async fn load_settings_from_dir(dir: &Path) -> anyhow::Result<AppSettings> {
     let file = dir.join(SETTINGS_FILE);
-    if !file.exists() {
-        return Ok(AppSettings::default());
+    let mut settings = if file.exists() {
+        serde_json::from_str(&tokio::fs::read_to_string(&file).await?)?
+    } else {
+        AppSettings::default()
+    };
+    // Detected on load rather than baked into the default, so a machine that
+    // gains an editor picks it up without the user editing a template. A
+    // template the user has typed is never overwritten.
+    if settings.editor_command.trim().is_empty() {
+        settings.editor_command = super::editor_launch::detect_editor_command();
     }
-    let raw = tokio::fs::read_to_string(&file).await?;
-    Ok(serde_json::from_str(&raw)?)
+    Ok(settings)
 }
 
 async fn save_settings_to_dir(dir: &Path, settings: &AppSettings) -> anyhow::Result<()> {
@@ -54,6 +61,7 @@ mod tests {
             spellcheck: true,
             spellcheck_language: "en".to_string(),
             pdf_import_mode: crate::models::PdfImportMode::Markdown,
+            editor_command: "nvim +{line} {file}".to_string(),
         };
         save_settings_to_dir(dir.path(), &original).await.unwrap();
         let loaded = load_settings_from_dir(dir.path()).await.unwrap();
@@ -61,7 +69,38 @@ mod tests {
         assert_eq!(loaded.editor_max_width_px, 960);
         assert!(loaded.spellcheck);
         assert_eq!(loaded.spellcheck_language, "en");
+        assert_eq!(loaded.editor_command, "nvim +{line} {file}");
         assert_eq!(loaded.pdf_import_mode, crate::models::PdfImportMode::Markdown);
+    }
+
+    // Detection fills the editor command only when there is nothing to keep.
+    // Silently replacing a template the user typed would make the setting feel
+    // broken on any machine that also has VS Code installed.
+    #[tokio::test]
+    async fn test_a_configured_editor_command_survives_detection() {
+        let dir = tempdir().unwrap();
+        let mut settings = AppSettings::default();
+        settings.editor_command = "subl {file}:{line}".to_string();
+        save_settings_to_dir(dir.path(), &settings).await.unwrap();
+
+        let loaded = load_settings_from_dir(dir.path()).await.unwrap();
+
+        assert_eq!(loaded.editor_command, "subl {file}:{line}");
+    }
+
+    #[tokio::test]
+    async fn test_an_empty_editor_command_is_filled_in_on_load() {
+        let dir = tempdir().unwrap();
+        tokio::fs::write(
+            dir.path().join(SETTINGS_FILE),
+            r#"{"autosaveDebounceMs":600,"editorMaxWidthPx":800}"#,
+        )
+        .await
+        .unwrap();
+
+        let loaded = load_settings_from_dir(dir.path()).await.unwrap();
+
+        assert!(loaded.editor_command.contains("{file}"), "got {:?}", loaded.editor_command);
     }
 
     // A settings.json written before spellcheck existed must still load, or

@@ -1365,6 +1365,26 @@ body {
   width: 96px;
 }
 
+.settings-row-control input.settings-text-wide {
+  width: 200px;
+  font-family: 'Cascadia Code', 'Fira Code', monospace;
+}
+
+/* A code deep link reads as a link only when it resolves. An unresolved one
+   keeps the wiki-link precedent: visibly a reference, visibly not pointing
+   anywhere, and inert on click. */
+.code-link {
+  color: var(--accent);
+  border-bottom: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+  cursor: pointer;
+}
+
+.code-link-missing {
+  color: var(--text-tertiary);
+  border-bottom: 1px dashed var(--text-tertiary);
+  cursor: default;
+}
+
 .settings-unit {
   font-size: 11px;
   color: var(--text-tertiary);

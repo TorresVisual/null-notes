@@ -4,7 +4,7 @@ Feature checklist. **The [roadmap](docs/ROADMAP.md) holds the reasoning and the 
 
 Effort: **S** ≈ hours · **M** ≈ a day or two · **L** ≈ several days.
 
-**Now (revised 2026-08-13 — see [`docs/specs/roadmap-revision-design.md`](docs/specs/roadmap-revision-design.md)):** ~~finish ruled fractions~~ → ~~freeze the PDF pipeline~~ → triage the three open bugs → P4-3 (closes M4) → the dogfood slice. **Phase numbers are identity, not order.**
+**Now (revised 2026-08-13 — see [`docs/specs/roadmap-revision-design.md`](docs/specs/roadmap-revision-design.md)):** ~~finish ruled fractions~~ → ~~freeze the PDF pipeline~~ → ~~triage the three open bugs~~ → ~~P4-3 (closes M4)~~ → the dogfood slice, now down to **P8-1**. **Phase numbers are identity, not order.**
 
 | # | Work | Size | |
 |---|---|---|---|
@@ -12,7 +12,7 @@ Effort: **S** ≈ hours · **M** ≈ a day or two · **L** ≈ several days.
 | 1 | Freeze the PDF pipeline under P4-2e | S | ✅ |
 | 2 | Triage the three open bugs below | S | ✅ |
 | 3 | **P4-3** → **M4** | M | ✅ |
-| 4 | Dogfood slice — P7-3 ignore list → P7-3 → P7-4 + P7-1 → P8-1 | M/L | ← |
+| 4 | Dogfood slice — ~~ignore list~~ → ~~P7-3~~ → ~~P7-4 + P7-1~~ → **P8-1** | M/L | ← |
 | 5 | Re-derive P5, P6, P9 from real use | — | |
 
 > **The PDF pipeline is frozen** as of 2026-08-13. The corpus is the regression suite; a new bug earns work only if it is whole-document or recurs across ≥2 corpus documents; 2D-layout reconstruction is closed. See P4-2e.
@@ -262,17 +262,21 @@ The brief's second pillar. Notes stay plain `.md` — a deep link is ordinary Ma
 
 > 🔒 First feature to launch external processes **using text taken from note content.** Pass paths as arguments to a configured command, never through a shell; refuse paths escaping the workspace/project root.
 
-### P7-1 Code deep links — **M** *(land together with P7-4)*
-- [ ] Recognise `src/main.cpp:58` and `path/file.rs#L20-L30` in note text
-- [ ] Resolve relative to workspace root, or project root if the workspace sits inside one
-- [ ] Click opens the configured editor at that file and line
-- [ ] Unresolvable path renders inert with a "not found" affordance, like an unresolved wiki-link
-- [ ] Shell metacharacters in a path cannot cause command execution — **with a test**
+### P7-1 Code deep links — **M** ✅ *(landed together with P7-4)*
+- [x] Recognise `src/main.cpp:58` and `path/file.rs#L20-L30` in note text
+- [x] Resolve relative to workspace root — *project root deferred with P5-1's repo detection; a link outside the workspace is inert rather than wrong*
+- [x] Click opens the configured editor at that file and line
+- [x] Unresolvable path renders inert with a "not found" affordance, like an unresolved wiki-link
+- [x] Shell metacharacters in a path cannot cause command execution — **with a test**
 
-### P7-4 Editor command setting — **S** *(not after P7-1 — with it)*
-- [ ] Configurable launch command template (VS Code / JetBrains / Neovim) in the settings panel
-- [ ] Detect what's installed
-- [ ] Switching editors changes where links open, with no code change
+> **Three structural guarantees, not checks.** No shell ever (`Command` with one `.arg()` per argument). The template is tokenized **before** substitution, never after — substituting first and splitting after would reintroduce word-splitting, so the tokenizer never sees a resolved path at all. And a target is refused unless every component is `Component::Normal`, following `assets.rs`: rejected *as written* rather than normalised and compared, because normalising invites a gap between the string checked and the string used. Ten backend tests, including a path containing `; rm -rf ~` staying one argument.
+>
+> Recognition is deliberately narrow — a separator **and** a file extension are both required, or `Analysis 2:`, a `10:30` timestamp and a bare `README` all become links. A wrong link that launches an editor is worse than no link. Existence comes from a batched, cached `resolve_code_links`; a failed lookup renders inert rather than failing open.
+
+### P7-4 Editor command setting — **S** ✅ *(landed with P7-1, not after)*
+- [x] Configurable launch command template (VS Code / JetBrains / Neovim / Sublime) in the settings panel
+- [x] Detect what's installed — probes `PATH` via `where`/`which` on load, **only when the template is empty**, so a typed template is never overwritten
+- [x] Switching editors changes where links open, with no code change
 
 ### P7-2 "Open in IDE" on code blocks — **S**
 - [ ] Action on code blocks that carry a source path, reusing P7-1's launcher and guardrails
