@@ -1,6 +1,6 @@
 # null-notes — Product & Technical Roadmap
 
-**Last updated:** 2026-08-13 (**roadmap revision** — see [`specs/roadmap-revision-design.md`](specs/roadmap-revision-design.md). The two weeks since the last update went almost entirely into PDF pipeline refinement, which the roadmap had no boundary for; this revision adds one (§Phase 4, "Pipeline completion criteria"), records the app's actual identity and two closed questions (§1), and **replaces the execution order in §6** — phase numbers are now identity, not order. **Next: finish ruled fractions → freeze the pipeline → triage the three open bugs → P4-3 → the dogfood slice.**)
+**Last updated:** 2026-08-13 (**roadmap revision** — see [`specs/roadmap-revision-design.md`](specs/roadmap-revision-design.md). The two weeks since the last update went almost entirely into PDF pipeline refinement, which the roadmap had no boundary for; this revision adds one (§Phase 4, "Pipeline completion criteria"), records the app's actual identity and two closed questions (§1), and **replaces the execution order in §6** — phase numbers are now identity, not order. **Next: ~~finish ruled fractions~~ → ~~freeze the pipeline~~ → triage the three open bugs → P4-3 → the dogfood slice.** Ruled fractions landed and **the pipeline is frozen** as of 2026-08-13 — see §Phase 4, P4-2e.)
 
 *Previously, 2026-07-30: M0–M3 all reached — P2-3 closed M2; P4-1 + P4-2 done — PDF→Markdown converts from the embedded text layer with no OCR, and equations are rebuilt as LaTeX rather than mangled into text; re-scoped against `notes/Plan.md`; Phases 5 "Versioned Workspaces" and 9 "Study & Revision" added — the first features that go beyond the original brief.*
 **Audience of this doc:** the maintainer (solo dev).
@@ -366,7 +366,7 @@ Sync is out of scope as a *feature* (principle #2), but since files are plain `.
 
 ---
 
-## Phase 4 — PDF → Markdown & the Exercise-Sheet Workflow (P4) — P4-1 + P4-2 done; P4-2e bounds the pipeline, P4-3 closes M4
+## Phase 4 — PDF → Markdown & the Exercise-Sheet Workflow (P4) — P4-1, P4-2 and P4-2e done; the pipeline is frozen, P4-3 closes M4
 
 **Milestone M4:** *I can drop an exercise sheet into the app and immediately start writing solutions into it — as text I can edit, not a picture.*
 
@@ -437,13 +437,11 @@ The two ways P4-1 can produce garbage. Both must fail visibly, never silently.
 
 *Four smaller gaps that document also exposed, diagnosed but not attempted — detail and reasoning in `TODO.md`'s P4-2b: **fractions** (same root cause as the matrix/vector limitation — a numerator and denominator are separate physical lines with the bar drawn as an invisible-to-text-layer graphics path — but far more disruptive in a fraction-heavy sheet), **`∮`** (pdfium hands back an ASCII placeholder instead of a real Unicode value; a blind family-scoped guess was deliberately not added, since CMEX overloads ASCII codepoints per sub-font and a wrong guess would silently corrupt some other symbol elsewhere), **an enumeration-label boundary artifact** (`(a$) C$`), and **`ß` decoding to `ÿ`**, confirmed to be pdfium's own decoding of this specific font and not fixable from here.*
 
-### P4-2e — Pipeline completion criteria (2026-08-13) — **S**, docs only
+### P4-2e — Pipeline completion criteria (2026-08-13) — **S**, docs only ✅ **the pipeline is frozen**
 
 **This subsystem is the only one on the roadmap with no natural end.** There is always another real document with another 2D-layout bug, and the two weeks after P4-2 was declared done proved it: ~120 commits, none of them wrong individually, none of them bounded collectively. A boundary has to be written as a rule, because "P4-2 is done" plainly was not one.
 
-**Ruled fractions (in flight as of `c72a24e`) is the last 2D shape.** The freeze takes effect on its completion — a rule with a carve-out for work already underway is still a real rule, provided the carve-out is named and finite, and abandoning a half-built feature costs more than finishing it.
-
-Once it lands:
+**Ruled fractions was the last 2D shape.** The freeze takes effect on its completion — a rule with a carve-out for work already underway is still a real rule, provided the carve-out is named and finite, and abandoning a half-built feature costs more than finishing it. It landed across `c72a24e`…`851bfff` (Blatt11 5 → 10 fractions, Blatt10 2 → 3, no sheet's count reduced; results and the constants that shipped are in `specs/pdf-ruled-fraction-reconstruction-design.md` §Implementation notes), **so the freeze is now in force:**
 
 - **The corpus is frozen** at the documents already in it. It is the regression suite. Adding a document is a deliberate decision, not a reflex.
 - **The bar is M4's own DoD — "faster than transcribing by hand" — not "correct."** A converted sheet needing three manual fixes still saved forty minutes. Correctness past that bar is not what this feature is for.
@@ -451,7 +449,7 @@ Once it lands:
 - **2D-layout reconstruction is closed.** Matrices, `\cases`, stacked fractions, operator limits, tables and ruled fractions are the complete set. No new shapes. Anything outside it renders as glyph-order text, and `throwOnError: false` on both maths nodes contains the failure to that one equation.
 - **Re-entry condition:** the pipeline reopens when *real coursework use* produces a document that fails the by-hand bar. Not before, and not from a diagnostic sweep.
 
-- **DoD:** the rules above are recorded here and in `TODO.md`; the next 2D shape encountered is filed rather than fixed.
+- **DoD:** the rules above are recorded here and in `TODO.md`; the next 2D shape encountered is filed rather than fixed. ✅ — `TODO.md`'s P4-2e now carries a **"Filed, not fixed"** list, which is where a post-freeze bug goes instead of into a commit. An empty list is the feature working, not a gap.
 
 ### P4-3 — Exercise splitting, solution scaffold, and "add next task" — **M**
 The part the brief says "would save students hours every semester."

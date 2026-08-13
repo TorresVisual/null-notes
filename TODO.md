@@ -4,16 +4,18 @@ Feature checklist. **The [roadmap](docs/ROADMAP.md) holds the reasoning and the 
 
 Effort: **S** ≈ hours · **M** ≈ a day or two · **L** ≈ several days.
 
-**Now (revised 2026-08-13 — see [`docs/specs/roadmap-revision-design.md`](docs/specs/roadmap-revision-design.md)):** finish ruled fractions → freeze the PDF pipeline → triage the three open bugs → P4-3 (closes M4) → the dogfood slice. **Phase numbers are identity, not order.**
+**Now (revised 2026-08-13 — see [`docs/specs/roadmap-revision-design.md`](docs/specs/roadmap-revision-design.md)):** ~~finish ruled fractions~~ → ~~freeze the PDF pipeline~~ → triage the three open bugs → P4-3 (closes M4) → the dogfood slice. **Phase numbers are identity, not order.**
 
-| # | Work | Size |
-|---|---|---|
-| 0 | Finish ruled fractions *(in flight, `c72a24e`)* | — |
-| 1 | Freeze the PDF pipeline under P4-2e | S |
-| 2 | Triage the three open bugs below | S |
-| 3 | **P4-3** → **M4** | M |
-| 4 | Dogfood slice — P7-3 ignore list → P7-3 → P7-4 + P7-1 → P8-1 | M/L |
-| 5 | Re-derive P5, P6, P9 from real use | — |
+| # | Work | Size | |
+|---|---|---|---|
+| 0 | Finish ruled fractions *(`c72a24e`…`851bfff`)* | — | ✅ |
+| 1 | Freeze the PDF pipeline under P4-2e | S | ✅ |
+| 2 | Triage the three open bugs below | S | ← |
+| 3 | **P4-3** → **M4** | M | |
+| 4 | Dogfood slice — P7-3 ignore list → P7-3 → P7-4 + P7-1 → P8-1 | M/L | |
+| 5 | Re-derive P5, P6, P9 from real use | — | |
+
+> **The PDF pipeline is frozen** as of 2026-08-13. The corpus is the regression suite; a new bug earns work only if it is whole-document or recurs across ≥2 corpus documents; 2D-layout reconstruction is closed. See P4-2e.
 
 **Three decisions owed:** `<details open>` — collapse state in the file or presentation-only (before ticking P6-1); split-pane editing (during P4); spaced-repetition storage (before any P9-3 code).
 
@@ -116,16 +118,21 @@ A closer read of a document already in the corpus (P4-2c's multi-bracket general
 - [x] **An upright Greek capital touching its word with no space glyph at all stayed stranded as plain prose.** `Potenzialfunktion Φ(x, y)` left `Φ` outside any equation — TeX sets an upright Greek capital in the same upright text font prose uses, so it's indistinguishable from a word by family alone, and unlike the `O(m log n)`/`cos(z)` case, there's no real word gap anywhere to anchor a whole-word match against; the fixed known-operator-name scan only ever matched a complete word, never a single bridgeable symbol glued straight onto one. New `is_bridgeable_symbol` (`layout.rs`) peels off one non-ASCII character at a time when it has its own known `latex::symbol_command` — restricted to non-ASCII so it can never fire mid-word on ordinary Latin prose.
 - [x] **A big operator's subscripted limit (`\iiint_K`) reconstructed as a bar-less fraction instead.** Geometrically identical to a fraction's numerator/denominator pair — a maths-only row stacked above another, straddled by a baseline — so `find_fraction_pair` was pairing a triple-integral row with its limit row and emitting `\frac{\int\int\int}{K}` in place of `M = \iiint_K (y+1)\,dx\,dy\,dz`. Generalized `find_fraction_pair` into `find_stacked_pair` (shared geometry search, parameterized by which rows are eligible as the top half and how the two combine) with two callers: `reconstruct_fractions` (unchanged behaviour, now explicitly excluding a big-operator-only top row) and the new `reconstruct_operator_limits`, which collapses a run of identical operator glyphs (`is_repeated_operator_token`/`collapse_operator_run` — `\int \int \int` → `\iiint`) into the limit form instead.
 
-### P4-2e Pipeline completion criteria — **S**, docs only — *step 1*
+### P4-2e Pipeline completion criteria — **S**, docs only ✅ *frozen 2026-08-13*
 
-> The only subsystem here with no natural end. ~120 commits in the two weeks after P4-2 was declared done, none wrong individually, none bounded collectively. **Ruled fractions (`c72a24e`, in flight) is the last 2D shape**; the freeze takes effect on its completion. Full reasoning in [ROADMAP.md](docs/ROADMAP.md) §Phase 4.
+> The only subsystem here with no natural end. ~120 commits in the two weeks after P4-2 was declared done, none wrong individually, none bounded collectively. **Ruled fractions was the last 2D shape**; the freeze took effect on its completion. Full reasoning in [ROADMAP.md](docs/ROADMAP.md) §Phase 4.
 
-- [ ] Finish ruled fractions — the one named, finite carve-out
-- [ ] **Corpus frozen** at the documents already in it; adding one is a deliberate decision, not a reflex
-- [ ] **Bar is "faster than transcribing by hand," not "correct"** — M4's own DoD
-- [ ] **A new bug earns work only if it is whole-document** (prose loss, mid-word tearing) **or recurs across ≥2 corpus documents.** Single-document cosmetic bugs get recorded here and left — *the load-bearing rule, and the one that will feel wrong to apply*
-- [ ] **2D-layout reconstruction closed** — matrices, `\cases`, stacked fractions, operator limits, tables, ruled fractions is the complete set. Anything else renders as glyph text; `throwOnError: false` contains it
-- [ ] **Re-entry only** when real coursework use produces a document failing the by-hand bar — not from a diagnostic sweep
+- [x] Finish ruled fractions — the one named, finite carve-out *(`c72a24e`…`851bfff`; Blatt11 5 → 10 fractions, Blatt10 2 → 3, no sheet reduced)*
+- [x] **Corpus frozen** at the documents already in it; adding one is a deliberate decision, not a reflex
+- [x] **Bar is "faster than transcribing by hand," not "correct"** — M4's own DoD
+- [x] **A new bug earns work only if it is whole-document** (prose loss, mid-word tearing) **or recurs across ≥2 corpus documents.** Single-document cosmetic bugs get recorded here and left — *the load-bearing rule, and the one that will feel wrong to apply*
+- [x] **2D-layout reconstruction closed** — matrices, `\cases`, stacked fractions, operator limits, tables, ruled fractions is the complete set. Anything else renders as glyph text; `throwOnError: false` contains it
+- [x] **Re-entry only** when real coursework use produces a document failing the by-hand bar — not from a diagnostic sweep
+
+#### Filed, not fixed — the record the freeze creates
+Bugs found after the freeze that do not clear the bar above. Recorded so they are not re-discovered, and so a second sighting is visible as a second sighting.
+
+- *(none yet)*
 
 ### P4-3 Exercise splitting & solution scaffold — **M** — *step 3, closes M4*
 - [ ] Split on exercise headings (`Aufgabe N`, `Task N`, `Exercise N`, `Problem N`, `N.`) into `## Task N` + `### Solution` pairs
