@@ -22,6 +22,9 @@ export type SplitOutcome = 'split' | 'no-structure'
  */
 export function report(error: unknown): void {
   const message = error instanceof Error ? error.message : String(error)
+  // Logged as well as shown: if the dialog itself is what is not getting
+  // through, the console still has it.
+  console.error('[split-into-tasks]', error)
   alert(`Split Into Tasks failed: ${message}`)
 }
 
@@ -35,8 +38,14 @@ function markdownOf(editor: Editor): string {
 }
 
 function notePathOf(editor: Editor): string {
-  const storage = editor.storage as unknown as { noteContext: { notePath: string } }
-  return storage.noteContext.notePath
+  const storage = editor.storage as unknown as { noteContext?: { notePath?: string } }
+  const notePath = storage.noteContext?.notePath
+  // The sibling Ink Block command carries the same guard, silently. An ink
+  // block is a reference to a file beside the note, so without the note's own
+  // path there is nowhere to put one — and failing with that sentence beats
+  // failing with "cannot read property of undefined".
+  if (!notePath) throw new Error('this note has no path yet, so no ink canvas can be created')
+  return notePath
 }
 
 /**
@@ -83,7 +92,17 @@ export async function splitIntoTasks(editor: Editor): Promise<SplitOutcome> {
   const split = await api.notes.splitIntoTasks(before)
   if (split === before) return 'no-structure'
 
-  const srcs = await blankCanvases(notePathOf(editor), emptySolutionCount(split))
+  // The split is the deliverable; the canvases are an addition to it. Losing
+  // the whole rewrite because a sidecar could not be written is the wrong
+  // trade — and it is what "it worked before ink support" was describing.
+  // A canvas failure is reported and the note is split anyway.
+  let srcs: string[] = []
+  try {
+    srcs = await blankCanvases(notePathOf(editor), emptySolutionCount(split))
+  } catch (error) {
+    report(error)
+  }
+
   editor.commands.setContent(withInkUnderSolutions(split, srcs))
   return 'split'
 }

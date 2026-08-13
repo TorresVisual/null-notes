@@ -115,6 +115,31 @@ describe('splitting a sheet into tasks', () => {
     await expect(splitIntoTasks(e)).rejects.toThrow('not found')
   })
 
+  // "It worked before we added ink support" — because before, nothing between
+  // the split and the rewrite could fail. The split is the deliverable and the
+  // canvases are an addition to it, so a sidecar that cannot be written costs
+  // the canvases and not the whole rewrite.
+  it('still splits the note when the canvases cannot be created', async () => {
+    const e = mount('<p>1. Erste</p>')
+    splitIntoTasksIpc.mockResolvedValue('## Task 1\n\n1. Erste\n\n### Solution\n\n## Task 2\n\n### Solution\n')
+    ensureDir.mockRejectedValue(new Error('permission denied'))
+
+    const outcome = await splitIntoTasks(e)
+
+    expect(outcome).toBe('split')
+    expect(markdownOf(e)).toContain('## Task 2')
+    expect(inkNodes(e)).toHaveLength(0)
+  })
+
+  it('still splits when the note has no path to hang a sidecar off', async () => {
+    const e = mount('<p>1. Erste</p>')
+    e.storage.noteContext.notePath = ''
+    splitIntoTasksIpc.mockResolvedValue('## Task 1\n\n1. Erste\n\n### Solution\n\n## Task 2\n\n### Solution\n')
+
+    expect(await splitIntoTasks(e)).toBe('split')
+    expect(markdownOf(e)).toContain('## Task 2')
+  })
+
   it('reports no-structure and changes nothing when the splitter found none', async () => {
     const e = mount('<p>ordinary prose</p>')
     splitIntoTasksIpc.mockImplementation((md) => Promise.resolve(md))
