@@ -1138,6 +1138,26 @@ fn a_heading_between_a_list_item_and_a_deeper_item_prevents_indenting() {
     assert!(!markdown.contains("    $\n    y = 1\n    $"), "got: {markdown}");
 }
 
+// An equation between two sub-parts of the *same* depth has to be indented to
+// that depth as well. At column zero it closes the sub-list it sits inside, so
+// every later sub-part is promoted to a top-level item — which on
+// Analysis_2_Blatt5_2026 and Blatt10 turned three sub-parts into three
+// exercises of their own once the note was split into tasks.
+#[test]
+fn an_equation_between_two_same_depth_sub_parts_stays_inside_the_list() {
+    let mut chars = page(&["Answer both parts."]);
+    chars.extend(set("1. Ein Bauteil hat die Form:", 72.0, 660.0, Style::default()));
+    chars.extend(set("(a) compute the total mass", 72.0, 636.0, Style::default()));
+    chars.extend(set("M = 1", 200.0, 612.0, maths()));
+    chars.extend(set("(b) compute the centroid", 72.0, 588.0, Style::default()));
+
+    let markdown = chars_to_markdown(&chars);
+
+    assert!(markdown.contains("    1. compute the total mass"), "got: {markdown}");
+    assert!(markdown.contains("    2. compute the centroid"), "got: {markdown}");
+    assert!(markdown.contains("    $\n    M = 1\n    $"), "not indented: {markdown}");
+}
+
 #[test]
 fn a_bare_letter_marker_becomes_a_list_item() {
     let mut chars = page(&["Answer each of the parts below in turn."]);

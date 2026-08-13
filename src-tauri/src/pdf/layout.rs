@@ -3188,7 +3188,12 @@ fn intervening_block_indent(blocks: &[Block]) -> Vec<usize> {
             j += 1;
         }
         if let Some(Block::ListItem { depth: next_depth, .. }) = blocks.get(j) {
-            if next_depth > depth {
+            // `>=`, not `>`. A block between two items of the *same* depth has
+            // to be indented to that depth too, or it closes the list it sits
+            // inside: Analysis_2_Blatt5_2026 and Blatt10 put a display equation
+            // between two sub-parts, and at column zero it ended the sub-list,
+            // promoting every later sub-part to a top-level exercise.
+            if next_depth >= depth && *next_depth > 0 {
                 for slot in indent.iter_mut().take(j).skip(i + 1) {
                     *slot = *next_depth;
                 }

@@ -132,7 +132,7 @@ A closer read of a document already in the corpus (P4-2c's multi-bracket general
 #### Filed, not fixed — the record the freeze creates
 Bugs found after the freeze that do not clear the bar above. Recorded so they are not re-discovered, and so a second sighting is visible as a second sighting.
 
-- *(none yet)*
+- **`Analysis_2_Blatt10` emits three of exercise 4's sub-parts at depth 0** (`1. Bestimmen Sie die zu $u$ harmonisch konjugierte…`, `2. Stellen Sie die Funktion…`, and the following item), so they read as top-level exercises and *Split Into Tasks* makes them tasks of their own — 7 tasks where the sheet has 4. **Single document**, and therefore filed rather than fixed: it is a depth-detection miss in `layout.rs`, not the intervening-block indent (that was a separate bug, hit two documents, and is fixed). A second sighting on another sheet clears the bar and earns the work.
 
 ### P4-3 Exercise splitting & solution scaffold — **M** ✅ — *step 3, closes M4*
 - [x] Split on exercise headings (`Aufgabe N`, `Beispiel N.M`, `Task N`, `Exercise N`, `Problem N`, `N.`) into `## Task N` + `### Solution` pairs — **on request only**, via *Split Into Tasks* in the slash menu and File menu
