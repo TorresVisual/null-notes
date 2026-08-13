@@ -20,6 +20,7 @@ import { useWorkspace, refreshTags, refreshRecents } from '../hooks/useWorkspace
 import { useExternalChanges } from '../hooks/useExternalChanges'
 import { useCreateNote } from '../hooks/useCreateNote'
 import { useCreateFolder } from '../hooks/useCreateFolder'
+import { useScaffoldProjectNotes } from '../hooks/useScaffoldProjectNotes'
 import { useCreateCanvasNote } from '../hooks/useCreateCanvasNote'
 import { useScrollRestoration } from '../hooks/useScrollRestoration'
 import { ConflictBar } from './ConflictBar'
@@ -50,6 +51,7 @@ export function Layout() {
   const createNote = useCreateNote()
   const createFolder = useCreateFolder()
   const createCanvasNote = useCreateCanvasNote()
+  const scaffoldProjectNotes = useScaffoldProjectNotes()
   const [viewMode, setViewMode] = useState<ViewMode>('wysiwyg')
   const [searchOpen, setSearchOpen] = useState(false)
   const [switcherOpen, setSwitcherOpen] = useState(false)
@@ -100,6 +102,16 @@ export function Layout() {
         case 'open-workspace':
           await openWorkspace()
           break
+        case 'scaffold-notes': {
+          if (!workspacePath) break
+          // Confirmed because it writes into a folder the user may not think
+          // of as theirs to write in — this is the one command that can put
+          // files inside somebody's source repository.
+          if (!confirm(`Create a notes/ folder with starter notes in ${workspacePath}?`)) break
+          const created = await scaffoldProjectNotes()
+          if (created === 0) alert('notes/ already has all four starter notes — nothing to add.')
+          break
+        }
         case 'settings':
           setSettingsOpen(true)
           break
@@ -135,7 +147,16 @@ export function Layout() {
           break
       }
     },
-    [activeTab, viewMode, workspacePath, createNote, createFolder, createCanvasNote, openWorkspace],
+    [
+      activeTab,
+      viewMode,
+      workspacePath,
+      createNote,
+      createFolder,
+      createCanvasNote,
+      scaffoldProjectNotes,
+      openWorkspace,
+    ],
   )
 
   useEffect(() => {

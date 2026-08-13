@@ -549,6 +549,66 @@ async fn create_note_file(folder: &str, title: &str) -> anyhow::Result<PathBuf> 
     Ok(path)
 }
 
+/// The starter notes a project workspace gets, on request.
+///
+/// Named in `docs/ROADMAP.md` §P7-3. Deliberately four and no more: the point
+/// is somewhere obvious to put the first note about a project, not a filing
+/// system nobody asked for.
+const PROJECT_NOTE_TITLES: [&str; 4] = ["Architecture", "Meeting", "Research", "Todo"];
+
+/// The folder project notes are scaffolded into. Everything this writes goes
+/// inside it — a code repository's own source directories are not somewhere
+/// the app gets to create files.
+const PROJECT_NOTES_DIR: &str = "notes";
+
+/// Creates `notes/` and its starter notes under `workspace`, returning the
+/// paths actually created.
+///
+/// Never overwrites: a title whose file already exists is skipped rather than
+/// replaced, so running this on a repo that already has `notes/Todo.md` tops
+/// up the missing three and leaves the real one alone. Nothing here runs
+/// unless the user asks for it — see the roadmap's "on request only".
+async fn scaffold_project_notes_at(
+    workspace: &str,
+) -> anyhow::Result<Vec<(&'static str, PathBuf)>> {
+    let folder = Path::new(workspace).join(PROJECT_NOTES_DIR);
+    tokio::fs::create_dir_all(&folder).await?;
+    let folder = folder.to_string_lossy().into_owned();
+
+    let mut created = Vec::new();
+    for title in PROJECT_NOTE_TITLES {
+        let path = Path::new(&folder).join(note_filename(title));
+        if tokio::fs::try_exists(&path).await? {
+            continue;
+        }
+        created.push((title, create_note_file(&folder, title).await?));
+    }
+    Ok(created)
+}
+
+#[tauri::command]
+pub async fn scaffold_project_notes(
+    workspace: String,
+    db: State<'_, DbPool>,
+) -> Result<Vec<NoteMetadata>, String> {
+    let paths = scaffold_project_notes_at(&workspace).await.map_err(|e| e.to_string())?;
+
+    let mut created = Vec::new();
+    for (title, path) in paths {
+        let path = path.to_string_lossy().into_owned();
+        let body = format!("# {title}\n");
+        index_note_at(&path, &workspace, &body, &db).await.map_err(|e| e.to_string())?;
+        created.push(NoteMetadata {
+            id: Uuid::new_v4().to_string(),
+            title: title.to_string(),
+            path,
+            workspace: workspace.clone(),
+            updated_at: now_ms(),
+        });
+    }
+    Ok(created)
+}
+
 async fn create_folder_at(parent: &str, name: &str) -> anyhow::Result<String> {
     let path = std::path::Path::new(parent).join(name);
     tokio::fs::create_dir(&path).await?;
@@ -1049,6 +1109,81 @@ mod folder_tests {
         let pool = DbPool::connect("sqlite::memory:").await.unwrap();
         run_migrations(&pool).await.unwrap();
         pool
+    }
+
+    // P7-3. Opt-in only: nothing calls this without the user asking.
+    #[tokio::test]
+    async fn test_scaffold_creates_the_four_starter_notes_inside_notes() {
+        let tmp = tempdir().unwrap();
+        let workspace = tmp.path().to_string_lossy().into_owned();
+
+        let created = scaffold_project_notes_at(&workspace).await.unwrap();
+
+        assert_eq!(created.len(), 4);
+        for (title, path) in &created {
+            assert!(path.is_file(), "{title} was not written");
+            assert_eq!(path.parent().unwrap(), tmp.path().join("notes"));
+        }
+    }
+
+    // The guarantee that matters in a code repository: this writes into
+    // notes/ and nowhere else, whatever else the workspace contains.
+    #[tokio::test]
+    async fn test_scaffold_touches_nothing_outside_the_notes_folder() {
+        let tmp = tempdir().unwrap();
+        let src = tmp.path().join("src");
+        tokio::fs::create_dir(&src).await.unwrap();
+        tokio::fs::write(src.join("main.rs"), "fn main() {}").await.unwrap();
+        let before = tokio::fs::read_to_string(src.join("main.rs")).await.unwrap();
+
+        scaffold_project_notes_at(&tmp.path().to_string_lossy())
+            .await
+            .unwrap();
+
+        let mut entries = tokio::fs::read_dir(&src).await.unwrap();
+        let mut names = Vec::new();
+        while let Some(entry) = entries.next_entry().await.unwrap() {
+            names.push(entry.file_name().to_string_lossy().into_owned());
+        }
+        assert_eq!(names, ["main.rs"], "source folder gained files");
+        assert_eq!(
+            tokio::fs::read_to_string(src.join("main.rs")).await.unwrap(),
+            before
+        );
+    }
+
+    // A repo that already keeps notes/Todo.md gets the missing three and keeps
+    // the real one. Overwriting a genuine note would be the worst possible
+    // behaviour for a convenience command.
+    #[tokio::test]
+    async fn test_scaffold_tops_up_without_overwriting_an_existing_note() {
+        let tmp = tempdir().unwrap();
+        let notes = tmp.path().join("notes");
+        tokio::fs::create_dir(&notes).await.unwrap();
+        tokio::fs::write(notes.join("Todo.md"), "# Todo\n\n- real work\n")
+            .await
+            .unwrap();
+
+        let created = scaffold_project_notes_at(&tmp.path().to_string_lossy())
+            .await
+            .unwrap();
+
+        assert_eq!(created.len(), 3, "Todo was rewritten");
+        assert_eq!(
+            tokio::fs::read_to_string(notes.join("Todo.md")).await.unwrap(),
+            "# Todo\n\n- real work\n"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_scaffold_run_twice_creates_nothing_the_second_time() {
+        let tmp = tempdir().unwrap();
+        let workspace = tmp.path().to_string_lossy().into_owned();
+
+        scaffold_project_notes_at(&workspace).await.unwrap();
+        let again = scaffold_project_notes_at(&workspace).await.unwrap();
+
+        assert!(again.is_empty());
     }
 
     #[tokio::test]

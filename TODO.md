@@ -278,9 +278,11 @@ The brief's second pillar. Notes stay plain `.md` — a deep link is ordinary Ma
 - [ ] Action on code blocks that carry a source path, reusing P7-1's launcher and guardrails
 - [ ] Appears only when the path resolves — never a dead button
 
-### P7-3 Project awareness & project notes — **M**
-- [ ] Open a code repo as a workspace; surface its `README.md` / `docs/` / `notes/` with no import step
-- [ ] Opt-in scaffold of `notes/` (Architecture / Meeting / Research / Todo) — **never automatic**, never writes into source folders
+### P7-3 Project awareness & project notes — **M** ✅
+- [x] Open a code repo as a workspace; surface its `README.md` / `docs/` / `notes/` with no import step — *delivered by P7-3a, then verified: this repo now scans to ~60 real `.md` files across `docs/`, `notes/` and the root, and nothing else*
+- [x] Opt-in scaffold of `notes/` (Architecture / Meeting / Research / Todo) — **never automatic**, never writes into source folders
+
+> Reachable from **File > Scaffold Project Notes** and nowhere else, behind a confirm naming the folder — it is the one command in the app that can put files inside somebody's source repository, so nothing on the workspace-open path may call it. It never overwrites: a repo already keeping `notes/Todo.md` gets the missing three and keeps the real one, and a second run creates nothing. Four backend tests cover the folder boundary (a `src/` alongside it is untouched, byte for byte), the top-up, and the second-run no-op.
 
 ---
 

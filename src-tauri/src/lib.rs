@@ -19,6 +19,9 @@ fn build_menu(handle: &tauri::AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
             &MenuItem::with_id(handle, "new-canvas", "New Canvas Note", true, None::<&str>)?,
             &PredefinedMenuItem::separator(handle)?,
             &MenuItem::with_id(handle, "open-workspace", "Open Workspace…", true, Some("CmdOrCtrl+O"))?,
+            // A menu item and nothing else: scaffolding is on request only, so
+            // it must never be reachable by opening a workspace.
+            &MenuItem::with_id(handle, "scaffold-notes", "Scaffold Project Notes", true, None::<&str>)?,
             &PredefinedMenuItem::separator(handle)?,
             &MenuItem::with_id(handle, "export-pdf", "Export to PDF…", true, None::<&str>)?,
             &PredefinedMenuItem::separator(handle)?,
@@ -108,6 +111,7 @@ pub fn run() {
             commands::notes::graph_links,
             commands::notes::graph_tags,
             commands::notes::create_folder,
+            commands::notes::scaffold_project_notes,
             commands::notes::rename_folder,
             commands::notes::delete_folder,
             commands::notes::move_note,

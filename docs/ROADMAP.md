@@ -599,13 +599,17 @@ The brief's second pillar — **"IDE integration instead of IDE replacement"** �
 - **Dependency:** P7-1 (same launcher, same path resolution, same guardrails).
 - **DoD:** The action appears only on blocks that actually have a resolvable path — never a dead button.
 
-### P7-3 — Project awareness & project notes — **S/M** *(smaller than it looks — see the scan note)*
+### P7-3 — Project awareness & project notes — **S/M** ✅ *(smaller than it looks — see the scan note)*
 - **Scan ignore list — S. Do this first; it is the whole unlock.** A workspace is just a folder scanned for `.md`, so opening a code repo as a workspace *already works* — except `is_excluded_dir` (`src-tauri/src/commands/notes.rs:113`) skips only `.ink` and dot-directories, so the scan walks `node_modules/` and `src-tauri/target/` and drowns. Exclude the standard build/dependency directories (`node_modules`, `target`, `dist`, `build`; `.git` is already covered by the dot rule).
 - Open a code project as a workspace and surface its existing `README.md` / `docs/` / `notes/` directly, with no import step (the brief: "No importing").
 - Optionally scaffold a `notes/` folder (Architecture / Meeting / Research / Todo) on request — **on request only**, never automatically, and never writing into source folders.
 - **DoD:** Pointing the app at this repo lists the files in `docs/` and nothing from `node_modules/` or `target/`, and does so as fast as a notes-only workspace; scaffolding is opt-in and creates only inside `notes/`.
 
 *Why this moved up (2026-08-13): it is the cheapest path to the maintainer becoming a **user** of the app, which §1's second closed question identifies as the missing input to the whole prioritization formula. This project's own `docs/` — 18 specs, a plans folder, this roadmap — is a real daily Markdown workflow currently being done in another editor. See §6.*
+
+*Done, and the scan note was right — the ignore list was hours, not the **M** this was scheduled as. It excludes `node_modules`, `target`, `dist` and `build` by exact name (so a folder called `distributed` survives) and, while there, the `.pdf`/`.assets` sidecars that had been left showing in the tree beside the already-excluded `.ink`. On this repo that is 580 `.md` files across 218 dependency directories no longer walked, against the 46 in `docs/` that are wanted.*
+
+*The scaffold is a File-menu item behind a confirm naming the folder, and is deliberately unreachable from anywhere else: it is the only command in the app that can write into somebody's source repository, so "on request only" has to be a structural property rather than an intention. It never overwrites — a repo already keeping `notes/Todo.md` gets the missing three — and a test asserts a sibling `src/` is untouched byte for byte, because that is the property whose violation would end the feature.*
 
 ### P7-4 — Editor command setting — **S**
 - A configurable launch command template (VS Code, JetBrains, Neovim…) in the P2-1 settings panel, with sensible detection of what's installed.

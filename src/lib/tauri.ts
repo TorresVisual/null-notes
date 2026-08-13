@@ -32,6 +32,8 @@ export const api = {
       invoke<NoteMetadata[]>('backlinks_for', { workspace, title }),
     createFolder: (parent: string, name: string) =>
       invoke<string>('create_folder', { parent, name }),
+    scaffoldProjectNotes: (workspace: string) =>
+      invoke<NoteMetadata[]>('scaffold_project_notes', { workspace }),
     renameFolder: (oldPath: string, newPath: string) =>
       invoke<void>('rename_folder', { oldPath, newPath }),
     deleteFolder: (path: string) =>
