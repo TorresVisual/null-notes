@@ -125,7 +125,9 @@ pub fn pages_to_markdown(pages: &[ExtractedPage]) -> models::PdfMarkdownImport {
         }
     }
 
-    let mut markdown = chunks.join("\n\n");
+    // Splitting runs on the whole joined document, not per page: an exercise
+    // routinely starts on one page and finishes on the next.
+    let mut markdown = super::exercises::split_into_tasks(&chunks.join("\n\n"));
     if !markdown.is_empty() {
         markdown.push('\n');
     }

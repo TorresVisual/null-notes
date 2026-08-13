@@ -1,4 +1,5 @@
 pub mod columns;
+pub mod exercises;
 pub mod extract;
 pub mod layout;
 pub mod latex;
