@@ -37,11 +37,11 @@ describe('a display equation sitting between a list item and its deeper sub-part
 
     const doc = e.state.doc.toJSON() as { content: Array<Record<string, unknown>> }
     expect(doc.content).toHaveLength(1)
-    const outerList = doc.content[0]
+    const outerList = doc.content[0]!
     expect(outerList['type']).toBe('orderedList')
     expect((outerList['attrs'] as Record<string, unknown>)['start']).toBe(6)
 
-    const listItem = (outerList['content'] as Array<Record<string, unknown>>)[0]
+    const listItem = (outerList['content'] as Array<Record<string, unknown>>)[0]!
     const itemContent = listItem['content'] as Array<Record<string, unknown>>
     const childTypes = itemContent.map((node) => node['type'])
     expect(childTypes).toEqual(['paragraph', 'blockMath', 'orderedList'])

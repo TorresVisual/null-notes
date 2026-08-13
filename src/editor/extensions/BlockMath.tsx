@@ -154,6 +154,11 @@ export const BlockMath = Node.create({
           s.closeBlock(node)
         },
         parse: {
+          // Parsed liberally, serialized conservatively. This app writes a lone
+          // `$` on its own line, but Obsidian, Notion, GitHub and plain LaTeX
+          // habit all write `$$` — and a note typed by hand or edited outside
+          // the app arrives in that dialect. Both are read; only the lone `$`
+          // is ever written back.
           setup(markdownit: {
             block: {
               ruler: {
@@ -161,6 +166,7 @@ export const BlockMath = Node.create({
                   ref: string,
                   name: string,
                   fn: (state: unknown, startLine: number, endLine: number, silent: boolean) => boolean,
+                  options?: { alt: string[] },
                 ) => void
               }
             }
@@ -181,35 +187,23 @@ export const BlockMath = Node.create({
               const max = st.eMarks[startLine] ?? 0
               const line = st.src.slice(pos, max).trim()
 
-              if (line !== '$') return false
-              if (silent) return true
-
-              let nextLine = startLine + 1
-              let found = false
-              while (nextLine < endLine) {
-                const npos = (st.bMarks[nextLine] ?? 0) + (st.tShift[nextLine] ?? 0)
-                const nmax = st.eMarks[nextLine] ?? 0
-                if (st.src.slice(npos, nmax).trim() === '$') {
-                  found = true
-                  break
-                }
-                nextLine++
-              }
-
+              const found = onOneLine(line, startLine) ?? acrossLines(st, line, startLine, endLine)
               if (!found) return false
 
-              const latex = st.src
-                .slice(st.bMarks[startLine + 1], st.eMarks[nextLine - 1])
-                .trim()
+              // Everything above has to be settled before this returns: in
+              // silent mode markdown-it is asking whether this line ends the
+              // paragraph above, and saying yes to an unclosed fence would cut
+              // that paragraph in half and render neither half as maths.
+              if (silent) return true
 
               const token = st.push('html_block', '', 0)
-              token.content = `<div data-type="block-math" data-latex="${encodeAttr(latex)}"></div>\n`
-              token.map = [startLine, nextLine + 1]
+              token.content = `<div data-type="block-math" data-latex="${encodeAttr(found.latex)}"></div>\n`
+              token.map = [startLine, found.lastLine + 1]
               token.level = st.level
 
-              st.line = nextLine + 1
+              st.line = found.lastLine + 1
               return true
-            })
+            }, { alt: ['paragraph', 'reference', 'blockquote', 'list'] })
           },
         },
       },
@@ -219,4 +213,38 @@ export const BlockMath = Node.create({
 
 function encodeAttr(str: string): string {
   return str.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+}
+
+interface Fence {
+  latex: string
+  lastLine: number
+}
+
+/** `$$e^{i\pi} + 1 = 0$$`, opened and closed on the line it occupies. */
+function onOneLine(line: string, startLine: number): Fence | null {
+  if (!line.startsWith('$$') || !line.endsWith('$$') || line.length <= 4) return null
+  const latex = line.slice(2, -2).trim()
+  return latex ? { latex, lastLine: startLine } : null
+}
+
+/** A `$` or `$$` fence line, its content, and the same marker closing it. */
+function acrossLines(
+  st: { src: string; bMarks: number[]; eMarks: number[]; tShift: number[] },
+  line: string,
+  startLine: number,
+  endLine: number,
+): Fence | null {
+  if (line !== '$' && line !== '$$') return null
+
+  for (let next = startLine + 1; next < endLine; next++) {
+    const from = (st.bMarks[next] ?? 0) + (st.tShift[next] ?? 0)
+    const to = st.eMarks[next] ?? 0
+    // A fence closes on the marker it opened with: guessing which half of a
+    // mismatched pair was meant would swallow the rest of the note.
+    if (st.src.slice(from, to).trim() !== line) continue
+
+    const latex = st.src.slice(st.bMarks[startLine + 1], st.eMarks[next - 1]).trim()
+    return latex ? { latex, lastLine: next } : null
+  }
+  return null
 }
