@@ -2496,3 +2496,20 @@ fn three_bars_on_one_row_become_three_fractions_around_their_connectors() {
         "got: {markdown}"
     );
 }
+
+// A page-furniture rule spans the whole text column, so every prose row on
+// the page sits "inside" its span — the span test alone cannot reject it, and
+// on Analysis_2_Blatt11.pdf the header rule duly swallowed the sheet's title
+// and its first paragraph as a numerator/denominator pair. What separates the
+// two is width: a fraction bar spans one term, a separator spans the column.
+#[test]
+fn a_full_width_separator_rule_is_not_a_fraction_bar() {
+    let mut chars = set("11. Ubungsblatt", 72.0, 750.0, Style::default());
+    chars.extend(set("1. Berechnen Sie das komplexe Kurvenintegral", 72.0, 720.0, Style::default()));
+    // As wide as the text column itself, sitting between the two rows.
+    let rules = [rule_at(70.0, 290.0, 737.0)];
+
+    let markdown = chars_and_rules_to_markdown(&chars, &rules);
+
+    assert!(!markdown.contains(r"\frac"), "got: {markdown}");
+}

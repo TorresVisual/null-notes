@@ -614,6 +614,17 @@ const RULE_ROW_INSIDE_RATIO: f32 = 0.5;
 /// character may sit and still be assigned to it.
 const SPAN_SLACK_EMS: f32 = 0.5;
 
+/// How much of the surrounding content's own width a bar may span before it
+/// is a separator rather than a fraction bar.
+///
+/// A page-furniture rule runs the full width of the text column, which means
+/// every prose row on the page sits inside its span — so
+/// `chars_inside_spans` cannot reject it, and on Analysis_2_Blatt11.pdf the
+/// header rule duly claimed the sheet's title as a numerator and its first
+/// paragraph as a denominator. A real bar spans a single term: the widest
+/// seen on that page is 81.19pt against a 482pt text column, a ratio of 0.17.
+const MAX_BAR_WIDTH_RATIO: f32 = 0.9;
+
 /// Reconstructs fractions from the rules the PDF draws.
 ///
 /// LaTeX's fraction bar is a drawn rule, so a row of several side-by-side
@@ -639,7 +650,21 @@ fn reconstruct_ruled_fractions(
     let mut consumed = vec![false; rows.len()];
     let mut synthesized: Vec<Line> = Vec::new();
 
-    for bars in super::rules::band(rules) {
+    let content_width = plain
+        .iter()
+        .filter(|row| !row.is_empty())
+        .map(|row| {
+            let (x0, x1) = row_x_extent(row);
+            x1 - x0
+        })
+        .fold(0.0_f32, f32::max);
+    let bars: Vec<RuleBox> = rules
+        .iter()
+        .copied()
+        .filter(|rule| rule.width() < content_width * MAX_BAR_WIDTH_RATIO)
+        .collect();
+
+    for bars in super::rules::band(&bars) {
         let band_y = bars[0].y;
 
         let Some(num_i) = flanking_row(&plain, &consumed, &bars, band_y, true) else {

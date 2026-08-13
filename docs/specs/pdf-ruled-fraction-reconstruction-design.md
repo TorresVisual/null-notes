@@ -109,6 +109,34 @@ Whether the geometric passes still fire on any real document once this lands is 
 - **Nested fractions.** A `\frac{\frac{a}{b}}{c}` presents two vertically-stacked, x-overlapping bars. The bail in step 3 is expected to reject them, leaving today's behaviour; positively reconstructing them is not attempted.
 - **Vertical rules.** Extracted geometry is horizontal-only. Vertical rules matter for table cell boundaries, which is the table spec's concern.
 
+## Implementation notes
+
+What actually shipped, and how it diverged from this spec's predictions — recorded here rather than silently, following `docs/specs/pdf-table-fraction-maths-guards-design.md`.
+
+**The claim that no page-furniture filter was needed is false, and it shipped as `MAX_BAR_WIDTH_RATIO = 0.9`.** The reasoning above — "a bar only matches if it finds numerator *and* denominator content inside its own x-span, and the header rule has neither" — does not survive contact with the corpus. A full-width rule's span covers the *entire* text column, so every prose row on the page scores 100% inside it. On the first real run the 596pt header rule claimed Blatt11's title as a numerator and its opening paragraph as a denominator, and the 482pt rule on page 1 did the same to the Bonusaufgabe heading. What actually separates the two is width: a fraction bar spans a single term (the widest on that page is 81.19pt against a 482pt text column, a ratio of 0.17), while a separator spans the column. Bars are now filtered against the surrounding content's own width before banding.
+
+**Every other constant shipped at its planned starting value**: `MAX_RULE_THICKNESS` 2.0, `MIN_RULE_ASPECT` 3.0, `RULE_ROW_TOLERANCE` 2.0, `SPAN_SLACK_EMS` 0.5, `MAX_RULES_PER_PAGE` 200, `RULE_ROW_INSIDE_RATIO` 0.5. None needed tuning.
+
+**`splice_into_baseline` was not generalized.** The plan proposed extending it to several x-ordered insertions; its own doc comment explains why that cannot work well — it operates on a finished `Line`, whose `Vec<Inline>` carries no per-piece position, so it infers the split point as "just before whatever comes last". The pass instead cuts the baseline row at the bars while real x coordinates are still available and runs each segment through `build_line`. `splice_into_baseline` is untouched and still serves the single-fraction geometric path.
+
+**Four of the five planned tests for the pairing stage did not discriminate.** A single bar over a numerator and denominator, and the baseline-versus-denominator case, both already passed against a do-nothing stub, because the existing geometric `find_stacked_pair` handles a lone fraction perfectly well. They are kept as regression guards. The test that actually drives the work is a row carrying *three* bars — a shape no amount of whole-line pairing can recover. Likewise the baseline-interleaving test needed tightening twice: leaving the baseline row unconsumed already gets its content onto the right output line, because `group_blocks` merges the two rows into one display block. What it gets wrong is *order*, stranding the residue at the end as `\frac \frac \frac + + dz`. The assertion is now on the exact interleaved string.
+
+**Measured result**, `dump_markdown` fraction counts across `notes/exercise_sheets/`, with rule extraction disabled versus enabled:
+
+| Sheet | Before | After |
+|---|---|---|
+| Analysis_2_Blatt11 | 5 | **10** |
+| Analysis_2_Blatt10 | 2 | **3** |
+| Analysis_2_Blatt12 | 1 | 1 |
+| Analysis_2_Blatt5_2026 | 1 | 1 |
+| Analysis_2_Blatt7_2026 | 1 | 1 |
+| Analysis_2_Blatt8_2026 | 2 | 2 |
+| Analysis_2_Blatt9_2026, Ue5, Ue6, Ue9 | 0 | 0 |
+
+Blatt11's items 4 and 5 now read `\frac{\cos(z)}{z^3} + \frac{4z}{2z^2-2z+1} + \frac{1}{z^4} dz,` and `\frac{1}{z^2+4} + \frac{1}{((2z-2)^2+1)^2} dz,`. Blatt10's gain is a genuine `\frac{1}{z}` the geometric path had missed. No sheet's count fell.
+
+**The open question stays open.** The geometric `reconstruct_fraction_sums` and `reconstruct_fractions` passes still fire — six of the ten sheets get all their fractions from them, since only two sheets changed at all. Retiring them is not on the table.
+
 ## Provenance
 
 The review that prompted this work looked at `firecrawl/anydoc` and, through it, `firecrawl/pdf-inspector` (both MIT). No code is ported here — pdf-inspector performs no LaTeX reconstruction and has no notion of a fraction. What transferred is the observation that a PDF's drawing operators carry structural information a text-only extractor discards, and the shape of two of its guards: `underline.rs`'s thickness-and-overlap test for what counts as a rule, and its dense-chart cap.
