@@ -110,8 +110,26 @@ pub async fn list_notes(
         .map_err(|e| e.to_string())
 }
 
+/// Build and dependency directories, skipped so a code repository can be
+/// opened as a workspace directly.
+///
+/// A workspace is just a folder scanned for `.md`, so pointing the app at a
+/// project already works — except the scan walks `node_modules/` and
+/// `target/` and drowns long before it reaches `docs/`. This list is what
+/// makes P7-3's "no importing" true rather than merely technically true.
+/// `.git` needs no entry; the dot rule already covers it.
+const EXCLUDED_DIRS: [&str; 4] = ["node_modules", "target", "dist", "build"];
+
+/// Sidecar directories, which hold a note's ink, rendered PDF pages and
+/// pasted images. They travel with the notes (see the storage boundary) but
+/// they are not folders the user made, and listing them in the tree offers a
+/// place to file a note that nothing should ever file a note in.
+const SIDECAR_SUFFIXES: [&str; 3] = [".ink", ".pdf", ".assets"];
+
 fn is_excluded_dir(name: &str) -> bool {
-    name.ends_with(".ink") || name.starts_with('.')
+    name.starts_with('.')
+        || SIDECAR_SUFFIXES.iter().any(|suffix| name.ends_with(suffix))
+        || EXCLUDED_DIRS.contains(&name)
 }
 
 async fn scan_dir_recursive(
@@ -595,6 +613,34 @@ pub async fn move_note(path: String, dest_folder: String, db: State<'_, DbPool>)
 mod tests {
     use super::*;
     use tempfile::tempdir;
+
+    // P7-3a. Opening a code repo as a workspace already worked; the scan just
+    // drowned in node_modules and target before reaching docs/.
+    #[test]
+    fn test_build_and_dependency_dirs_are_not_scanned() {
+        for name in ["node_modules", "target", "dist", "build"] {
+            assert!(is_excluded_dir(name), "{name} should be skipped");
+        }
+    }
+
+    // Sidecars hold a note's own ink, PDF pages and images. Listing them in
+    // the tree offers a folder to file notes into that nothing should.
+    #[test]
+    fn test_sidecar_dirs_are_not_scanned() {
+        for name in ["Lecture 7.ink", "Lecture 7.pdf", "Lecture 7.assets"] {
+            assert!(is_excluded_dir(name), "{name} should be skipped");
+        }
+    }
+
+    #[test]
+    fn test_dotfiles_are_still_skipped_and_ordinary_folders_are_not() {
+        assert!(is_excluded_dir(".git"));
+        assert!(!is_excluded_dir("Analysis 2"));
+        // Only an exact match: a course folder named after a build directory
+        // is a stretch, but "Distributed Systems" abbreviated is not.
+        assert!(!is_excluded_dir("distributed"));
+        assert!(!is_excluded_dir("building-compilers"));
+    }
 
     #[test]
     fn test_title_from_content_heading() {
