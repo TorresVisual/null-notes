@@ -252,9 +252,11 @@ The brief's second pillar. Notes stay plain `.md` — a deep link is ordinary Ma
 >
 > **Milestone for the slice: this repo's `docs/` lives in null-notes and gets edited there.** Order within it: ignore list → P7-3 → P7-4 + P7-1 together → P8-1.
 
-### P7-3a Scan ignore list — **S** — *do this first; it is the whole unlock*
-- [ ] Exclude `node_modules`, `target`, `dist`, `build` in `is_excluded_dir` (`src-tauri/src/commands/notes.rs:113`) — today it skips only `.ink` and dot-directories
-- [ ] DoD: opening this repo as a workspace lists `docs/` and nothing from `node_modules/` or `target/`, as fast as a notes-only workspace
+### P7-3a Scan ignore list — **S** ✅ — *done first; it was the whole unlock*
+
+> `is_excluded_dir` skipped only `.ink` and dot-directories, so the scan walked `node_modules/` and `target/` — 580 `.md` files across 218 dependency directories in this repo, against the 46 in `docs/` actually wanted. Now excludes `node_modules`, `target`, `dist`, `build` (exact match, so a folder named `distributed` survives) and the `.pdf`/`.assets` sidecars that had been left in the tree alongside the already-excluded `.ink`.
+- [x] Exclude `node_modules`, `target`, `dist`, `build` in `is_excluded_dir` (`src-tauri/src/commands/notes.rs`) — it had skipped only `.ink` and dot-directories
+- [x] DoD: opening this repo as a workspace lists `docs/` and nothing from `node_modules/` or `target/`, as fast as a notes-only workspace — *unit-verified on the predicate and by file counts; the in-app open is part of the dogfood slice itself*
 
 > A workspace is just a folder scanned for `.md`, so "open a code repo as a workspace" **already works** — the scan simply drowns in dependencies first. P7-3 was scheduled **M** behind three phases; the part that actually unblocks daily use is hours.
 
