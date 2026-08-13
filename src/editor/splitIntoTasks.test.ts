@@ -91,6 +91,19 @@ describe('splitting a sheet into tasks', () => {
     expect(inkNodes(e)[0]?.['height']).toBe(400)
   })
 
+  // Reported from real use: the split did nothing, but a NoteName.ink/ folder
+  // appeared beside the note anyway — which reads as the command having
+  // half-run on a note it did not touch.
+  it('creates no ink sidecar when there is nothing to put a canvas under', async () => {
+    const e = mount('<p>1. Erste</p>')
+    splitIntoTasksIpc.mockResolvedValue('## Task 1\n\n1. Erste\n\n### Solution\n\nalready answered\n')
+
+    await splitIntoTasks(e)
+
+    expect(ensureDir).not.toHaveBeenCalled()
+    expect(writeInk).not.toHaveBeenCalled()
+  })
+
   it('reports no-structure and changes nothing when the splitter found none', async () => {
     const e = mount('<p>ordinary prose</p>')
     splitIntoTasksIpc.mockImplementation((md) => Promise.resolve(md))

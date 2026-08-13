@@ -64,9 +64,17 @@ A single scan decides for the whole document. Per-block decisions are what would
 
 ### Which ordered items are exercises
 
-Only the **longest run of consecutive integers starting at 1**, at top level. On every Analysis sheet that is exactly `1.` … `6.`, and `11. Übungsblatt` is excluded because it neither starts at 1 nor continues a run — no keyword list of title words ("Übungsblatt", "Assignment", "Sheet") is needed, and none is added, because such a list is a guess about the next document rather than a fact about this one.
+**The numbers cannot be trusted, and this is the single most important fact in this section.** `12. Übungsblatt` and the `1.` beneath it are *one* CommonMark list — a list item's written number is ignored after the first — so the editor's own Markdown round-trip renumbers the first exercise to `13.`, and every following one in turn. Saving the note writes that back to the file, so it is not recoverable by reading from disk either. A block between two items (a display equation, say) breaks the list and the next item restarts, which is why a real sheet shows a mixture like `12, 13, 2, 3, 4` rather than any clean sequence.
 
-Indented items are never candidates: `layout.rs` already decides depth, and a sub-part is a sub-part.
+This was not theoretical: requiring a run starting at 1 made **Split Into Tasks silently do nothing** on a real converted sheet. The original measurement went through the Rust pipeline only — `dump_markdown` — and never through the editor, which is precisely where the numbering changes.
+
+So there are two paths:
+
+1. **Intact numbering** — the longest run of consecutive integers starting at 1, at top level. On a freshly converted sheet that is exactly `1.` … `6.`, and `11. Übungsblatt` is excluded because it neither starts at 1 nor continues a run — no keyword list of title words ("Übungsblatt", "Assignment", "Sheet") is needed, and none is added, because such a list is a guess about the next document rather than a fact about this one.
+
+2. **Renumbered** — every top-level ordered item, once the run above finds fewer than two. Being an ordered item at top level is the one property that survives the round trip, so it is what the fallback rests on. The sheet-number line is then dropped only when it is *leading and label-like*: at most two words, where the shortest real exercise opener in the corpus is four (`Berechnen Sie das Kurvenintegral`). An exercise is an instruction and runs to a sentence; `12. Übungsblatt` is a label. That is a heuristic, and it is confined to the path where the precise rule has already failed — the alternative there is not splitting at all, which is strictly worse than one spurious task the reader can delete.
+
+Indented items are never candidates in either path: `layout.rs` already decides depth, and a sub-part is a sub-part.
 
 ### The output
 

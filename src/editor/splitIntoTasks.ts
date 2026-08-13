@@ -34,6 +34,11 @@ function notePathOf(editor: Editor): string {
  * files which were never written.
  */
 async function blankCanvases(notePath: string, count: number): Promise<string[]> {
+  // Checked before touching the filesystem: creating the sidecar for zero
+  // canvases leaves an empty `NoteName.ink/` next to a note that has no ink in
+  // it, which reads as the command having half-run.
+  if (count === 0) return []
+
   const dir = await inkApi.ensureDir(notePath)
   const sep = dir.includes('\\') ? '\\' : '/'
   const stamp = Date.now()

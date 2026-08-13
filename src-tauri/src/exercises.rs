@@ -145,7 +145,7 @@ fn ordered_starts(lines: &[&str]) -> Vec<Start> {
     let mut run: Vec<Start> = Vec::new();
     let mut expected = 1u32;
 
-    for (line, number) in candidates {
+    for &(line, number) in &candidates {
         if number == expected {
             run.push(Start { line, label: number.to_string(), indent: 0 });
             expected += 1;
@@ -168,7 +168,50 @@ fn ordered_starts(lines: &[&str]) -> Vec<Start> {
     if run.len() > best.len() {
         best = run;
     }
-    best
+    if best.len() >= 2 {
+        return best;
+    }
+    all_ordered_items(lines, &candidates)
+}
+
+/// Every top-level ordered item, used when the numbering is unusable.
+///
+/// **Why the numbers cannot be trusted.** `12. Übungsblatt` and the `1.` that
+/// follows it are one CommonMark list — a list item's written number is
+/// ignored after the first — so the editor's own Markdown round-trip
+/// renumbers the first exercise to `13.`, and saving the note writes that
+/// back to the file. The run-from-1 rule then finds no run at all and the
+/// sheet silently refuses to split, which is a far worse outcome than one
+/// spurious task.
+///
+/// Being an ordered item at top level is the one property that survives the
+/// round trip, so it is what this falls back to. The sheet-number line is
+/// dropped only when it is *leading and title-like* — an exercise is an
+/// instruction and runs to a sentence, while `12. Übungsblatt` is a label.
+fn all_ordered_items(lines: &[&str], candidates: &[(usize, u32)]) -> Vec<Start> {
+    let skip = usize::from(candidates.len() > 2 && leads_with_a_title(lines, candidates));
+    candidates
+        .iter()
+        .skip(skip)
+        .map(|(line, number)| Start { line: *line, label: number.to_string(), indent: 0 })
+        .collect()
+}
+
+/// How many words an ordered item may carry and still read as a label rather
+/// than an instruction. `12. Übungsblatt` is one; `5. Übungsblatt (19.5.2026)`
+/// is two; the shortest real exercise opener in the corpus is four
+/// (`Berechnen Sie das Kurvenintegral`).
+const TITLE_MAX_WORDS: usize = 2;
+
+fn leads_with_a_title(lines: &[&str], candidates: &[(usize, u32)]) -> bool {
+    let Some((line, _)) = candidates.first() else {
+        return false;
+    };
+    let Some(text) = lines.get(*line) else {
+        return false;
+    };
+    let after_marker = text.trim_start().split_once(". ").map(|(_, rest)| rest).unwrap_or("");
+    !after_marker.is_empty() && after_marker.split_whitespace().count() <= TITLE_MAX_WORDS
 }
 
 #[cfg(test)]
@@ -349,6 +392,98 @@ mod tests {
         for line in md.lines().filter(|l| !l.trim().is_empty()) {
             assert!(out.contains(line), "lost {line:?} from: {out}");
         }
+    }
+
+    // The bug that made the command silently do nothing on a real sheet.
+    //
+    // `12. Übungsblatt` and the `1.` under it are one CommonMark list — a list
+    // item's written number is ignored after the first — so the editor's own
+    // Markdown round-trip renumbers the first exercise to `13.`, and saving
+    // the note writes that back to the file. There is then no run starting at
+    // 1 anywhere, and requiring one meant the sheet refused to split at all.
+    #[test]
+    fn a_sheet_whose_numbering_the_editor_renumbered_still_splits() {
+        let md = sheet(&[
+            "# Analysis 2 für Informatikstudien",
+            "",
+            "12. Übungsblatt",
+            "",
+            "13. Lösen Sie das folgende Anfangswertproblem:",
+            "",
+            "2. Lösen Sie das zweite Problem:",
+            "",
+            "3. Ein gedämpftes System:",
+            "",
+            "4. Bestimmen Sie die Lösung:",
+        ]);
+
+        let out = split_into_tasks(&md);
+
+        assert_eq!(out.matches("## Task").count(), 4, "got: {out}");
+        assert!(!out.contains("## Task 12"), "the sheet number: {out}");
+        assert!(out.contains("11. Übungsblatt") || out.contains("12. Übungsblatt"));
+    }
+
+    // With nothing between the items to break the list, every exercise
+    // continues the sheet-number list and none of the original numbers
+    // survives at all. This is the real Blatt12 head after a round trip.
+    #[test]
+    fn a_sheet_renumbered_end_to_end_still_splits() {
+        let md = sheet(&[
+            "# Analysis 2 für Informatikstudien",
+            "",
+            "12. Übungsblatt",
+            "",
+            "13. Lösen Sie das folgende Anfangswertproblem:",
+            "",
+            "14. Lösen Sie das zweite Anfangswertproblem:",
+            "",
+            "15. Ein gedämpftes Schwingungssystem:",
+        ]);
+
+        let out = split_into_tasks(&md);
+
+        assert_eq!(out.matches("## Task").count(), 3, "got: {out}");
+        assert!(!out.contains("## Task 12"), "the sheet number: {out}");
+        assert_eq!(out.matches("### Solution").count(), 3);
+    }
+
+    // The fallback only drops a *leading, label-like* item. An exercise is an
+    // instruction and runs to a sentence, so length is what separates them —
+    // no list of title words, which would be a guess about the next document.
+    #[test]
+    fn the_fallback_keeps_every_item_when_the_first_is_a_real_exercise() {
+        let md = sheet(&[
+            "7. Berechnen Sie das Kurvenintegral über C:",
+            "",
+            "9. Bestimmen Sie die Lösung des Systems:",
+            "",
+            "11. Zeigen Sie die Konvergenz der Reihe:",
+        ]);
+
+        let out = split_into_tasks(&md);
+
+        assert_eq!(out.matches("## Task").count(), 3, "got: {out}");
+    }
+
+    // Intact numbering still takes the precise path — a fresh import must not
+    // regress to the fallback's looser judgement.
+    #[test]
+    fn intact_numbering_still_excludes_the_sheet_number_exactly() {
+        let md = sheet(&[
+            "12. Übungsblatt",
+            "",
+            "1. Erste Aufgabe hier",
+            "",
+            "2. Zweite Aufgabe hier",
+            "",
+            "3. Dritte Aufgabe hier",
+        ]);
+
+        let out = split_into_tasks(&md);
+
+        assert_eq!(out.matches("## Task").count(), 3, "got: {out}");
+        assert!(!out.contains("## Task 12"), "got: {out}");
     }
 
     // Numbering that skips is still one run as long as it starts at 1 and the
