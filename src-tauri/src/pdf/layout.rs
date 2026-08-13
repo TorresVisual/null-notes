@@ -605,15 +605,142 @@ pub(super) fn baseline_label(row: &[CharBox]) -> String {
     label
 }
 
-/// Reconstructs fractions from the rules the PDF draws — see
-/// `docs/specs/pdf-ruled-fraction-reconstruction-design.md`. Filled in by
-/// Task 4 of the implementation plan; passes every row through untouched
-/// until then.
+/// How much of a row's printing content must sit under a band's bars for it
+/// to be that band's numerator or denominator, rather than the baseline row
+/// that runs between them.
+const RULE_ROW_INSIDE_RATIO: f32 = 0.5;
+
+/// How far outside a bar's span, in ems of the row's own font size, a
+/// character may sit and still be assigned to it.
+const SPAN_SLACK_EMS: f32 = 0.5;
+
+/// Reconstructs fractions from the rules the PDF draws.
+///
+/// LaTeX's fraction bar is a drawn rule, so a row of several side-by-side
+/// fractions arrives as three unrelated rows — every numerator on one, every
+/// denominator on another, the connectors and any surrounding integrand on a
+/// third. `reconstruct_fraction_sums` infers the term count from the
+/// connectors and the term boundaries from the widest x-gaps; both are
+/// guesses, and both fail on a contour integral whose baseline carries `dz,`
+/// as well as its `+`s. The bars state the same two facts exactly: how many
+/// terms there are, and where each one begins.
+///
+/// Runs after `reconstruct_cases` and `reconstruct_matrices` have claimed
+/// their rows, so a bar drawn inside a matrix is never visible here.
 fn reconstruct_ruled_fractions(
     rows: Vec<Vec<(usize, CharBox)>>,
-    _rules: &[RuleBox],
+    rules: &[RuleBox],
 ) -> (Vec<Line>, Vec<Vec<(usize, CharBox)>>) {
-    (Vec::new(), rows)
+    if rules.is_empty() {
+        return (Vec::new(), rows);
+    }
+
+    let plain: Vec<Vec<CharBox>> = rows.iter().map(|r| r.iter().map(|(_, c)| *c).collect()).collect();
+    let mut consumed = vec![false; rows.len()];
+    let mut synthesized: Vec<Line> = Vec::new();
+
+    for bars in super::rules::band(rules) {
+        let band_y = bars[0].y;
+
+        let Some(num_i) = flanking_row(&plain, &consumed, &bars, band_y, true) else {
+            continue;
+        };
+        let Some(den_i) = flanking_row(&plain, &consumed, &bars, band_y, false) else {
+            continue;
+        };
+
+        let slack = row_font_size(&plain[num_i]).max(1.0) * SPAN_SLACK_EMS;
+        let Some(num_groups) = bucket_by_span(&plain[num_i], &bars, slack) else {
+            continue;
+        };
+        let Some(den_groups) = bucket_by_span(&plain[den_i], &bars, slack) else {
+            continue;
+        };
+
+        let content: Vec<Inline> = num_groups
+            .iter()
+            .zip(den_groups.iter())
+            .map(|(n, d)| {
+                Inline::Maths(format!("\\frac{{{}}}{{{}}}", latex::to_latex(n), latex::to_latex(d)))
+            })
+            .collect();
+
+        let (num_x0, num_x1) = row_x_extent(&plain[num_i]);
+        let (den_x0, den_x1) = row_x_extent(&plain[den_i]);
+
+        synthesized.push(Line {
+            content,
+            x: num_x0.min(den_x0),
+            right: num_x1.max(den_x1),
+            y: band_y,
+            font_size: row_font_size(&plain[num_i]).max(1.0),
+            fixed_pitch: false,
+            is_display_maths: true,
+            ends_hyphenated: false,
+        });
+
+        consumed[num_i] = true;
+        consumed[den_i] = true;
+    }
+
+    let remaining: Vec<Vec<(usize, CharBox)>> = rows
+        .into_iter()
+        .enumerate()
+        .filter(|(i, _)| !consumed[*i])
+        .map(|(_, row)| row)
+        .collect();
+
+    (synthesized, remaining)
+}
+
+/// The nearest unconsumed row above (`above`) or below a band whose printing
+/// characters mostly sit under the band's own bars.
+///
+/// Vertical distance alone is not enough: the baseline row running between a
+/// band's numerator and denominator is often the *closest* row below it. What
+/// separates them is that the denominator sits under the bars and the
+/// baseline does not.
+fn flanking_row(
+    plain: &[Vec<CharBox>],
+    consumed: &[bool],
+    bars: &[RuleBox],
+    band_y: f32,
+    above: bool,
+) -> Option<usize> {
+    let mut candidates: Vec<(usize, f32)> = plain
+        .iter()
+        .enumerate()
+        .filter(|(i, row)| !consumed[*i] && !row.is_empty())
+        .filter_map(|(i, row)| {
+            let gap = if above { row_y(row) - band_y } else { band_y - row_y(row) };
+            (gap > 0.0).then_some((i, gap))
+        })
+        .filter(|(i, gap)| *gap <= row_font_size(&plain[*i]).max(1.0) * FRACTION_MAX_ROW_GAP)
+        .collect();
+    candidates.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
+
+    candidates.into_iter().find_map(|(i, _)| {
+        let slack = row_font_size(&plain[i]).max(1.0) * SPAN_SLACK_EMS;
+        (super::rules::chars_inside_spans(&plain[i], bars, slack) > RULE_ROW_INSIDE_RATIO)
+            .then_some(i)
+    })
+}
+
+/// A row's characters split into one group per bar, by which span each falls
+/// under. `None` when any character sits outside every span — the bars do not
+/// describe this row, and a partial reconstruction is worse than none — or
+/// when any bar ends up with nothing under it.
+fn bucket_by_span(row: &[CharBox], bars: &[RuleBox], slack: f32) -> Option<Vec<Vec<CharBox>>> {
+    let mut groups: Vec<Vec<CharBox>> = vec![Vec::new(); bars.len()];
+    let mut sorted: Vec<CharBox> = row.iter().copied().filter(|c| !c.ch.is_whitespace()).collect();
+    sorted.sort_by(|a, b| a.x.partial_cmp(&b.x).unwrap_or(std::cmp::Ordering::Equal));
+
+    for ch in sorted {
+        let index = super::rules::span_index(ch.x + ch.width / 2.0, bars, slack)?;
+        groups[index].push(ch);
+    }
+
+    groups.iter().all(|g| !g.is_empty()).then_some(groups)
 }
 
 /// Finds and reconstructs a "sum of stacked fractions" — several fractions

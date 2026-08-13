@@ -2356,3 +2356,97 @@ fn group_lines_with_no_rules_matches_group_lines() {
 
     assert_eq!(group_lines_with_rules(&chars, &[]), group_lines(&chars));
 }
+
+use super::rules::RuleBox;
+
+fn rule_at(x0: f32, x1: f32, y: f32) -> RuleBox {
+    RuleBox { x0, x1, y, thickness: 0.96 }
+}
+
+// The bar states outright what the geometric pass has to infer: the row above
+// it is a numerator and the row below it is a denominator.
+#[test]
+fn a_drawn_bar_pairs_the_rows_it_separates() {
+    let mut chars = set("a + b", 300.0, 700.0, maths_italic());
+    chars.extend(set("c + d", 300.0, 680.0, maths_italic()));
+    let rules = [rule_at(298.0, 330.0, 690.0)];
+
+    let markdown = chars_and_rules_to_markdown(&chars, &rules);
+
+    assert!(markdown.contains(r"\frac{a + b}{c + d}"), "got: {markdown}");
+}
+
+// The crux. On a real contour integral the baseline row sits *closer* to the
+// bar than the denominator does, so ranking candidate rows by vertical
+// distance picks the wrong one. Only "most of this row's characters sit under
+// a bar" separates them.
+#[test]
+fn the_baseline_row_is_not_mistaken_for_the_denominator() {
+    let mut chars = set("a", 245.0, 248.0, maths_italic());
+    // Outside the bar's span, and nearer to the bar than the denominator is.
+    chars.extend(set("dz", 275.0, 240.0, maths_italic()));
+    // Under the bar, and further from it.
+    chars.extend(set("x", 245.0, 234.0, maths_italic()));
+    let rules = [rule_at(240.0, 270.0, 242.0)];
+
+    let markdown = chars_and_rules_to_markdown(&chars, &rules);
+
+    assert!(markdown.contains(r"\frac{a}{x}"), "got: {markdown}");
+}
+
+// A bar with nothing under it is page furniture — a header rule — and must
+// not drag unrelated content into a fraction.
+#[test]
+fn a_bar_with_no_content_in_its_span_reconstructs_nothing() {
+    let chars = page_at(700.0, &["Hello world", "a second line of prose"]);
+    // Spans the full page width at the very top, like a header rule.
+    let rules = [rule_at(-0.4, 595.67, 737.4)];
+
+    let markdown = chars_and_rules_to_markdown(&chars, &rules);
+
+    assert!(!markdown.contains(r"\frac"), "got: {markdown}");
+}
+
+// Half-reconstructed mathematics is worse than none: a numerator character
+// stranded far outside every span means the bars do not describe this row, so
+// the whole band gives up and leaves the rows to the existing passes.
+#[test]
+fn a_character_far_outside_every_span_abandons_the_band() {
+    let mut chars = set("a", 245.0, 248.0, maths_italic());
+    chars.extend(set("Q", 480.0, 248.0, maths_italic()));
+    chars.extend(set("x", 245.0, 234.0, maths_italic()));
+    let rules = [rule_at(240.0, 270.0, 242.0)];
+
+    let markdown = chars_and_rules_to_markdown(&chars, &rules);
+
+    assert!(!markdown.contains(r"\frac{a}{x}"), "got: {markdown}");
+}
+
+// Three fractions side by side under one row of bars — the shape
+// Analysis_2_Blatt11.pdf item 4 sets. Every numerator shares one row and
+// every denominator another, so no amount of pairing whole *lines* can
+// recover three separate fractions; only the bars' own x-spans say where one
+// term ends and the next begins. The baseline's own content is Task 5's
+// concern, so this asserts only the fractions.
+#[test]
+fn three_bars_on_one_row_become_three_separate_fractions() {
+    let mut chars = set("a", 245.0, 248.0, maths_italic());
+    chars.extend(set("b", 295.0, 248.0, maths_italic()));
+    chars.extend(set("c", 355.0, 248.0, maths_italic()));
+
+    chars.extend(set("x", 245.0, 234.0, maths_italic()));
+    chars.extend(set("y", 295.0, 234.0, maths_italic()));
+    chars.extend(set("z", 355.0, 234.0, maths_italic()));
+
+    let rules = [
+        rule_at(240.0, 270.0, 242.0),
+        rule_at(290.0, 330.0, 242.0),
+        rule_at(350.0, 370.0, 242.0),
+    ];
+
+    let markdown = chars_and_rules_to_markdown(&chars, &rules);
+
+    assert!(markdown.contains(r"\frac{a}{x}"), "got: {markdown}");
+    assert!(markdown.contains(r"\frac{b}{y}"), "got: {markdown}");
+    assert!(markdown.contains(r"\frac{c}{z}"), "got: {markdown}");
+}
