@@ -334,7 +334,9 @@ git commit -m "refactor(ink): read shared tool state from the store"
 - Consumes: `useInkStore` from Task 1.
 - Produces:
   - `CanvasHandle` — `{ undo(): void; redo(): void; canUndo: boolean; canRedo: boolean; deleteSelected(): void; hasSelection: boolean; toggleRuler(): void; rulerOn: boolean; zoom: number; setZoom(zoom: number): void }`
-  - `useInkStore` gains `activeCanvas: CanvasHandle | null`, `setActiveCanvas(handle: CanvasHandle | null)`, `clearActiveCanvas()`.
+  - `useInkStore` gains `activeCanvas: CanvasHandle | null`, `activeCanvasId: string | null`, `setActiveCanvas(id: string, handle: CanvasHandle)`, `clearActiveCanvas(id: string)`.
+
+**Correction (found in task review, ruled by the human before this task was dispatched to implementation):** the first draft of this task keyed "am I the active canvas" off a plain `useRef` set to `true` on pointerdown and never reset. With one canvas that is harmless; with several mounted concurrently — which is now the normal case, since every exercise solution gets its own canvas — it is a real exclusivity bug: canvas A's stale `true` ref lets it silently reclaim the slot from canvas B the next time any of A's own state changes, and lets A's unmount wipe out B's live registration. Fixed by keying the store on a stable per-canvas id (`svgPath`, already unique per canvas) instead of an unsynchronized ref: `activeCanvasId` plus `setActiveCanvas(id, handle)` / `clearActiveCanvas(id)`, where `clearActiveCanvas` only clears if its `id` still matches the current owner. Each canvas then derives `isActive` reactively from the store (`activeCanvasId === svgPath`) rather than tracking it locally, so losing the slot to another canvas needs no cleanup step to remember.
 
 Still no visible change: the per-canvas toolbar stays. This task only makes the target reachable.
 
@@ -362,31 +364,47 @@ function handle(overrides: Partial<CanvasHandle> = {}): CanvasHandle {
 }
 
 describe('the active canvas', () => {
-  beforeEach(() => useInkStore.getState().clearActiveCanvas())
+  beforeEach(() => useInkStore.setState({ activeCanvas: null, activeCanvasId: null }))
 
   it('has none to begin with', () => {
     expect(useInkStore.getState().activeCanvas).toBeNull()
+    expect(useInkStore.getState().activeCanvasId).toBeNull()
   })
 
   it('remembers the canvas that registered', () => {
-    const first = handle({ canUndo: true })
-    useInkStore.getState().setActiveCanvas(first)
+    useInkStore.getState().setActiveCanvas('a', handle({ canUndo: true }))
 
+    expect(useInkStore.getState().activeCanvasId).toBe('a')
     expect(useInkStore.getState().activeCanvas?.canUndo).toBe(true)
   })
 
   it('replaces the previous one when another canvas registers', () => {
-    useInkStore.getState().setActiveCanvas(handle({ zoom: 1 }))
-    useInkStore.getState().setActiveCanvas(handle({ zoom: 2 }))
+    useInkStore.getState().setActiveCanvas('a', handle({ zoom: 1 }))
+    useInkStore.getState().setActiveCanvas('b', handle({ zoom: 2 }))
 
+    expect(useInkStore.getState().activeCanvasId).toBe('b')
     expect(useInkStore.getState().activeCanvas?.zoom).toBe(2)
   })
 
-  it('clears', () => {
-    useInkStore.getState().setActiveCanvas(handle())
-    useInkStore.getState().clearActiveCanvas()
+  it('clears when the current owner asks', () => {
+    useInkStore.getState().setActiveCanvas('a', handle())
+    useInkStore.getState().clearActiveCanvas('a')
 
     expect(useInkStore.getState().activeCanvas).toBeNull()
+    expect(useInkStore.getState().activeCanvasId).toBeNull()
+  })
+
+  // The exclusivity property the id-keyed design exists for: a canvas that
+  // has already lost the slot to another one cannot claw it back, or clear
+  // it, just by acting after the fact.
+  it('does not clear when a former owner asks after another canvas has taken over', () => {
+    useInkStore.getState().setActiveCanvas('a', handle())
+    useInkStore.getState().setActiveCanvas('b', handle())
+
+    useInkStore.getState().clearActiveCanvas('a')
+
+    expect(useInkStore.getState().activeCanvasId).toBe('b')
+    expect(useInkStore.getState().activeCanvas).not.toBeNull()
   })
 })
 ```
@@ -424,24 +442,32 @@ Add to the `InkStore` interface:
 
 ```ts
   activeCanvas: CanvasHandle | null
-  setActiveCanvas: (handle: CanvasHandle) => void
-  clearActiveCanvas: () => void
+  activeCanvasId: string | null
+  setActiveCanvas: (id: string, handle: CanvasHandle) => void
+  clearActiveCanvas: (id: string) => void
 ```
 
 And to the store body:
 
 ```ts
   activeCanvas: null,
-  setActiveCanvas: (handle) => set({ activeCanvas: handle }),
-  clearActiveCanvas: () => set({ activeCanvas: null }),
+  activeCanvasId: null,
+  setActiveCanvas: (id, handle) => set({ activeCanvas: handle, activeCanvasId: id }),
+  // Only the current owner's id can clear the slot: a canvas that has
+  // already lost it to another one must not be able to wipe out the new
+  // owner's registration from its own stale unmount or effect cleanup —
+  // that exact bug is why this is keyed on an id rather than a bare toggle.
+  clearActiveCanvas: (id) => {
+    if (get().activeCanvasId === id) set({ activeCanvas: null, activeCanvasId: null })
+  },
 ```
 
 - [ ] **Step 4: Run the store tests**
 
 Run: `npx vitest run src/store/ink.test.ts`
-Expected: PASS, 13 tests.
+Expected: PASS, 14 tests.
 
-- [ ] **Step 5: Write the failing registration test**
+- [ ] **Step 5: Write the failing registration tests**
 
 Create `src/ink/activeCanvas.test.tsx`:
 
@@ -459,29 +485,54 @@ vi.mock('../lib/ink', () => ({
   },
 }))
 
-beforeEach(() => useInkStore.getState().clearActiveCanvas())
+beforeEach(() => useInkStore.setState({ activeCanvas: null, activeCanvasId: null }))
 afterEach(cleanup)
+
+function pointerDownOn(container: HTMLElement) {
+  const canvas = container.querySelector('canvas')!
+  fireEvent.pointerDown(canvas, { clientX: 10, clientY: 10, pointerId: 1 })
+}
 
 describe('registering the canvas being drawn in', () => {
   it('registers on pointerdown', async () => {
     const { container } = render(<InkCanvas svgPath="/ws/N.ink/a.svg" width={700} height={400} />)
 
-    const canvas = container.querySelector('canvas')!
-    fireEvent.pointerDown(canvas, { clientX: 10, clientY: 10, pointerId: 1 })
+    pointerDownOn(container)
 
     await waitFor(() => expect(useInkStore.getState().activeCanvas).not.toBeNull())
+    expect(useInkStore.getState().activeCanvasId).toBe('/ws/N.ink/a.svg')
   })
 
   it('clears when it unmounts while active', async () => {
     const { container, unmount } = render(
       <InkCanvas svgPath="/ws/N.ink/a.svg" width={700} height={400} />,
     )
-    fireEvent.pointerDown(container.querySelector('canvas')!, { clientX: 10, clientY: 10, pointerId: 1 })
+    pointerDownOn(container)
     await waitFor(() => expect(useInkStore.getState().activeCanvas).not.toBeNull())
 
     unmount()
 
     expect(useInkStore.getState().activeCanvas).toBeNull()
+  })
+
+  // The scenario the original ref-based design got wrong: two canvases
+  // mounted at once — one per exercise solution is now the normal case —
+  // and the one that lost the slot must not be able to reclaim or clear it
+  // later, whether by its own state changing or by unmounting.
+  it('a second canvas becoming active is not later overwritten by the first', async () => {
+    const a = render(<InkCanvas svgPath="/ws/N.ink/a.svg" width={700} height={400} />)
+    const b = render(<InkCanvas svgPath="/ws/N.ink/b.svg" width={700} height={400} />)
+
+    pointerDownOn(a.container)
+    await waitFor(() => expect(useInkStore.getState().activeCanvasId).toBe('/ws/N.ink/a.svg'))
+
+    pointerDownOn(b.container)
+    await waitFor(() => expect(useInkStore.getState().activeCanvasId).toBe('/ws/N.ink/b.svg'))
+
+    a.unmount()
+
+    expect(useInkStore.getState().activeCanvasId).toBe('/ws/N.ink/b.svg')
+    expect(useInkStore.getState().activeCanvas).not.toBeNull()
   })
 })
 ```
@@ -489,15 +540,16 @@ describe('registering the canvas being drawn in', () => {
 - [ ] **Step 6: Run it to verify it fails**
 
 Run: `npx vitest run src/ink/activeCanvas.test.tsx`
-Expected: FAIL — `activeCanvas` stays `null`.
+Expected: FAIL — `activeCanvas` stays `null`; `setActiveCanvas` takes one argument, not two.
 
 - [ ] **Step 7: Register from `InkCanvas`**
 
 In `src/ink/InkCanvas.tsx`, add the imports:
 
 ```tsx
-import { useEffect } from 'react'
+import { useEffect, useCallback } from 'react'
 import { useInkStore } from '../store/ink'
+import type { CanvasHandle } from '../store/ink'
 ```
 
 Inside the component, after the `useInkCanvas` destructuring, add:
@@ -505,11 +557,12 @@ Inside the component, after the `useInkCanvas` destructuring, add:
 ```tsx
 const setActiveCanvas = useInkStore((s) => s.setActiveCanvas)
 const clearActiveCanvas = useInkStore((s) => s.clearActiveCanvas)
-
-// Whether *this* canvas is the active one. A ref, not state: it is set from a
-// pointer handler and read by an effect, and re-rendering on it would achieve
-// nothing the effect does not already do.
-const activeHere = useRef(false)
+// Whether *this* canvas is the active one — derived from the store, not a
+// manually-toggled ref. This is what makes exclusivity automatic: the instant
+// another canvas calls `setActiveCanvas`, every other canvas's `isActive`
+// recomputes to `false` on its own next render, with no cleanup step to
+// remember. `svgPath` is this canvas's stable identity: one file per canvas.
+const isActive = useInkStore((s) => s.activeCanvasId === svgPath)
 
 const handle = useCallback(
   (): CanvasHandle => ({
@@ -529,27 +582,26 @@ const handle = useCallback(
 
 // Re-registered whenever a value the bar renders changes, so `canUndo` in the
 // toolbar tracks the stroke that was just drawn rather than the state when the
-// pen first touched down.
+// pen first touched down — but only while this canvas actually owns the slot.
 useEffect(() => {
-  if (activeHere.current) setActiveCanvas(handle())
-}, [handle, setActiveCanvas])
+  if (isActive) setActiveCanvas(svgPath, handle())
+}, [isActive, handle, setActiveCanvas, svgPath])
 
-useEffect(
-  () => () => {
-    if (activeHere.current) clearActiveCanvas()
-  },
-  [clearActiveCanvas],
-)
+// Safe to call unconditionally on every unmount: `clearActiveCanvas` only
+// clears if `svgPath` still owns the slot, so a canvas that already lost it
+// to another one cannot wipe out that canvas's live registration.
+useEffect(() => () => clearActiveCanvas(svgPath), [clearActiveCanvas, svgPath])
 ```
 
-Import `useRef` and `useCallback` from `react` if they are not already imported, and `CanvasHandle` as a type from `../store/ink`.
+`useRef` is not needed for this mechanism — do not add an `activeHere` ref. If `useRef` is already imported for something else in the file, leave that usage alone.
 
-In `handlePointerDown`, as the first two statements:
+In `handlePointerDown`, as the first statement:
 
 ```tsx
-activeHere.current = true
-setActiveCanvas(handle())
+setActiveCanvas(svgPath, handle())
 ```
+
+`isActive` becomes `true` reactively on the next render once the store updates; there is nothing else to set by hand.
 
 - [ ] **Step 8: Run the tests**
 
@@ -1316,4 +1368,6 @@ git commit -m "feat(editor): add the exercise-sheet actions to the toolbar"
 
 **Placeholder scan:** no TBD/TODO; every code step carries real code. Task 4 Step 3 says "the moved markup" rather than reproducing ~120 lines verbatim — acceptable because the instruction is a literal move of an existing block with a named, enumerated set of rewires, not a description of code to invent.
 
-**Type consistency:** `CanvasHandle` has identical members in Task 3's store definition, Task 3's test helper and Task 4's test helper. `activePenOf` takes `Pick<InkStore, 'pens' | 'activePenId'>` in Task 1 and is called with `{ pens, activePenId }` in Task 4. `setTool`, `selectPen`, `updateActivePen`, `setEraserMode`, `setEraserSize` are named identically in Tasks 1, 2 and 4. `addNextTask(editor, label)` in Task 7 matches its existing signature in `src/editor/splitIntoTasks.ts`.
+**Type consistency:** `CanvasHandle` has identical members in Task 3's store definition, Task 3's test helper and Task 4's test helper. `activePenOf` takes `Pick<InkStore, 'pens' | 'activePenId'>` in Task 1 and is called with `{ pens, activePenId }` in Task 4. `setTool`, `selectPen`, `updateActivePen`, `setEraserMode`, `setEraserSize` are named identically in Tasks 1, 2 and 4. `addNextTask(editor, label)` in Task 7 matches its existing signature in `src/editor/splitIntoTasks.ts`. `setActiveCanvas(id, handle)` / `clearActiveCanvas(id)` take the same `(id: string, ...)` shape everywhere they appear (Task 3's store, its own tests, `InkCanvas.tsx`) — Task 4 onward only ever reads `activeCanvas` (the handle) and never calls either setter, so the id-keying introduced by the Task 3 correction is invisible past Task 3.
+
+**Post-writing correction (Task 3, caught by task review, ruled by the human):** the first version of Task 3 keyed active-canvas tracking off a `useRef` set `true` on pointerdown and never reset — correct with one canvas mounted, a real exclusivity bug once several are (the normal case now that every exercise solution gets its own canvas). Corrected in place, before dispatch to the fix loop, to key the store on each canvas's `svgPath` instead: `activeCanvasId: string | null` alongside `activeCanvas`, `setActiveCanvas(id, handle)`, and `clearActiveCanvas(id)` that only clears if `id` still owns the slot. Each canvas derives `isActive` reactively (`activeCanvasId === svgPath`) rather than tracking it in a ref, so losing the slot needs no cleanup step to remember. The plan text above reflects the corrected version throughout; no task after Task 3 needed a text change, since none of them touch the id.
