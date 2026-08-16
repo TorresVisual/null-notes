@@ -79,3 +79,50 @@ describe('the ink store', () => {
     expect(localStorage.getItem('null-notes.ink.eraserSize')).toBe(String(clamped))
   })
 })
+
+import type { CanvasHandle } from './ink'
+
+function handle(overrides: Partial<CanvasHandle> = {}): CanvasHandle {
+  return {
+    undo: () => {},
+    redo: () => {},
+    canUndo: false,
+    canRedo: false,
+    deleteSelected: () => {},
+    hasSelection: false,
+    toggleRuler: () => {},
+    rulerOn: false,
+    zoom: 1,
+    setZoom: () => {},
+    ...overrides,
+  }
+}
+
+describe('the active canvas', () => {
+  beforeEach(() => useInkStore.getState().clearActiveCanvas())
+
+  it('has none to begin with', () => {
+    expect(useInkStore.getState().activeCanvas).toBeNull()
+  })
+
+  it('remembers the canvas that registered', () => {
+    const first = handle({ canUndo: true })
+    useInkStore.getState().setActiveCanvas(first)
+
+    expect(useInkStore.getState().activeCanvas?.canUndo).toBe(true)
+  })
+
+  it('replaces the previous one when another canvas registers', () => {
+    useInkStore.getState().setActiveCanvas(handle({ zoom: 1 }))
+    useInkStore.getState().setActiveCanvas(handle({ zoom: 2 }))
+
+    expect(useInkStore.getState().activeCanvas?.zoom).toBe(2)
+  })
+
+  it('clears', () => {
+    useInkStore.getState().setActiveCanvas(handle())
+    useInkStore.getState().clearActiveCanvas()
+
+    expect(useInkStore.getState().activeCanvas).toBeNull()
+  })
+})

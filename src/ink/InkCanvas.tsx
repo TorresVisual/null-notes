@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useRef, useState, useEffect, useCallback } from 'react'
 import type { PointerEvent as ReactPointerEvent } from 'react'
 import {
   PenLine,
@@ -15,6 +15,8 @@ import {
 } from 'lucide-react'
 import { useInkCanvas, isEraserTip } from './useInkCanvas'
 import { pinchZoom, distanceBetween } from './zoom'
+import { useInkStore } from '../store/ink'
+import type { CanvasHandle } from '../store/ink'
 import type { EraserMode, Tool } from './types'
 
 const TOOLS: { id: Tool; label: string; Icon: typeof PenLine }[] = [
@@ -98,6 +100,44 @@ export function InkCanvas({
     canRedo,
   } = useInkCanvas(svgPath, width, height, { zoom, autoGrow })
 
+  const setActiveCanvas = useInkStore((s) => s.setActiveCanvas)
+  const clearActiveCanvas = useInkStore((s) => s.clearActiveCanvas)
+
+  // Whether *this* canvas is the active one. A ref, not state: it is set from a
+  // pointer handler and read by an effect, and re-rendering on it would achieve
+  // nothing the effect does not already do.
+  const activeHere = useRef(false)
+
+  const handle = useCallback(
+    (): CanvasHandle => ({
+      undo,
+      redo,
+      canUndo,
+      canRedo,
+      deleteSelected,
+      hasSelection,
+      toggleRuler,
+      rulerOn: ruler !== null,
+      zoom,
+      setZoom: (next: number) => onZoomChange?.(next),
+    }),
+    [undo, redo, canUndo, canRedo, deleteSelected, hasSelection, toggleRuler, ruler, zoom, onZoomChange],
+  )
+
+  // Re-registered whenever a value the bar renders changes, so `canUndo` in the
+  // toolbar tracks the stroke that was just drawn rather than the state when the
+  // pen first touched down.
+  useEffect(() => {
+    if (activeHere.current) setActiveCanvas(handle())
+  }, [handle, setActiveCanvas])
+
+  useEffect(
+    () => () => {
+      if (activeHere.current) clearActiveCanvas()
+    },
+    [clearActiveCanvas],
+  )
+
   const [cursorPos, setCursorPos] = useState<{ x: number; y: number } | null>(null)
 
   // Fingers never draw — the pen owns the ink — so touch is free to mean
@@ -115,6 +155,9 @@ export function InkCanvas({
   }
 
   function handlePointerDown(e: ReactPointerEvent<HTMLDivElement>) {
+    activeHere.current = true
+    setActiveCanvas(handle())
+
     if (e.pointerType !== 'touch') return
 
     const { x, y } = pagePoint(e.currentTarget, e.clientX, e.clientY)
