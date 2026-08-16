@@ -1,15 +1,14 @@
 import { useEditor, EditorContent } from '@tiptap/react'
 import { useEffect, useRef, useState } from 'react'
-import { PenLine } from 'lucide-react'
 import { TextSelection } from '@tiptap/pm/state'
 import { coreExtensions } from './extensions'
 import { rememberPosition, recallPosition } from '../lib/notePositions'
 import { handleEditorKeyDown, handleEditorTextInput } from './extensions/CodeBlockEditor'
-import { inkApi } from '../lib/ink'
 import { splitIntoTasks, report } from './splitIntoTasks'
-import type { InkData } from '../ink/types'
 import { EditorStatusBar } from './EditorStatusBar'
 import { BlockHandle } from './extensions/BlockHandle'
+import { EditorToolbar } from './toolbar/EditorToolbar'
+import { useInkStore } from '../store/ink'
 
 interface NoteEditorProps {
   content: string
@@ -26,14 +25,6 @@ interface MarkdownStorage {
 function getMarkdown(storage: unknown): string {
   return ((storage as Record<string, unknown>)['markdown'] as MarkdownStorage).getMarkdown()
 }
-
-// Sized to the editor pane's content width (800px max-width less 48px padding
-// a side) so the right edge is not clipped, and tall enough for a worked
-// derivation rather than a couple of lines.
-const INK_WIDTH = 700
-const INK_HEIGHT = 900
-
-const EMPTY_INK: InkData = { width: INK_WIDTH, height: INK_HEIGHT, strokes: [], shapes: [] }
 
 // `lang` is the only thing that tells the WebView which dictionary to check
 // against; without it the note inherits index.html's `lang="en"`, and German
@@ -90,6 +81,13 @@ export function NoteEditor({ content, notePath, spellcheck, spellcheckLanguage, 
     const onSelectionUpdate = () => {
       setEditorVersion((version) => version + 1)
       rememberPosition(notePath, { selection: editor.state.selection.anchor })
+      // A canvas pointerdown does not move the ProseMirror selection, and the bar
+      // preventDefaults its own presses, so this fires only when the caret really
+      // lands in prose — which is exactly when the drawing tools should go away.
+      // Forced rather than routed through `clearActiveCanvas(id)`: the caret does
+      // not know or care which canvas currently owns the slot, only that none
+      // should once it has landed in text.
+      useInkStore.setState({ activeCanvas: null, activeCanvasId: null })
     }
     editor.on('selectionUpdate', onSelectionUpdate)
 
@@ -121,29 +119,6 @@ export function NoteEditor({ content, notePath, spellcheck, spellcheckLanguage, 
     editor.commands.focus(null, { scrollIntoView: false })
   }, [editor, notePath, content])
 
-  async function insertInkBlock() {
-    if (!editor) return
-    const dir = await inkApi.ensureDir(notePath)
-    const sep = dir.includes('\\') ? '\\' : '/'
-    const svgPath = `${dir}${sep}sketch-${Date.now()}.svg`
-    await inkApi.write(svgPath, EMPTY_INK)
-    editor.commands.insertContent({
-      type: 'inkBlock',
-      attrs: { src: svgPath, width: INK_WIDTH, height: INK_HEIGHT },
-    })
-  }
-
-  // Lets the native menu's "Insert Ink Block" item (and its accelerator)
-  // reach the currently-focused note without lifting the editor instance
-  // up to Layout — Layout just dispatches a plain window event.
-  useEffect(() => {
-    function onInsertInk() {
-      void insertInkBlock()
-    }
-    window.addEventListener('command:insert-ink', onInsertInk)
-    return () => window.removeEventListener('command:insert-ink', onInsertInk)
-  }, [editor, notePath])
-
   // Same shape, for "Split Into Tasks". Confirmed before it runs: this
   // rewrites the whole note, and asserting that a document *is* an exercise
   // sheet is a claim only the reader can make — which is why no import path
@@ -168,66 +143,9 @@ export function NoteEditor({ content, notePath, spellcheck, spellcheckLanguage, 
     return () => window.removeEventListener('command:split-tasks', handler)
   }, [editor, onChange])
 
-  const codeLanguage = editor?.getAttributes('codeBlock')['language']
-  const selectedCodeLanguage = typeof codeLanguage === 'string' ? codeLanguage : ''
-
   return (
     <div className="note-editor-wrap">
-      <div className="editor-toolbar" role="toolbar" aria-label="Insert">
-        <button onClick={() => void insertInkBlock()} aria-label="Insert ink block" title="Insert ink block">
-          <PenLine size={14} /> Ink
-        </button>
-        {editor?.isActive('codeBlock') && (
-          <label className="code-language-control">
-            <span>Language</span>
-            <select
-              aria-label="Code block language"
-              value={selectedCodeLanguage}
-              onChange={(event) => {
-                editor.chain().focus().updateAttributes('codeBlock', { language: event.target.value }).run()
-                setEditorVersion((version) => version + 1)
-              }}
-            >
-              <option value="">Plain text</option>
-              <option value="arduino">Arduino</option>
-              <option value="bash">Bash</option>
-              <option value="c">C</option>
-              <option value="cpp">C++</option>
-              <option value="csharp">C#</option>
-              <option value="css">CSS</option>
-              <option value="diff">Diff</option>
-              <option value="go">Go</option>
-              <option value="graphql">GraphQL</option>
-              <option value="html">HTML</option>
-              <option value="ini">INI</option>
-              <option value="java">Java</option>
-              <option value="javascript">JavaScript</option>
-              <option value="json">JSON</option>
-              <option value="kotlin">Kotlin</option>
-              <option value="less">Less</option>
-              <option value="lua">Lua</option>
-              <option value="makefile">Makefile</option>
-              <option value="markdown">Markdown</option>
-              <option value="objectivec">Objective-C</option>
-              <option value="perl">Perl</option>
-              <option value="php">PHP</option>
-              <option value="python">Python</option>
-              <option value="r">R</option>
-              <option value="ruby">Ruby</option>
-              <option value="rust">Rust</option>
-              <option value="scss">SCSS</option>
-              <option value="shell">Shell</option>
-              <option value="sql">SQL</option>
-              <option value="swift">Swift</option>
-              <option value="typescript">TypeScript</option>
-              <option value="vbnet">Visual Basic .NET</option>
-              <option value="wasm">WebAssembly</option>
-              <option value="xml">XML</option>
-              <option value="yaml">YAML</option>
-            </select>
-          </label>
-        )}
-      </div>
+      <EditorToolbar editor={editor} notePath={notePath} />
       <EditorContent
         editor={editor}
         role="textbox"

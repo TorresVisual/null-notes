@@ -608,6 +608,21 @@ body {
   border-bottom: 1px solid var(--border);
   margin-bottom: var(--space-lg);
   flex-shrink: 0;
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: var(--bg-base);
+  /* One row that scrolls, never one that wraps: a bar which changes height
+     when you switch tools shifts the note under your pen mid-stroke. */
+  overflow-x: auto;
+  flex-wrap: nowrap;
+}
+
+.toolbar-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
 }
 
 .editor-toolbar button {
@@ -1166,20 +1181,12 @@ body {
   background: var(--bg-raised);
 }
 
-/* The toolbar wraps rather than squeezing. Left to shrink, the text buttons go
-   first — they size to their label, so "Point" and "Stroke" collapse to nothing
-   while the fixed-width icon buttons hold their ground. */
-.ink-toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 4px;
-  padding: 6px 8px;
-  background: var(--bg-raised);
-  border-bottom: 1px solid var(--border);
-}
-
-.ink-toolbar > * { flex: none; }
+/* Nested in the sticky `.editor-toolbar`, which already supplies the row's
+   background, border and padding — so this group only lays out its own
+   buttons. It does not wrap: the bar scrolls horizontally instead, since a
+   toolbar that changes height when you switch tools shifts the note under
+   your pen mid-stroke. */
+.toolbar-ink > * { flex: none; }
 
 .ink-tool {
   width: 28px;
@@ -1197,7 +1204,7 @@ body {
 .ink-tool:hover { background: var(--border-strong); color: var(--text-primary); }
 .ink-tool.active { background: var(--accent); color: var(--accent-contrast); }
 
-.ink-toolbar input[type="color"] {
+.toolbar-ink input[type="color"] {
   width: 26px;
   height: 26px;
   padding: 0;
@@ -1207,7 +1214,7 @@ body {
   cursor: pointer;
 }
 
-.ink-toolbar input[type="range"] {
+.toolbar-ink input[type="range"] {
   width: 90px;
   accent-color: var(--accent);
 }
@@ -1252,7 +1259,7 @@ body {
   margin: 0 2px;
 }
 
-.ink-toolbar button:disabled { opacity: 0.35; cursor: not-allowed; }
+.toolbar-ink button:disabled { opacity: 0.35; cursor: not-allowed; }
 
 /* Grid lives in CSS, not in the stroke data — it guides handwriting without
    ever being saved into the .svg sidecar. */
