@@ -1,6 +1,6 @@
 import { createElement, useState } from 'react'
 import { Node, mergeAttributes } from '@tiptap/core'
-import { ReactNodeViewRenderer } from '@tiptap/react'
+import { ReactNodeViewRenderer, NodeViewWrapper } from '@tiptap/react'
 import type { ReactNodeViewProps } from '@tiptap/react'
 import { InkCanvas } from '../../ink/InkCanvas'
 
@@ -10,20 +10,32 @@ interface InkBlockAttrs {
   height: number
 }
 
+// Every React node view has to render a `NodeViewWrapper` at its root:
+// `ReactNodeViewRenderer` reads the wrapper's element out of the rendered
+// output and throws "Please use the NodeViewWrapper component for your node
+// view" from its own `get dom()` without one. That throw escapes
+// `EditorView.updateState`, so it does not merely break the block — it aborts
+// whatever transaction created it, which is how one bad ink block could take
+// a whole "Split Into Tasks" rewrite down with it.
 function InkBlockView({ node }: ReactNodeViewProps) {
   const [zoom, setZoom] = useState(1)
   const { src, width, height } = node.attrs as unknown as InkBlockAttrs
-  if (!src) return null
+  // A wrapper even with nothing in it — returning null renders no wrapper.
+  if (!src) return createElement(NodeViewWrapper, { className: 'ink-block' })
   // Zoom is per block and lives only in the view — the file keeps unscaled
   // coordinates, so reopening a note never inherits someone's zoom level.
-  return createElement(InkCanvas, {
-    svgPath: src,
-    width,
-    height,
-    zoom,
-    onZoomChange: setZoom,
-    autoGrow: true,
-  })
+  return createElement(
+    NodeViewWrapper,
+    { className: 'ink-block' },
+    createElement(InkCanvas, {
+      svgPath: src,
+      width,
+      height,
+      zoom,
+      onZoomChange: setZoom,
+      autoGrow: true,
+    }),
+  )
 }
 
 export const InkBlock = Node.create({
