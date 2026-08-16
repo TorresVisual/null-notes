@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest'
-import { render, cleanup, fireEvent, waitFor } from '@testing-library/react'
+import { render, cleanup, fireEvent, waitFor, act } from '@testing-library/react'
 import { EditorToolbar } from './EditorToolbar'
 import { NoteEditor } from '../NoteEditor'
 import { useInkStore } from '../../store/ink'
@@ -57,14 +57,23 @@ describe('the editor toolbar', () => {
     expect(getByLabelText('Undo')).toBeDisabled()
   })
 
-  // The load-bearing rule. Reaching for undo must not deselect the canvas that
-  // undo is meant to act on, so the bar never lets a press move focus.
-  it('does not clear the active canvas when a button is pressed', () => {
+  // The load-bearing rule, at the unit level. `fireEvent.mouseDown` returns
+  // the boolean result of the underlying `dispatchEvent` call, which is
+  // `false` exactly when some handler called `preventDefault()` on that
+  // event — so this is a direct check that the bar's guard actually ran, not
+  // just that nothing happened to clear the canvas. The distinction matters:
+  // jsdom does not implement the browser's own "mousedown focuses/deselects"
+  // default action at all (verified separately), so a plain
+  // `activeCanvas is still set` assertion here would pass identically with
+  // the `onMouseDown` handler deleted — jsdom never performs that default
+  // action in the first place, prevented or not.
+  it('prevents the default action on every press, so a click can never move focus off the canvas', () => {
     useInkStore.getState().setActiveCanvas('a', handle({ canUndo: true }))
     const { getByLabelText } = render(<EditorToolbar editor={null} notePath="/ws/a.md" />)
 
-    fireEvent.mouseDown(getByLabelText('Undo'))
+    const notCancelled = fireEvent.mouseDown(getByLabelText('Undo'))
 
+    expect(notCancelled).toBe(false)
     expect(useInkStore.getState().activeCanvas).not.toBeNull()
   })
 
@@ -127,5 +136,41 @@ describe('the editor toolbar', () => {
     clickInto(pmEl)
 
     await waitFor(() => expect(useInkStore.getState().activeCanvas).toBeNull())
+  })
+
+  // The end-to-end version of the load-bearing rule: reproduces the actual
+  // shape of the bug (real prose selection already exists from earlier
+  // editing, then a canvas is drawn on, then a toolbar button is pressed)
+  // through the full tree `NoteEditor` really renders — `EditorToolbar` and
+  // `InkToolGroup` mounted for real, not in isolation, and the same editor
+  // instance `NoteEditor`'s own `selectionUpdate` handler is subscribed to.
+  // `EditorToolbar` in isolation (the test above) cannot exercise that
+  // handler at all, since it never mounts an editor.
+  it('a real toolbar press does not trigger the caret-moved-into-text clear', async () => {
+    const { container } = render(
+      <NoteEditor
+        content="hello world"
+        notePath="/ws/a.md"
+        spellcheck={false}
+        spellcheckLanguage="en"
+        onChange={() => {}}
+      />,
+    )
+    const pmEl = editorRoot(container)
+    await waitFor(() => expect(pmEl.textContent).toContain('hello world'))
+
+    // Establishes a genuine, focused ProseMirror selection first — the state
+    // the editor would actually be in after the user had been typing, before
+    // reaching for the pen.
+    clickInto(pmEl)
+
+    act(() => useInkStore.getState().setActiveCanvas('a', handle({ canUndo: true })))
+    await waitFor(() => expect(container.querySelector('[aria-label="Undo"]')).not.toBeNull())
+
+    const undoButton = container.querySelector('[aria-label="Undo"]') as HTMLElement
+    const notCancelled = fireEvent.mouseDown(undoButton)
+
+    expect(notCancelled).toBe(false)
+    expect(useInkStore.getState().activeCanvas).not.toBeNull()
   })
 })

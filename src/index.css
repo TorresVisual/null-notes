@@ -625,7 +625,12 @@ body {
   flex: none;
 }
 
-.editor-toolbar button {
+/* Direct child only: the ink group's own buttons (.ink-tool, .ink-pen,
+   .ink-mode) sit two levels down, inside .toolbar-ink, and carry their own
+   sizing/border/font-size that this rule would otherwise outrank on every
+   shared property. Only the Insert-ink button and the language <select>'s
+   label are ever direct children of .editor-toolbar itself. */
+.editor-toolbar > button {
   display: flex;
   align-items: center;
   gap: 5px;
@@ -638,7 +643,7 @@ body {
   font-size: 12px;
 }
 
-.editor-toolbar button:hover { background: var(--border-strong); color: var(--text-primary); }
+.editor-toolbar > button:hover { background: var(--border-strong); color: var(--text-primary); }
 
 .code-language-control {
   display: flex;
