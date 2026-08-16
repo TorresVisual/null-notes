@@ -25,21 +25,10 @@ import {
   deleteSelection as removeSelection,
 } from './lasso'
 import type { LassoPoint, Selection } from './lasso'
-import {
-  DEFAULT_PENS,
-  loadPens,
-  savePens,
-  loadActivePenId,
-  saveActivePenId,
-  loadEraserSize,
-  saveEraserSize,
-  clampEraserSize,
-  loadEraserMode,
-  saveEraserMode,
-  withPen,
-} from './pens'
+import { DEFAULT_PENS } from './pens'
+import { useInkStore } from '../store/ink'
 import type { PreviewShape } from './shapePreview'
-import type { InkData, Stroke, Shape, Tool, Point, Pen, EraserMode } from './types'
+import type { InkData, Stroke, Shape, Tool, Point } from './types'
 
 const SHAPE_TOOLS: Tool[] = ['line', 'circle', 'rect', 'arrow']
 const STROKE_OPTIONS = { thinning: 0.5, smoothing: 0.5, streamline: 0.5 }
@@ -199,15 +188,20 @@ export function useInkCanvas(
   { zoom = 1, autoGrow = false }: InkOptions = {},
 ) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  const [tool, setTool] = useState<Tool>('pen')
-  const [pens, setPens] = useState<Pen[]>(loadPens)
-  const [activePenId, setActivePenId] = useState(() => loadActivePenId(loadPens()))
+  const tool = useInkStore((s) => s.tool)
+  const pens = useInkStore((s) => s.pens)
+  const activePenId = useInkStore((s) => s.activePenId)
+  const eraserMode = useInkStore((s) => s.eraserMode)
+  const eraserSize = useInkStore((s) => s.eraserSize)
+  const setToolInStore = useInkStore((s) => s.setTool)
+  const selectPenInStore = useInkStore((s) => s.selectPen)
+  const updateActivePen = useInkStore((s) => s.updateActivePen)
+  const setEraserMode = useInkStore((s) => s.setEraserMode)
+  const setEraserSize = useInkStore((s) => s.setEraserSize)
   const [inkData, setInkData] = useState<InkData>({ width, height, strokes: [], shapes: [] })
   const [history, setHistory] = useState<InkData[]>([])
   const [future, setFuture] = useState<InkData[]>([])
 
-  const [eraserSize, setEraserSizeState] = useState(loadEraserSize)
-  const [eraserMode, setEraserModeState] = useState<EraserMode>(loadEraserMode)
   const [ruler, setRuler] = useState<Ruler | null>(null)
   const [lassoPolygon, setLassoPolygon] = useState<LassoPoint[] | null>(null)
   const [selection, setSelection] = useState<Selection>(EMPTY_SELECTION)
@@ -227,17 +221,6 @@ export function useInkCanvas(
   const activePen = pens.find((p) => p.id === activePenId) ?? DEFAULT_PENS[0]
   const { color, size, opacity } = activePen
 
-  const updateActivePen = useCallback(
-    (changes: Partial<Pen>) => {
-      setPens((current) => {
-        const updated = withPen(current, { ...activePen, ...changes })
-        savePens(updated)
-        return updated
-      })
-    },
-    [activePen],
-  )
-
   const setColor = useCallback(
     (next: string) => updateActivePen({ color: next }),
     [updateActivePen],
@@ -247,22 +230,11 @@ export function useInkCanvas(
     [updateActivePen],
   )
 
-  const setEraserSize = useCallback((next: number) => {
-    const clamped = clampEraserSize(next)
-    setEraserSizeState(clamped)
-    saveEraserSize(clamped)
-  }, [])
-
   // The ruler arrives lying across the middle of the page you are looking at,
   // not the middle of a page that has grown to twice the screen.
   const toggleRuler = useCallback(() => {
     setRuler((current) => (current ? null : centredRuler(inkData.width, height)))
   }, [inkData.width, height])
-
-  const setEraserMode = useCallback((next: EraserMode) => {
-    setEraserModeState(next)
-    saveEraserMode(next)
-  }, [])
 
   const clearSelection = useCallback(() => {
     lassoPath.current = []
@@ -270,24 +242,15 @@ export function useInkCanvas(
     setSelection(EMPTY_SELECTION)
   }, [])
 
-  // Reaching for another tool means you are done with what you were holding —
-  // a marquee left floating over the page would only be in the way.
-  const selectTool = useCallback(
-    (next: Tool) => {
-      setTool(next)
-      clearSelection()
-    },
-    [clearSelection],
-  )
+  const selectTool = useCallback((next: Tool) => setToolInStore(next), [setToolInStore])
+  const selectPen = useCallback((id: string) => selectPenInStore(id), [selectPenInStore])
 
-  const selectPen = useCallback(
-    (id: string) => {
-      setActivePenId(id)
-      saveActivePenId(id)
-      selectTool('pen')
-    },
-    [selectTool],
-  )
+  // The tool is shared, the selection is not: switching tools has to clear the
+  // selection in *every* canvas, not only the one whose button was pressed, or a
+  // lasso selection in another block outlives the tool that made it.
+  useEffect(() => {
+    clearSelection()
+  }, [tool, clearSelection])
 
   useEffect(() => {
     inkApi.read(svgPath).then((data) => {

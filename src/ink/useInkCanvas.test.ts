@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import { useInkCanvas, isEraserTip } from './useInkCanvas'
 import { DEFAULT_PENS } from './pens'
+import { useInkStore } from '../store/ink'
 
 vi.mock('../lib/ink', () => ({
   inkApi: {
@@ -9,6 +10,19 @@ vi.mock('../lib/ink', () => ({
     write: vi.fn().mockResolvedValue(undefined),
   },
 }))
+
+// The store is module-scoped now, unlike the old per-hook useState — a value
+// one test leaves behind (a selected pen, a switched tool) would otherwise
+// still be there when the next test's fresh renderHook reads it.
+beforeEach(() => {
+  useInkStore.setState({
+    tool: 'pen',
+    pens: DEFAULT_PENS,
+    activePenId: DEFAULT_PENS[0].id,
+    eraserMode: 'point',
+    eraserSize: 12,
+  })
+})
 
 // The pen's eraser end reports button 5 only on down and up; mid-drag the
 // button field is -1 and the state lives in the buttons bitmask. Missing that
