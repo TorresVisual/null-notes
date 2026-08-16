@@ -25,8 +25,7 @@ import {
   deleteSelection as removeSelection,
 } from './lasso'
 import type { LassoPoint, Selection } from './lasso'
-import { DEFAULT_PENS } from './pens'
-import { useInkStore } from '../store/ink'
+import { useInkStore, activePenOf } from '../store/ink'
 import type { PreviewShape } from './shapePreview'
 import type { InkData, Stroke, Shape, Tool, Point } from './types'
 
@@ -218,7 +217,7 @@ export function useInkCanvas(
   // The selected preset *is* the pen — colour, width and opacity all come from
   // it, and the toolbar's colour and size controls edit it in place. That is
   // what makes a pen you configured still be there in tomorrow's lecture.
-  const activePen = pens.find((p) => p.id === activePenId) ?? DEFAULT_PENS[0]
+  const activePen = activePenOf({ pens, activePenId })
   const { color, size, opacity } = activePen
 
   const setColor = useCallback(
