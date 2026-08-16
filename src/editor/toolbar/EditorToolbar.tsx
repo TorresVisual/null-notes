@@ -4,6 +4,7 @@ import { useInkStore } from '../../store/ink'
 import { InkToolGroup } from './InkToolGroup'
 import { TextFormatGroup } from './TextFormatGroup'
 import { InsertGroup } from './InsertGroup'
+import { SheetGroup } from './SheetGroup'
 import { inkApi } from '../../lib/ink'
 import type { InkData } from '../../ink/types'
 
@@ -70,6 +71,7 @@ export function EditorToolbar({ editor, notePath }: EditorToolbarProps) {
       ) : (
         <>
           {editor && <InsertGroup editor={editor} notePath={notePath} />}
+          {editor && <SheetGroup editor={editor} />}
           {editor && (editor.isActive('codeBlock') ? (
             <label className="code-language-control">
               <span>Language</span>
