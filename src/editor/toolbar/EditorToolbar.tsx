@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
 import type { Editor } from '@tiptap/core'
-import { PenLine } from 'lucide-react'
 import { useInkStore } from '../../store/ink'
 import { InkToolGroup } from './InkToolGroup'
 import { TextFormatGroup } from './TextFormatGroup'
+import { InsertGroup } from './InsertGroup'
 import { inkApi } from '../../lib/ink'
 import type { InkData } from '../../ink/types'
 
@@ -69,9 +69,7 @@ export function EditorToolbar({ editor, notePath }: EditorToolbarProps) {
         <InkToolGroup />
       ) : (
         <>
-          <button onClick={() => void insertInkBlock()} aria-label="Insert ink block" title="Insert ink block">
-            <PenLine size={14} /> Ink
-          </button>
+          {editor && <InsertGroup editor={editor} notePath={notePath} />}
           {editor && (editor.isActive('codeBlock') ? (
             <label className="code-language-control">
               <span>Language</span>
