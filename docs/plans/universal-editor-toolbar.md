@@ -506,42 +506,49 @@ Inside the component, after the `useInkCanvas` destructuring, add:
 const setActiveCanvas = useInkStore((s) => s.setActiveCanvas)
 const clearActiveCanvas = useInkStore((s) => s.clearActiveCanvas)
 
+// Whether *this* canvas is the active one. A ref, not state: it is set from a
+// pointer handler and read by an effect, and re-rendering on it would achieve
+// nothing the effect does not already do.
+const activeHere = useRef(false)
+
+const handle = useCallback(
+  (): CanvasHandle => ({
+    undo,
+    redo,
+    canUndo,
+    canRedo,
+    deleteSelected,
+    hasSelection,
+    toggleRuler,
+    rulerOn: ruler !== null,
+    zoom,
+    setZoom: (next: number) => onZoomChange?.(next),
+  }),
+  [undo, redo, canUndo, canRedo, deleteSelected, hasSelection, toggleRuler, ruler, zoom, onZoomChange],
+)
+
 // Re-registered whenever a value the bar renders changes, so `canUndo` in the
 // toolbar tracks the stroke that was just drawn rather than the state when the
 // pen first touched down.
-const isActive = useInkStore((s) => s.activeCanvas) !== null && activeHere.current
-const activeHere = useRef(false)
-
 useEffect(() => {
-  if (!activeHere.current) return
-  setActiveCanvas({
-    undo, redo, canUndo, canRedo,
-    deleteSelected, hasSelection,
-    toggleRuler, rulerOn: ruler !== null,
-    zoom, setZoom: (next: number) => onZoomChange?.(next),
-  })
-}, [
-  undo, redo, canUndo, canRedo, deleteSelected, hasSelection,
-  toggleRuler, ruler, zoom, onZoomChange, setActiveCanvas,
-])
+  if (activeHere.current) setActiveCanvas(handle())
+}, [handle, setActiveCanvas])
 
-useEffect(() => () => {
-  if (activeHere.current) clearActiveCanvas()
-}, [clearActiveCanvas])
+useEffect(
+  () => () => {
+    if (activeHere.current) clearActiveCanvas()
+  },
+  [clearActiveCanvas],
+)
 ```
 
-Declare `activeHere` before the effects and drop the unused `isActive` line if the linter objects — it is there only if a later task needs it; delete it now if not.
+Import `useRef` and `useCallback` from `react` if they are not already imported, and `CanvasHandle` as a type from `../store/ink`.
 
-In `handlePointerDown`, as the first statement:
+In `handlePointerDown`, as the first two statements:
 
 ```tsx
 activeHere.current = true
-setActiveCanvas({
-  undo, redo, canUndo, canRedo,
-  deleteSelected, hasSelection,
-  toggleRuler, rulerOn: ruler !== null,
-  zoom, setZoom: (next: number) => onZoomChange?.(next),
-})
+setActiveCanvas(handle())
 ```
 
 - [ ] **Step 8: Run the tests**
@@ -725,7 +732,7 @@ export function EditorToolbar({ editor, notePath }: EditorToolbarProps) {
 }
 ```
 
-`editor` and `notePath` are unused until Tasks 5–7. Keep them in the props so those tasks are additive, and satisfy the linter by prefixing with `void editor; void notePath;`— or omit them here and add them in Task 5, whichever the project's lint settings prefer.
+**`editor` and `notePath` are used in this task, not left dangling.** Task 4 moves `NoteEditor`'s existing Ink button and code-language select into the bar, and both need them — the Ink button needs `notePath` to create its sidecar, the select needs `editor`. Nothing unused is introduced, so no `void` suppression is needed anywhere. Tasks 5–7 then replace those two controls with the fuller groups.
 
 - [ ] **Step 5: Mount it in `NoteEditor` and make it sticky**
 
