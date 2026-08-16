@@ -45,13 +45,14 @@ interface InkStore {
   eraserMode: EraserMode
   eraserSize: number
   activeCanvas: CanvasHandle | null
+  activeCanvasId: string | null
   setTool: (tool: Tool) => void
   selectPen: (id: string) => void
   updateActivePen: (changes: Partial<Pen>) => void
   setEraserMode: (mode: EraserMode) => void
   setEraserSize: (size: number) => void
-  setActiveCanvas: (handle: CanvasHandle) => void
-  clearActiveCanvas: () => void
+  setActiveCanvas: (id: string, handle: CanvasHandle) => void
+  clearActiveCanvas: (id: string) => void
 }
 
 export function activePenOf(state: Pick<InkStore, 'pens' | 'activePenId'>): Pen {
@@ -65,6 +66,7 @@ export const useInkStore = create<InkStore>((set, get) => ({
   eraserMode: loadEraserMode(),
   eraserSize: loadEraserSize(),
   activeCanvas: null,
+  activeCanvasId: null,
 
   setTool: (tool) => set({ tool }),
 
@@ -91,6 +93,12 @@ export const useInkStore = create<InkStore>((set, get) => ({
     set({ eraserSize: clamped })
   },
 
-  setActiveCanvas: (handle) => set({ activeCanvas: handle }),
-  clearActiveCanvas: () => set({ activeCanvas: null }),
+  setActiveCanvas: (id, handle) => set({ activeCanvas: handle, activeCanvasId: id }),
+  // Only the current owner's id can clear the slot: a canvas that has
+  // already lost it to another one must not be able to wipe out the new
+  // owner's registration from its own stale unmount or effect cleanup —
+  // that exact bug is why this is keyed on an id rather than a bare toggle.
+  clearActiveCanvas: (id) => {
+    if (get().activeCanvasId === id) set({ activeCanvas: null, activeCanvasId: null })
+  },
 }))

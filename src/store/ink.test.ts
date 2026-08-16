@@ -99,30 +99,46 @@ function handle(overrides: Partial<CanvasHandle> = {}): CanvasHandle {
 }
 
 describe('the active canvas', () => {
-  beforeEach(() => useInkStore.getState().clearActiveCanvas())
+  beforeEach(() => useInkStore.setState({ activeCanvas: null, activeCanvasId: null }))
 
   it('has none to begin with', () => {
     expect(useInkStore.getState().activeCanvas).toBeNull()
+    expect(useInkStore.getState().activeCanvasId).toBeNull()
   })
 
   it('remembers the canvas that registered', () => {
-    const first = handle({ canUndo: true })
-    useInkStore.getState().setActiveCanvas(first)
+    useInkStore.getState().setActiveCanvas('a', handle({ canUndo: true }))
 
+    expect(useInkStore.getState().activeCanvasId).toBe('a')
     expect(useInkStore.getState().activeCanvas?.canUndo).toBe(true)
   })
 
   it('replaces the previous one when another canvas registers', () => {
-    useInkStore.getState().setActiveCanvas(handle({ zoom: 1 }))
-    useInkStore.getState().setActiveCanvas(handle({ zoom: 2 }))
+    useInkStore.getState().setActiveCanvas('a', handle({ zoom: 1 }))
+    useInkStore.getState().setActiveCanvas('b', handle({ zoom: 2 }))
 
+    expect(useInkStore.getState().activeCanvasId).toBe('b')
     expect(useInkStore.getState().activeCanvas?.zoom).toBe(2)
   })
 
-  it('clears', () => {
-    useInkStore.getState().setActiveCanvas(handle())
-    useInkStore.getState().clearActiveCanvas()
+  it('clears when the current owner asks', () => {
+    useInkStore.getState().setActiveCanvas('a', handle())
+    useInkStore.getState().clearActiveCanvas('a')
 
     expect(useInkStore.getState().activeCanvas).toBeNull()
+    expect(useInkStore.getState().activeCanvasId).toBeNull()
+  })
+
+  // The exclusivity property the id-keyed design exists for: a canvas that
+  // has already lost the slot to another one cannot claw it back, or clear
+  // it, just by acting after the fact.
+  it('does not clear when a former owner asks after another canvas has taken over', () => {
+    useInkStore.getState().setActiveCanvas('a', handle())
+    useInkStore.getState().setActiveCanvas('b', handle())
+
+    useInkStore.getState().clearActiveCanvas('a')
+
+    expect(useInkStore.getState().activeCanvasId).toBe('b')
+    expect(useInkStore.getState().activeCanvas).not.toBeNull()
   })
 })

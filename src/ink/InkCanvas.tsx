@@ -102,11 +102,12 @@ export function InkCanvas({
 
   const setActiveCanvas = useInkStore((s) => s.setActiveCanvas)
   const clearActiveCanvas = useInkStore((s) => s.clearActiveCanvas)
-
-  // Whether *this* canvas is the active one. A ref, not state: it is set from a
-  // pointer handler and read by an effect, and re-rendering on it would achieve
-  // nothing the effect does not already do.
-  const activeHere = useRef(false)
+  // Whether *this* canvas is the active one — derived from the store, not a
+  // manually-toggled ref. This is what makes exclusivity automatic: the instant
+  // another canvas calls `setActiveCanvas`, every other canvas's `isActive`
+  // recomputes to `false` on its own next render, with no cleanup step to
+  // remember. `svgPath` is this canvas's stable identity: one file per canvas.
+  const isActive = useInkStore((s) => s.activeCanvasId === svgPath)
 
   const handle = useCallback(
     (): CanvasHandle => ({
@@ -126,17 +127,15 @@ export function InkCanvas({
 
   // Re-registered whenever a value the bar renders changes, so `canUndo` in the
   // toolbar tracks the stroke that was just drawn rather than the state when the
-  // pen first touched down.
+  // pen first touched down — but only while this canvas actually owns the slot.
   useEffect(() => {
-    if (activeHere.current) setActiveCanvas(handle())
-  }, [handle, setActiveCanvas])
+    if (isActive) setActiveCanvas(svgPath, handle())
+  }, [isActive, handle, setActiveCanvas, svgPath])
 
-  useEffect(
-    () => () => {
-      if (activeHere.current) clearActiveCanvas()
-    },
-    [clearActiveCanvas],
-  )
+  // Safe to call unconditionally on every unmount: `clearActiveCanvas` only
+  // clears if `svgPath` still owns the slot, so a canvas that already lost it
+  // to another one cannot wipe out that canvas's live registration.
+  useEffect(() => () => clearActiveCanvas(svgPath), [clearActiveCanvas, svgPath])
 
   const [cursorPos, setCursorPos] = useState<{ x: number; y: number } | null>(null)
 
@@ -155,8 +154,7 @@ export function InkCanvas({
   }
 
   function handlePointerDown(e: ReactPointerEvent<HTMLDivElement>) {
-    activeHere.current = true
-    setActiveCanvas(handle())
+    setActiveCanvas(svgPath, handle())
 
     if (e.pointerType !== 'touch') return
 
