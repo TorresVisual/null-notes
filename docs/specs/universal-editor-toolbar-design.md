@@ -32,8 +32,14 @@ Ownership follows what is already true rather than introducing a new arrangement
 
 | State | Owner | Why |
 |---|---|---|
-| tool, pens, active pen, colour, size, eraser mode, eraser size, ruler | **`src/store/ink.ts`** (new) | Already global — persisted in `localStorage`, identical across canvases. The store makes that explicit; `ink/pens.ts` stays the load/save layer, unchanged. |
-| strokes, shapes, undo history, selection, zoom | **`useInkCanvas`**, per canvas | Genuinely per-block. Zoom is already documented as per-block and deliberately not persisted. |
+| tool, pens, active pen, eraser mode, eraser size | **`src/store/ink.ts`** (new) | Already global — persisted in `localStorage`, identical across canvases. The store makes that explicit; `ink/pens.ts` stays the load/save layer, unchanged. |
+| strokes, shapes, undo history, selection, lasso polygon, **ruler**, zoom | **`useInkCanvas`**, per canvas | Genuinely per-block. |
+
+**Colour and size are not state.** `useInkCanvas` derives them from the active pen — "the selected preset *is* the pen" — and `setColor`/`setSize` edit that pen in place through `updateActivePen`, which is what makes a pen you configured still be there in tomorrow's lecture. The store keeps exactly that arrangement; it gains `pens` and `activePenId`, not a colour field.
+
+**The ruler is per-canvas, not global**, despite looking like a mode. `toggleRuler` builds a `centredRuler(width, height)` positioned in *that* canvas's coordinate space, and grab/drag/release move it there. Only the toggle is exposed to the bar, through the canvas handle below — the geometry never leaves the canvas.
+
+Zoom is per-canvas too, and deliberately not persisted, so reopening a note never inherits someone's zoom level.
 
 This is the whole reason the refactor is small: the half that has to become shared **is** shared, and moving it changes no behaviour.
 
@@ -49,10 +55,14 @@ interface CanvasHandle {
   canRedo: boolean
   deleteSelected(): void
   hasSelection: boolean
+  toggleRuler(): void
+  rulerOn: boolean
   zoom: number
   setZoom(zoom: number): void
 }
 ```
+
+Everything on it is per-canvas by nature: two canvases have separate histories, separate selections, separate rulers and separate zoom. Nothing here could live in the store without meaning the wrong thing.
 
 - **Registered** on pointerdown inside a canvas, and re-registered when its reactive values change while it is the active one (so `canUndo` in the bar tracks the stroke you just drew).
 - **Cleared** when the ProseMirror selection moves to a text position, when the open note changes, and when the active canvas unmounts.
