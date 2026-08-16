@@ -625,25 +625,33 @@ body {
   flex: none;
 }
 
-/* Direct child only: the ink group's own buttons (.ink-tool, .ink-pen,
-   .ink-mode) sit two levels down, inside .toolbar-ink, and carry their own
-   sizing/border/font-size that this rule would otherwise outrank on every
-   shared property. Only the Insert-ink button and the language <select>'s
-   label are ever direct children of .editor-toolbar itself. */
-.editor-toolbar > button {
+/* Same box as .ink-tool below: every group in the bar (formatting, insert,
+   exercise sheet) shares one button look so the ink group is not the only
+   part of the toolbar that reads as designed rather than default. */
+.toolbar-button {
+  width: 28px;
+  height: 28px;
   display: flex;
   align-items: center;
-  gap: 5px;
-  padding: 3px 10px;
+  justify-content: center;
   background: var(--bg-hover);
-  border: 1px solid var(--border-strong);
-  border-radius: 4px;
+  border: 1px solid transparent;
+  border-radius: 6px;
   color: var(--text-secondary);
   cursor: pointer;
-  font-size: 12px;
 }
 
-.editor-toolbar > button:hover { background: var(--border-strong); color: var(--text-primary); }
+.toolbar-button:hover { background: var(--border-strong); color: var(--text-primary); }
+.toolbar-button.active { background: var(--accent); color: var(--accent-contrast); }
+
+/* Same divider as .ink-sep below, for the same reason .toolbar-button
+   matches .ink-tool. */
+.toolbar-sep {
+  width: 1px;
+  height: 20px;
+  background: var(--border-strong);
+  margin: 0 2px;
+}
 
 .code-language-control {
   display: flex;
