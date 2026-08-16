@@ -3,6 +3,7 @@ import type { Editor } from '@tiptap/core'
 import { PenLine } from 'lucide-react'
 import { useInkStore } from '../../store/ink'
 import { InkToolGroup } from './InkToolGroup'
+import { TextFormatGroup } from './TextFormatGroup'
 import { inkApi } from '../../lib/ink'
 import type { InkData } from '../../ink/types'
 
@@ -71,7 +72,7 @@ export function EditorToolbar({ editor, notePath }: EditorToolbarProps) {
           <button onClick={() => void insertInkBlock()} aria-label="Insert ink block" title="Insert ink block">
             <PenLine size={14} /> Ink
           </button>
-          {editor?.isActive('codeBlock') && (
+          {editor && (editor.isActive('codeBlock') ? (
             <label className="code-language-control">
               <span>Language</span>
               <select
@@ -120,7 +121,9 @@ export function EditorToolbar({ editor, notePath }: EditorToolbarProps) {
                 <option value="yaml">YAML</option>
               </select>
             </label>
-          )}
+          ) : (
+            <TextFormatGroup editor={editor} />
+          ))}
         </>
       )}
     </div>
