@@ -59,7 +59,7 @@ pub fn resolve_in_workspace(workspace: &str, target: &str) -> Result<PathBuf, St
 /// happens afterwards, inside tokens that are already separated. Doing it the
 /// other way round would let a path containing a space become two arguments,
 /// which is the same injection this module exists to prevent.
-fn tokenize(template: &str) -> Vec<String> {
+pub(crate) fn tokenize(template: &str) -> Vec<String> {
     template.split_whitespace().map(str::to_string).collect()
 }
 
