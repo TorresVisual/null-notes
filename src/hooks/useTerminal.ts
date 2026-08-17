@@ -22,6 +22,12 @@ export function useTerminal(
   shell: string,
 ) {
   const termRef = useRef<Terminal | null>(null)
+  // terminal_open (spawning a real shell process) is async and not
+  // instantaneous. A write issued before it resolves — a fast click on the
+  // insert-path button, or a fast typist — hits "no terminal session is
+  // open" on the backend. Every write path (typed input and insertText)
+  // chains onto this instead of firing the moment the component mounts.
+  const readyRef = useRef<Promise<void>>(Promise.resolve())
 
   useEffect(() => {
     const container = containerRef.current
@@ -34,17 +40,19 @@ export function useTerminal(
     fit.fit()
     termRef.current = term
 
-    void api.terminal.open(workspace, notePath, shell)
-    void api.terminal.resize(term.cols, term.rows)
+    const ready = api.terminal.open(workspace, notePath, shell).then(() => {
+      void api.terminal.resize(term.cols, term.rows)
+    })
+    readyRef.current = ready
 
-    const dataSub = term.onData((data) => void api.terminal.write(data))
+    const dataSub = term.onData((data) => void ready.then(() => api.terminal.write(data)))
     const outputUnlisten = listen<string>('terminal-output', (event) => {
       term.write(decodeChunk(event.payload))
     })
 
     const resizeObserver = new ResizeObserver(() => {
       fit.fit()
-      void api.terminal.resize(term.cols, term.rows)
+      void ready.then(() => api.terminal.resize(term.cols, term.rows))
     })
     resizeObserver.observe(container)
 
@@ -63,7 +71,7 @@ export function useTerminal(
   }, [])
 
   function insertText(text: string) {
-    void api.terminal.write(text)
+    void readyRef.current.then(() => api.terminal.write(text))
   }
 
   async function kill() {
