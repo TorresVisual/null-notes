@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core'
-import type { NoteMetadata, WorkspaceState, WorkspaceTree, SearchResult, AppSettings, GraphLink, GraphTag, RepoMode, CommitOutcome } from '../types'
+import type { NoteMetadata, WorkspaceState, WorkspaceTree, SearchResult, AppSettings, GraphLink, GraphTag, RepoMode, CommitOutcome, PushOutcome } from '../types'
 import type { PdfPage, PdfMarkdownImport } from '../pdf/types'
 
 export const api = {
@@ -71,6 +71,8 @@ export const api = {
       invoke<RepoMode | null>('detect_repo', { workspace }),
     autoCommit: (workspace: string, paths: string[], skipHooks: boolean) =>
       invoke<CommitOutcome>('auto_commit', { workspace, paths, skipHooks }),
+    pushNotes: (workspace: string, mode: RepoMode) =>
+      invoke<PushOutcome>('push_notes', { workspace, mode }),
   },
   settings: {
     load: () =>

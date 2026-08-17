@@ -16,7 +16,7 @@ export function useGitAutoCommit() {
       clearTimeout(idleTimer.current)
       idleTimer.current = null
     }
-    const { path, git, gitPendingPaths, clearGitPendingPaths, setGitCommitStatus } =
+    const { path, repoMode, git, gitPendingPaths, clearGitPendingPaths, setGitCommitStatus } =
       useWorkspaceStore.getState()
     if (!path || !git.autoCommit || gitPendingPaths.length === 0) return
 
@@ -27,6 +27,16 @@ export function useGitAutoCommit() {
       if (outcome.kind === 'committed') {
         clearGitPendingPaths()
         setGitCommitStatus('committed')
+        // The only call site for pushNotes in the app — this is what makes
+        // "never for a code repo" true on the frontend side too, on top of
+        // the Rust-level guard in checked_push.
+        if (repoMode === 'notesOnly' && git.autoPush) {
+          try {
+            await api.git.pushNotes(path, repoMode)
+          } catch (e) {
+            console.error('push after auto-commit failed', e)
+          }
+        }
       } else if (outcome.kind === 'nothingToCommit') {
         clearGitPendingPaths()
         setGitCommitStatus('idle')

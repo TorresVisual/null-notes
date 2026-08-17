@@ -5,7 +5,7 @@ import { useWorkspaceStore } from '../store/workspace'
 import { api } from '../lib/tauri'
 
 vi.mock('../lib/tauri', () => ({
-  api: { git: { autoCommit: vi.fn() } },
+  api: { git: { autoCommit: vi.fn(), pushNotes: vi.fn() } },
 }))
 
 const git = vi.mocked(api.git)
@@ -81,5 +81,33 @@ describe('useGitAutoCommit', () => {
 
     expect(useWorkspaceStore.getState().gitPendingPaths).toEqual(['/ws/a.md'])
     expect(useWorkspaceStore.getState().gitCommitStatus).toBe('skipped')
+  })
+
+  it('pushes after a successful commit when notes-only and autoPush is on', async () => {
+    git.autoCommit.mockResolvedValue({ kind: 'committed' })
+    git.pushNotes.mockResolvedValue({ kind: 'pushed' })
+    useWorkspaceStore.setState({
+      git: { prompted: true, autoCommit: true, idleMinutes: 10, skipHooks: false, autoPush: true },
+    })
+    renderHook(() => useGitAutoCommit())
+
+    useWorkspaceStore.getState().addGitPendingPath('/ws/a.md')
+    await act(() => vi.advanceTimersByTimeAsync(10 * 60_000))
+
+    expect(git.pushNotes).toHaveBeenCalledWith('/ws', 'notesOnly')
+  })
+
+  it('never pushes a code-repo workspace, even with autoPush on', async () => {
+    git.autoCommit.mockResolvedValue({ kind: 'committed' })
+    useWorkspaceStore.setState({
+      repoMode: 'codeRepo',
+      git: { prompted: true, autoCommit: true, idleMinutes: 10, skipHooks: false, autoPush: true },
+    })
+    renderHook(() => useGitAutoCommit())
+
+    useWorkspaceStore.getState().addGitPendingPath('/ws/a.md')
+    await act(() => vi.advanceTimersByTimeAsync(10 * 60_000))
+
+    expect(git.pushNotes).not.toHaveBeenCalled()
   })
 })

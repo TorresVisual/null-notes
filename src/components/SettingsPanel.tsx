@@ -16,6 +16,7 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
   const gitAutoCommit = useWorkspaceStore((s) => s.git.autoCommit)
   const gitIdleMinutes = useWorkspaceStore((s) => s.git.idleMinutes)
   const gitSkipHooks = useWorkspaceStore((s) => s.git.skipHooks)
+  const gitAutoPush = useWorkspaceStore((s) => s.git.autoPush)
   const { updateGit } = useGitConfig()
   const [error, setError] = useState<string | null>(null)
 
@@ -200,6 +201,25 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
                 />
               </span>
             </label>
+
+            {repoMode === 'notesOnly' && (
+              <label className="settings-row">
+                <span>
+                  Push after commit
+                  <small>
+                    Only ever applies to a notes-only repo — a workspace inside a code repo never
+                    auto-pushes, at any setting.
+                  </small>
+                </span>
+                <span className="settings-row-control">
+                  <input
+                    type="checkbox"
+                    checked={gitAutoPush}
+                    onChange={(e) => void updateGit({ autoPush: e.target.checked })}
+                  />
+                </span>
+              </label>
+            )}
           </>
         )}
 

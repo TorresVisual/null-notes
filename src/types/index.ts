@@ -47,6 +47,12 @@ export type CommitOutcome =
   | { kind: 'nothingToCommit' }
   | { kind: 'hookFailed'; output: string }
 
+export type PushOutcome =
+  | { kind: 'pushed' }
+  | { kind: 'noRemote' }
+  | { kind: 'authFailed'; output: string }
+  | { kind: 'rejected'; output: string }
+
 export type PdfImportMode = 'pages' | 'markdown'
 
 export interface AppSettings {
