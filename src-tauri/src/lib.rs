@@ -127,6 +127,7 @@ pub fn run() {
             commands::git::auto_commit,
             commands::git::push_notes,
             commands::git::fetch_and_compare,
+            commands::git::init_notes_repo,
             commands::terminal::terminal_open,
             commands::terminal::terminal_write,
             commands::terminal::terminal_resize,

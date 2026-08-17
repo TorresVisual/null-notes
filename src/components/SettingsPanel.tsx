@@ -12,6 +12,7 @@ interface SettingsPanelProps {
 export function SettingsPanel({ onClose }: SettingsPanelProps) {
   const settings = useSettingsStore((s) => s.settings)
   const setSettings = useSettingsStore((s) => s.setSettings)
+  const workspacePath = useWorkspaceStore((s) => s.path)
   const repoMode = useWorkspaceStore((s) => s.repoMode)
   const gitAutoCommit = useWorkspaceStore((s) => s.git.autoCommit)
   const gitIdleMinutes = useWorkspaceStore((s) => s.git.idleMinutes)
@@ -144,6 +145,35 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
             />
           </span>
         </label>
+
+        {repoMode === null && workspacePath && (
+          <div className="settings-row">
+            <span>
+              This workspace isn&apos;t a Git repository yet
+              <small>
+                Turn it into one — private by default if you have the GitHub CLI installed, local-only
+                otherwise.
+              </small>
+            </span>
+            <button
+              onClick={() => {
+                if (!confirm(`Initialize a Git repository in ${workspacePath}?`)) return
+                void (async () => {
+                  const wantsRemote = confirm(
+                    'Also create a private GitHub remote via `gh`? (Cancel = local-only)',
+                  )
+                  const outcome = await api.git.initNotesRepo(workspacePath, wantsRemote)
+                  if (outcome.kind === 'initializedLocalOnly') {
+                    alert(`Repo created locally. To add a remote later:\n${outcome.remoteAddCommand}`)
+                  }
+                  useWorkspaceStore.getState().setRepoMode('notesOnly')
+                })()
+              }}
+            >
+              Initialize Git repo
+            </button>
+          </div>
+        )}
 
         {repoMode && (
           <label className="settings-row">

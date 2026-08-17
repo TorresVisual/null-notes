@@ -59,6 +59,10 @@ export type PullOutcome =
   | { kind: 'diverged'; ahead: number; behind: number }
   | { kind: 'noRemote' }
 
+export type RepoInitOutcome =
+  | { kind: 'initializedWithRemote' }
+  | { kind: 'initializedLocalOnly'; remoteAddCommand: string }
+
 export type PdfImportMode = 'pages' | 'markdown'
 
 export interface AppSettings {
