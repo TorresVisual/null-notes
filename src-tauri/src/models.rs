@@ -25,6 +25,43 @@ pub struct WorkspaceState {
     pub active_tab: Option<String>,
     #[serde(default)]
     pub expanded_folders: Vec<String>,
+    // Machine-local: whether this machine should auto-commit here at all (P5).
+    // Lives on `WorkspaceState` because `.workspace.json` is already the one
+    // workspace-folder file P3-4 gitignores — the exact "per-workspace but
+    // stays on this machine" home the config needs, per the storage boundary
+    // in CLAUDE.md. Added after `.workspace.json` shipped, so it has to
+    // tolerate its own absence in a file an older build wrote.
+    #[serde(default)]
+    pub git: GitWorkspaceConfig,
+}
+
+/// Whether *this machine* should auto-commit in this workspace, and whether
+/// it has already been asked. Never populated by detection alone — detecting
+/// a repo answers "which mode," not "should we act," and P5-1's guarantee is
+/// that no Git command runs until a human has said yes here.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, Default, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct GitWorkspaceConfig {
+    /// True once the one-time "enable auto-commit?" prompt has been answered,
+    /// accepted or declined — distinct from `auto_commit` so declining doesn't
+    /// get asked again on every open.
+    #[serde(default)]
+    pub prompted: bool,
+    #[serde(default)]
+    pub auto_commit: bool,
+}
+
+/// Which of P5's two Git modes a workspace is in, or absent when it isn't a
+/// Git repository at all. `NotesOnly` gets different defaults than
+/// `CodeRepo` throughout P5 — starting with whether auto-push is ever safe.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum RepoMode {
+    /// The repo root is the workspace itself — this machine's history alone.
+    NotesOnly,
+    /// The workspace is a subtree of a repo that also holds source other
+    /// people read the log of.
+    CodeRepo,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -1,5 +1,6 @@
 pub mod assets;
 pub mod editor_launch;
+pub mod git;
 pub mod ink;
 pub mod notes;
 pub mod pdf;

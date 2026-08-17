@@ -1,6 +1,6 @@
 # null-notes — Product & Technical Roadmap
 
-**Last updated:** 2026-08-17 (**the dogfood slice is complete.** P8-1 shipped — a PTY-backed terminal pane (`portable-pty` + `xterm.js`), toggled with `Ctrl+\``, rooted at the workspace, with the active note's path as an env var plus a one-key insert. **M8 reached.** The full slice — P7-3a's scan ignore list → P7-3 → P7-4 + P7-1 → P8-1 — is now done end to end; this project's own `docs/` can be opened, edited, and worked on from inside null-notes itself. **Next per §6: step 5, re-deriving P5, P6 and P9 from real use** — not before, since their current priorities are still estimates per §1's second closed question.)
+**Last updated:** 2026-08-17 (**the dogfood slice is complete.** P8-1 shipped — a PTY-backed terminal pane (`portable-pty` + `xterm.js`), toggled with `Ctrl+\``, rooted at the workspace, with the active note's path as an env var plus a one-key insert. **M8 reached.** The full slice — P7-3a's scan ignore list → P7-3 → P7-4 + P7-1 → P8-1 — is now done end to end; this project's own `docs/` can be opened, edited, and worked on from inside null-notes itself. Same day, P7-2 ("Open in IDE" on a code block that names its own source path) landed too, reusing P7-1's launcher and cache outright — **M7 reached**. §6's step 5 (wait for a couple of weeks of real dogfood use before continuing P5/P6/P9) is now **superseded** — see §1's third closed question, 2026-08-17: the maintainer's mode is implementing and verifying features, not daily use, so the wait never resolves on its own. Step 6 (P5 → P6 → P9) is underway: **P5-1 shipped same day** — `git rev-parse --show-toplevel`, canonicalized against the workspace path, classifies notes-only vs. code-repo mode; the opt-in config lives on `WorkspaceState` next to `.workspace.json`'s other machine-local UI state; no Git command runs until a human answers the one-time prompt. **Next: P5-2**, batched auto-commit — the phase's real safety-property task.)
 
 *2026-08-13 revision, kept for context — see `specs/roadmap-revision-design.md`: the two weeks before that went almost entirely into PDF pipeline refinement, which the roadmap had no boundary for; that revision added one (§Phase 4, "Pipeline completion criteria"), recorded the app's actual identity and two closed questions (§1), and replaced the execution order in §6 — phase numbers are identity, not order. Ruled fractions landed, freezing the pipeline (§Phase 4, P4-2e); all three open bugs were triaged (two fixed, one didn't reproduce); P4-3 closed M4.*
 
@@ -39,6 +39,7 @@ Recorded so they are not silently reopened.
 | --- | --- | --- |
 | Freeform 2D canvas (true OneNote) | **Won't build.** Ink-in-flow is the answer; principle #1 below stands unamended. | 2026-08-13 |
 | Does the maintainer currently supply the daily-use signal §3 prioritizes by? | **No** — building, not using. Every priority call below M4 is an estimate. This is the argument for the dogfood slice in §6. | 2026-08-13 |
+| Will the maintainer actually dogfood for a couple of weeks before P5/P6/P9 continue, per §6 step 5? | **No.** The maintainer's mode is implementing features, verified by "does it work," not lived daily-use friction — that isn't going to change on its own, so a wait gate keyed on it never resolves. **Step 5's wait is dropped.** P5/P6/P9 proceed on the pre-dogfood priority order (§6's "superseded order": P5 → P6 → P9), the roadmap's best estimate rather than an observed one, revised opportunistically if a specific choice proves wrong when actually tried — not via a dedicated observation period that isn't happening. | 2026-08-17 |
 
 The canvas verdict connects to Phase 4's completion criteria: a canvas — objects at x/y — has no Markdown representation, which is exactly why principle #1 blocks it. That is the *same problem* the PDF pipeline keeps hitting. Matrices, `\cases`, stacked fractions and multi-column layout are all "2D layout has no linear representation." One problem, two places — so closing the canvas half while leaving the PDF half open would be inconsistent.
 
@@ -155,7 +156,7 @@ Given "personal daily driver," priority = `(daily-use value) × (risk of data lo
 | **P4** | PDF→Markdown & exercise sheets | **M4:** an exercise sheet becomes a workable note in one step | ✅ | The brief's own flagship; the biggest single time-saver |
 | **P5** | Versioned workspaces (Git automation) | **M5:** my notes commit themselves, in both kinds of repo |  | The next tier of P0's data safety — a commit is a recoverable backup |
 | **P6** | STEM authoring | **M6:** writing maths/algorithms is faster here than anywhere else |  | Compounds on every note; cheap, since the infra exists |
-| **P7** | IDE integration | **M7:** notes and code are one workflow, not two |  | The brief's second pillar — "integrate, don't replace" |
+| **P7** | IDE integration | **M7:** notes and code are one workflow, not two | ✅ | The brief's second pillar — "integrate, don't replace" |
 | **P8** | Embedded terminal | **M8:** `claude` runs against the open note without leaving the app | ✅ | Small effort; delivers the brief's AI ask without AI code |
 | **P9** | Study & revision | **M9:** the app helps me *revise*, not just capture |  | The only phase not derived from the brief — see below |
 | **P10** | Gated stretch | **M10:** in-app AI + code execution | gated | Explicitly deferred; do not let it pull focus |
@@ -541,13 +542,19 @@ Everything in this phase follows from one distinction:
 
 The code-repo case is the dangerous one, and the guardrails below exist because of it.
 
-### P5-1 — Repo detection + per-workspace Git config — **S/M**
+### P5-1 — Repo detection + per-workspace Git config — **S/M** ✅
 
 - On opening a workspace, detect whether it is inside a Git repo and which mode applies: repo root ≈ workspace (**notes-only**) vs. workspace is a subtree of a repo containing source (**code repo**).
 - **Shell out to** `git`**, don't link** `git2`**/**`gix`**.** Shelling out inherits the user's credential helpers, SSH agent, commit signing and `.gitconfig` for free — all of which are painful to reimplement and impossible to get exactly right. Requires `git` on `PATH`, a safe assumption for this audience.
 - Config is **per-workspace and machine-local** (autocommit on/off, cadence, push policy). "Should this machine autocommit" is a fact about the machine, not about the notes, so it belongs beside `.workspace.json` — which P3-4 already gitignores — not in a synced file.
 - **Opt-in.** Detecting a repo prompts once; it never starts committing on its own.
 - **DoD:** Both modes are correctly identified on open; no Git command runs against any workspace that hasn't been explicitly opted in.
+
+*Done. Detection is `git -C <workspace> rev-parse --show-toplevel`, classified purely by comparing the canonicalized result against the canonicalized workspace path — success and the two paths match is* `NotesOnly`*, success and they don't is* `CodeRepo`*, any failure (including "*`git`* not on* `PATH`*") is "not a repo," read off the exit code rather than a parsed error string so an unusual locale still detects correctly. Canonicalizing both sides matters on Windows specifically: git normalises its own* `--show-toplevel` *output to forward slashes regardless of platform, so a raw string comparison against the workspace path as given would mismatch on separator style alone. No mutating Git command exists yet — this phase's task is detection only.*
+
+*The config lives directly on* `WorkspaceState`*, not a new file: `.workspace.json` was already the one workspace-folder file P3-4 gitignores, which is exactly "per-workspace but stays on this machine." Deliberately just two fields —* `prompted` *and* `auto_commit` *— rather than the cadence/push-policy fields P5-1's own prose lists, because those are P5-2's and P5-3's own named tasks; adding unread fields now would be scaffolding a feature ahead of the code that acts on it. `prompted` is tracked separately from `auto_commit` specifically so declining the prompt doesn't get asked again on every open, while still leaving the choice revisable — a Settings-panel toggle (visible only when the open workspace is a detected repo) reads and writes the same config the one-time banner does, through one shared `useGitConfig` hook, so there's a single persistence path for both surfaces.*
+
+*Detection itself never blocks a workspace from opening — a missing* `git` *binary degrades to "no repo detected," not a failed open, matching how the rest of the app treats best-effort detection (P7-4's editor-command probe takes the same posture). Repo mode itself is never persisted: it's re-derived from the disk on every open rather than cached, since a workspace's Git status is a fact that can change between sessions (an existing folder later gets `git init`'d) and staleness there would be a silent correctness bug, not a convenience trade-off.*
 
 ### P5-2 — Batched auto-commit — **M**
 
@@ -641,7 +648,7 @@ The brief asks search to cover "equations, code, handwritten notes, PDFs." Equat
 
 ---
 
-## Phase 7 — IDE Integration (P7)
+## Phase 7 — IDE Integration (P7) ✅
 
 **Milestone M7:** *Notes and code are one workflow. I never manually hunt for the file a note is talking about.*
 
@@ -668,11 +675,17 @@ The brief's second pillar — **"IDE integration instead of IDE replacement"** �
 
 *Existence is answered by a batched, workspace-cached* `resolve_code_links` *rather than per link per render, and a **failed** lookup marks its targets unresolved — the feature fails inert, never open. The project-root half of the DoD is deferred: it needs P5-1's repo detection, so today the workspace root is the only root and a link outside it is inert rather than wrong.*
 
-### P7-2 — "Open in IDE" on code blocks — **S**
+### P7-2 — "Open in IDE" on code blocks — **S** ✅
 
 - A code block that carries a source path gets an "Open in IDE" action.
 - **Dependency:** P7-1 (same launcher, same path resolution, same guardrails).
 - **DoD:** The action appears only on blocks that actually have a resolvable path — never a dead button.
+
+*Done. "Carries a source path" turned out to need a recognition rule of its own — a code block's content is source, not a reference to it, so P7-1's* `findCodeLinks` *can't just run over the whole block. The answer reuses it anyway: a new* `codeBlockSourcePath` *(*`lib/codeLinks.ts`*) checks whether the block's own first line, comment marker optionally stripped (*`//`*,* `#`*,* `--`*,* `;`*,* `%`*), is nothing but a path —* `// src/main.rs` *above a pasted function is already how this gets written by hand, so recognition needed no new syntax and the annotation stays a plain, portable comment line in any other viewer. A code block naming two paths, or naming one only in passing ("see src/main.rs for details"), matches nothing — same "prefer a miss" posture P7-1 took.*
+
+*The action itself is a widget decoration, not a node attribute: nothing new is stored in the document, so there is nothing new to serialize and nothing that can drift from the text it was read from.* `CodeBlockOpenInIde` *(new extension) shares* `CodeLink`*'s workspace-scoped resolution cache and its* `resolve_code_links`*/*`open_in_editor` *backend commands outright — the same launcher, the same guardrails, per the DoD — rather than standing up a second copy of either.* `resolveMissing` *is now exported from* `CodeLink.ts` *for exactly this reuse. The button renders only once* `resolve_code_links` *confirms the path, never as a disabled placeholder, and a code block that already carries no such button prints its content the same as any other in the P3-2 PDF export (hidden in* `@media print`*, since the affordance is interactive-only).*
+
+**Exit check for M7:** reached — P7-1, P7-3, P7-4 and now P7-2 are all done. A note naming code is one click from the file, in prose and in a pasted block alike.
 
 ### P7-3 — Project awareness & project notes — **S/M** ✅ *(smaller than it looks — see the scan note)*
 
@@ -866,11 +879,10 @@ P10-* gated behind M9
 | 2 | Triage the three "Issues Discovered" in `TODO.md` | S | Reported defects on the daily-use path, owned by no phase, sitting above a 371-line plan. Reproduce first — all three are unverified. |
 | 3 | **P4-3** → **M4** | M | Closes the milestone. Converts the PDF work from an open hunt into a shut phase. |
 | 4 | **Dogfood slice:** P7-3's ignore list → P7-3 → P7-4 + P7-1 together → P8-1 | M/L | ✅ *Milestone reached: this project's own* `docs/` *lives in null-notes and gets edited there.* |
-| 5 | Re-derive P5, P6 and P9 from real use | — | ← Their current priorities are estimates. Do not plan them further until step 4 has run for a couple of weeks. |
+| 5 | ~~Re-derive P5, P6 and P9 from real use~~ | — | ✅❌ *Superseded 2026-08-17 (§1) — the wait never resolves because daily use isn't the mode the maintainer is in. Dropped rather than left open forever.* |
+| 6 | **P5 → P6 → P9**, in that order | — | ← Reverts to the pre-dogfood priority order (below), the roadmap's best estimate. P6 carries a scope caveat — see the note under its own TODO.md section — worth a glance before deep-planning it, but not a blocking wait. |
 
-**Why the dogfood slice outranks P5 and P6.** It is the only item on the board that changes what *future* planning is based on — everything else produces a feature, this produces evidence. §1's second closed question records that the daily-use term in §3's formula currently has no supplier; this is the fix. P6 in particular should not be re-planned before it, because §4 of the revision spec found that a whole stream of editor work (`BlockHandle`, `Divider`, `TextAlignment`, `Highlight`, `Kbd`, `HTMLBlock`, `SpanStyle`, `NoteImage`) is happening off-book, which suggests P6's "STEM authoring" scope is the wrong frame for what is actually being built.
-
-*Superseded order, kept for reference: P4-1 → P4-2 → P4-3 → **M4** → P5-* → **M5** → P6-\* → **M6** → P7-1 + P7-4 → P7-2 → P7-3 → **M7** → P8-1 → **M8** → P9-\* → **M9** → P10.\*
+*Superseded order, now back in force for step 6: P4-1 → P4-2 → P4-3 → **M4** → P5-* → **M5** → P6-\* → **M6** → P7-1 + P7-4 → P7-2 → P7-3 → **M7** → P8-1 → **M8** → P9-\* → **M9** → P10.* *(P7 and P8 are already done, out of their slot in this list — the dogfood reordering pulled them forward and that part stands; only the P5/P6/P9 wait is reverted.)*
 
 Five orderings are deliberate and worth not reshuffling:
 

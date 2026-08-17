@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { X } from 'lucide-react'
 import { useSettingsStore, DEFAULT_SETTINGS } from '../store/settings'
+import { useWorkspaceStore } from '../store/workspace'
+import { useGitConfig } from '../hooks/useGitConfig'
 import { api } from '../lib/tauri'
 
 interface SettingsPanelProps {
@@ -10,6 +12,9 @@ interface SettingsPanelProps {
 export function SettingsPanel({ onClose }: SettingsPanelProps) {
   const settings = useSettingsStore((s) => s.settings)
   const setSettings = useSettingsStore((s) => s.setSettings)
+  const repoMode = useWorkspaceStore((s) => s.repoMode)
+  const gitAutoCommit = useWorkspaceStore((s) => s.git.autoCommit)
+  const { updateGit } = useGitConfig()
   const [error, setError] = useState<string | null>(null)
 
   async function update(patch: Partial<typeof settings>) {
@@ -136,6 +141,27 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
             />
           </span>
         </label>
+
+        {repoMode && (
+          <label className="settings-row">
+            <span>
+              Auto-commit this workspace
+              <small>
+                {repoMode === 'notesOnly'
+                  ? 'This workspace is its own Git repository.'
+                  : 'This workspace sits inside a larger code repository — auto-commit only ever touches note paths, and never auto-pushes here.'}{' '}
+                Machine-local, not synced with the notes.
+              </small>
+            </span>
+            <span className="settings-row-control">
+              <input
+                type="checkbox"
+                checked={gitAutoCommit}
+                onChange={(e) => void updateGit({ prompted: true, autoCommit: e.target.checked })}
+              />
+            </span>
+          </label>
+        )}
 
         {error && <p className="settings-error">{error}</p>}
 

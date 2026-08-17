@@ -99,6 +99,7 @@ mod tests {
             open_tabs: vec!["/ws/note.md".into()],
             active_tab: Some("/ws/note.md".into()),
             expanded_folders: vec!["/ws/Course1".into()],
+            ..Default::default()
         };
         save_workspace_to_dir(&path, &original).await.unwrap();
         let loaded = load_workspace_from_dir(&path).await.unwrap();
@@ -161,5 +162,44 @@ mod tests {
             .unwrap();
         assert_eq!(state.open_tabs, vec!["/ws/a.md".to_string()]);
         assert!(state.expanded_folders.is_empty());
+    }
+
+    // A `.workspace.json` written before P5-1 shipped has no `git` key at
+    // all. It must still load — with auto-commit off and the one-time
+    // prompt still owed — rather than fail the whole workspace open.
+    #[tokio::test]
+    async fn test_load_legacy_file_without_git_config() {
+        let dir = tempdir().unwrap();
+        tokio::fs::write(
+            dir.path().join(".workspace.json"),
+            r#"{"openTabs":[],"activeTab":null}"#,
+        )
+        .await
+        .unwrap();
+
+        let state = load_workspace_from_dir(&dir.path().to_string_lossy())
+            .await
+            .unwrap();
+
+        assert!(!state.git.prompted);
+        assert!(!state.git.auto_commit);
+    }
+
+    #[tokio::test]
+    async fn test_git_config_roundtrips() {
+        use crate::models::GitWorkspaceConfig;
+
+        let dir = tempdir().unwrap();
+        let path = dir.path().to_string_lossy().into_owned();
+        let original = WorkspaceState {
+            git: GitWorkspaceConfig { prompted: true, auto_commit: true },
+            ..Default::default()
+        };
+
+        save_workspace_to_dir(&path, &original).await.unwrap();
+        let loaded = load_workspace_from_dir(&path).await.unwrap();
+
+        assert!(loaded.git.prompted);
+        assert!(loaded.git.auto_commit);
     }
 }

@@ -1,5 +1,8 @@
 import { create } from 'zustand'
 import { isUnderPath, replacePathPrefix } from '../lib/pathPrefix'
+import type { GitWorkspaceConfig, RepoMode } from '../types'
+
+const DEFAULT_GIT_CONFIG: GitWorkspaceConfig = { prompted: false, autoCommit: false }
 
 interface FolderContextMenuState {
   path: string
@@ -32,6 +35,14 @@ interface WorkspaceStore {
   recentWorkspaces: string[]
   setRecentWorkspaces: (paths: string[]) => void
   resetForNewWorkspace: () => void
+  // P5-1: which Git mode the open workspace is in (re-detected on every
+  // open, never persisted — it's a fact about the disk, not a preference),
+  // and the per-workspace, machine-local config that P5-1's one-time prompt
+  // and its Settings toggle both read and write.
+  repoMode: RepoMode | null
+  setRepoMode: (mode: RepoMode | null) => void
+  git: GitWorkspaceConfig
+  setGit: (git: GitWorkspaceConfig) => void
 }
 
 export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
@@ -44,6 +55,8 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   folderError: null,
   tagFilter: null,
   recentWorkspaces: [],
+  repoMode: null,
+  git: DEFAULT_GIT_CONFIG,
 
   setPath: (path) => set({ path, selectedFolder: path }),
 
@@ -99,6 +112,8 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   setFolderError: (message) => set({ folderError: message }),
   setTagFilter: (tag) => set({ tagFilter: tag }),
   setRecentWorkspaces: (paths) => set({ recentWorkspaces: paths }),
+  setRepoMode: (mode) => set({ repoMode: mode }),
+  setGit: (git) => set({ git }),
 
   resetForNewWorkspace: () =>
     set({
@@ -109,5 +124,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
       folderContextMenu: null,
       folderError: null,
       tagFilter: null,
+      repoMode: null,
+      git: DEFAULT_GIT_CONFIG,
     }),
 }))

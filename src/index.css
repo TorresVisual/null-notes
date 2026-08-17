@@ -607,7 +607,7 @@ body {
 .save-status button:hover { color: var(--text-primary); }
 
 /* External-change conflict prompt — never resolves itself */
-.conflict-bar {
+.conflict-bar, .git-prompt {
   display: flex;
   align-items: center;
   gap: var(--space-sm);
@@ -620,8 +620,9 @@ body {
 }
 
 .conflict-bar > svg { color: var(--danger); flex-shrink: 0; }
+.git-prompt > svg { color: var(--accent); flex-shrink: 0; }
 
-.conflict-bar button {
+.conflict-bar button, .git-prompt button {
   padding: 3px 10px;
   background: var(--bg-raised);
   border: 1px solid var(--border-strong);
@@ -631,7 +632,7 @@ body {
   font-size: 12px;
 }
 
-.conflict-bar button:hover { background: var(--border-strong); }
+.conflict-bar button:hover, .git-prompt button:hover { background: var(--border-strong); }
 
 /* Raw markdown textarea */
 .raw-editor {

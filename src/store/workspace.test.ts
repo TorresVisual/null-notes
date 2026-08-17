@@ -12,6 +12,8 @@ const reset = () =>
     folderError: null,
     tagFilter: null,
     recentWorkspaces: [],
+    repoMode: null,
+    git: { prompted: false, autoCommit: false },
   })
 
 describe('useWorkspaceStore', () => {
@@ -123,5 +125,29 @@ describe('useWorkspaceStore', () => {
     useWorkspaceStore.getState().setRecentWorkspaces(['/ws/a'])
     useWorkspaceStore.getState().resetForNewWorkspace()
     expect(useWorkspaceStore.getState().recentWorkspaces).toEqual(['/ws/a'])
+  })
+
+  // P5-1: repo mode is re-detected on every open, never carried over from
+  // whatever workspace was open before.
+  it('sets and clears the detected repo mode', () => {
+    useWorkspaceStore.getState().setRepoMode('notesOnly')
+    expect(useWorkspaceStore.getState().repoMode).toBe('notesOnly')
+    useWorkspaceStore.getState().setRepoMode(null)
+    expect(useWorkspaceStore.getState().repoMode).toBeNull()
+  })
+
+  it('sets the per-workspace git config', () => {
+    useWorkspaceStore.getState().setGit({ prompted: true, autoCommit: true })
+    expect(useWorkspaceStore.getState().git).toEqual({ prompted: true, autoCommit: true })
+  })
+
+  it('resetForNewWorkspace clears the repo mode and git config back to their defaults', () => {
+    useWorkspaceStore.getState().setRepoMode('codeRepo')
+    useWorkspaceStore.getState().setGit({ prompted: true, autoCommit: true })
+
+    useWorkspaceStore.getState().resetForNewWorkspace()
+
+    expect(useWorkspaceStore.getState().repoMode).toBeNull()
+    expect(useWorkspaceStore.getState().git).toEqual({ prompted: false, autoCommit: false })
   })
 })

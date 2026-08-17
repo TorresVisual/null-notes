@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core'
-import type { NoteMetadata, WorkspaceState, WorkspaceTree, SearchResult, AppSettings, GraphLink, GraphTag } from '../types'
+import type { NoteMetadata, WorkspaceState, WorkspaceTree, SearchResult, AppSettings, GraphLink, GraphTag, RepoMode } from '../types'
 import type { PdfPage, PdfMarkdownImport } from '../pdf/types'
 
 export const api = {
@@ -65,6 +65,10 @@ export const api = {
       invoke<string[]>('recent_workspaces'),
     remember: (path: string) =>
       invoke<string[]>('remember_workspace', { path }),
+  },
+  git: {
+    detectRepo: (workspace: string) =>
+      invoke<RepoMode | null>('detect_repo', { workspace }),
   },
   settings: {
     load: () =>

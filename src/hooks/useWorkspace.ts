@@ -28,16 +28,16 @@ export function useWorkspace() {
   const { setNotes, setFolders } = useNotesStore()
 
   const saveSession = useCallback(async () => {
-    const { path, openTabs, activeTab, expandedFolders } = useWorkspaceStore.getState()
+    const { path, openTabs, activeTab, expandedFolders, git } = useWorkspaceStore.getState()
     if (!path) return
-    await api.workspace.save(path, { openTabs, activeTab, expandedFolders })
+    await api.workspace.save(path, { openTabs, activeTab, expandedFolders, git })
   }, [])
 
   // Read the folder before touching any state: a recent workspace can be gone
   // by the time it's clicked, and a failed scan must leave the current one open.
   const openWorkspaceAt = useCallback(
     async (selected: string) => {
-      const { setFolderError, setRecentWorkspaces } = useWorkspaceStore.getState()
+      const { setFolderError, setRecentWorkspaces, setGit, setRepoMode } = useWorkspaceStore.getState()
       let tree, session
       try {
         ;[tree, session] = await Promise.all([
@@ -57,11 +57,20 @@ export function useWorkspace() {
       setNotes(tree.notes)
       setFolders(tree.folders)
       setExpandedFolders(session.expandedFolders)
+      setGit(session.git)
       for (const tab of session.openTabs) {
         openTab(tab)
       }
       await refreshTags()
       setRecentWorkspaces(await api.workspace.remember(selected))
+
+      // Best-effort: a missing `git` binary or any other detection failure
+      // just means no repo prompt, never a blocked workspace open.
+      try {
+        setRepoMode(await api.git.detectRepo(selected))
+      } catch {
+        setRepoMode(null)
+      }
     },
     [setPath, setNotes, setFolders, setExpandedFolders, openTab, resetForNewWorkspace, saveSession],
   )

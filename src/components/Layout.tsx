@@ -25,6 +25,8 @@ import { useScaffoldProjectNotes } from '../hooks/useScaffoldProjectNotes'
 import { useCreateCanvasNote } from '../hooks/useCreateCanvasNote'
 import { useScrollRestoration } from '../hooks/useScrollRestoration'
 import { ConflictBar } from './ConflictBar'
+import { GitAutoCommitPrompt } from './GitAutoCommitPrompt'
+import { useGitConfig } from '../hooks/useGitConfig'
 import { api } from '../lib/tauri'
 
 type ViewMode = 'wysiwyg' | 'raw'
@@ -48,6 +50,9 @@ export function Layout() {
     reloadTheirs,
   } = useNote(activeTab)
   const { saveSession, openWorkspace } = useWorkspace()
+  const { updateGit } = useGitConfig()
+  const repoMode = useWorkspaceStore((s) => s.repoMode)
+  const gitPrompted = useWorkspaceStore((s) => s.git.prompted)
   useExternalChanges()
   const createNote = useCreateNote()
   const createFolder = useCreateFolder()
@@ -222,6 +227,13 @@ export function Layout() {
           onDismissSaveError={dismissError}
         />
         {conflict && <ConflictBar onKeepMine={keepMine} onReloadTheirs={reloadTheirs} />}
+        {repoMode && !gitPrompted && (
+          <GitAutoCommitPrompt
+            mode={repoMode}
+            onEnable={() => void updateGit({ prompted: true, autoCommit: true })}
+            onDecline={() => void updateGit({ prompted: true })}
+          />
+        )}
         <div className="editor-scroll" ref={scrollRef}>
           <div
             className="editor-pane"

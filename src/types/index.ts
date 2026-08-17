@@ -17,11 +17,21 @@ export interface SearchResult {
   snippet: string
 }
 
+export interface GitWorkspaceConfig {
+  /** Whether the one-time "enable auto-commit?" prompt has been answered. */
+  prompted: boolean
+  autoCommit: boolean
+}
+
 export interface WorkspaceState {
   openTabs: string[]
   activeTab: string | null
   expandedFolders: string[]
+  git: GitWorkspaceConfig
 }
+
+/** Which of P5's two Git modes a workspace is in, or null when it isn't a Git repository at all. */
+export type RepoMode = 'notesOnly' | 'codeRepo'
 
 export type PdfImportMode = 'pages' | 'markdown'
 

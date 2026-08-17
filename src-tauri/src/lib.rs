@@ -123,6 +123,7 @@ pub fn run() {
             commands::notes::split_into_tasks,
             commands::editor_launch::open_in_editor,
             commands::editor_launch::resolve_code_links,
+            commands::git::detect_repo,
             commands::terminal::terminal_open,
             commands::terminal::terminal_write,
             commands::terminal::terminal_resize,

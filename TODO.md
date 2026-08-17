@@ -4,7 +4,9 @@ Feature checklist. **The [roadmap](docs/ROADMAP.md) holds the reasoning and the 
 
 Effort: **S** ≈ hours · **M** ≈ a day or two · **L** ≈ several days.
 
-**Now (revised 2026-08-17):** ~~finish ruled fractions~~ → ~~freeze the PDF pipeline~~ → ~~triage the three open bugs~~ → ~~P4-3 (closes M4)~~ → ~~the dogfood slice~~ → **re-derive P5, P6, P9 from real use**. **Phase numbers are identity, not order.**
+**Now (revised 2026-08-17):** ~~finish ruled fractions~~ → ~~freeze the PDF pipeline~~ → ~~triage the three open bugs~~ → ~~P4-3 (closes M4)~~ → ~~the dogfood slice~~ → ~~P7-2 (closes M7)~~ → ~~P5-1~~ → **P5-2 → P5-3 → P5-4 → P5-5 → P6 → P9**. **Phase numbers are identity, not order.**
+
+> The plan was to re-derive P5/P6/P9 priorities from a couple of weeks of real dogfood use first. That's dropped (see ROADMAP.md §1, 2026-08-17) — the maintainer's mode right now is implementing and verifying features, not daily use, so the wait doesn't resolve on its own. Back to the pre-dogfood priority order.
 
 | # | Work | Size | |
 |---|---|---|---|
@@ -13,7 +15,8 @@ Effort: **S** ≈ hours · **M** ≈ a day or two · **L** ≈ several days.
 | 2 | Triage the three open bugs below | S | ✅ |
 | 3 | **P4-3** → **M4** | M | ✅ |
 | 4 | Dogfood slice — ~~ignore list~~ → ~~P7-3~~ → ~~P7-4 + P7-1~~ → ~~P8-1~~ | M/L | ✅ |
-| 5 | Re-derive P5, P6, P9 from real use | — | ← |
+| 5 | ~~Re-derive P5, P6, P9 from real use~~ | — | ✅❌ *superseded* |
+| 6 | **P5** → **P6** → **P9** | — | ← |
 
 > **The PDF pipeline is frozen** as of 2026-08-13. The corpus is the regression suite; a new bug earns work only if it is whole-document or recurs across ≥2 corpus documents; 2D-layout reconstruction is closed. See P4-2e.
 
@@ -42,7 +45,7 @@ Effort: **S** ≈ hours · **M** ≈ a day or two · **L** ≈ several days.
 | P4 PDF→Markdown & exercise sheets | M4 — a sheet becomes a workable note | ✅ |
 | P5 Versioned workspaces (Git) | M5 — my notes commit themselves | |
 | P6 STEM authoring | M6 — fastest place to write maths | |
-| P7 IDE integration | M7 — notes and code are one workflow | |
+| P7 IDE integration | M7 — notes and code are one workflow | ✅ |
 | P8 Embedded terminal | M8 — `claude` runs against the open note | ✅ |
 | P9 Study & revision | M9 — the app helps me *revise*, not just capture | |
 | P10 Gated stretch | M10 — in-app AI + code execution | gated |
@@ -166,11 +169,13 @@ Two modes, different defaults — everything here follows from this:
 
 > 🔒 **Don't touch what you didn't create.** Pathspec-scope every Git command; abandon rather than repair an unexpected repo state; leave staged and unstaged source work untouched. A skipped auto-commit costs minutes — a wrong one costs trust in the feature.
 
-### P5-1 Repo detection + per-workspace config — **S/M**
-- [ ] Detect mode on open: repo root ≈ workspace (notes-only) vs. subtree of a source repo (code repo)
-- [ ] Shell out to `git`, **not** `git2`/`gix` — inherits credential helpers, SSH agent, signing, `.gitconfig` for free
-- [ ] Per-workspace, machine-local config beside `.workspace.json` (already gitignored) — "should this machine autocommit" isn't a fact about the notes
-- [ ] **Opt-in**: detecting a repo prompts once, never starts committing on its own
+### P5-1 Repo detection + per-workspace config — **S/M** ✅
+- [x] Detect mode on open: repo root ≈ workspace (notes-only) vs. subtree of a source repo (code repo)
+- [x] Shell out to `git`, **not** `git2`/`gix` — inherits credential helpers, SSH agent, signing, `.gitconfig` for free
+- [x] Per-workspace, machine-local config beside `.workspace.json` (already gitignored) — "should this machine autocommit" isn't a fact about the notes
+- [x] **Opt-in**: detecting a repo prompts once, never starts committing on its own
+
+> `git -C <workspace> rev-parse --show-toplevel`, canonicalized on both sides before comparing (git normalises its own output to forward slashes even on Windows, so a raw string compare against the workspace path would mismatch on separator style alone). Any failure — including `git` missing from `PATH` — reads as "not a repo," off the exit code rather than a parsed message, and never blocks the workspace from opening. Config is two fields only (`prompted`, `autoCommit`) on `WorkspaceState`; cadence and push policy are P5-2's and P5-3's own tasks, not scaffolded here ahead of the code that would read them. A one-time banner (`GitAutoCommitPrompt`) offers the toggle when a repo is first detected; a Settings-panel row (visible only when the open workspace is a detected repo) revisits it later — both go through one `useGitConfig` hook, so there's a single persistence path. Repo mode itself is never persisted, only re-detected each open — it's a fact about the disk that can change between sessions.
 
 ### P5-2 Batched auto-commit — **M**
 - [ ] One commit per session / N minutes idle — never per-save (far coarser than the 600 ms save and 2.5 s reindex debounces)
@@ -200,13 +205,11 @@ Two modes, different defaults — everything here follows from this:
 
 ---
 
-## ▸ P6 — STEM authoring (M6) — ***rescope at step 5, don't re-plan before***
+## ▸ P6 — STEM authoring (M6)
 
 > ⚠️ Every new node needs `addStorage().markdown.serialize/parse`. Without one it serialises as escaped plain text — silent data loss.
 
-> **Finding, 2026-08-13: a stream of editor work has no roadmap representation at all.** `BlockHandle`, `Divider`, `TextAlignment`, `Highlight`, `Kbd`, `HTMLBlock`, `HTMLInline`, `SpanStyle`, `Superscript`/`Subscript` and `NoteImage` all exist in `src/editor/extensions/` and correspond to no phase or task here. The Notion half of the app — which [ROADMAP.md](docs/ROADMAP.md) §1 now names as a pillar — is being built off-book.
->
-> Not an argument to stop; an argument that **P6's scope is wrong**. It was written as "STEM authoring" when the work actually happening is "Notion parity," and the two overlap only partly. Rescope it at step 5, informed by what the dogfood slice shows is missing, rather than re-planning now from the current guesses.
+> **Finding, 2026-08-13, still worth knowing before diving in: a stream of editor work has no roadmap representation at all.** `BlockHandle`, `Divider`, `TextAlignment`, `Highlight`, `Kbd`, `HTMLBlock`, `HTMLInline`, `SpanStyle`, `Superscript`/`Subscript` and `NoteImage` all exist in `src/editor/extensions/` and correspond to no phase or task here. The Notion half of the app — which [ROADMAP.md](docs/ROADMAP.md) §1 now names as a pillar — is being built off-book, which suggests "STEM authoring" is only part of the real frame ("Notion parity" is the other part). **No longer a blocking rescope** (the step-5 wait it was tied to is superseded, ROADMAP.md §1 2026-08-17) — just a caveat to keep in mind while working through the boxes below, which are genuinely missing either way.
 >
 > Still genuinely unbuilt: proof/theorem blocks, algorithm blocks (P6-2), templates (P6-3), equation snippets (P6-4), search refinement (P6-5), outline panel (P6-6).
 
@@ -247,7 +250,7 @@ Two modes, different defaults — everything here follows from this:
 
 ---
 
-## ▸ P7 — IDE integration (M7) — ***step 4: the dogfood slice, moved ahead of P5 and P6***
+## ▸ P7 — IDE integration (M7) ✅ — ***step 4: the dogfood slice, moved ahead of P5 and P6***
 
 The brief's second pillar. Notes stay plain `.md` — a deep link is ordinary Markdown that degrades to readable text elsewhere.
 
@@ -281,9 +284,11 @@ The brief's second pillar. Notes stay plain `.md` — a deep link is ordinary Ma
 - [x] Detect what's installed — probes `PATH` via `where`/`which` on load, **only when the template is empty**, so a typed template is never overwritten
 - [x] Switching editors changes where links open, with no code change
 
-### P7-2 "Open in IDE" on code blocks — **S**
-- [ ] Action on code blocks that carry a source path, reusing P7-1's launcher and guardrails
-- [ ] Appears only when the path resolves — never a dead button
+### P7-2 "Open in IDE" on code blocks — **S** ✅
+- [x] Action on code blocks that carry a source path, reusing P7-1's launcher and guardrails
+- [x] Appears only when the path resolves — never a dead button
+
+> A block "carries a source path" when its first line, comment marker optional (`//`, `#`, `--`, `;`, `%`), is nothing but the path — `// src/main.rs` above a pasted function, which is already how this gets written by hand. `codeBlockSourcePath` (`lib/codeLinks.ts`) reuses `findCodeLinks` rather than a second recognizer; a path named only in passing ("see src/main.rs for details") or a block naming two paths matches nothing, same "prefer a miss" posture as P7-1. The button is a widget decoration — nothing new stored in the document, nothing to serialize — sharing `CodeLink`'s resolution cache and its `resolve_code_links`/`open_in_editor` backend commands directly (`resolveMissing` now exported for this). Hidden in the P3-2 print export as an interactive-only affordance.
 
 ### P7-3 Project awareness & project notes — **M** ✅
 - [x] Open a code repo as a workspace; surface its `README.md` / `docs/` / `notes/` with no import step — *delivered by P7-3a, then verified: this repo now scans to ~60 real `.md` files across `docs/`, `notes/` and the root, and nothing else*
