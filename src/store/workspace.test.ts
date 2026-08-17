@@ -15,6 +15,7 @@ const reset = () =>
     repoMode: null,
     git: { prompted: false, autoCommit: false, idleMinutes: 10, skipHooks: false, autoPush: true },
     gitPendingPaths: [],
+    gitCommitStatus: 'idle',
   })
 
 describe('useWorkspaceStore', () => {

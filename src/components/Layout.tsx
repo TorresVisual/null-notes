@@ -27,6 +27,7 @@ import { useScrollRestoration } from '../hooks/useScrollRestoration'
 import { ConflictBar } from './ConflictBar'
 import { GitAutoCommitPrompt } from './GitAutoCommitPrompt'
 import { useGitConfig } from '../hooks/useGitConfig'
+import { useGitAutoCommit } from '../hooks/useGitAutoCommit'
 import { api } from '../lib/tauri'
 
 type ViewMode = 'wysiwyg' | 'raw'
@@ -51,6 +52,7 @@ export function Layout() {
   } = useNote(activeTab)
   const { saveSession, openWorkspace } = useWorkspace()
   const { updateGit } = useGitConfig()
+  const { flushGitCommit } = useGitAutoCommit()
   const repoMode = useWorkspaceStore((s) => s.repoMode)
   const gitPrompted = useWorkspaceStore((s) => s.git.prompted)
   useExternalChanges()
@@ -77,13 +79,14 @@ export function Layout() {
       try {
         await flush()
         await saveSession()
+        await flushGitCommit()
       } finally {
         await api.terminal.close()
         await api.window.confirmClose()
       }
     })
     return () => void unlisten.then((off) => off())
-  }, [flush, saveSession])
+  }, [flush, saveSession, flushGitCommit])
 
   // The native File/Edit/View menu is the single source of truth for every
   // modifier-key shortcut (accelerators shown on the menu items themselves) —

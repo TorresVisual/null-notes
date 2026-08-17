@@ -39,6 +39,8 @@ export interface WorkspaceState {
 /** Which of P5's two Git modes a workspace is in, or null when it isn't a Git repository at all. */
 export type RepoMode = 'notesOnly' | 'codeRepo'
 
+export type GitCommitStatus = 'idle' | 'committing' | 'committed' | 'skipped' | 'error'
+
 export type CommitOutcome =
   | { kind: 'committed' }
   | { kind: 'skipped'; reason: string }

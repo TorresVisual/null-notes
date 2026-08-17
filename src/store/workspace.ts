@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { isUnderPath, replacePathPrefix } from '../lib/pathPrefix'
-import type { GitWorkspaceConfig, RepoMode } from '../types'
+import type { GitWorkspaceConfig, RepoMode, GitCommitStatus } from '../types'
 
 const DEFAULT_GIT_CONFIG: GitWorkspaceConfig = {
   prompted: false,
@@ -54,6 +54,8 @@ interface WorkspaceStore {
   gitPendingPaths: string[]
   addGitPendingPath: (path: string) => void
   clearGitPendingPaths: () => void
+  gitCommitStatus: GitCommitStatus
+  setGitCommitStatus: (status: GitCommitStatus) => void
 }
 
 export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
@@ -69,6 +71,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   repoMode: null,
   git: DEFAULT_GIT_CONFIG,
   gitPendingPaths: [],
+  gitCommitStatus: 'idle',
 
   setPath: (path) => set({ path, selectedFolder: path }),
 
@@ -133,6 +136,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
     set({ gitPendingPaths: [...gitPendingPaths, path] })
   },
   clearGitPendingPaths: () => set({ gitPendingPaths: [] }),
+  setGitCommitStatus: (status) => set({ gitCommitStatus: status }),
 
   resetForNewWorkspace: () =>
     set({
@@ -146,5 +150,6 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
       repoMode: null,
       git: DEFAULT_GIT_CONFIG,
       gitPendingPaths: [],
+      gitCommitStatus: 'idle',
     }),
 }))
