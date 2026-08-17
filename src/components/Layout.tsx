@@ -12,6 +12,7 @@ import { WorkspacePicker } from './WorkspacePicker'
 import { SettingsPanel } from './SettingsPanel'
 import { ShortcutsOverlay } from './ShortcutsOverlay'
 import { GraphView } from './GraphView'
+import { TerminalPane } from './TerminalPane'
 import { useWorkspaceStore } from '../store/workspace'
 import { useNotesStore } from '../store/notes'
 import { useSettingsStore } from '../store/settings'
@@ -58,6 +59,8 @@ export function Layout() {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [shortcutsOpen, setShortcutsOpen] = useState(false)
   const [graphOpen, setGraphOpen] = useState(false)
+  const [terminalMounted, setTerminalMounted] = useState(false)
+  const [terminalOpen, setTerminalOpen] = useState(false)
   const settings = useSettingsStore((s) => s.settings)
   const setSettings = useSettingsStore((s) => s.setSettings)
   const scrollRef = useScrollRestoration(activeTab, isLoading)
@@ -70,6 +73,7 @@ export function Layout() {
         await flush()
         await saveSession()
       } finally {
+        await api.terminal.close()
         await api.window.confirmClose()
       }
     })
@@ -149,6 +153,11 @@ export function Layout() {
           break
         case 'graph-view':
           if (workspacePath) setGraphOpen(true)
+          break
+        case 'toggle-terminal':
+          if (!workspacePath) break
+          setTerminalMounted(true)
+          setTerminalOpen((o) => !o)
           break
       }
     },
@@ -252,6 +261,15 @@ export function Layout() {
             )}
           </div>
         </div>
+        {terminalMounted && workspacePath && (
+          <TerminalPane
+            workspace={workspacePath}
+            notePath={activeTab}
+            shell={settings.terminalShell}
+            hidden={!terminalOpen}
+            onClose={() => setTerminalOpen(false)}
+          />
+        )}
       </div>
     </div>
   )
