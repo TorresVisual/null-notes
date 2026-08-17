@@ -3,6 +3,7 @@ import { open } from '@tauri-apps/plugin-dialog'
 import { api } from '../lib/tauri'
 import { useWorkspaceStore } from '../store/workspace'
 import { useNotesStore } from '../store/notes'
+import { useGitAutoPull } from './useGitAutoPull'
 
 export async function refreshTree(): Promise<void> {
   const path = useWorkspaceStore.getState().path
@@ -26,6 +27,7 @@ export async function refreshRecents(): Promise<void> {
 export function useWorkspace() {
   const { setPath, openTab, setExpandedFolders, resetForNewWorkspace } = useWorkspaceStore()
   const { setNotes, setFolders } = useNotesStore()
+  const { checkForUpdates } = useGitAutoPull()
 
   const saveSession = useCallback(async () => {
     const { path, openTabs, activeTab, expandedFolders, git } = useWorkspaceStore.getState()
@@ -67,12 +69,14 @@ export function useWorkspace() {
       // Best-effort: a missing `git` binary or any other detection failure
       // just means no repo prompt, never a blocked workspace open.
       try {
-        setRepoMode(await api.git.detectRepo(selected))
+        const mode = await api.git.detectRepo(selected)
+        setRepoMode(mode)
+        if (mode) await checkForUpdates(selected)
       } catch {
         setRepoMode(null)
       }
     },
-    [setPath, setNotes, setFolders, setExpandedFolders, openTab, resetForNewWorkspace, saveSession],
+    [setPath, setNotes, setFolders, setExpandedFolders, openTab, resetForNewWorkspace, saveSession, checkForUpdates],
   )
 
   const openWorkspace = useCallback(async () => {

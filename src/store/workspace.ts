@@ -56,6 +56,8 @@ interface WorkspaceStore {
   clearGitPendingPaths: () => void
   gitCommitStatus: GitCommitStatus
   setGitCommitStatus: (status: GitCommitStatus) => void
+  gitDiverged: { ahead: number; behind: number } | null
+  setGitDiverged: (d: { ahead: number; behind: number } | null) => void
 }
 
 export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
@@ -72,6 +74,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   git: DEFAULT_GIT_CONFIG,
   gitPendingPaths: [],
   gitCommitStatus: 'idle',
+  gitDiverged: null,
 
   setPath: (path) => set({ path, selectedFolder: path }),
 
@@ -137,6 +140,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   },
   clearGitPendingPaths: () => set({ gitPendingPaths: [] }),
   setGitCommitStatus: (status) => set({ gitCommitStatus: status }),
+  setGitDiverged: (d) => set({ gitDiverged: d }),
 
   resetForNewWorkspace: () =>
     set({
@@ -151,5 +155,6 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
       git: DEFAULT_GIT_CONFIG,
       gitPendingPaths: [],
       gitCommitStatus: 'idle',
+      gitDiverged: null,
     }),
 }))

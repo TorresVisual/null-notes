@@ -53,6 +53,12 @@ export type PushOutcome =
   | { kind: 'authFailed'; output: string }
   | { kind: 'rejected'; output: string }
 
+export type PullOutcome =
+  | { kind: 'upToDate' }
+  | { kind: 'fastForwarded' }
+  | { kind: 'diverged'; ahead: number; behind: number }
+  | { kind: 'noRemote' }
+
 export type PdfImportMode = 'pages' | 'markdown'
 
 export interface AppSettings {

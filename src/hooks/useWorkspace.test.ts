@@ -10,7 +10,7 @@ vi.mock('../lib/tauri', () => ({
   api: {
     notes: { scan: vi.fn(), listTags: vi.fn() },
     workspace: { load: vi.fn(), save: vi.fn(), watch: vi.fn(), remember: vi.fn() },
-    git: { detectRepo: vi.fn() },
+    git: { detectRepo: vi.fn(), fetchAndCompare: vi.fn() },
   },
 }))
 
@@ -44,6 +44,7 @@ describe('useWorkspace', () => {
     workspace.watch.mockResolvedValue(undefined)
     workspace.remember.mockResolvedValue([])
     git.detectRepo.mockResolvedValue(null)
+    git.fetchAndCompare.mockResolvedValue({ kind: 'upToDate' })
   })
 
   afterEach(() => {
@@ -88,6 +89,24 @@ describe('useWorkspace', () => {
 
     expect(useWorkspaceStore.getState().path).toBe('/ws')
     expect(useWorkspaceStore.getState().repoMode).toBeNull()
+  })
+
+  it('fetches and compares once a repo is detected', async () => {
+    git.detectRepo.mockResolvedValue('notesOnly')
+    const { result } = renderHook(() => useWorkspace())
+
+    await result.current.openWorkspaceAt('/ws')
+
+    expect(git.fetchAndCompare).toHaveBeenCalledWith('/ws')
+  })
+
+  it('does not fetch when the workspace is not a git repository', async () => {
+    git.detectRepo.mockResolvedValue(null)
+    const { result } = renderHook(() => useWorkspace())
+
+    await result.current.openWorkspaceAt('/ws')
+
+    expect(git.fetchAndCompare).not.toHaveBeenCalled()
   })
 
   it('saveSession persists the current git config alongside the rest of the session', async () => {
