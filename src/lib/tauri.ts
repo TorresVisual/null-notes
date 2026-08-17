@@ -90,4 +90,14 @@ export const api = {
     importMarkdown: (pdfPath: string) =>
       invoke<PdfMarkdownImport>('import_pdf_markdown', { pdfPath }),
   },
+  terminal: {
+    open: (workspace: string, notePath: string | null, shell: string) =>
+      invoke<void>('terminal_open', { workspace, notePath, shell }),
+    write: (data: string) =>
+      invoke<void>('terminal_write', { data }),
+    resize: (cols: number, rows: number) =>
+      invoke<void>('terminal_resize', { cols, rows }),
+    close: () =>
+      invoke<void>('terminal_close'),
+  },
 }

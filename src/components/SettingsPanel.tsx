@@ -119,6 +119,24 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
           </span>
         </label>
 
+        <label className="settings-row">
+          <span>
+            Terminal shell
+            <small>
+              Spawned by the terminal pane (<code>Ctrl `</code>), rooted at the workspace. Detected on
+              first load.
+            </small>
+          </span>
+          <span className="settings-row-control">
+            <input
+              type="text"
+              className="settings-text settings-text-wide"
+              value={settings.terminalShell}
+              onChange={(e) => void update({ terminalShell: e.target.value })}
+            />
+          </span>
+        </label>
+
         {error && <p className="settings-error">{error}</p>}
 
         <button

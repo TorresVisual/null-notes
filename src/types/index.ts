@@ -34,6 +34,8 @@ export interface AppSettings {
   pdfImportMode: PdfImportMode
   /** Launch template for code deep links, with {file} and {line} placeholders. */
   editorCommand: string
+  /** Shell a terminal pane spawns, e.g. `powershell` or `wsl -d Ubuntu`. */
+  terminalShell: string
 }
 
 export interface GraphLink {

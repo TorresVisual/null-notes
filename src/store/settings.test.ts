@@ -16,6 +16,7 @@ describe('useSettingsStore', () => {
       spellcheckLanguage: 'en',
       pdfImportMode: 'markdown',
       editorCommand: 'nvim +{line} {file}',
+      terminalShell: 'wsl -d Ubuntu',
     })
     expect(useSettingsStore.getState().settings).toEqual({
       autosaveDebounceMs: 1200,
@@ -24,6 +25,7 @@ describe('useSettingsStore', () => {
       spellcheckLanguage: 'en',
       pdfImportMode: 'markdown',
       editorCommand: 'nvim +{line} {file}',
+      terminalShell: 'wsl -d Ubuntu',
     })
   })
 })

@@ -8,6 +8,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   spellcheckLanguage: 'de',
   pdfImportMode: 'pages',
   editorCommand: 'code -g {file}:{line}',
+  terminalShell: 'powershell',
 }
 
 interface SettingsStore {
