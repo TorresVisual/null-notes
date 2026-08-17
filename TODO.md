@@ -4,7 +4,7 @@ Feature checklist. **The [roadmap](docs/ROADMAP.md) holds the reasoning and the 
 
 Effort: **S** ≈ hours · **M** ≈ a day or two · **L** ≈ several days.
 
-**Now (revised 2026-08-17):** ~~finish ruled fractions~~ → ~~freeze the PDF pipeline~~ → ~~triage the three open bugs~~ → ~~P4-3 (closes M4)~~ → ~~the dogfood slice~~ → ~~P7-2 (closes M7)~~ → ~~P5-1~~ → **P5-2 → P5-3 → P5-4 → P5-5 → P6 → P9**. **Phase numbers are identity, not order.**
+**Now (revised 2026-08-17):** ~~finish ruled fractions~~ → ~~freeze the PDF pipeline~~ → ~~triage the three open bugs~~ → ~~P4-3 (closes M4)~~ → ~~the dogfood slice~~ → ~~P7-2 (closes M7)~~ → ~~P5-1~~ → ~~P5-2 → P5-3 → P5-4 → P5-5 (closes M5)~~ → **P6 → P9**. **Phase numbers are identity, not order.**
 
 > The plan was to re-derive P5/P6/P9 priorities from a couple of weeks of real dogfood use first. That's dropped (see ROADMAP.md §1, 2026-08-17) — the maintainer's mode right now is implementing and verifying features, not daily use, so the wait doesn't resolve on its own. Back to the pre-dogfood priority order.
 
@@ -16,7 +16,7 @@ Effort: **S** ≈ hours · **M** ≈ a day or two · **L** ≈ several days.
 | 3 | **P4-3** → **M4** | M | ✅ |
 | 4 | Dogfood slice — ~~ignore list~~ → ~~P7-3~~ → ~~P7-4 + P7-1~~ → ~~P8-1~~ | M/L | ✅ |
 | 5 | ~~Re-derive P5, P6, P9 from real use~~ | — | ✅❌ *superseded* |
-| 6 | **P5** → **P6** → **P9** | — | ← |
+| 6 | ~~**P5**~~ → **P6** → **P9** | — | ← |
 
 > **The PDF pipeline is frozen** as of 2026-08-13. The corpus is the regression suite; a new bug earns work only if it is whole-document or recurs across ≥2 corpus documents; 2D-layout reconstruction is closed. See P4-2e.
 
@@ -43,7 +43,7 @@ Effort: **S** ≈ hours · **M** ≈ a day or two · **L** ≈ several days.
 | P2 Feel & ergonomics | M2 — a pleasure to use for hours | ✅ |
 | P3 Headline features | M3 — the CS superpowers land | ✅ |
 | P4 PDF→Markdown & exercise sheets | M4 — a sheet becomes a workable note | ✅ |
-| P5 Versioned workspaces (Git) | M5 — my notes commit themselves | |
+| P5 Versioned workspaces (Git) | M5 — my notes commit themselves | ✅ |
 | P6 STEM authoring | M6 — fastest place to write maths | |
 | P7 IDE integration | M7 — notes and code are one workflow | ✅ |
 | P8 Embedded terminal | M8 — `claude` runs against the open note | ✅ |
@@ -177,31 +177,41 @@ Two modes, different defaults — everything here follows from this:
 
 > `git -C <workspace> rev-parse --show-toplevel`, canonicalized on both sides before comparing (git normalises its own output to forward slashes even on Windows, so a raw string compare against the workspace path would mismatch on separator style alone). Any failure — including `git` missing from `PATH` — reads as "not a repo," off the exit code rather than a parsed message, and never blocks the workspace from opening. Config is two fields only (`prompted`, `autoCommit`) on `WorkspaceState`; cadence and push policy are P5-2's and P5-3's own tasks, not scaffolded here ahead of the code that would read them. A one-time banner (`GitAutoCommitPrompt`) offers the toggle when a repo is first detected; a Settings-panel row (visible only when the open workspace is a detected repo) revisits it later — both go through one `useGitConfig` hook, so there's a single persistence path. Repo mode itself is never persisted, only re-detected each open — it's a fact about the disk that can change between sessions.
 
-### P5-2 Batched auto-commit — **M**
-- [ ] One commit per session / N minutes idle — never per-save (far coarser than the 600 ms save and 2.5 s reindex debounces)
-- [ ] Message summarizes which notes changed
-- [ ] **Always `git add -- <paths>` / `git commit -- <paths>`** — never `git add -A`, never a bare commit that sweeps in staged work
-- [ ] Skip entirely on mid-rebase/merge/cherry-pick, detached HEAD, or existing conflict markers; report quietly, never repair
-- [ ] Run hooks and abort on failure — no silent `--no-verify`; opt-in per-workspace toggle to skip them
-- [ ] **Test: staged and unstaged source changes are byte-identical after an auto-commit.** The one unforgivable failure.
+### P5-2 Batched auto-commit — **M** ✅
+- [x] One commit per session / N minutes idle — never per-save (far coarser than the 600 ms save and 2.5 s reindex debounces)
+- [x] Message summarizes which notes changed
+- [x] **Always `git add -- <paths>` / `git commit -- <paths>`** — never `git add -A`, never a bare commit that sweeps in staged work
+- [x] Skip entirely on mid-rebase/merge/cherry-pick, detached HEAD, or existing conflict markers; report quietly, never repair
+- [x] Run hooks and abort on failure — no silent `--no-verify`; opt-in per-workspace toggle to skip them
+- [x] **Test: staged and unstaged source changes are byte-identical after an auto-commit.** The one unforgivable failure.
 
-### P5-3 Push policy — **S**
-- [ ] Notes-only: push after commit (on by default, configurable)
-- [ ] Code repo: **never auto-push at any setting** — notes ride along with your next real push
-- [ ] Surface no-remote / auth failure / non-fast-forward; never retry blindly, never force
+> `checked_auto_commit` resolves the git dir once (`rev-parse --absolute-git-dir`) and answers detached-HEAD/merge/cherry-pick/rebase by reading it directly; only unresolved conflicts need a real `git` call (`ls-files -u`). A conflicted merge sets `MERGE_HEAD` too, so it reports as "a merge is in progress" rather than "unresolved conflicts" — the more specific, more actionable reason; exercising the conflicts check in isolation needed a conflicting `stash pop` instead of a merge. The idle timer lives on the frontend (`useGitAutoCommit`, resets on every new saved path, default 10 minutes via `git.idleMinutes`) and also flushes once on session end. A non-`Committed` outcome leaves the batch pending rather than clearing it, so the next trigger retries instead of losing the changes. First version of the "nothing else touched" test compared the whole-repo diff listing before/after, which is wrong — it shrinks once the note's own change lands; fixed to scope the comparison to the untouched file specifically.
 
-### P5-4 Fast-forward-only auto-pull — **M** — *most dangerous task on the roadmap*
-- [ ] Fetch and compare on workspace open (optionally on an interval)
-- [ ] No divergent local commits → fast-forward silently (P0-5's watcher already debounces the file burst; P3-4 traced this exact path)
-- [ ] Diverged → **stop.** Bar reusing the P0-5 conflict-bar pattern; you resolve it in the terminal (P8) or your Git tool
-- [ ] **Never** auto-merge, auto-rebase, or write a conflict marker into a `.md`
-- [ ] A dirty buffer is never overwritten by a pull — extends the existing CLAUDE.md rule to the pull path
-- [ ] Test: a deliberately diverged history produces **zero** conflict markers in any `.md`
+### P5-3 Push policy — **S** ✅
+- [x] Notes-only: push after commit (on by default, configurable)
+- [x] Code repo: **never auto-push at any setting** — notes ride along with your next real push
+- [x] Surface no-remote / auth failure / non-fast-forward; never retry blindly, never force
 
-### P5-5 Repo creation for a notes-only workspace — **S**
-- [ ] Offer `git init` + the `.gitignore` P3-4 documents when the workspace isn't a repo
-- [ ] Optional GitHub remote via `gh repo create` — **private by default**
-- [ ] No `gh`? Init locally and print the exact remote command. Never a hard dependency
+> `checked_push` refuses `RepoMode::CodeRepo` unconditionally as a Rust-level guard, on top of the frontend's own single call site being gated on `repoMode === 'notesOnly'` — two independent places a code-repo push would have to slip through, not one.
+
+### P5-4 Fast-forward-only auto-pull — **M** ✅ — *most dangerous task on the roadmap*
+- [x] Fetch and compare on workspace open (optionally on an interval)
+- [x] No divergent local commits → fast-forward silently (P0-5's watcher already debounces the file burst; P3-4 traced this exact path)
+- [x] Diverged → **stop.** Bar reusing the P0-5 conflict-bar pattern; you resolve it in the terminal (P8) or your Git tool
+- [x] **Never** auto-merge, auto-rebase, or write a conflict marker into a `.md`
+- [x] A dirty buffer is never overwritten by a pull — extends the existing CLAUDE.md rule to the pull path
+- [x] Test: a deliberately diverged history produces **zero** conflict markers in any `.md`
+
+> `git merge --ff-only` does the actual fast-forward — refuses rather than merging if it isn't a pure fast-forward, or if a local uncommitted change would be overwritten. No new reload logic was needed for the dirty-buffer rule: a fast-forward's resulting file changes are an ordinary external edit, and P0-5's watcher plus `useNote`'s existing conflict handling already cover exactly this path. `GitDivergedBar` reuses `ConflictBar`'s `.conflict-bar` styling rather than a second bar look.
+
+### P5-5 Repo creation for a notes-only workspace — **S** ✅
+- [x] Offer `git init` + the `.gitignore` P3-4 documents when the workspace isn't a repo
+- [x] Optional GitHub remote via `gh repo create` — **private by default**
+- [x] No `gh`? Init locally and print the exact remote command. Never a hard dependency
+
+> `checked_init_notes_repo` never overwrites an existing `.gitignore`. Any `gh repo create` failure — absent, not logged in, network — falls through to `InitializedLocalOnly` with the exact `git remote add origin <url>` command surfaced in an alert. Settings sets `repoMode` to `'notesOnly'` directly after a successful init rather than re-running detection, which reuses P5-1's existing one-time-prompt wiring unchanged: `git.prompted` is still `false`, so the auto-commit banner appears right away.
+
+**Exit check for M5:** notes commit themselves in both modes ✅; a code repo's staged work, unstaged work, branch and history are provably untouched outside note paths (tested) ✅; a fast-forward pull writes no conflict marker and a diverged one stops with a count instead ✅. **M5 reached (2026-08-17).**
 
 ---
 

@@ -1,6 +1,6 @@
 # null-notes — Product & Technical Roadmap
 
-**Last updated:** 2026-08-17 (**the dogfood slice is complete.** P8-1 shipped — a PTY-backed terminal pane (`portable-pty` + `xterm.js`), toggled with `Ctrl+\``, rooted at the workspace, with the active note's path as an env var plus a one-key insert. **M8 reached.** The full slice — P7-3a's scan ignore list → P7-3 → P7-4 + P7-1 → P8-1 — is now done end to end; this project's own `docs/` can be opened, edited, and worked on from inside null-notes itself. Same day, P7-2 ("Open in IDE" on a code block that names its own source path) landed too, reusing P7-1's launcher and cache outright — **M7 reached**. §6's step 5 (wait for a couple of weeks of real dogfood use before continuing P5/P6/P9) is now **superseded** — see §1's third closed question, 2026-08-17: the maintainer's mode is implementing and verifying features, not daily use, so the wait never resolves on its own. Step 6 (P5 → P6 → P9) is underway: **P5-1 shipped same day** — `git rev-parse --show-toplevel`, canonicalized against the workspace path, classifies notes-only vs. code-repo mode; the opt-in config lives on `WorkspaceState` next to `.workspace.json`'s other machine-local UI state; no Git command runs until a human answers the one-time prompt. **Next: P5-2**, batched auto-commit — the phase's real safety-property task.)
+**Last updated:** 2026-08-17 (**the dogfood slice is complete.** P8-1 shipped — a PTY-backed terminal pane (`portable-pty` + `xterm.js`), toggled with `Ctrl+\``, rooted at the workspace, with the active note's path as an env var plus a one-key insert. **M8 reached.** The full slice — P7-3a's scan ignore list → P7-3 → P7-4 + P7-1 → P8-1 — is now done end to end; this project's own `docs/` can be opened, edited, and worked on from inside null-notes itself. Same day, P7-2 ("Open in IDE" on a code block that names its own source path) landed too, reusing P7-1's launcher and cache outright — **M7 reached**. §6's step 5 (wait for a couple of weeks of real dogfood use before continuing P5/P6/P9) is now **superseded** — see §1's third closed question, 2026-08-17: the maintainer's mode is implementing and verifying features, not daily use, so the wait never resolves on its own. Step 6 (P5 → P6 → P9) is underway: **P5-1 shipped same day** — `git rev-parse --show-toplevel`, canonicalized against the workspace path, classifies notes-only vs. code-repo mode; the opt-in config lives on `WorkspaceState` next to `.workspace.json`'s other machine-local UI state; no Git command runs until a human answers the one-time prompt. **P5-2 through P5-5 are now also done — M5 reached.** Batched auto-commit is pathspec-scoped and backs off on any unsafe repo state; push never happens for a code-repo workspace, enforced at both the Rust and frontend layers; auto-pull is fast-forward-only, reusing P0-5's watcher for the resulting file changes rather than adding new reload logic; a plain notes folder can become a private GitHub-backed repo in one Settings action. **Next: P6**, STEM authoring.)
 
 *2026-08-13 revision, kept for context — see `specs/roadmap-revision-design.md`: the two weeks before that went almost entirely into PDF pipeline refinement, which the roadmap had no boundary for; that revision added one (§Phase 4, "Pipeline completion criteria"), recorded the app's actual identity and two closed questions (§1), and replaced the execution order in §6 — phase numbers are identity, not order. Ruled fractions landed, freezing the pipeline (§Phase 4, P4-2e); all three open bugs were triaged (two fixed, one didn't reproduce); P4-3 closed M4.*
 
@@ -154,7 +154,7 @@ Given "personal daily driver," priority = `(daily-use value) × (risk of data lo
 | **P2** | Feel & ergonomics | **M2:** it's a pleasure to use for hours | ✅ | Compounding daily quality-of-life |
 | **P3** | Headline features & power tools | **M3:** the CS-specific superpowers land | ✅ | PDF-as-reference, export, graph |
 | **P4** | PDF→Markdown & exercise sheets | **M4:** an exercise sheet becomes a workable note in one step | ✅ | The brief's own flagship; the biggest single time-saver |
-| **P5** | Versioned workspaces (Git automation) | **M5:** my notes commit themselves, in both kinds of repo |  | The next tier of P0's data safety — a commit is a recoverable backup |
+| **P5** | Versioned workspaces (Git automation) | **M5:** my notes commit themselves, in both kinds of repo | ✅ | The next tier of P0's data safety — a commit is a recoverable backup |
 | **P6** | STEM authoring | **M6:** writing maths/algorithms is faster here than anywhere else |  | Compounds on every note; cheap, since the infra exists |
 | **P7** | IDE integration | **M7:** notes and code are one workflow, not two | ✅ | The brief's second pillar — "integrate, don't replace" |
 | **P8** | Embedded terminal | **M8:** `claude` runs against the open note without leaving the app | ✅ | Small effort; delivers the brief's AI ask without AI code |
@@ -521,7 +521,7 @@ The part the brief says "would save students hours every semester."
 
 ---
 
-## Phase 5 — Versioned Workspaces / Git Automation (P5)
+## Phase 5 — Versioned Workspaces / Git Automation (P5) ✅
 
 **Milestone M5:** *My notes commit themselves. A paragraph I deleted yesterday is recoverable, and I never think about it.*
 
@@ -556,7 +556,7 @@ The code-repo case is the dangerous one, and the guardrails below exist because 
 
 *Detection itself never blocks a workspace from opening — a missing* `git` *binary degrades to "no repo detected," not a failed open, matching how the rest of the app treats best-effort detection (P7-4's editor-command probe takes the same posture). Repo mode itself is never persisted: it's re-derived from the disk on every open rather than cached, since a workspace's Git status is a fact that can change between sessions (an existing folder later gets `git init`'d) and staleness there would be a silent correctness bug, not a convenience trade-off.*
 
-### P5-2 — Batched auto-commit — **M**
+### P5-2 — Batched auto-commit — **M** ✅
 
 The core of the phase, and where every safety property lives.
 
@@ -567,7 +567,13 @@ The core of the phase, and where every safety property lives.
 - **Dependency:** P5-1.
 - **DoD:** An editing session produces exactly one commit touching only note paths. **Critically:** in a repo with staged source changes and unstaged source edits, both are still exactly as they were after an auto-commit runs — covered by a test, because this is the property whose violation would be unforgivable.
 
-### P5-3 — Push policy — **S**
+*Done. `checked_auto_commit` (`git.rs`) checks* `unsafe_repo_state` *first — resolving the git dir with one* `rev-parse --absolute-git-dir` *call, then reading detached-HEAD/merge/cherry-pick/rebase off it directly rather than one subprocess spawn per question. Only unresolved conflicts genuinely need git's own index parsing (*`ls-files -u`*). A conflicted merge sets* `MERGE_HEAD` *too, and that check runs first — reported as "a merge is in progress," the more specific and more actionable of the two true reasons; the conflicts-only test had to reach that state through a conflicting* `stash pop` *instead of a merge, precisely because a real merge conflict is never conflicts-without-a-marker.*
+
+*Cadence lives on the frontend, not in* `git.rs`*:* `useGitAutoCommit` *resets a plain* `setTimeout` *(*`git.idleMinutes`*, default 10) on every new path added to a session-scoped* `gitPendingPaths` *list, and also flushes once from* `Layout`*'s close-requested handler so a session shorter than the idle window still commits before the app quits. A non-*`Committed` *outcome (skipped or a failed hook) leaves the batch pending rather than clearing it — the next trigger retries instead of the changes quietly vanishing from the batch.*
+
+***The one unforgivable-failure test caught a real bug in itself.*** *The first version compared the whole-repo* `git diff --name-only` *listing before and after the auto-commit — wrong, because that listing is* **expected** *to shrink once the note's own change is committed. Fixed to scope both the staged and unstaged comparisons to the untouched source file specifically, which is the property the DoD actually asks for.*
+
+### P5-3 — Push policy — **S** ✅
 
 - **Notes-only workspace:** push after commit (configurable, on by default).
 - **Code repo: never auto-push, at any setting.** Notes ride along with your next real push. Auto-pushing into a shared repo can trigger CI and put commits on a branch someone else is working from — outward-facing, hard to undo, and not worth the convenience.
@@ -575,7 +581,9 @@ The core of the phase, and where every safety property lives.
 - **Dependency:** P5-2.
 - **DoD:** No sequence of UI actions causes a push from a code-repo workspace. A notes-only workspace pushes after commit and reports failures visibly rather than silently falling behind.
 
-### P5-4 — Fast-forward-only auto-pull — **M**
+*Done.* `checked_push` *refuses* `RepoMode::CodeRepo` *unconditionally as a Rust-level guard — never called for a code repo today, but the guard exists so a future caller can't push into a shared repo by forgetting to check* `repoMode` *first. The frontend's only call site (*`useGitAutoCommit`*, after a successful commit) is itself gated on* `repoMode === 'notesOnly' && git.autoPush`*, so a code-repo push has two independent places to slip through, not one. No-remote, auth failure and non-fast-forward rejection are surfaced as distinct outcomes off* `git push`*'s stderr; none of the three retries or forces.*
+
+### P5-4 — Fast-forward-only auto-pull — **M** ✅
 
 The laptop→desktop case, and **the most dangerous task on the roadmap** — a bad merge writes `<<<<<<< HEAD` into a `.md`, which the editor will faithfully render as content.
 
@@ -587,14 +595,20 @@ The laptop→desktop case, and **the most dangerous task on the roadmap** — a 
 - **Dependency:** P5-1. Independent of P5-2/P5-3.
 - **DoD:** A laptop→desktop round trip fast-forwards with no prompt and no conflict. A deliberately diverged history produces a prompt and **zero** conflict markers in any `.md`. A dirty buffer survives a pull that would have changed its file.
 
-### P5-5 — Repo creation for a notes-only workspace — **S**
+*Done.* `checked_pull` *fetches, then* `git merge --ff-only @{u}` *does the actual fast-forward — the standard, safe way to move a branch ref without a real merge commit, and it refuses (rather than merging) both when history has genuinely diverged and when a local uncommitted change would be overwritten. Diverged is reported as* `Diverged { ahead, behind }` *with real counts from* `git rev-list --count`*, computed before any merge is attempted.*
+
+***No new file-reload logic was needed****, which was the actual bet this task made: a fast-forward's resulting file burst is an ordinary external change from the app's point of view, and P0-5's watcher plus* `useNote`*'s existing dirty/clean handling already cover it exactly — confirmed rather than assumed, by tracing the same code path P3-4 already traced for a manual* `git pull`*.* `GitDivergedBar` *reuses* `ConflictBar`*'s* `.conflict-bar` *styling rather than inventing a second "you decide, we don't" bar look, and offers no action buttons beyond dismiss — resolving it is explicitly the terminal's (P8) or the user's own Git tool's job.*
+
+### P5-5 — Repo creation for a notes-only workspace — **S** ✅
 
 - A workspace that isn't a repo offers: `git init`, the `.gitignore` P3-4 already documents, and optionally a GitHub remote via `gh repo create`.
 - **Private by default** — lecture notes must not become public by accident.
 - If `gh` is absent, initialize locally and print the exact remote command to run. Never a hard dependency on `gh`.
 - **DoD:** A plain notes folder becomes a private GitHub-backed repo in one action, or degrades to a working local repo with clear next steps when `gh` isn't installed.
 
-**Exit check for M5:** notes commit themselves in both modes; a code repo's staged work, unstaged work, branch and history are provably untouched outside note paths; a laptop→desktop round trip completes without a single conflict marker.
+*Done.* `checked_init_notes_repo` *runs* `git init`*, then writes the README-documented* `.gitignore` *— but never overwrites one that's already there, since the folder being turned into a repo isn't necessarily empty of prior intent.* `gh repo create --private` *is attempted only when the frontend asks for it and* `gh` *is actually on* `PATH`*; any failure past that point — absent, not logged in, offline — falls through to* `InitializedLocalOnly` *carrying the exact* `git remote add origin <url>` *command, surfaced in an alert rather than swallowed.* `gh` *is opt-in machinery, never a hard dependency, exactly as the DoD requires. The Settings-panel action sets* `repoMode` *to* `'notesOnly'` *directly on success instead of re-running detection — which reuses P5-1's existing one-time-prompt wiring in* `Layout` *unchanged, since* `git.prompted` *is still* `false` *for a workspace that didn't exist as a repo a moment ago.*
+
+**Exit check for M5:** notes commit themselves in both modes ✅ — tested: staged and unstaged source changes survive an auto-commit byte-for-byte, and a code-repo workspace cannot push through any UI path. A fast-forward pull writes zero conflict markers; a diverged one stops and reports counts instead of guessing. **M5 reached (2026-08-17).**
 
 ---
 
@@ -880,7 +894,7 @@ P10-* gated behind M9
 | 3 | **P4-3** → **M4** | M | Closes the milestone. Converts the PDF work from an open hunt into a shut phase. |
 | 4 | **Dogfood slice:** P7-3's ignore list → P7-3 → P7-4 + P7-1 together → P8-1 | M/L | ✅ *Milestone reached: this project's own* `docs/` *lives in null-notes and gets edited there.* |
 | 5 | ~~Re-derive P5, P6 and P9 from real use~~ | — | ✅❌ *Superseded 2026-08-17 (§1) — the wait never resolves because daily use isn't the mode the maintainer is in. Dropped rather than left open forever.* |
-| 6 | **P5 → P6 → P9**, in that order | — | ← Reverts to the pre-dogfood priority order (below), the roadmap's best estimate. P6 carries a scope caveat — see the note under its own TODO.md section — worth a glance before deep-planning it, but not a blocking wait. |
+| 6 | ~~**P5**~~ → **P6 → P9**, in that order | — | ✅ *P5 done, M5 reached 2026-08-17.* ← Reverts to the pre-dogfood priority order (below), the roadmap's best estimate. P6 carries a scope caveat — see the note under its own TODO.md section — worth a glance before deep-planning it, but not a blocking wait. |
 
 *Superseded order, now back in force for step 6: P4-1 → P4-2 → P4-3 → **M4** → P5-* → **M5** → P6-\* → **M6** → P7-1 + P7-4 → P7-2 → P7-3 → **M7** → P8-1 → **M8** → P9-\* → **M9** → P10.* *(P7 and P8 are already done, out of their slot in this list — the dogfood reordering pulled them forward and that part stands; only the P5/P6/P9 wait is reverted.)*
 
