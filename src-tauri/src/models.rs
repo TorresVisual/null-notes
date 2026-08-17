@@ -93,6 +93,11 @@ pub struct AppSettings {
     /// anything.
     #[serde(default)]
     pub editor_command: String,
+    /// The shell a terminal pane spawns, e.g. `powershell` or `wsl -d Ubuntu`.
+    /// Tokenized the same way as `editor_command`, run without a shell — see
+    /// `commands::terminal`. Empty means "detect on next load."
+    #[serde(default)]
+    pub terminal_shell: String,
 }
 
 fn default_spellcheck_language() -> String {
@@ -108,6 +113,7 @@ impl Default for AppSettings {
             spellcheck_language: default_spellcheck_language(),
             pdf_import_mode: PdfImportMode::Pages,
             editor_command: String::new(),
+            terminal_shell: String::new(),
         }
     }
 }

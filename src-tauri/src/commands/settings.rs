@@ -17,6 +17,9 @@ async fn load_settings_from_dir(dir: &Path) -> anyhow::Result<AppSettings> {
     if settings.editor_command.trim().is_empty() {
         settings.editor_command = super::editor_launch::detect_editor_command();
     }
+    if settings.terminal_shell.trim().is_empty() {
+        settings.terminal_shell = super::terminal::detect_terminal_shell();
+    }
     Ok(settings)
 }
 
@@ -62,6 +65,7 @@ mod tests {
             spellcheck_language: "en".to_string(),
             pdf_import_mode: crate::models::PdfImportMode::Markdown,
             editor_command: "nvim +{line} {file}".to_string(),
+            terminal_shell: "wsl -d Ubuntu".to_string(),
         };
         save_settings_to_dir(dir.path(), &original).await.unwrap();
         let loaded = load_settings_from_dir(dir.path()).await.unwrap();
@@ -71,6 +75,7 @@ mod tests {
         assert_eq!(loaded.spellcheck_language, "en");
         assert_eq!(loaded.editor_command, "nvim +{line} {file}");
         assert_eq!(loaded.pdf_import_mode, crate::models::PdfImportMode::Markdown);
+        assert_eq!(loaded.terminal_shell, "wsl -d Ubuntu");
     }
 
     // Detection fills the editor command only when there is nothing to keep.
@@ -101,6 +106,35 @@ mod tests {
         let loaded = load_settings_from_dir(dir.path()).await.unwrap();
 
         assert!(loaded.editor_command.contains("{file}"), "got {:?}", loaded.editor_command);
+    }
+
+    #[tokio::test]
+    async fn test_an_empty_terminal_shell_is_filled_in_on_load() {
+        let dir = tempdir().unwrap();
+        tokio::fs::write(
+            dir.path().join(SETTINGS_FILE),
+            r#"{"autosaveDebounceMs":600,"editorMaxWidthPx":800}"#,
+        )
+        .await
+        .unwrap();
+
+        let loaded = load_settings_from_dir(dir.path()).await.unwrap();
+
+        assert!(!loaded.terminal_shell.trim().is_empty(), "got {:?}", loaded.terminal_shell);
+    }
+
+    // A shell the user typed is never replaced by detection, same guarantee
+    // P7-4 gives editor_command.
+    #[tokio::test]
+    async fn test_a_configured_terminal_shell_survives_detection() {
+        let dir = tempdir().unwrap();
+        let mut settings = AppSettings::default();
+        settings.terminal_shell = "wsl -d Ubuntu".to_string();
+        save_settings_to_dir(dir.path(), &settings).await.unwrap();
+
+        let loaded = load_settings_from_dir(dir.path()).await.unwrap();
+
+        assert_eq!(loaded.terminal_shell, "wsl -d Ubuntu");
     }
 
     // A settings.json written before spellcheck existed must still load, or
