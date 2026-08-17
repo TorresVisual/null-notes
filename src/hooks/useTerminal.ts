@@ -1,0 +1,74 @@
+import { useEffect, useRef } from 'react'
+import type { RefObject } from 'react'
+import { Terminal } from '@xterm/xterm'
+import { FitAddon } from '@xterm/addon-fit'
+import { listen } from '@tauri-apps/api/event'
+import { api } from '../lib/tauri'
+
+// PTY output crosses the IPC boundary as base64 (see commands/terminal.rs) —
+// bytes, not a decoded string, so a multi-byte character split across two
+// reads is xterm's own parser's problem to reassemble, not this hook's.
+function decodeChunk(base64: string): Uint8Array {
+  const binary = atob(base64)
+  const bytes = new Uint8Array(binary.length)
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+  return bytes
+}
+
+export function useTerminal(
+  containerRef: RefObject<HTMLDivElement | null>,
+  workspace: string,
+  notePath: string | null,
+  shell: string,
+) {
+  const termRef = useRef<Terminal | null>(null)
+
+  useEffect(() => {
+    const container = containerRef.current
+    if (!container) return
+
+    const term = new Terminal({ convertEol: true, fontSize: 13 })
+    const fit = new FitAddon()
+    term.loadAddon(fit)
+    term.open(container)
+    fit.fit()
+    termRef.current = term
+
+    void api.terminal.open(workspace, notePath, shell)
+    void api.terminal.resize(term.cols, term.rows)
+
+    const dataSub = term.onData((data) => void api.terminal.write(data))
+    const outputUnlisten = listen<string>('terminal-output', (event) => {
+      term.write(decodeChunk(event.payload))
+    })
+
+    const resizeObserver = new ResizeObserver(() => {
+      fit.fit()
+      void api.terminal.resize(term.cols, term.rows)
+    })
+    resizeObserver.observe(container)
+
+    return () => {
+      dataSub.dispose()
+      void outputUnlisten.then((off) => off())
+      resizeObserver.disconnect()
+      term.dispose()
+      termRef.current = null
+    }
+    // Deliberately empty: this effect spawns the session once on mount
+    // (TerminalPane lazy-mounts exactly once — see its own comment) and never
+    // re-runs for a workspace/note/shell change, matching the design's
+    // "switching workspaces doesn't respawn a running terminal" decision.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  function insertText(text: string) {
+    void api.terminal.write(text)
+  }
+
+  async function kill() {
+    await api.terminal.close()
+  }
+
+  return { insertText, kill }
+}
