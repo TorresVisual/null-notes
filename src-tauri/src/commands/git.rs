@@ -220,6 +220,53 @@ pub async fn auto_commit(
         .map_err(|e| e.to_string())
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+pub enum PushOutcome {
+    Pushed,
+    NoRemote,
+    AuthFailed { output: String },
+    Rejected { output: String },
+}
+
+fn has_remote(workspace: &str) -> anyhow::Result<bool> {
+    let output = Command::new("git").arg("-C").arg(workspace).arg("remote").output()?;
+    Ok(!String::from_utf8_lossy(&output.stdout).trim().is_empty())
+}
+
+/// Never called for `RepoMode::CodeRepo` from the frontend, but the guard
+/// lives here too — structural, not only a UI-layer check (P5-3).
+pub fn checked_push(workspace: &str, mode: RepoMode) -> anyhow::Result<PushOutcome> {
+    if mode == RepoMode::CodeRepo {
+        anyhow::bail!("refusing to push a CodeRepo workspace — P5-3 forbids it unconditionally");
+    }
+    if !has_remote(workspace)? {
+        return Ok(PushOutcome::NoRemote);
+    }
+
+    let output = Command::new("git").arg("-C").arg(workspace).arg("push").output()?;
+    if output.status.success() {
+        return Ok(PushOutcome::Pushed);
+    }
+
+    let stderr = String::from_utf8_lossy(&output.stderr).into_owned();
+    if stderr.contains("Authentication failed") || stderr.contains("Permission denied") {
+        Ok(PushOutcome::AuthFailed { output: stderr })
+    } else {
+        // Non-fast-forward and everything else — surfaced, never retried,
+        // never forced.
+        Ok(PushOutcome::Rejected { output: stderr })
+    }
+}
+
+#[tauri::command]
+pub async fn push_notes(workspace: String, mode: RepoMode) -> Result<PushOutcome, String> {
+    tokio::task::spawn_blocking(move || checked_push(&workspace, mode))
+        .await
+        .map_err(|e| e.to_string())?
+        .map_err(|e| e.to_string())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -522,5 +569,66 @@ mod tests {
         ).unwrap();
 
         assert_eq!(outcome, CommitOutcome::Skipped { reason: "a rebase is in progress".to_string() });
+    }
+
+    // A bare "remote" plus one clone that already has commits pushed to it —
+    // the shared fixture every push/pull test in this file builds on.
+    fn bare_remote_with_clone() -> (tempfile::TempDir, tempfile::TempDir) {
+        let remote = tempdir().unwrap();
+        Command::new("git").arg("init").arg("--bare").arg("-q").arg(remote.path()).status().unwrap();
+
+        let clone = tempdir().unwrap();
+        Command::new("git")
+            .arg("clone").arg("-q").arg(remote.path()).arg(clone.path())
+            .status().unwrap();
+        commit_file(clone.path(), "note.md", "# Note\n");
+        Command::new("git").arg("-C").arg(clone.path()).arg("push").arg("-q").arg("origin").arg("HEAD").status().unwrap();
+
+        (remote, clone)
+    }
+
+    #[test]
+    fn pushes_a_notes_only_workspace_with_a_remote() {
+        let (_remote, clone) = bare_remote_with_clone();
+        commit_file(clone.path(), "note2.md", "# Note 2\n");
+
+        let outcome = checked_push(&clone.path().to_string_lossy(), RepoMode::NotesOnly).unwrap();
+
+        assert_eq!(outcome, PushOutcome::Pushed);
+    }
+
+    #[test]
+    fn no_remote_is_reported_not_errored() {
+        let tmp = tempdir().unwrap();
+        git_init(tmp.path());
+        commit_file(tmp.path(), "note.md", "# Note\n");
+
+        let outcome = checked_push(&tmp.path().to_string_lossy(), RepoMode::NotesOnly).unwrap();
+
+        assert_eq!(outcome, PushOutcome::NoRemote);
+    }
+
+    #[test]
+    fn a_non_fast_forward_push_is_rejected_not_forced() {
+        let (remote, clone_a) = bare_remote_with_clone();
+        let clone_b = tempdir().unwrap();
+        Command::new("git").arg("clone").arg("-q").arg(remote.path()).arg(clone_b.path()).status().unwrap();
+
+        commit_file(clone_a.path(), "a.md", "from a\n");
+        Command::new("git").arg("-C").arg(clone_a.path()).arg("push").arg("-q").arg("origin").arg("HEAD").status().unwrap();
+
+        commit_file(clone_b.path(), "b.md", "from b\n");
+        let outcome = checked_push(&clone_b.path().to_string_lossy(), RepoMode::NotesOnly).unwrap();
+
+        assert!(matches!(outcome, PushOutcome::Rejected { .. }));
+    }
+
+    #[test]
+    fn a_code_repo_workspace_is_refused_unconditionally() {
+        let (_remote, clone) = bare_remote_with_clone();
+
+        let result = checked_push(&clone.path().to_string_lossy(), RepoMode::CodeRepo);
+
+        assert!(result.is_err());
     }
 }
