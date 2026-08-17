@@ -14,6 +14,8 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
   const setSettings = useSettingsStore((s) => s.setSettings)
   const repoMode = useWorkspaceStore((s) => s.repoMode)
   const gitAutoCommit = useWorkspaceStore((s) => s.git.autoCommit)
+  const gitIdleMinutes = useWorkspaceStore((s) => s.git.idleMinutes)
+  const gitSkipHooks = useWorkspaceStore((s) => s.git.skipHooks)
   const { updateGit } = useGitConfig()
   const [error, setError] = useState<string | null>(null)
 
@@ -161,6 +163,44 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
               />
             </span>
           </label>
+        )}
+
+        {repoMode && gitAutoCommit && (
+          <>
+            <label className="settings-row">
+              <span>
+                Auto-commit idle window
+                <small>Minutes of no note activity before a pending batch is committed.</small>
+              </span>
+              <span className="settings-row-control">
+                <input
+                  type="number"
+                  min={1}
+                  max={120}
+                  value={gitIdleMinutes}
+                  onChange={(e) => void updateGit({ idleMinutes: Number(e.target.value) })}
+                />
+                <span className="settings-unit">min</span>
+              </span>
+            </label>
+
+            <label className="settings-row">
+              <span>
+                Skip commit hooks
+                <small>
+                  Run without <code>pre-commit</code>/<code>commit-msg</code> hooks. Off by default — a
+                  failing hook aborts the auto-commit instead.
+                </small>
+              </span>
+              <span className="settings-row-control">
+                <input
+                  type="checkbox"
+                  checked={gitSkipHooks}
+                  onChange={(e) => void updateGit({ skipHooks: e.target.checked })}
+                />
+              </span>
+            </label>
+          </>
         )}
 
         {error && <p className="settings-error">{error}</p>}

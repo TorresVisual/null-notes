@@ -55,6 +55,7 @@ export function Layout() {
   const { flushGitCommit } = useGitAutoCommit()
   const repoMode = useWorkspaceStore((s) => s.repoMode)
   const gitPrompted = useWorkspaceStore((s) => s.git.prompted)
+  const gitCommitStatus = useWorkspaceStore((s) => s.gitCommitStatus)
   useExternalChanges()
   const createNote = useCreateNote()
   const createFolder = useCreateFolder()
@@ -228,6 +229,7 @@ export function Layout() {
           saveError={saveError}
           onRetrySave={() => void retrySave()}
           onDismissSaveError={dismissError}
+          gitCommitStatus={gitCommitStatus}
         />
         {conflict && <ConflictBar onKeepMine={keepMine} onReloadTheirs={reloadTheirs} />}
         {repoMode && !gitPrompted && (

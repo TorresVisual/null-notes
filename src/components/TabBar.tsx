@@ -1,7 +1,9 @@
 import { X } from 'lucide-react'
 import { useWorkspaceStore } from '../store/workspace'
 import { SaveStatus } from './SaveStatus'
+import { GitCommitStatus } from './GitCommitStatus'
 import type { SaveState } from '../hooks/useNote'
+import type { GitCommitStatus as GitStatus } from '../types'
 
 interface TabBarProps {
   viewMode: 'wysiwyg' | 'raw'
@@ -10,6 +12,7 @@ interface TabBarProps {
   saveError: string | null
   onRetrySave: () => void
   onDismissSaveError: () => void
+  gitCommitStatus: GitStatus
 }
 
 export function TabBar({
@@ -19,6 +22,7 @@ export function TabBar({
   saveError,
   onRetrySave,
   onDismissSaveError,
+  gitCommitStatus,
 }: TabBarProps) {
   const { openTabs, activeTab, setActiveTab, closeTab } = useWorkspaceStore()
   if (openTabs.length === 0) return null
@@ -49,6 +53,7 @@ export function TabBar({
             onRetry={onRetrySave}
             onDismiss={onDismissSaveError}
           />
+          <GitCommitStatus status={gitCommitStatus} />
           <button
             className={`view-toggle${viewMode === 'raw' ? ' active' : ''}`}
             onClick={onToggleView}

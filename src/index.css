@@ -606,6 +606,18 @@ body {
 
 .save-status button:hover { color: var(--text-primary); }
 
+.git-commit-status {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: 0 var(--space-md);
+  font-size: 12px;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.git-commit-status.error { color: var(--danger); }
+
 /* External-change conflict prompt — never resolves itself */
 .conflict-bar, .git-prompt {
   display: flex;
