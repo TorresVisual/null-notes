@@ -23,7 +23,7 @@ const emptySession: WorkspaceState = {
   openTabs: [],
   activeTab: null,
   expandedFolders: [],
-  git: { prompted: false, autoCommit: false },
+  git: { prompted: false, autoCommit: false, idleMinutes: 10, skipHooks: false, autoPush: true },
 }
 
 describe('useWorkspace', () => {
@@ -34,7 +34,7 @@ describe('useWorkspace', () => {
       activeTab: null,
       expandedFolders: [],
       repoMode: null,
-      git: { prompted: false, autoCommit: false },
+      git: { prompted: false, autoCommit: false, idleMinutes: 10, skipHooks: false, autoPush: true },
     })
     useNotesStore.setState({ notes: [], folders: [], tags: [] })
     notes.scan.mockResolvedValue(emptyTree)
@@ -51,12 +51,12 @@ describe('useWorkspace', () => {
   })
 
   it('loads the persisted git config into the store', async () => {
-    workspace.load.mockResolvedValue({ ...emptySession, git: { prompted: true, autoCommit: true } })
+    workspace.load.mockResolvedValue({ ...emptySession, git: { prompted: true, autoCommit: true, idleMinutes: 10, skipHooks: false, autoPush: true } })
     const { result } = renderHook(() => useWorkspace())
 
     await result.current.openWorkspaceAt('/ws')
 
-    expect(useWorkspaceStore.getState().git).toEqual({ prompted: true, autoCommit: true })
+    expect(useWorkspaceStore.getState().git).toEqual({ prompted: true, autoCommit: true, idleMinutes: 10, skipHooks: false, autoPush: true })
   })
 
   it('detects the repo mode after opening and stores it', async () => {
@@ -91,14 +91,14 @@ describe('useWorkspace', () => {
   })
 
   it('saveSession persists the current git config alongside the rest of the session', async () => {
-    useWorkspaceStore.setState({ path: '/ws', git: { prompted: true, autoCommit: false } })
+    useWorkspaceStore.setState({ path: '/ws', git: { prompted: true, autoCommit: false, idleMinutes: 10, skipHooks: false, autoPush: true } })
     const { result } = renderHook(() => useWorkspace())
 
     await result.current.saveSession()
 
     expect(workspace.save).toHaveBeenCalledWith(
       '/ws',
-      expect.objectContaining({ git: { prompted: true, autoCommit: false } }),
+      expect.objectContaining({ git: { prompted: true, autoCommit: false, idleMinutes: 10, skipHooks: false, autoPush: true } }),
     )
   })
 })

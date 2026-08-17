@@ -13,7 +13,7 @@ const reset = () =>
     tagFilter: null,
     recentWorkspaces: [],
     repoMode: null,
-    git: { prompted: false, autoCommit: false },
+    git: { prompted: false, autoCommit: false, idleMinutes: 10, skipHooks: false, autoPush: true },
   })
 
 describe('useWorkspaceStore', () => {
@@ -137,17 +137,23 @@ describe('useWorkspaceStore', () => {
   })
 
   it('sets the per-workspace git config', () => {
-    useWorkspaceStore.getState().setGit({ prompted: true, autoCommit: true })
-    expect(useWorkspaceStore.getState().git).toEqual({ prompted: true, autoCommit: true })
+    useWorkspaceStore.getState().setGit({ prompted: true, autoCommit: true, idleMinutes: 10, skipHooks: false, autoPush: true })
+    expect(useWorkspaceStore.getState().git).toEqual({ prompted: true, autoCommit: true, idleMinutes: 10, skipHooks: false, autoPush: true })
   })
 
   it('resetForNewWorkspace clears the repo mode and git config back to their defaults', () => {
     useWorkspaceStore.getState().setRepoMode('codeRepo')
-    useWorkspaceStore.getState().setGit({ prompted: true, autoCommit: true })
+    useWorkspaceStore.getState().setGit({ prompted: true, autoCommit: true, idleMinutes: 10, skipHooks: false, autoPush: true })
 
     useWorkspaceStore.getState().resetForNewWorkspace()
 
     expect(useWorkspaceStore.getState().repoMode).toBeNull()
-    expect(useWorkspaceStore.getState().git).toEqual({ prompted: false, autoCommit: false })
+    expect(useWorkspaceStore.getState().git).toEqual({
+      prompted: false,
+      autoCommit: false,
+      idleMinutes: 10,
+      skipHooks: false,
+      autoPush: true,
+    })
   })
 })

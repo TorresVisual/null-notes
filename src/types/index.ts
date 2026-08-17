@@ -21,6 +21,12 @@ export interface GitWorkspaceConfig {
   /** Whether the one-time "enable auto-commit?" prompt has been answered. */
   prompted: boolean
   autoCommit: boolean
+  /** Minutes of no note activity before a pending batch is committed. */
+  idleMinutes: number
+  /** Per-workspace opt-out of running commit hooks on an auto-commit. */
+  skipHooks: boolean
+  /** Push after each auto-commit — only consulted when repoMode is 'notesOnly'. */
+  autoPush: boolean
 }
 
 export interface WorkspaceState {

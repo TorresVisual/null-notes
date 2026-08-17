@@ -17,7 +17,7 @@ describe('useGitConfig', () => {
       openTabs: ['/ws/a.md'],
       activeTab: '/ws/a.md',
       expandedFolders: [],
-      git: { prompted: false, autoCommit: false },
+      git: { prompted: false, autoCommit: false, idleMinutes: 10, skipHooks: false, autoPush: true },
     })
     workspace.save.mockResolvedValue(undefined)
   })
@@ -31,24 +31,38 @@ describe('useGitConfig', () => {
 
     await result.current.updateGit({ prompted: true, autoCommit: true })
 
-    expect(useWorkspaceStore.getState().git).toEqual({ prompted: true, autoCommit: true })
+    expect(useWorkspaceStore.getState().git).toEqual({
+      prompted: true,
+      autoCommit: true,
+      idleMinutes: 10,
+      skipHooks: false,
+      autoPush: true,
+    })
     expect(workspace.save).toHaveBeenCalledWith('/ws', {
       openTabs: ['/ws/a.md'],
       activeTab: '/ws/a.md',
       expandedFolders: [],
-      git: { prompted: true, autoCommit: true },
+      git: { prompted: true, autoCommit: true, idleMinutes: 10, skipHooks: false, autoPush: true },
     })
   })
 
   // "Not now" only sets `prompted` — declining must not silently also flip
   // auto-commit on, which a naive full-object replace could do by accident.
   it('a partial patch leaves the other field untouched', async () => {
-    useWorkspaceStore.setState({ git: { prompted: false, autoCommit: true } })
+    useWorkspaceStore.setState({
+      git: { prompted: false, autoCommit: true, idleMinutes: 10, skipHooks: false, autoPush: true },
+    })
     const { result } = renderHook(() => useGitConfig())
 
     await result.current.updateGit({ prompted: true })
 
-    expect(useWorkspaceStore.getState().git).toEqual({ prompted: true, autoCommit: true })
+    expect(useWorkspaceStore.getState().git).toEqual({
+      prompted: true,
+      autoCommit: true,
+      idleMinutes: 10,
+      skipHooks: false,
+      autoPush: true,
+    })
   })
 
   it('does nothing without an open workspace', async () => {

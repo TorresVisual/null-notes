@@ -39,7 +39,7 @@ pub struct WorkspaceState {
 /// it has already been asked. Never populated by detection alone — detecting
 /// a repo answers "which mode," not "should we act," and P5-1's guarantee is
 /// that no Git command runs until a human has said yes here.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct GitWorkspaceConfig {
     /// True once the one-time "enable auto-commit?" prompt has been answered,
@@ -49,6 +49,41 @@ pub struct GitWorkspaceConfig {
     pub prompted: bool,
     #[serde(default)]
     pub auto_commit: bool,
+    /// Minutes of no new note activity before a pending batch is committed.
+    /// Deliberately coarse — far coarser than the 600ms save / 2.5s reindex
+    /// debounces (P5-2).
+    #[serde(default = "default_idle_minutes")]
+    pub idle_minutes: u32,
+    /// Per-workspace opt-out of running commit hooks on an auto-commit.
+    /// Off by default — silently skipping hooks on someone's behalf is
+    /// exactly the decision P5-2 refuses to make for them.
+    #[serde(default)]
+    pub skip_hooks: bool,
+    /// Push after each auto-commit. Only ever consulted for a
+    /// `RepoMode::NotesOnly` workspace — a `CodeRepo` workspace never
+    /// pushes, at any setting (P5-3, enforced in `git.rs` itself).
+    #[serde(default = "default_auto_push")]
+    pub auto_push: bool,
+}
+
+fn default_idle_minutes() -> u32 {
+    10
+}
+
+fn default_auto_push() -> bool {
+    true
+}
+
+impl Default for GitWorkspaceConfig {
+    fn default() -> Self {
+        Self {
+            prompted: false,
+            auto_commit: false,
+            idle_minutes: default_idle_minutes(),
+            skip_hooks: false,
+            auto_push: default_auto_push(),
+        }
+    }
 }
 
 /// Which of P5's two Git modes a workspace is in, or absent when it isn't a

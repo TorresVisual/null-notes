@@ -2,7 +2,13 @@ import { create } from 'zustand'
 import { isUnderPath, replacePathPrefix } from '../lib/pathPrefix'
 import type { GitWorkspaceConfig, RepoMode } from '../types'
 
-const DEFAULT_GIT_CONFIG: GitWorkspaceConfig = { prompted: false, autoCommit: false }
+const DEFAULT_GIT_CONFIG: GitWorkspaceConfig = {
+  prompted: false,
+  autoCommit: false,
+  idleMinutes: 10,
+  skipHooks: false,
+  autoPush: true,
+}
 
 interface FolderContextMenuState {
   path: string

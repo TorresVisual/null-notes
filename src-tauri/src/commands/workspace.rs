@@ -192,7 +192,7 @@ mod tests {
         let dir = tempdir().unwrap();
         let path = dir.path().to_string_lossy().into_owned();
         let original = WorkspaceState {
-            git: GitWorkspaceConfig { prompted: true, auto_commit: true },
+            git: GitWorkspaceConfig { prompted: true, auto_commit: true, ..Default::default() },
             ..Default::default()
         };
 
@@ -201,5 +201,29 @@ mod tests {
 
         assert!(loaded.git.prompted);
         assert!(loaded.git.auto_commit);
+    }
+
+    // idle_minutes/skip_hooks/auto_push are P5-2/P5-3 fields, added after
+    // prompted/auto_commit shipped — a file written by that earlier build
+    // has none of them and must still load with sane defaults, not zeros.
+    #[tokio::test]
+    async fn test_load_legacy_file_without_p5_2_git_fields() {
+        let dir = tempdir().unwrap();
+        tokio::fs::write(
+            dir.path().join(".workspace.json"),
+            r#"{"openTabs":[],"activeTab":null,"git":{"prompted":true,"autoCommit":true}}"#,
+        )
+        .await
+        .unwrap();
+
+        let state = load_workspace_from_dir(&dir.path().to_string_lossy())
+            .await
+            .unwrap();
+
+        assert!(state.git.prompted);
+        assert!(state.git.auto_commit);
+        assert_eq!(state.git.idle_minutes, 10);
+        assert!(!state.git.skip_hooks);
+        assert!(state.git.auto_push);
     }
 }
