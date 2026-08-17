@@ -267,6 +267,71 @@ pub async fn push_notes(workspace: String, mode: RepoMode) -> Result<PushOutcome
         .map_err(|e| e.to_string())
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+pub enum PullOutcome {
+    UpToDate,
+    FastForwarded,
+    Diverged { ahead: u32, behind: u32 },
+    NoRemote,
+}
+
+fn count_commits(workspace: &str, range: &str) -> anyhow::Result<u32> {
+    let output = Command::new("git")
+        .arg("-C").arg(workspace)
+        .arg("rev-list").arg("--count").arg(range)
+        .output()?;
+    if !output.status.success() {
+        anyhow::bail!("git rev-list --count {range} failed for {workspace}");
+    }
+    Ok(String::from_utf8_lossy(&output.stdout).trim().parse()?)
+}
+
+/// Fetches, then either fast-forwards silently or reports a divergence —
+/// never a real merge, never a rebase, never `reset --hard`. The resulting
+/// file changes (on a fast-forward) are an ordinary external edit from the
+/// app's point of view; P0-5's watcher and `useNote`'s existing
+/// dirty/conflict handling pick them up with no new logic needed here.
+pub fn checked_pull(workspace: &str) -> anyhow::Result<PullOutcome> {
+    if !has_remote(workspace)? {
+        return Ok(PullOutcome::NoRemote);
+    }
+
+    let fetch_status = Command::new("git").arg("-C").arg(workspace).arg("fetch").status()?;
+    if !fetch_status.success() {
+        anyhow::bail!("git fetch failed for {workspace}");
+    }
+
+    let ahead = count_commits(workspace, "@{u}..HEAD")?;
+    let behind = count_commits(workspace, "HEAD..@{u}")?;
+
+    if behind == 0 {
+        return Ok(PullOutcome::UpToDate);
+    }
+    if ahead > 0 {
+        return Ok(PullOutcome::Diverged { ahead, behind });
+    }
+
+    // `--ff-only`: moves the branch ref if and only if it's a pure
+    // fast-forward, and refuses (rather than merging) if a local
+    // uncommitted change would be overwritten.
+    let merge_status = Command::new("git")
+        .arg("-C").arg(workspace).arg("merge").arg("--ff-only").arg("@{u}")
+        .status()?;
+    if !merge_status.success() {
+        anyhow::bail!("fast-forward merge unexpectedly failed for {workspace}");
+    }
+    Ok(PullOutcome::FastForwarded)
+}
+
+#[tauri::command]
+pub async fn fetch_and_compare(workspace: String) -> Result<PullOutcome, String> {
+    tokio::task::spawn_blocking(move || checked_pull(&workspace))
+        .await
+        .map_err(|e| e.to_string())?
+        .map_err(|e| e.to_string())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -630,5 +695,58 @@ mod tests {
         let result = checked_push(&clone.path().to_string_lossy(), RepoMode::CodeRepo);
 
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn fast_forwards_when_purely_behind() {
+        let (remote, clone_a) = bare_remote_with_clone();
+        let clone_b = tempdir().unwrap();
+        Command::new("git").arg("clone").arg("-q").arg(remote.path()).arg(clone_b.path()).status().unwrap();
+
+        commit_file(clone_a.path(), "a.md", "from a\n");
+        Command::new("git").arg("-C").arg(clone_a.path()).arg("push").arg("-q").arg("origin").arg("HEAD").status().unwrap();
+
+        let outcome = checked_pull(&clone_b.path().to_string_lossy()).unwrap();
+
+        assert_eq!(outcome, PullOutcome::FastForwarded);
+        assert!(clone_b.path().join("a.md").exists());
+    }
+
+    #[test]
+    fn up_to_date_when_nothing_changed() {
+        let (_remote, clone) = bare_remote_with_clone();
+
+        let outcome = checked_pull(&clone.path().to_string_lossy()).unwrap();
+
+        assert_eq!(outcome, PullOutcome::UpToDate);
+    }
+
+    #[test]
+    fn diverged_reports_counts_and_writes_no_conflict_marker() {
+        let (remote, clone_a) = bare_remote_with_clone();
+        let clone_b = tempdir().unwrap();
+        Command::new("git").arg("clone").arg("-q").arg(remote.path()).arg(clone_b.path()).status().unwrap();
+
+        commit_file(clone_a.path(), "a.md", "from a\n");
+        Command::new("git").arg("-C").arg(clone_a.path()).arg("push").arg("-q").arg("origin").arg("HEAD").status().unwrap();
+        commit_file(clone_b.path(), "b.md", "from b, unpushed\n");
+
+        let outcome = checked_pull(&clone_b.path().to_string_lossy()).unwrap();
+
+        assert_eq!(outcome, PullOutcome::Diverged { ahead: 1, behind: 1 });
+        // The whole point of ff-only: a diverged pull must never touch any
+        // file's content, so there is nothing to search for a marker in.
+        assert!(!clone_b.path().join("a.md").exists());
+    }
+
+    #[test]
+    fn no_remote_is_reported_not_errored_on_pull() {
+        let tmp = tempdir().unwrap();
+        git_init(tmp.path());
+        commit_file(tmp.path(), "note.md", "# Note\n");
+
+        let outcome = checked_pull(&tmp.path().to_string_lossy()).unwrap();
+
+        assert_eq!(outcome, PullOutcome::NoRemote);
     }
 }
