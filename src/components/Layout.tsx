@@ -26,6 +26,7 @@ import { useCreateCanvasNote } from '../hooks/useCreateCanvasNote'
 import { useScrollRestoration } from '../hooks/useScrollRestoration'
 import { ConflictBar } from './ConflictBar'
 import { GitAutoCommitPrompt } from './GitAutoCommitPrompt'
+import { GitDivergedBar } from './GitDivergedBar'
 import { useGitConfig } from '../hooks/useGitConfig'
 import { useGitAutoCommit } from '../hooks/useGitAutoCommit'
 import { api } from '../lib/tauri'
@@ -56,6 +57,7 @@ export function Layout() {
   const repoMode = useWorkspaceStore((s) => s.repoMode)
   const gitPrompted = useWorkspaceStore((s) => s.git.prompted)
   const gitCommitStatus = useWorkspaceStore((s) => s.gitCommitStatus)
+  const gitDiverged = useWorkspaceStore((s) => s.gitDiverged)
   useExternalChanges()
   const createNote = useCreateNote()
   const createFolder = useCreateFolder()
@@ -232,6 +234,13 @@ export function Layout() {
           gitCommitStatus={gitCommitStatus}
         />
         {conflict && <ConflictBar onKeepMine={keepMine} onReloadTheirs={reloadTheirs} />}
+        {gitDiverged && (
+          <GitDivergedBar
+            ahead={gitDiverged.ahead}
+            behind={gitDiverged.behind}
+            onDismiss={() => useWorkspaceStore.getState().setGitDiverged(null)}
+          />
+        )}
         {repoMode && !gitPrompted && (
           <GitAutoCommitPrompt
             mode={repoMode}
