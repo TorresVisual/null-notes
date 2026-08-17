@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { X } from 'lucide-react'
+import { confirm, message } from '@tauri-apps/plugin-dialog'
 import { useSettingsStore, DEFAULT_SETTINGS } from '../store/settings'
 import { useWorkspaceStore } from '../store/workspace'
 import { useGitConfig } from '../hooks/useGitConfig'
@@ -157,14 +158,15 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
             </span>
             <button
               onClick={() => {
-                if (!confirm(`Initialize a Git repository in ${workspacePath}?`)) return
                 void (async () => {
-                  const wantsRemote = confirm(
+                  const proceed = await confirm(`Initialize a Git repository in ${workspacePath}?`)
+                  if (!proceed) return
+                  const wantsRemote = await confirm(
                     'Also create a private GitHub remote via `gh`? (Cancel = local-only)',
                   )
                   const outcome = await api.git.initNotesRepo(workspacePath, wantsRemote)
                   if (outcome.kind === 'initializedLocalOnly') {
-                    alert(`Repo created locally. To add a remote later:\n${outcome.remoteAddCommand}`)
+                    await message(`Repo created locally. To add a remote later:\n${outcome.remoteAddCommand}`)
                   }
                   useWorkspaceStore.getState().setRepoMode('notesOnly')
                 })()
