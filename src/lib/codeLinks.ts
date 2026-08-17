@@ -54,3 +54,30 @@ function stripSuffix(match: string): string {
   const colon = match.search(/:\d+/)
   return colon === -1 ? match : match.slice(0, colon)
 }
+
+// A line-comment marker in one of the languages this app's syntax highlighter
+// actually covers, followed by the space a human types after one. Stripped
+// before matching so `// src/main.rs` and `# scripts/build.py` both read as
+// the bare path underneath — the same shape a plain `src/main.rs` line does.
+const COMMENT_PREFIX = /^[ \t]*(?:\/\/|#|--|;|%)[ \t]*/
+
+/**
+ * The source path a code block's first line names, or null.
+ *
+ * A code block "carrying a source path" (P7-2) means its first line *is*
+ * that path, comment marker optional — `// src/main.rs` above a pasted
+ * function is already how this gets written by hand. Deliberately reuses
+ * `findCodeLinks` rather than a second pattern: a path mid-sentence
+ * ("see src/main.rs for details") is prose, not an annotation, so the whole
+ * stripped line has to be nothing but the match.
+ */
+export function codeBlockSourcePath(firstLine: string): CodeLink | null {
+  const stripped = firstLine.replace(COMMENT_PREFIX, '').trim()
+  if (!stripped) return null
+
+  const [link, second] = findCodeLinks(stripped)
+  if (!link || second) return null
+  if (stripped.slice(link.from, link.to) !== stripped) return null
+
+  return link
+}

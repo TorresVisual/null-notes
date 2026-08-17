@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { findCodeLinks } from './codeLinks'
+import { findCodeLinks, codeBlockSourcePath } from './codeLinks'
 
 function targets(text: string): string[] {
   return findCodeLinks(text).map((l) => l.target)
@@ -83,5 +83,48 @@ describe('findCodeLinks', () => {
 
   it('finds nothing in ordinary prose', () => {
     expect(targets('This paragraph names no files at all.')).toEqual([])
+  })
+})
+
+describe('codeBlockSourcePath', () => {
+  it('reads a bare path with no comment marker', () => {
+    const link = codeBlockSourcePath('src/main.rs')
+
+    expect(link?.target).toBe('src/main.rs')
+    expect(link?.line).toBeNull()
+  })
+
+  it('strips a line-comment marker before matching', () => {
+    expect(codeBlockSourcePath('// src/main.rs')?.target).toBe('src/main.rs')
+    expect(codeBlockSourcePath('# scripts/build.py')?.target).toBe('scripts/build.py')
+    expect(codeBlockSourcePath('-- sql/migrate.sql')?.target).toBe('sql/migrate.sql')
+  })
+
+  it('carries a line number through the same as prose', () => {
+    expect(codeBlockSourcePath('// src/main.rs:58')?.line).toBe(58)
+  })
+
+  // A path named mid-sentence is prose, not an annotation — the whole
+  // stripped line has to be nothing but the path.
+  it('ignores a path mentioned inside a real comment', () => {
+    expect(codeBlockSourcePath('// see src/main.rs for details')).toBeNull()
+  })
+
+  it('ignores an ordinary line of code', () => {
+    expect(codeBlockSourcePath('fn main() {')).toBeNull()
+    expect(codeBlockSourcePath('import os')).toBeNull()
+  })
+
+  it('ignores a blank first line', () => {
+    expect(codeBlockSourcePath('')).toBeNull()
+    expect(codeBlockSourcePath('   ')).toBeNull()
+  })
+
+  it('ignores a shebang', () => {
+    expect(codeBlockSourcePath('#!/usr/bin/env python')).toBeNull()
+  })
+
+  it('ignores a line naming two paths', () => {
+    expect(codeBlockSourcePath('src/a.ts and src/b.ts')).toBeNull()
   })
 })

@@ -21,6 +21,7 @@ import { MermaidBlock } from './MermaidBlock'
 import { Callout } from './Callout'
 import { WikiLink } from './WikiLink'
 import { CodeLink } from './CodeLink'
+import { CodeBlockOpenInIde } from './CodeBlockOpenInIde'
 import { Tag } from './Tag'
 import { NoteContext } from './NoteContext'
 import { SlashCommands } from './SlashCommands'
@@ -155,6 +156,7 @@ export const coreExtensions = [
   WikiLink,
   Tag,
   CodeLink,
+  CodeBlockOpenInIde,
   NoteContext,
   SlashCommands,
   // Typography marks

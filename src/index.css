@@ -1456,6 +1456,27 @@ body {
   cursor: default;
 }
 
+/* "Open in IDE" (P7-2) — only ever rendered once the path resolves, so
+   there is no disabled/missing variant to style here. */
+.note-editor pre { position: relative; }
+.code-block-open-in-ide {
+  position: absolute;
+  top: 6px;
+  right: 10px;
+  padding: 2px 8px;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-tertiary);
+  font-size: 11px;
+  font-family: 'Cascadia Code', 'Fira Code', monospace;
+  cursor: pointer;
+}
+.code-block-open-in-ide:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
 .settings-unit {
   font-size: 11px;
   color: var(--text-tertiary);
@@ -1718,7 +1739,7 @@ body {
   html, body { background: #fff; height: auto; overflow: visible; }
 
   .sidebar, .tab-bar, .editor-toolbar, .editor-status, .backlinks-panel,
-  .search-overlay { display: none !important; }
+  .search-overlay, .code-block-open-in-ide { display: none !important; }
 
   .layout, .main { display: block; height: auto; }
   .editor-scroll { overflow: visible; height: auto; }
