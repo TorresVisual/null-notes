@@ -332,6 +332,76 @@ pub async fn fetch_and_compare(workspace: String) -> Result<PullOutcome, String>
         .map_err(|e| e.to_string())
 }
 
+/// The workspace `.gitignore` this app documents in README.md — kept as one
+/// constant so the two never drift apart.
+pub const NOTES_GITIGNORE: &str = ".workspace.json\n.*.tmp\n";
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+pub enum RepoInitOutcome {
+    /// A private GitHub remote was created and set as `origin`.
+    InitializedWithRemote,
+    /// `git init` succeeded but there's no remote yet — either `gh` isn't on
+    /// `PATH`, a remote wasn't requested, or `gh repo create` itself failed.
+    /// `remote_add_command` is the exact command to run by hand; `gh` is
+    /// never a hard dependency (P5-5's own DoD).
+    InitializedLocalOnly { remote_add_command: String },
+}
+
+fn has_gh() -> bool {
+    let probe = if cfg!(windows) { "where" } else { "which" };
+    Command::new(probe)
+        .arg("gh")
+        .output()
+        .map(|o| o.status.success())
+        .unwrap_or(false)
+}
+
+pub fn checked_init_notes_repo(
+    workspace: &str,
+    create_github_remote: bool,
+) -> anyhow::Result<RepoInitOutcome> {
+    let init_status = Command::new("git").arg("-C").arg(workspace).arg("init").status()?;
+    if !init_status.success() {
+        anyhow::bail!("git init failed for {workspace}");
+    }
+
+    let gitignore_path = Path::new(workspace).join(".gitignore");
+    if !gitignore_path.exists() {
+        std::fs::write(&gitignore_path, NOTES_GITIGNORE)?;
+    }
+
+    if create_github_remote && has_gh() {
+        // Private by default: lecture notes must not become public by
+        // accident.
+        let status = Command::new("gh")
+            .arg("repo").arg("create")
+            .arg("--source").arg(workspace)
+            .arg("--private")
+            .arg("--remote").arg("origin")
+            .status()?;
+        if status.success() {
+            return Ok(RepoInitOutcome::InitializedWithRemote);
+        }
+        // Falls through to local-only on any gh failure.
+    }
+
+    Ok(RepoInitOutcome::InitializedLocalOnly {
+        remote_add_command: "git remote add origin <your-repo-url>".to_string(),
+    })
+}
+
+#[tauri::command]
+pub async fn init_notes_repo(
+    workspace: String,
+    create_github_remote: bool,
+) -> Result<RepoInitOutcome, String> {
+    tokio::task::spawn_blocking(move || checked_init_notes_repo(&workspace, create_github_remote))
+        .await
+        .map_err(|e| e.to_string())?
+        .map_err(|e| e.to_string())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -748,5 +818,42 @@ mod tests {
         let outcome = checked_pull(&tmp.path().to_string_lossy()).unwrap();
 
         assert_eq!(outcome, PullOutcome::NoRemote);
+    }
+
+    #[test]
+    fn init_creates_a_repo_and_the_documented_gitignore() {
+        let tmp = tempdir().unwrap();
+
+        let outcome = checked_init_notes_repo(&tmp.path().to_string_lossy(), false).unwrap();
+
+        assert!(matches!(outcome, RepoInitOutcome::InitializedLocalOnly { .. }));
+        assert!(tmp.path().join(".git").is_dir());
+        let gitignore = std::fs::read_to_string(tmp.path().join(".gitignore")).unwrap();
+        assert_eq!(gitignore, NOTES_GITIGNORE);
+    }
+
+    #[test]
+    fn init_does_not_overwrite_an_existing_gitignore() {
+        let tmp = tempdir().unwrap();
+        std::fs::write(tmp.path().join(".gitignore"), "custom\n").unwrap();
+
+        checked_init_notes_repo(&tmp.path().to_string_lossy(), false).unwrap();
+
+        let gitignore = std::fs::read_to_string(tmp.path().join(".gitignore")).unwrap();
+        assert_eq!(gitignore, "custom\n");
+    }
+
+    #[test]
+    fn declining_the_github_remote_returns_the_exact_command_to_run_by_hand() {
+        let tmp = tempdir().unwrap();
+
+        let outcome = checked_init_notes_repo(&tmp.path().to_string_lossy(), false).unwrap();
+
+        match outcome {
+            RepoInitOutcome::InitializedLocalOnly { remote_add_command } => {
+                assert!(remote_add_command.starts_with("git remote add origin"));
+            }
+            other => panic!("expected InitializedLocalOnly, got {other:?}"),
+        }
     }
 }
