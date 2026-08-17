@@ -62,6 +62,7 @@ fn build_menu(handle: &tauri::AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
             &MenuItem::with_id(handle, "toggle-view", "Toggle Source/Preview", true, Some("CmdOrCtrl+E"))?,
             &MenuItem::with_id(handle, "insert-ink", "Insert Ink Block", true, Some("CmdOrCtrl+Shift+I"))?,
             &MenuItem::with_id(handle, "graph-view", "Connections Graph", true, Some("CmdOrCtrl+G"))?,
+            &MenuItem::with_id(handle, "toggle-terminal", "Toggle Terminal", true, Some("CmdOrCtrl+`"))?,
             &PredefinedMenuItem::separator(handle)?,
             &MenuItem::with_id(handle, "shortcuts-help", "Keyboard Shortcuts", true, None::<&str>)?,
         ],
@@ -97,6 +98,7 @@ pub fn run() {
                 .expect("failed to initialise database");
             app.manage(pool);
             app.manage(commands::watcher::WatcherState::default());
+            app.manage(commands::terminal::PtyState::default());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -121,6 +123,10 @@ pub fn run() {
             commands::notes::split_into_tasks,
             commands::editor_launch::open_in_editor,
             commands::editor_launch::resolve_code_links,
+            commands::terminal::terminal_open,
+            commands::terminal::terminal_write,
+            commands::terminal::terminal_resize,
+            commands::terminal::terminal_close,
             commands::notes::rename_folder,
             commands::notes::delete_folder,
             commands::notes::move_note,
