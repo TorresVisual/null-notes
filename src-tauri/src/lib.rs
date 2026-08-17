@@ -124,6 +124,7 @@ pub fn run() {
             commands::editor_launch::open_in_editor,
             commands::editor_launch::resolve_code_links,
             commands::git::detect_repo,
+            commands::git::auto_commit,
             commands::terminal::terminal_open,
             commands::terminal::terminal_write,
             commands::terminal::terminal_resize,

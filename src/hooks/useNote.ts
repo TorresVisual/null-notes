@@ -95,6 +95,7 @@ export function useNote(path: string | null) {
     try {
       await api.notes.save(job.path, job.content)
       lastWritten.current = job.content
+      useWorkspaceStore.getState().addGitPendingPath(job.path)
       if (!pendingWrite.current) {
         setSaveState('clean')
         setSaveError(null)

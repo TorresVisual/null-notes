@@ -49,6 +49,11 @@ interface WorkspaceStore {
   setRepoMode: (mode: RepoMode | null) => void
   git: GitWorkspaceConfig
   setGit: (git: GitWorkspaceConfig) => void
+  // P5-2: paths saved since the last auto-commit, deduplicated, in save
+  // order — what the next batched commit will touch.
+  gitPendingPaths: string[]
+  addGitPendingPath: (path: string) => void
+  clearGitPendingPaths: () => void
 }
 
 export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
@@ -63,6 +68,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   recentWorkspaces: [],
   repoMode: null,
   git: DEFAULT_GIT_CONFIG,
+  gitPendingPaths: [],
 
   setPath: (path) => set({ path, selectedFolder: path }),
 
@@ -121,6 +127,13 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   setRepoMode: (mode) => set({ repoMode: mode }),
   setGit: (git) => set({ git }),
 
+  addGitPendingPath: (path) => {
+    const { gitPendingPaths } = get()
+    if (gitPendingPaths.includes(path)) return
+    set({ gitPendingPaths: [...gitPendingPaths, path] })
+  },
+  clearGitPendingPaths: () => set({ gitPendingPaths: [] }),
+
   resetForNewWorkspace: () =>
     set({
       openTabs: [],
@@ -132,5 +145,6 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
       tagFilter: null,
       repoMode: null,
       git: DEFAULT_GIT_CONFIG,
+      gitPendingPaths: [],
     }),
 }))

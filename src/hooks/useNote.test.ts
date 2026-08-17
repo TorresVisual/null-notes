@@ -66,6 +66,18 @@ describe('useNote', () => {
     expect(notes.save).toHaveBeenCalledWith('/ws/note.md', '# Note\nabc')
   })
 
+  it('records the saved path for auto-commit batching', async () => {
+    useWorkspaceStore.setState({ path: '/ws', gitPendingPaths: [] })
+    const { result } = await mountNote()
+
+    act(() => result.current.save('# Note\nfor git'))
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(PAST_SAVE)
+    })
+
+    expect(useWorkspaceStore.getState().gitPendingPaths).toContain('/ws/note.md')
+  })
+
   it('reports dirty while typing and clean once the write lands', async () => {
     const { result } = await mountNote()
 

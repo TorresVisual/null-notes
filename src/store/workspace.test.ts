@@ -14,6 +14,7 @@ const reset = () =>
     recentWorkspaces: [],
     repoMode: null,
     git: { prompted: false, autoCommit: false, idleMinutes: 10, skipHooks: false, autoPush: true },
+    gitPendingPaths: [],
   })
 
 describe('useWorkspaceStore', () => {
@@ -155,5 +156,18 @@ describe('useWorkspaceStore', () => {
       skipHooks: false,
       autoPush: true,
     })
+  })
+
+  it('addGitPendingPath dedupes', () => {
+    useWorkspaceStore.getState().addGitPendingPath('/ws/a.md')
+    useWorkspaceStore.getState().addGitPendingPath('/ws/a.md')
+    useWorkspaceStore.getState().addGitPendingPath('/ws/b.md')
+    expect(useWorkspaceStore.getState().gitPendingPaths).toEqual(['/ws/a.md', '/ws/b.md'])
+  })
+
+  it('clearGitPendingPaths empties the list', () => {
+    useWorkspaceStore.getState().addGitPendingPath('/ws/a.md')
+    useWorkspaceStore.getState().clearGitPendingPaths()
+    expect(useWorkspaceStore.getState().gitPendingPaths).toEqual([])
   })
 })

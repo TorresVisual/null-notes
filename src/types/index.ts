@@ -39,6 +39,12 @@ export interface WorkspaceState {
 /** Which of P5's two Git modes a workspace is in, or null when it isn't a Git repository at all. */
 export type RepoMode = 'notesOnly' | 'codeRepo'
 
+export type CommitOutcome =
+  | { kind: 'committed' }
+  | { kind: 'skipped'; reason: string }
+  | { kind: 'nothingToCommit' }
+  | { kind: 'hookFailed'; output: string }
+
 export type PdfImportMode = 'pages' | 'markdown'
 
 export interface AppSettings {
