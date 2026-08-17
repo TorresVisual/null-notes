@@ -4,7 +4,7 @@ Feature checklist. **The [roadmap](docs/ROADMAP.md) holds the reasoning and the 
 
 Effort: **S** ≈ hours · **M** ≈ a day or two · **L** ≈ several days.
 
-**Now (revised 2026-08-13 — see [`docs/specs/roadmap-revision-design.md`](docs/specs/roadmap-revision-design.md)):** ~~finish ruled fractions~~ → ~~freeze the PDF pipeline~~ → ~~triage the three open bugs~~ → ~~P4-3 (closes M4)~~ → the dogfood slice, now down to **P8-1**. **Phase numbers are identity, not order.**
+**Now (revised 2026-08-17):** ~~finish ruled fractions~~ → ~~freeze the PDF pipeline~~ → ~~triage the three open bugs~~ → ~~P4-3 (closes M4)~~ → ~~the dogfood slice~~ → **re-derive P5, P6, P9 from real use**. **Phase numbers are identity, not order.**
 
 | # | Work | Size | |
 |---|---|---|---|
@@ -12,8 +12,8 @@ Effort: **S** ≈ hours · **M** ≈ a day or two · **L** ≈ several days.
 | 1 | Freeze the PDF pipeline under P4-2e | S | ✅ |
 | 2 | Triage the three open bugs below | S | ✅ |
 | 3 | **P4-3** → **M4** | M | ✅ |
-| 4 | Dogfood slice — ~~ignore list~~ → ~~P7-3~~ → ~~P7-4 + P7-1~~ → **P8-1** | M/L | ← |
-| 5 | Re-derive P5, P6, P9 from real use | — | |
+| 4 | Dogfood slice — ~~ignore list~~ → ~~P7-3~~ → ~~P7-4 + P7-1~~ → ~~P8-1~~ | M/L | ✅ |
+| 5 | Re-derive P5, P6, P9 from real use | — | ← |
 
 > **The PDF pipeline is frozen** as of 2026-08-13. The corpus is the regression suite; a new bug earns work only if it is whole-document or recurs across ≥2 corpus documents; 2D-layout reconstruction is closed. See P4-2e.
 
@@ -43,7 +43,7 @@ Effort: **S** ≈ hours · **M** ≈ a day or two · **L** ≈ several days.
 | P5 Versioned workspaces (Git) | M5 — my notes commit themselves | |
 | P6 STEM authoring | M6 — fastest place to write maths | |
 | P7 IDE integration | M7 — notes and code are one workflow | |
-| P8 Embedded terminal | M8 — `claude` runs against the open note | |
+| P8 Embedded terminal | M8 — `claude` runs against the open note | ✅ |
 | P9 Study & revision | M9 — the app helps me *revise*, not just capture | |
 | P10 Gated stretch | M10 — in-app AI + code execution | gated |
 
@@ -293,15 +293,17 @@ The brief's second pillar. Notes stay plain `.md` — a deep link is ordinary Ma
 
 ---
 
-## ▸ P8 — Embedded terminal (M8)
+## ▸ P8 — Embedded terminal (M8) ✅
 
 The brief's AI ask is a *terminal* feature, not an AI feature: no AI code, no API keys, works with any CLI. P0-5's watcher already makes externally-edited files safe.
 
-### P8-1 Terminal pane — **M/L**
-- [ ] PTY-backed pane rooted at the workspace
-- [ ] Active note's path available as an env var + one-key insert
-- [ ] `claude` editing the open note updates the editor through the **existing** watcher path — no new reload logic, no conflict special-case
-- [ ] Closing the pane leaves no orphaned process
+### P8-1 Terminal pane — **M/L** ✅
+- [x] PTY-backed pane rooted at the workspace
+- [x] Active note's path available as an env var + one-key insert
+- [x] `claude` editing the open note updates the editor through the **existing** watcher path — no new reload logic, no conflict special-case
+- [x] Closing the pane leaves no orphaned process
+
+> Done. `portable-pty` (ConPTY on Windows) + `xterm.js`, base64-chunked output over a Tauri event (same shape as `read_ink`/`read_pdf_page`). Toggling (`Ctrl+\``) only flips CSS visibility — the shell survives being hidden; only "Kill Terminal" or the app window closing actually tears it down. `NULL_NOTES_ACTIVE_NOTE` is frozen at spawn time; the header button covers the live case. One real bug found in manual QA: the insert-path button silently did nothing because `terminal_open`'s spawn wasn't awaited before the first write — a human's typing speed outlasted the race, a fast click didn't. Fixed by chaining every write onto the open promise; regression test confirmed against the pre-fix code via `git stash`. Design: `docs/specs/terminal-pane-design.md`.
 
 ---
 

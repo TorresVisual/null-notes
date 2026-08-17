@@ -1,6 +1,8 @@
 # null-notes — Product & Technical Roadmap
 
-**Last updated:** 2026-08-13 (**roadmap revision** — see `specs/roadmap-revision-design.md`. The two weeks since the last update went almost entirely into PDF pipeline refinement, which the roadmap had no boundary for; this revision adds one (§Phase 4, "Pipeline completion criteria"), records the app's actual identity and two closed questions (§1), and **replaces the execution order in §6** — phase numbers are now identity, not order. **Next: ~~finish ruled fractions~~ → ~~freeze the pipeline~~ → ~~triage the three open bugs~~ → ~~P4-3~~ → the dogfood slice.** As of 2026-08-13 ruled fractions landed, **the pipeline is frozen** (§Phase 4, P4-2e), all three bugs are triaged — two fixed in the editor, one did not reproduce — and **P4-3 closed M4**. The next work is the dogfood slice: P7-3a's scan ignore list, then P7-3, then P7-4 + P7-1, then P8-1.)
+**Last updated:** 2026-08-17 (**the dogfood slice is complete.** P8-1 shipped — a PTY-backed terminal pane (`portable-pty` + `xterm.js`), toggled with `Ctrl+\``, rooted at the workspace, with the active note's path as an env var plus a one-key insert. **M8 reached.** The full slice — P7-3a's scan ignore list → P7-3 → P7-4 + P7-1 → P8-1 — is now done end to end; this project's own `docs/` can be opened, edited, and worked on from inside null-notes itself. **Next per §6: step 5, re-deriving P5, P6 and P9 from real use** — not before, since their current priorities are still estimates per §1's second closed question.)
+
+*2026-08-13 revision, kept for context — see `specs/roadmap-revision-design.md`: the two weeks before that went almost entirely into PDF pipeline refinement, which the roadmap had no boundary for; that revision added one (§Phase 4, "Pipeline completion criteria"), recorded the app's actual identity and two closed questions (§1), and replaced the execution order in §6 — phase numbers are identity, not order. Ruled fractions landed, freezing the pipeline (§Phase 4, P4-2e); all three open bugs were triaged (two fixed, one didn't reproduce); P4-3 closed M4.*
 
 *Previously, 2026-07-30: M0–M3 all reached — P2-3 closed M2; P4-1 + P4-2 done — PDF→Markdown converts from the embedded text layer with no OCR, and equations are rebuilt as LaTeX rather than mangled into text; re-scoped against* `notes/Plan.md`*; Phases 5 "Versioned Workspaces" and 9 "Study & Revision" added — the first features that go beyond the original brief*.**Audience of this doc:** the maintainer (solo dev). **Product audience:** you — a personal, offline, daily-driver note app for CS coursework. This is **not** aimed at public distribution yet, which deliberately pushes packaging, cross-platform, auto-update, branding, and onboarding *down* the priority list. Correctness, data integrity, and the editor/ink/PDF workflow come first.
 
@@ -154,7 +156,7 @@ Given "personal daily driver," priority = `(daily-use value) × (risk of data lo
 | **P5** | Versioned workspaces (Git automation) | **M5:** my notes commit themselves, in both kinds of repo |  | The next tier of P0's data safety — a commit is a recoverable backup |
 | **P6** | STEM authoring | **M6:** writing maths/algorithms is faster here than anywhere else |  | Compounds on every note; cheap, since the infra exists |
 | **P7** | IDE integration | **M7:** notes and code are one workflow, not two |  | The brief's second pillar — "integrate, don't replace" |
-| **P8** | Embedded terminal | **M8:** `claude` runs against the open note without leaving the app |  | Small effort; delivers the brief's AI ask without AI code |
+| **P8** | Embedded terminal | **M8:** `claude` runs against the open note without leaving the app | ✅ | Small effort; delivers the brief's AI ask without AI code |
 | **P9** | Study & revision | **M9:** the app helps me *revise*, not just capture |  | The only phase not derived from the brief — see below |
 | **P10** | Gated stretch | **M10:** in-app AI + code execution | gated | Explicitly deferred; do not let it pull focus |
 
@@ -695,17 +697,25 @@ The brief's second pillar — **"IDE integration instead of IDE replacement"** �
 
 ---
 
-## Phase 8 — Embedded Terminal (P8)
+## Phase 8 — Embedded Terminal (P8) ✅
 
-**Milestone M8:** *I can run* `claude` *(or any CLI) against the note I'm looking at without leaving the app.*
+**Milestone M8 reached:** *I can run* `claude` *(or any CLI) against the note I'm looking at without leaving the app.*
 
 The brief's actual AI ask is *"a terminal in which I can do* `claude` *and work with the opened* `.md` *file"* — which is a **terminal feature, not an AI feature**. It is roughly an order of magnitude cheaper than the in-app assistant (P10-1), ships no AI code, adds no API key handling, and works with any CLI tool. Crucially, **the hard part is already built**: P0-5's watcher means a file edited by an external process is already detected, reloaded when clean, and conflict-prompted when dirty. The terminal is a client of infrastructure that exists.
 
-### P8-1 — Terminal pane — **M/L**
+### P8-1 — Terminal pane — **M/L** ✅
 
 - A terminal pane (PTY-backed) rooted at the workspace, with the active note's path readily available — an env var and a one-key insert.
 - **Dependency:** P0-5 (external-change handling is what makes CLI edits safe). Benefits from P2-2's command dispatcher for the toggle shortcut.
 - **DoD:** Running `claude` in the pane and having it edit the open note updates the editor through the existing watcher path, with no new reload logic and no conflict-handling special case. Closing the pane leaves no orphaned process.
+
+*Done. `portable-pty` (ConPTY on Windows) spawns the configured shell (a new* `terminal_shell` *setting, detected on load exactly like P7-4's* `editor_command`*) rooted at the workspace;* `xterm.js` *renders its output, decoded from base64 chunks streamed over a Tauri event — the same binary-over-IPC shape* `read_ink`*/*`read_pdf_page` *already use, needed because a multi-byte character can split across two PTY reads and Tauri events are JSON. Toggling the pane (View menu,* `Ctrl+\``*) only flips CSS visibility; the shell keeps running underneath, which is what lets a long* `claude` *session survive switching back to editing. Only an explicit "Kill Terminal" click or the app window closing actually tears the process down — the window-close handler now calls* `terminal_close` *before* `confirm_close`*, so quitting can't leave an orphan. The active note's path is frozen into* `NULL_NOTES_ACTIVE_NOTE` *at spawn time (a running process's environment can't be rewritten from outside); the header button, labeled with the current note's filename, covers the live case by typing the path at the cursor on demand.*
+
+*The one real bug, found during manual QA: the insert-path button did nothing, silently. Root cause was a startup race —* `terminal_open` *spawns a real shell process and wasn't awaited before either write path (typed input or the insert button) could fire; a human's reaction time comfortably outlasts the spawn, so typing worked, but a click right after opening the pane could race ahead of it and hit "no terminal session is open" with no* `.catch` *anywhere to surface it. Both write paths now chain onto the* `terminal_open` *promise. Confirmed by reverting the fix via* `git stash`*, watching a new regression test fail against the pre-fix code, then restoring it and watching the same test pass.*
+
+*Verifying the "no new reload logic" half of the DoD needed no code — a file edited from inside the pane is an ordinary filesystem write from the app's point of view, and P0-5's watcher already reloads a clean buffer or raises the conflict bar on a dirty one, confirmed in the same manual QA pass. Design:* `docs/specs/terminal-pane-design.md`*.*
+
+**Exit check for M8:** the pane spawns rooted at the workspace, the env var and insert button both work, hide/show preserves a running session, and killing the terminal or closing the app leaves no orphaned shell process — all confirmed by hand, since none of it is realistically unit-testable in this environment (no native PTY in CI, no canvas/ResizeObserver for `xterm.js` in jsdom).
 
 ---
 
@@ -855,8 +865,8 @@ P10-* gated behind M9
 | 1 | **Freeze the pipeline** under P4-2e | S | Docs, not code. The next 2D shape is the rule's first real application. |
 | 2 | Triage the three "Issues Discovered" in `TODO.md` | S | Reported defects on the daily-use path, owned by no phase, sitting above a 371-line plan. Reproduce first — all three are unverified. |
 | 3 | **P4-3** → **M4** | M | Closes the milestone. Converts the PDF work from an open hunt into a shut phase. |
-| 4 | **Dogfood slice:** P7-3's ignore list → P7-3 → P7-4 + P7-1 together → P8-1 | M/L | *Milestone: this project's own* `docs/` *lives in null-notes and gets edited there.* |
-| 5 | Re-derive P5, P6 and P9 from real use | — | Their current priorities are estimates. Do not plan them further until step 4 has run for a couple of weeks. |
+| 4 | **Dogfood slice:** P7-3's ignore list → P7-3 → P7-4 + P7-1 together → P8-1 | M/L | ✅ *Milestone reached: this project's own* `docs/` *lives in null-notes and gets edited there.* |
+| 5 | Re-derive P5, P6 and P9 from real use | — | ← Their current priorities are estimates. Do not plan them further until step 4 has run for a couple of weeks. |
 
 **Why the dogfood slice outranks P5 and P6.** It is the only item on the board that changes what *future* planning is based on — everything else produces a feature, this produces evidence. §1's second closed question records that the daily-use term in §3's formula currently has no supplier; this is the fix. P6 in particular should not be re-planned before it, because §4 of the revision spec found that a whole stream of editor work (`BlockHandle`, `Divider`, `TextAlignment`, `Highlight`, `Kbd`, `HTMLBlock`, `SpanStyle`, `NoteImage`) is happening off-book, which suggests P6's "STEM authoring" scope is the wrong frame for what is actually being built.
 
