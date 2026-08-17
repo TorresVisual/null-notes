@@ -77,6 +77,20 @@ describe('the editor toolbar', () => {
     expect(useInkStore.getState().activeCanvas).not.toBeNull()
   })
 
+  // The mirror of the rule above: the guard is scoped to buttons, not the
+  // whole bar, because the pen-size slider's thumb only drags — and a
+  // <select>'s dropdown only opens — on an un-prevented mousedown. A
+  // `preventDefault` back on the root `<div>` would pass every test above
+  // while silently breaking this one.
+  it('does not prevent the default action on an ink slider, so it can still be dragged', () => {
+    useInkStore.getState().setActiveCanvas('a', handle({ canUndo: true }))
+    const { getByLabelText } = render(<EditorToolbar editor={null} notePath="/ws/a.md" />)
+
+    const notCancelled = fireEvent.mouseDown(getByLabelText('Pen size'))
+
+    expect(notCancelled).toBe(true)
+  })
+
   it('selecting a tool changes the shared tool', () => {
     useInkStore.getState().setActiveCanvas('a', handle())
     const { getByLabelText } = render(<EditorToolbar editor={null} notePath="/ws/a.md" />)
@@ -172,5 +186,32 @@ describe('the editor toolbar', () => {
 
     expect(notCancelled).toBe(false)
     expect(useInkStore.getState().activeCanvas).not.toBeNull()
+  })
+
+  // The concrete failure the whole-branch review found: `setCodeBlock()`
+  // wraps the current selection in a code block without moving it, so
+  // `selectionUpdate` — the only thing NoteEditor re-rendered the bar from —
+  // never fires, and the bar kept showing TextFormatGroup instead of the
+  // language select until the caret happened to move. Mounted through the
+  // real `NoteEditor` tree, since the bug lives in the gap between the
+  // editor's own transaction and NoteEditor's re-render, not in EditorToolbar
+  // alone.
+  it('switches to the language select right after Insert code block, though the caret never moves', async () => {
+    const { container, getByLabelText } = render(
+      <NoteEditor
+        content="hello world"
+        notePath="/ws/a.md"
+        spellcheck={false}
+        spellcheckLanguage="en"
+        onChange={() => {}}
+      />,
+    )
+    const pmEl = editorRoot(container)
+    await waitFor(() => expect(pmEl.textContent).toContain('hello world'))
+    clickInto(pmEl)
+
+    fireEvent.click(getByLabelText('Insert code block'))
+
+    await waitFor(() => expect(getByLabelText('Code block language')).toBeInTheDocument())
   })
 })

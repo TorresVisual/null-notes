@@ -1,33 +1,18 @@
 import { PenLine, Sigma, Table, Code, Info } from 'lucide-react'
 import type { Editor } from '@tiptap/core'
-import { inkApi } from '../../lib/ink'
-import type { InkData } from '../../ink/types'
+import { insertInk } from './insertInk'
+import { report } from '../splitIntoTasks'
 
 interface InsertGroupProps {
   editor: Editor
   notePath: string
 }
 
-const INK_WIDTH = 700
-const INK_HEIGHT = 900
-const EMPTY_INK: InkData = { width: INK_WIDTH, height: INK_HEIGHT, strokes: [], shapes: [] }
-
 export function InsertGroup({ editor, notePath }: InsertGroupProps) {
-  async function insertInk() {
-    const dir = await inkApi.ensureDir(notePath)
-    const sep = dir.includes('\\') ? '\\' : '/'
-    const svgPath = `${dir}${sep}sketch-${Date.now()}.svg`
-    await inkApi.write(svgPath, EMPTY_INK)
-    editor.commands.insertContent({
-      type: 'inkBlock',
-      attrs: { src: svgPath, width: INK_WIDTH, height: INK_HEIGHT },
-    })
-  }
-
   return (
     <div className="toolbar-group" role="group" aria-label="Insert">
       <button className="toolbar-button" aria-label="Insert ink canvas" title="Insert ink canvas"
-        onClick={() => void insertInk()}>
+        onClick={() => void insertInk(editor, notePath).catch(report)}>
         <PenLine size={15} />
       </button>
       <button className="toolbar-button" aria-label="Insert equation" title="Insert equation"

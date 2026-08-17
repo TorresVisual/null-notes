@@ -1,70 +1,74 @@
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
+import { useEditorState } from '@tiptap/react'
 import type { Editor } from '@tiptap/core'
 import { useInkStore } from '../../store/ink'
 import { InkToolGroup } from './InkToolGroup'
 import { TextFormatGroup } from './TextFormatGroup'
 import { InsertGroup } from './InsertGroup'
 import { SheetGroup } from './SheetGroup'
-import { inkApi } from '../../lib/ink'
-import type { InkData } from '../../ink/types'
+import { insertInk } from './insertInk'
+import { report } from '../splitIntoTasks'
 
 interface EditorToolbarProps {
   editor: Editor | null
   notePath: string
 }
 
-// Sized to the editor pane's content width (800px max-width less 48px padding
-// a side) so the right edge is not clipped, and tall enough for a worked
-// derivation rather than a couple of lines.
-const INK_WIDTH = 700
-const INK_HEIGHT = 900
+interface CodeBlockState {
+  active: boolean
+  language: string
+}
 
-const EMPTY_INK: InkData = { width: INK_WIDTH, height: INK_HEIGHT, strokes: [], shapes: [] }
+const NO_CODE_BLOCK: CodeBlockState = { active: false, language: '' }
 
 // One bar, one group at a time. A canvas being active means a pen is in hand,
 // and then nothing else in the bar is what you want — so the ink group takes
 // it alone rather than sharing a row it could not fit in anyway.
 export function EditorToolbar({ editor, notePath }: EditorToolbarProps) {
-  const drawing = useInkStore((s) => s.activeCanvas) !== null
-  // Forces a re-render after a command run directly from this bar (the
-  // language select) mutates the editor: `editor` is a mutable object, so
-  // changing its state alone does not make this component re-render.
-  const [, bump] = useState(0)
+  const drawing = useInkStore((s) => s.activeCanvas !== null)
 
-  async function insertInkBlock() {
-    if (!editor) return
-    const dir = await inkApi.ensureDir(notePath)
-    const sep = dir.includes('\\') ? '\\' : '/'
-    const svgPath = `${dir}${sep}sketch-${Date.now()}.svg`
-    await inkApi.write(svgPath, EMPTY_INK)
-    editor.commands.insertContent({
-      type: 'inkBlock',
-      attrs: { src: svgPath, width: INK_WIDTH, height: INK_HEIGHT },
-    })
-  }
+  // Subscribed directly to the editor's own `transaction` event rather than
+  // to a re-render forced by a parent: `setCodeBlock()` and
+  // `updateAttributes('codeBlock', …)` both mutate the doc without moving the
+  // selection, so `selectionUpdate` (what NoteEditor re-renders on) never
+  // fires for either. This is what lets the bar switch to the language
+  // select immediately after "Insert code block", and what lets the select
+  // itself pick up its own `updateAttributes` call without the old `bump`
+  // hack.
+  const codeBlockState = useEditorState({
+    editor,
+    selector: ({ editor }) => {
+      if (!editor) return NO_CODE_BLOCK
+      const language = editor.getAttributes('codeBlock')['language']
+      return { active: editor.isActive('codeBlock'), language: typeof language === 'string' ? language : '' }
+    },
+  }) ?? NO_CODE_BLOCK
 
   // Lets the native menu's "Insert Ink Block" item (and its accelerator)
   // reach the currently-focused note without lifting the editor instance
   // up to Layout — Layout just dispatches a plain window event.
   useEffect(() => {
     function onInsertInk() {
-      void insertInkBlock()
+      if (!editor) return
+      void insertInk(editor, notePath).catch(report)
     }
     window.addEventListener('command:insert-ink', onInsertInk)
     return () => window.removeEventListener('command:insert-ink', onInsertInk)
   }, [editor, notePath])
-
-  const codeLanguage = editor?.getAttributes('codeBlock')['language']
-  const selectedCodeLanguage = typeof codeLanguage === 'string' ? codeLanguage : ''
 
   return (
     <div
       className="editor-toolbar"
       role="toolbar"
       aria-label="Editor"
-      // Never let a press move focus or the selection: clicking undo would
-      // otherwise clear the very canvas undo is meant to act on.
-      onMouseDown={(e) => e.preventDefault()}
+      // Never let a *button* press move focus or the selection: clicking undo
+      // would otherwise clear the very canvas undo is meant to act on. Scoped
+      // away from inputs and selects — the eraser/pen-size sliders need their
+      // native mousedown to drag the thumb at all, and Chromium/WebView2 opens
+      // a <select>'s dropdown as that same event's default action.
+      onMouseDown={(event) => {
+        if (!(event.target as HTMLElement).closest('input, select')) event.preventDefault()
+      }}
     >
       {drawing ? (
         <InkToolGroup />
@@ -72,15 +76,14 @@ export function EditorToolbar({ editor, notePath }: EditorToolbarProps) {
         <>
           {editor && <InsertGroup editor={editor} notePath={notePath} />}
           {editor && <SheetGroup editor={editor} />}
-          {editor && (editor.isActive('codeBlock') ? (
+          {editor && (codeBlockState.active ? (
             <label className="code-language-control">
               <span>Language</span>
               <select
                 aria-label="Code block language"
-                value={selectedCodeLanguage}
+                value={codeBlockState.language}
                 onChange={(event) => {
                   editor.chain().focus().updateAttributes('codeBlock', { language: event.target.value }).run()
-                  bump((n) => n + 1)
                 }}
               >
                 <option value="">Plain text</option>
