@@ -1,16 +1,18 @@
-//! Detecting which of P5's two Git modes a workspace is in (P5-1).
+//! P5's Git automation: which of the two modes a workspace is in (P5-1),
+//! batched auto-commit (P5-2), push policy (P5-3), fast-forward-only
+//! auto-pull (P5-4), and repo creation (P5-5).
 //!
-//! This is detection only — it answers "notes-only repo," "code repo," or
-//! "not a repo at all," and nothing here runs a mutating Git command or
-//! writes anything. Shells out to `git` rather than linking `git2`/`gix`:
-//! that inherits the user's credential helpers, SSH agent, commit signing
-//! and `.gitconfig` for free, which is exactly what later P5 tasks need and
-//! would otherwise have to reimplement.
+//! Every mutating command here is pathspec-scoped to note paths and backs
+//! off quietly on an unsafe repo state — see `unsafe_repo_state` — rather
+//! than ever trying to repair one. Shells out to `git` rather than linking
+//! `git2`/`gix`: that inherits the user's credential helpers, SSH agent,
+//! commit signing and `.gitconfig` for free.
 //!
 //! Design: `docs/ROADMAP.md` §Phase 5.
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use serde::{Deserialize, Serialize};
 use crate::models::RepoMode;
 
 /// `git -C <workspace> rev-parse --show-toplevel`, classified against the
@@ -123,6 +125,99 @@ pub fn unsafe_repo_state(workspace: &str) -> anyhow::Result<Option<UnsafeRepoSta
     }
 
     Ok(None)
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+pub enum CommitOutcome {
+    Committed,
+    Skipped { reason: String },
+    NothingToCommit,
+    HookFailed { output: String },
+}
+
+fn build_commit_message(paths: &[String]) -> String {
+    let names: Vec<String> = paths
+        .iter()
+        .map(|p| {
+            Path::new(p)
+                .file_stem()
+                .map(|s| s.to_string_lossy().into_owned())
+                .unwrap_or_else(|| p.clone())
+        })
+        .collect();
+    let summary = if names.len() > 4 {
+        format!("{}, and {} more", names[..4].join(", "), names.len() - 4)
+    } else {
+        names.join(", ")
+    };
+    format!("notes: update {summary}")
+}
+
+fn has_pending_changes(workspace: &str, paths: &[String]) -> anyhow::Result<bool> {
+    if paths.is_empty() {
+        return Ok(false);
+    }
+    let output = Command::new("git")
+        .arg("-C").arg(workspace)
+        .arg("status").arg("--porcelain").arg("--")
+        .args(paths)
+        .output()?;
+    Ok(!output.stdout.is_empty())
+}
+
+/// Commits only `paths`, never anything else staged in the repo. Backs off
+/// quietly on an unsafe repo state; aborts (without committing) if a hook
+/// rejects the commit, unless `skip_hooks` opts out of running them at all.
+pub fn checked_auto_commit(
+    workspace: &str,
+    paths: &[String],
+    skip_hooks: bool,
+) -> anyhow::Result<CommitOutcome> {
+    if let Some(state) = unsafe_repo_state(workspace)? {
+        return Ok(CommitOutcome::Skipped { reason: state.reason().to_string() });
+    }
+    if !has_pending_changes(workspace, paths)? {
+        return Ok(CommitOutcome::NothingToCommit);
+    }
+
+    let add_status = Command::new("git")
+        .arg("-C").arg(workspace)
+        .arg("add").arg("--")
+        .args(paths)
+        .status()?;
+    if !add_status.success() {
+        anyhow::bail!("git add failed for {workspace}");
+    }
+
+    let mut commit_cmd = Command::new("git");
+    commit_cmd.arg("-C").arg(workspace).arg("commit");
+    if skip_hooks {
+        commit_cmd.arg("--no-verify");
+    }
+    commit_cmd.arg("-m").arg(build_commit_message(paths));
+    commit_cmd.arg("--").args(paths);
+    let output = commit_cmd.output()?;
+
+    if output.status.success() {
+        Ok(CommitOutcome::Committed)
+    } else {
+        Ok(CommitOutcome::HookFailed {
+            output: String::from_utf8_lossy(&output.stderr).into_owned(),
+        })
+    }
+}
+
+#[tauri::command]
+pub async fn auto_commit(
+    workspace: String,
+    paths: Vec<String>,
+    skip_hooks: bool,
+) -> Result<CommitOutcome, String> {
+    tokio::task::spawn_blocking(move || checked_auto_commit(&workspace, &paths, skip_hooks))
+        .await
+        .map_err(|e| e.to_string())?
+        .map_err(|e| e.to_string())
 }
 
 #[cfg(test)]
@@ -287,5 +382,145 @@ mod tests {
             unsafe_repo_state(&tmp.path().to_string_lossy()).unwrap(),
             Some(UnsafeRepoState::UnresolvedConflicts)
         );
+    }
+
+    fn write_failing_pre_commit_hook(workspace: &Path) {
+        let git_dir = absolute_git_dir(&workspace.to_string_lossy()).unwrap();
+        let hooks_dir = git_dir.join("hooks");
+        std::fs::create_dir_all(&hooks_dir).unwrap();
+        let hook_path = hooks_dir.join("pre-commit");
+        std::fs::write(&hook_path, "#!/bin/sh\nexit 1\n").unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mut perms = std::fs::metadata(&hook_path).unwrap().permissions();
+            perms.set_mode(0o755);
+            std::fs::set_permissions(&hook_path, perms).unwrap();
+        }
+    }
+
+    #[test]
+    fn commits_only_the_given_note_paths() {
+        let tmp = tempdir().unwrap();
+        git_init(tmp.path());
+        commit_file(tmp.path(), "src.rs", "fn main() {}\n");
+        commit_file(tmp.path(), "note.md", "# Note\n");
+
+        // A staged source change and an unstaged source edit — both must
+        // survive the auto-commit byte-for-byte. This is the one
+        // unforgivable failure per P5-2's own DoD.
+        std::fs::write(tmp.path().join("src.rs"), "fn main() { staged() }\n").unwrap();
+        Command::new("git").arg("-C").arg(tmp.path()).arg("add").arg("src.rs").status().unwrap();
+        std::fs::write(tmp.path().join("note.md"), "# Note\nmore\n").unwrap();
+        std::fs::write(tmp.path().join("src.rs"), "fn main() { staged() } // unstaged\n").unwrap();
+
+        // Scoped to src.rs specifically — the whole-repo diff listing is
+        // *expected* to shrink once note.md's own change is committed, so
+        // comparing the unscoped listing before/after would be the wrong
+        // assertion. What must be identical is src.rs's own staged and
+        // unstaged content.
+        let staged_before = Command::new("git")
+            .arg("-C").arg(tmp.path()).arg("diff").arg("--cached").arg("--").arg("src.rs")
+            .output().unwrap();
+        let unstaged_before = Command::new("git")
+            .arg("-C").arg(tmp.path()).arg("diff").arg("--").arg("src.rs")
+            .output().unwrap();
+
+        let outcome = checked_auto_commit(
+            &tmp.path().to_string_lossy(),
+            &["note.md".to_string()],
+            false,
+        ).unwrap();
+
+        assert_eq!(outcome, CommitOutcome::Committed);
+
+        let staged_after = Command::new("git")
+            .arg("-C").arg(tmp.path()).arg("diff").arg("--cached").arg("--").arg("src.rs")
+            .output().unwrap();
+        let unstaged_after = Command::new("git")
+            .arg("-C").arg(tmp.path()).arg("diff").arg("--").arg("src.rs")
+            .output().unwrap();
+        assert_eq!(staged_before.stdout, staged_after.stdout, "src.rs's staged change must be untouched");
+        assert_eq!(unstaged_before.stdout, unstaged_after.stdout, "src.rs's unstaged change must be untouched");
+
+        let last_commit_files = Command::new("git")
+            .arg("-C").arg(tmp.path()).arg("show").arg("--stat").arg("--format=").arg("HEAD")
+            .output().unwrap();
+        let files = String::from_utf8_lossy(&last_commit_files.stdout);
+        assert!(files.contains("note.md"));
+        assert!(!files.contains("src.rs"));
+    }
+
+    #[test]
+    fn nothing_to_commit_when_paths_are_unchanged() {
+        let tmp = tempdir().unwrap();
+        git_init(tmp.path());
+        commit_file(tmp.path(), "note.md", "# Note\n");
+
+        let outcome = checked_auto_commit(
+            &tmp.path().to_string_lossy(),
+            &["note.md".to_string()],
+            false,
+        ).unwrap();
+
+        assert_eq!(outcome, CommitOutcome::NothingToCommit);
+    }
+
+    #[test]
+    fn a_failing_hook_aborts_the_commit() {
+        let tmp = tempdir().unwrap();
+        git_init(tmp.path());
+        commit_file(tmp.path(), "note.md", "# Note\n");
+        write_failing_pre_commit_hook(tmp.path());
+        std::fs::write(tmp.path().join("note.md"), "# Note\nchanged\n").unwrap();
+
+        let before = Command::new("git").arg("-C").arg(tmp.path()).arg("rev-list").arg("--count").arg("HEAD")
+            .output().unwrap();
+
+        let outcome = checked_auto_commit(
+            &tmp.path().to_string_lossy(),
+            &["note.md".to_string()],
+            false,
+        ).unwrap();
+
+        assert!(matches!(outcome, CommitOutcome::HookFailed { .. }));
+        let after = Command::new("git").arg("-C").arg(tmp.path()).arg("rev-list").arg("--count").arg("HEAD")
+            .output().unwrap();
+        assert_eq!(before.stdout, after.stdout, "a failed hook must not leave a commit behind");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn skip_hooks_bypasses_a_failing_hook() {
+        let tmp = tempdir().unwrap();
+        git_init(tmp.path());
+        commit_file(tmp.path(), "note.md", "# Note\n");
+        write_failing_pre_commit_hook(tmp.path());
+        std::fs::write(tmp.path().join("note.md"), "# Note\nchanged\n").unwrap();
+
+        let outcome = checked_auto_commit(
+            &tmp.path().to_string_lossy(),
+            &["note.md".to_string()],
+            true,
+        ).unwrap();
+
+        assert_eq!(outcome, CommitOutcome::Committed);
+    }
+
+    #[test]
+    fn an_unsafe_repo_state_is_skipped_with_its_reason() {
+        let tmp = tempdir().unwrap();
+        git_init(tmp.path());
+        commit_file(tmp.path(), "note.md", "# Note\n");
+        std::fs::create_dir(tmp.path().join(".git").join("rebase-merge")).unwrap();
+        std::fs::write(tmp.path().join("note.md"), "# Note\nchanged\n").unwrap();
+
+        let outcome = checked_auto_commit(
+            &tmp.path().to_string_lossy(),
+            &["note.md".to_string()],
+            false,
+        ).unwrap();
+
+        assert_eq!(outcome, CommitOutcome::Skipped { reason: "a rebase is in progress".to_string() });
     }
 }
