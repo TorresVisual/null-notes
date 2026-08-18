@@ -140,6 +140,35 @@ describe('Callout proof/theorem blocks (P6-1)', () => {
   })
 })
 
+describe('Algorithm blocks (P6-2)', () => {
+  it('round-trips as a plain, portable Markdown blockquote with bold slot labels', () => {
+    // One blank-line-separated paragraph per slot — what /Algorithm Block
+    // actually inserts (see SlashCommands.tsx), and how the DoD's "inserts
+    // from / and round-trips" is meant to be exercised.
+    const md =
+      '> [!ALGORITHM] Dijkstra\n>\n> **Complexity:**\n>\n> O((V + E) log V)\n>\n> **Pseudocode:**\n>\n> ```\n> for each vertex...\n> ```'
+    const e = mount(md)
+    expect(calloutNodes(e)).toEqual([{ calloutType: 'algorithm', title: 'Dijkstra', number: '' }])
+    const out = getMarkdown(e)
+    expect(out).toContain('[!ALGORITHM] Dijkstra')
+    expect(out).toContain('**Complexity:**')
+    expect(out).toContain('**Pseudocode:**')
+  })
+})
+
+describe('Callout parser: marker line sharing a paragraph with body text (P6-1/P6-2 fix)', () => {
+  // Pre-existing bug, found while building P6-2: a blockquote line right
+  // under the marker with no blank line before it is the *same* Markdown
+  // paragraph as the marker (a soft line break), and the old parser deleted
+  // that whole paragraph — marker and body both — rather than just the
+  // marker. Real content loss, not cosmetic.
+  it('keeps body text that shares a paragraph with the marker line', () => {
+    const md = '> [!NOTE] Title\n> line one'
+    const e = mount(md)
+    expect(getMarkdown(e)).toContain('line one')
+  })
+})
+
 describe('DivBlock node', () => {
   it('parses a generic <div> and preserves content', () => {
     const e = mount('<div><p>inside div</p></div>')

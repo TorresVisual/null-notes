@@ -172,6 +172,33 @@ const COMMANDS: Cmd[] = [
         .run(),
   },
   {
+    title: 'Algorithm Block',
+    description: 'Complexity / Pseudocode / Implementation / References',
+    // Reuses the Callout node exactly like Theorem/Proof — no new node type.
+    // The four slots are plain bold-labeled sections inside the blockquote,
+    // so the block stays readable as ordinary Markdown in any other editor.
+    run: ({ editor, range }) =>
+      editor
+        .chain()
+        .focus()
+        .deleteRange(range)
+        .insertContent({
+          type: 'callout',
+          attrs: { calloutType: 'algorithm', title: '', number: '' },
+          content: [
+            { type: 'paragraph', content: [{ type: 'text', text: 'Complexity:', marks: [{ type: 'bold' }] }] },
+            { type: 'paragraph' },
+            { type: 'paragraph', content: [{ type: 'text', text: 'Pseudocode:', marks: [{ type: 'bold' }] }] },
+            { type: 'codeBlock' },
+            { type: 'paragraph', content: [{ type: 'text', text: 'Implementation:', marks: [{ type: 'bold' }] }] },
+            { type: 'codeBlock' },
+            { type: 'paragraph', content: [{ type: 'text', text: 'References:', marks: [{ type: 'bold' }] }] },
+            { type: 'paragraph' },
+          ],
+        })
+        .run(),
+  },
+  {
     title: 'Collapsible Section',
     description: 'Toggle block — click the summary to expand or collapse',
     run: ({ editor, range }) =>

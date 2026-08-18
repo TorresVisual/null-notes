@@ -221,7 +221,7 @@ Two modes, different defaults — everything here follows from this:
 
 > **Finding, 2026-08-13, still worth knowing before diving in: a stream of editor work has no roadmap representation at all.** `BlockHandle`, `Divider`, `TextAlignment`, `Highlight`, `Kbd`, `HTMLBlock`, `HTMLInline`, `SpanStyle`, `Superscript`/`Subscript` and `NoteImage` all exist in `src/editor/extensions/` and correspond to no phase or task here. The Notion half of the app — which [ROADMAP.md](docs/ROADMAP.md) §1 now names as a pillar — is being built off-book, which suggests "STEM authoring" is only part of the real frame ("Notion parity" is the other part). **No longer a blocking rescope** (the step-5 wait it was tied to is superseded, ROADMAP.md §1 2026-08-17) — just a caveat to keep in mind while working through the boxes below, which are genuinely missing either way.
 >
-> Still genuinely unbuilt: algorithm blocks (P6-2), templates (P6-3), equation snippets (P6-4), search refinement (P6-5), outline panel (P6-6), cross-references (P6-7).
+> Still genuinely unbuilt: templates (P6-3), equation snippets (P6-4), search refinement (P6-5), outline panel (P6-6), cross-references (P6-7).
 
 ### P6-1 Proof blocks + collapsible sections — **M** ✅
 - [x] Theorem / Lemma / Corollary / Proof / Definition / Example blocks, optional numbering + title
@@ -233,9 +233,15 @@ Two modes, different defaults — everything here follows from this:
 >
 > **Theorem/Lemma/Corollary/Proof/Definition/Example are new `calloutType` values on the existing `Callout` node**, per the DoD's "don't invent a second block mechanism" — same `> [!TYPE] Title` admonition syntax, with a new `number` attribute (`> [!THEOREM 3.2] Squeeze Theorem`) so P6-7's cross-references have something to resolve against. A `Proof` block appends a QED mark (`∎`) after its last child — CSS only, never stored. All six reachable from `/`; the print stylesheet gets a palette pass and `break-inside: avoid` alongside the existing callout types. A collapsed `Details` section stays in the DOM (hidden via CSS, not unmounted) specifically so PDF export/print can force it visible — otherwise a collapsed section would silently vanish from the exported PDF.
 
-### P6-2 Algorithm blocks — **M** *(after P6-1, reuse its machinery)*
-- [ ] Complexity / Pseudocode / Implementation / References slots
-- [ ] Serialises to Markdown that still reads sensibly in any other editor
+### P6-2 Algorithm blocks — **M** *(after P6-1, reuse its machinery)* ✅
+- [x] Complexity / Pseudocode / Implementation / References slots
+- [x] Serialises to Markdown that still reads sensibly in any other editor
+
+> **Reuses P6-1's machinery literally** — `algorithm` is one more `calloutType` on the same `Callout` node, no new node type. The four slots are bold-labeled paragraphs (`**Complexity:**`, `**Pseudocode:**`, …) inside the blockquote body rather than a fixed sub-schema, which is what makes it a plain, portable `.md` structure instead of the most bespoke node in the app — a bold line followed by a blank line and its content is legible in any Markdown viewer, GitHub included. Reachable from `/` as *Algorithm Block*, prefilled with all four slots (`Pseudocode`/`Implementation` as code blocks).
+>
+> **Building this found a real, pre-existing bug in `Callout`'s parser**, not introduced by P6-1/P6-2 but first exercised by them: a blockquote line directly under the marker line, with no blank line before it, is the *same* Markdown paragraph as the marker (a soft line break) — and the old parser's `firstP.remove()` deleted that whole paragraph, marker **and** body, rather than just the marker. Silent content loss on save→reload for any callout typed by hand without a blank line after `[!TYPE]`. Fixed: only the marker's own text characters are stripped from the DOM now: `Callout.tsx`'s `updateDOM` walks `firstP`'s child nodes, removing whole nodes that fall inside the marker line and `Text.deleteData`-splitting the one that straddles the boundary, leaving everything after it — including inline marks — as the callout's real first body paragraph.
+>
+> **Filed, not fixed — a separate, narrower bug surfaced while testing the fix above:** a `<strong>` (or presumably any mark) run that ends immediately adjacent to more plain text with **no space or line break between them**, inside a `Callout`'s `wrapBlock`-serialized body, round-trips with its closing `**` misplaced (`**Complexity**:X` instead of `**Complexity:**X`) — confirmed via raw JSON content, so it's in `wrapBlock`/`renderContent`'s interaction with prosemirror-markdown's own mark-boundary logic, not in the parser fixed above. Doesn't reproduce through the actual `/` insertion path (each slot's label and value are separate paragraphs), only through hand-typed Markdown with a mark glued straight onto trailing text. Single, narrow trigger condition — recorded rather than chased, same posture as the frozen PDF pipeline's filed-bugs list.
 
 ### P6-3 Templates — **S/M**
 - [ ] `templates/` folder in the workspace; "New from template" in sidebar + File menu

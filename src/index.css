@@ -806,6 +806,7 @@ body {
 .callout-definition { --callout-color: #e0b34d; --callout-bg: #241d0a; }
 .callout-proof      { --callout-color: #9ca3af; --callout-bg: #1a1c20; }
 .callout-example    { --callout-color: #6bcf7f; --callout-bg: #12240f; }
+.callout-algorithm  { --callout-color: #f472b6; --callout-bg: #2a1220; }
 
 /* Traditional QED mark closing a proof — visual only, never stored */
 .callout-proof .callout-body > :last-child::after {
@@ -1770,6 +1771,7 @@ body {
   .callout-definition { --callout-color: #8a6410; --callout-bg: #faf1de; }
   .callout-proof { --callout-color: #4b5563; --callout-bg: #f0f1f3; }
   .callout-example { --callout-color: #15803d; --callout-bg: #e9f7ee; }
+  .callout-algorithm { --callout-color: #a8296b; --callout-bg: #fbeaf2; }
 
   * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 

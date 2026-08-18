@@ -13,6 +13,7 @@ import {
   CheckCircle2,
   BookMarked,
   FlaskConical,
+  Cpu,
 } from 'lucide-react'
 
 type CalloutType =
@@ -28,6 +29,7 @@ type CalloutType =
   | 'proof'
   | 'definition'
   | 'example'
+  | 'algorithm'
 
 interface CalloutAttrs {
   calloutType: CalloutType
@@ -48,6 +50,7 @@ const CALLOUT_LABEL: Record<string, string> = {
   proof: 'Proof',
   definition: 'Definition',
   example: 'Example',
+  algorithm: 'Algorithm',
 }
 
 const CALLOUT_ICON: Record<string, typeof Info> = {
@@ -63,6 +66,7 @@ const CALLOUT_ICON: Record<string, typeof Info> = {
   proof: CheckCircle2,
   definition: BookMarked,
   example: FlaskConical,
+  algorithm: Cpu,
 }
 
 // Proof/theorem-family blocks carry an optional user-assigned number
@@ -145,10 +149,12 @@ export const Callout = Node.create({
             element.querySelectorAll('blockquote').forEach((bq) => {
               const firstP = bq.querySelector(':scope > p:first-child')
               if (!firstP) return
-              const text = firstP.textContent?.trim() ?? ''
+              const rawText = firstP.textContent ?? ''
+              const newlineIdx = rawText.indexOf('\n')
+              const markerLine = (newlineIdx === -1 ? rawText : rawText.slice(0, newlineIdx)).trim()
               const match =
-                /^\[!(NOTE|TIP|WARNING|DANGER|INFO|IMPORTANT|THEOREM|LEMMA|COROLLARY|PROOF|DEFINITION|EXAMPLE)(?:\s+([\w.]+))?\](.*)/i.exec(
-                  text,
+                /^\[!(NOTE|TIP|WARNING|DANGER|INFO|IMPORTANT|THEOREM|LEMMA|COROLLARY|PROOF|DEFINITION|EXAMPLE|ALGORITHM)(?:\s+([\w.]+))?\](.*)/i.exec(
+                  markerLine,
                 )
               if (!match) return
               const calloutType = match[1]!.toLowerCase()
@@ -159,7 +165,32 @@ export const Callout = Node.create({
               div.setAttribute('data-callout-type', calloutType)
               div.setAttribute('data-callout-title', title)
               div.setAttribute('data-callout-number', number)
-              firstP.remove()
+
+              // A blockquote line right under the marker with no blank line
+              // between them is the *same* Markdown paragraph as the marker
+              // (a soft line break), not a separate one — strip only the
+              // marker line's own characters from the DOM and leave whatever
+              // follows (with its inline formatting intact) as the callout's
+              // first body paragraph. Deleting the whole paragraph here was a
+              // real content-loss bug: any body text glued to the marker line
+              // vanished silently on every save.
+              const markerLen = newlineIdx === -1 ? rawText.length : newlineIdx + 1
+              let consumed = 0
+              for (const child of Array.from(firstP.childNodes)) {
+                if (consumed >= markerLen) break
+                const len = child.textContent?.length ?? 0
+                if (consumed + len <= markerLen) {
+                  child.remove()
+                  consumed += len
+                } else if (child.nodeType === 3 /* Node.TEXT_NODE — `Node` above is TipTap's, not the DOM's */) {
+                  ;(child as Text).deleteData(0, markerLen - consumed)
+                  consumed = markerLen
+                } else {
+                  consumed = markerLen
+                }
+              }
+              if (!firstP.textContent?.trim()) firstP.remove()
+
               while (bq.firstChild) div.appendChild(bq.firstChild)
               bq.replaceWith(div)
             })
