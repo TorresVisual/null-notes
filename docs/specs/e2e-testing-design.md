@@ -15,27 +15,29 @@ Both need an answer before any test can run end to end.
 
 Playwright's `_electron` driver is Electron/Chromium-specific — it doesn't attach to a Tauri app, because Tauri renders through the OS's native WebView (WebView2 on Windows), not a bundled Chromium. `tauri-driver` is Tauri's own answer: it wraps the platform's native WebDriver server (`msedgedriver` on Windows, since WebView2 is Chromium-based under the hood) behind the standard WebDriver protocol, so any W3C WebDriver client — WebdriverIO here — can drive the real compiled `.exe`.
 
-`msedgedriver` has to match the installed Edge major version (151.x locally); a mismatch fails the session at launch, not with a useful error.
+`msedgedriver` has to match the installed Edge major version (151.x locally); a mismatch fails the session at launch, not with a useful error. WebdriverIO ships an official `@wdio/tauri-service` that manages this itself — `autoInstallTauriDriver` runs `cargo install tauri-driver` on first use, `autoDownloadEdgeDriver` fetches the matching `msedgedriver` build, and the service spawns/tears down `tauri-driver` around each test session. Configured with `driverProvider: 'official'`, this needs no Rust-side changes — the alternative `'embedded'` provider gets a richer bridge but requires adding `tauri-plugin-wdio-webdriver` to `Cargo.toml` and a `wdio:default` entry in a Tauri v2 permissions/capabilities file this project doesn't have yet. `'official'` gets the same driving capability with the smaller diff, so that's the one this design uses — the `--workspace` startup arg stays the only Rust-side change.
 
 ## Architecture
 
 ```
-┌─ src-tauri (Rust) ────────────┐        ┌─ e2e/ (Node, WebdriverIO) ───────────┐
-│ argv: --workspace <path>      │        │ wdio.conf.ts                          │
-│  → managed state               │        │  spawns tauri-driver (child_process)  │
-│  → #[tauri::command]           │        │  capabilities: tauri:options.app =    │
-│    initial_workspace()         │        │    target/debug/null-notes.exe        │
-└────────────┬────────────────────┘        │    args: ["--workspace", <fixture>]  │
-             │ invoke on startup            │                                        │
-             ▼                              │ specs/*.e2e.ts                        │
-┌─ Frontend ─────────────────────┐          │  - create temp fixture workspace      │
-│ App root: call                 │          │  - drive DOM via WebDriver            │
-│  initial_workspace() before    │          │  - handle native prompt()/confirm()   │
-│  rendering WorkspacePicker;    │          │    via WebDriver alert API            │
-│  Some(path) → openWorkspaceAt  │          │  - assert against files on disk,      │
-│  (same path recents already    │          │    not just DOM state                 │
-│  use)                          │          └────────────────────────────────────────┘
-└──────────────────────────────────┘
+┌─ src-tauri (Rust) ────────────┐        ┌─ e2e/ (Node, WebdriverIO) ────────────────┐
+│ argv: --workspace <path>      │        │ wdio.conf.ts                              │
+│  → managed state               │        │  services: [['@wdio/tauri-service', {     │
+│  → #[tauri::command]           │        │    driverProvider: 'official',            │
+│    initial_workspace()         │        │    autoInstallTauriDriver: true,          │
+└────────────┬────────────────────┘        │    autoDownloadEdgeDriver: true }]]       │
+             │ invoke on startup            │  capabilities: tauri:options.application  │
+             ▼                              │    = target/debug/null-notes.exe,         │
+┌─ Frontend ─────────────────────┐          │    args: ["--workspace", <fixture>]       │
+│ App root: call                 │          │                                            │
+│  initial_workspace() before    │          │ specs/*.e2e.ts                            │
+│  rendering WorkspacePicker;    │          │  - create temp fixture workspace          │
+│  Some(path) → openWorkspaceAt  │          │  - drive DOM via WebDriver                │
+│  (same path recents already    │          │  - handle native prompt()/confirm()       │
+│  use)                          │          │    via WebDriver alert API                │
+└──────────────────────────────────┘        │  - assert against files on disk,          │
+                                             │    not just DOM state                     │
+                                             └────────────────────────────────────────────┘
 ```
 
 ## The `--workspace` startup arg
@@ -52,17 +54,16 @@ This isn't test-only scaffolding: it's a real "open null-notes.exe pointed at a 
 
 ```
 e2e/
-  wdio.conf.ts       — capabilities, tauri-driver spawn/teardown hooks
+  wdio.conf.ts       — services: @wdio/tauri-service (driverProvider: 'official',
+                        autoInstallTauriDriver, autoDownloadEdgeDriver); capabilities
+                        point at target/debug/null-notes.exe
+  tsconfig.json        — separate from the root src/ tsconfig; picks up WDIO's own types
   specs/
     create-note.e2e.ts
-  .bin/                — gitignored; holds msedgedriver.exe
-  README.md            — one-time setup: cargo install tauri-driver, how to add a new spec
-scripts/
-  download-msedgedriver.ps1   — mirrors download-pdfium.ps1: detects local Edge version,
-                                 fetches the matching msedgedriver build into e2e/.bin/
+  README.md            — one-time setup notes, how to add a new spec
 ```
 
-`cargo install tauri-driver` is a one-time global tool install, the same category as already having `cargo`/`node` present — not a repo dependency, documented in `e2e/README.md` rather than vendored.
+devDependencies: `@wdio/cli`, `@wdio/tauri-service`, `@wdio/mocha-framework`, `@wdio/spec-reporter` (`mocha` itself comes along as `@wdio/mocha-framework`'s dependency). `autoInstallTauriDriver: true` runs `cargo install tauri-driver` on first use and `autoDownloadEdgeDriver: true` fetches the matching `msedgedriver` build — both one-time, cached, no repo-side script needed.
 
 npm scripts:
 
