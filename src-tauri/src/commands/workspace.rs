@@ -54,6 +54,23 @@ async fn push_recent(dir: &Path, workspace: &str) -> anyhow::Result<Vec<String>>
     Ok(recents)
 }
 
+pub fn initial_workspace_from_args<I: IntoIterator<Item = String>>(args: I) -> Option<String> {
+    let mut iter = args.into_iter();
+    while let Some(arg) = iter.next() {
+        if arg == "--workspace" {
+            return iter.next();
+        }
+    }
+    None
+}
+
+pub struct InitialWorkspace(pub Option<String>);
+
+#[tauri::command]
+pub fn initial_workspace(state: tauri::State<InitialWorkspace>) -> Option<String> {
+    state.0.clone()
+}
+
 #[tauri::command]
 pub async fn recent_workspaces(app: AppHandle) -> Result<Vec<String>, String> {
     let dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
@@ -225,5 +242,34 @@ mod tests {
         assert_eq!(state.git.idle_minutes, 10);
         assert!(!state.git.skip_hooks);
         assert!(state.git.auto_push);
+    }
+
+    #[test]
+    fn test_initial_workspace_from_args_finds_the_flag() {
+        let args = vec!["--workspace".to_string(), "/tmp/ws".to_string()];
+        assert_eq!(initial_workspace_from_args(args), Some("/tmp/ws".to_string()));
+    }
+
+    #[test]
+    fn test_initial_workspace_from_args_ignores_other_flags() {
+        let args = vec!["--debug".to_string()];
+        assert_eq!(initial_workspace_from_args(args), None);
+    }
+
+    #[test]
+    fn test_initial_workspace_from_args_trailing_flag_with_no_value_returns_none() {
+        let args = vec!["--workspace".to_string()];
+        assert_eq!(initial_workspace_from_args(args), None);
+    }
+
+    #[test]
+    fn test_initial_workspace_from_args_takes_the_value_immediately_after_the_flag() {
+        let args = vec![
+            "--debug".to_string(),
+            "--workspace".to_string(),
+            "/tmp/ws".to_string(),
+            "--other".to_string(),
+        ];
+        assert_eq!(initial_workspace_from_args(args), Some("/tmp/ws".to_string()));
     }
 }
