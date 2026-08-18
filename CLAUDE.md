@@ -234,14 +234,19 @@ Key handling that must run *before* the keymap plugins (and so before StarterKit
 cargo build                  # build Tauri backend
 cargo test                   # run Rust tests
 cargo clippy -- -D warnings  # lint (must pass clean)
+cargo audit                  # scan Rust deps for known vulnerabilities (from src-tauri/)
 
 # Frontend
 npm run dev                  # Vite dev server
 npm run build                # production build
 npm run typecheck            # tsc --noEmit
 npm test                     # vitest run
+npm audit                    # scan npm deps for known vulnerabilities
 
 # Full app
 npm run tauri dev            # launch desktop app in dev mode
 npm run tauri build          # package installer
+
+# End-to-end (drives the real compiled app — see .claude/skills/e2e-verify/)
+npm run test:e2e             # rebuilds via `tauri build --debug`, then runs e2e/specs/
 ```
