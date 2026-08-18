@@ -88,6 +88,56 @@ describe('Details node', () => {
     expect(md).toContain('<summary>Click me</summary>')
     expect(md).toContain('Body content')
   })
+
+  it('never persists open/collapsed state to markdown (P6-1: presentation-only)', () => {
+    const html = '<details open><summary>x</summary><p>body</p></details>'
+    const e = mount(html)
+    const md = getMarkdown(e)
+    expect(md).toContain('<details>')
+    expect(md).not.toContain('<details open>')
+  })
+})
+
+function calloutNodes(e: Editor): Array<{ calloutType: string; title: string; number: string }> {
+  const found: Array<{ calloutType: string; title: string; number: string }> = []
+  e.state.doc.descendants((node) => {
+    if (node.type.name === 'callout') {
+      found.push({
+        calloutType: node.attrs['calloutType'] as string,
+        title: node.attrs['title'] as string,
+        number: node.attrs['number'] as string,
+      })
+    }
+    return true
+  })
+  return found
+}
+
+describe('Callout proof/theorem blocks (P6-1)', () => {
+  it('parses a numbered theorem and round-trips its number and title', () => {
+    const md = '> [!THEOREM 3.2] Squeeze Theorem\n> Let f, g, h be functions.'
+    const e = mount(md)
+    expect(calloutNodes(e)).toEqual([{ calloutType: 'theorem', title: 'Squeeze Theorem', number: '3.2' }])
+    expect(getMarkdown(e)).toContain('[!THEOREM 3.2] Squeeze Theorem')
+  })
+
+  it('parses an unnumbered, untitled proof block', () => {
+    const md = '> [!PROOF]\n> Trivial.'
+    const e = mount(md)
+    expect(calloutNodes(e)).toEqual([{ calloutType: 'proof', title: '', number: '' }])
+    const out = getMarkdown(e)
+    expect(out).toContain('[!PROOF]')
+    expect(out).not.toContain('[!PROOF ')
+  })
+
+  it('round-trips lemma, corollary, definition and example types', () => {
+    for (const type of ['LEMMA', 'COROLLARY', 'DEFINITION', 'EXAMPLE']) {
+      const md = `> [!${type}] Title\n> Body.`
+      const e = mount(md)
+      expect(calloutNodes(e)).toEqual([{ calloutType: type.toLowerCase(), title: 'Title', number: '' }])
+      expect(getMarkdown(e)).toContain(`[!${type}] Title`)
+    }
+  })
 })
 
 describe('DivBlock node', () => {

@@ -318,6 +318,10 @@ body {
 }
 .details-wrapper.open .details-chevron { transform: rotate(90deg); }
 
+/* Content stays in the DOM at all times (see Details.tsx) so a collapsed
+   section still exports/prints; only screen display hides it. */
+.details-wrapper:not(.open) .details-body { display: none; }
+
 .details-summary-input {
   background: none;
   border: none;
@@ -794,6 +798,21 @@ body {
 .callout-warning   { --callout-color: #f0a030; --callout-bg: #271c0a; }
 .callout-danger    { --callout-color: #e05050; --callout-bg: #270d0d; }
 .callout-important { --callout-color: #9b59b6; --callout-bg: #1a0d27; }
+
+/* Proof/theorem-family blocks (P6-1) — same mechanism, an academic palette */
+.callout-theorem    { --callout-color: #8b7cf6; --callout-bg: #191531; }
+.callout-lemma      { --callout-color: #6d8cf5; --callout-bg: #131c30; }
+.callout-corollary  { --callout-color: #4fd1e3; --callout-bg: #0d2630; }
+.callout-definition { --callout-color: #e0b34d; --callout-bg: #241d0a; }
+.callout-proof      { --callout-color: #9ca3af; --callout-bg: #1a1c20; }
+.callout-example    { --callout-color: #6bcf7f; --callout-bg: #12240f; }
+
+/* Traditional QED mark closing a proof — visual only, never stored */
+.callout-proof .callout-body > :last-child::after {
+  content: '∎';
+  margin-left: 0.4em;
+  color: var(--callout-color);
+}
 
 /* Wiki links */
 .wiki-link {
@@ -1746,6 +1765,11 @@ body {
   .callout-warning { --callout-color: #8a5a10; --callout-bg: #fbf1e0; }
   .callout-danger { --callout-color: #b3261e; --callout-bg: #fbeaea; }
   .callout-important { --callout-color: #6b3fa0; --callout-bg: #f2ebf9; }
+  .callout-theorem, .callout-lemma { --callout-color: #4d3fa0; --callout-bg: #eeecfb; }
+  .callout-corollary { --callout-color: #0e7490; --callout-bg: #e5f6fa; }
+  .callout-definition { --callout-color: #8a6410; --callout-bg: #faf1de; }
+  .callout-proof { --callout-color: #4b5563; --callout-bg: #f0f1f3; }
+  .callout-example { --callout-color: #15803d; --callout-bg: #e9f7ee; }
 
   * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 
@@ -1760,9 +1784,14 @@ body {
 
   .note-editor h1, .note-editor h2, .note-editor h3 { break-after: avoid; }
   .note-editor pre, .pdf-page-block, .ink-block-wrapper, .note-editor table,
-  .note-image {
+  .note-image, .callout, .details-wrapper {
     break-inside: avoid;
   }
+
+  /* A collapsed section is a screen-only affordance — printing must show
+     every section's content regardless of its current open/closed state. */
+  .details-body { display: block !important; }
+  .details-chevron { display: none; }
 }
 
 /* ── Block Handle ──────────────────────────────────────────────── */

@@ -20,7 +20,7 @@ Effort: **S** ≈ hours · **M** ≈ a day or two · **L** ≈ several days.
 
 > **The PDF pipeline is frozen** as of 2026-08-13. The corpus is the regression suite; a new bug earns work only if it is whole-document or recurs across ≥2 corpus documents; 2D-layout reconstruction is closed. See P4-2e.
 
-**Three decisions owed:** `<details open>` — collapse state in the file or presentation-only (before ticking P6-1); split-pane editing (during P4); spaced-repetition storage (before any P9-3 code).
+**Two decisions owed:** split-pane editing (during P4); spaced-repetition storage (before any P9-3 code). *(The third — `<details open>`, collapse state in the file or presentation-only — was decided 2026-08-18: presentation-only. See P6-1.)*
 
 ---
 
@@ -221,17 +221,17 @@ Two modes, different defaults — everything here follows from this:
 
 > **Finding, 2026-08-13, still worth knowing before diving in: a stream of editor work has no roadmap representation at all.** `BlockHandle`, `Divider`, `TextAlignment`, `Highlight`, `Kbd`, `HTMLBlock`, `HTMLInline`, `SpanStyle`, `Superscript`/`Subscript` and `NoteImage` all exist in `src/editor/extensions/` and correspond to no phase or task here. The Notion half of the app — which [ROADMAP.md](docs/ROADMAP.md) §1 now names as a pillar — is being built off-book, which suggests "STEM authoring" is only part of the real frame ("Notion parity" is the other part). **No longer a blocking rescope** (the step-5 wait it was tied to is superseded, ROADMAP.md §1 2026-08-17) — just a caveat to keep in mind while working through the boxes below, which are genuinely missing either way.
 >
-> Still genuinely unbuilt: proof/theorem blocks, algorithm blocks (P6-2), templates (P6-3), equation snippets (P6-4), search refinement (P6-5), outline panel (P6-6), cross-references (P6-7).
+> Still genuinely unbuilt: algorithm blocks (P6-2), templates (P6-3), equation snippets (P6-4), search refinement (P6-5), outline panel (P6-6), cross-references (P6-7).
 
-### P6-1 Proof blocks + collapsible sections — **M**
-- [ ] Theorem / Lemma / Corollary / Proof / Definition / Example blocks, optional numbering + title
-- [~] Collapsible sections — **built, but not meeting this DoD.** See the two findings below
-- [ ] Build on the existing `Callout` node pattern — don't invent a second block mechanism
-- [ ] Round-trips through save→reload; prints correctly in PDF export
+### P6-1 Proof blocks + collapsible sections — **M** ✅
+- [x] Theorem / Lemma / Corollary / Proof / Definition / Example blocks, optional numbering + title
+- [x] Collapsible sections — decision made (below), now presentation-only and reachable from `/`
+- [x] Build on the existing `Callout` node pattern — don't invent a second block mechanism
+- [x] Round-trips through save→reload; prints correctly in PDF export
 
-> **Reconciliation, 2026-08-13.** `src/editor/extensions/Details.tsx` is a real collapsible node with `summary`/`open` attributes — but it is **absent from the slash menu**, so "inserts from `/`" is not met: it is built and unreachable. And it **serializes collapse state into the file** (`<details open>`), while this DoD says collapse state is presentation-only and never touches the `.md`.
+> **Decided, 2026-08-18: collapse state is presentation-only.** `Details.tsx`'s `open`/closed state is now plain React component state, never a node-attribute update — toggling a section no longer dirties the buffer, so it can't trigger a save or (under P5) an auto-commit for what is purely a view-state click. The tradeoff this gives up: collapse state doesn't survive reopening the note, and a raw `<details>` in the file (no `open` attribute) always renders closed in GitHub — accepted, since the DoD explicitly named this as the requirement, not an oversight. Reachable from `/` as *Collapsible Section*.
 >
-> The second is a genuine open decision, not a bug to fix silently. `<details open>` is standard, portable HTML that renders in GitHub and every other Markdown viewer — an argument for keeping it. Against: collapsing a section then dirties the buffer and triggers a write, and under P5 it produces an auto-commit, which is the exact churn the DoD was written to prevent. **Decide before ticking P6-1.**
+> **Theorem/Lemma/Corollary/Proof/Definition/Example are new `calloutType` values on the existing `Callout` node**, per the DoD's "don't invent a second block mechanism" — same `> [!TYPE] Title` admonition syntax, with a new `number` attribute (`> [!THEOREM 3.2] Squeeze Theorem`) so P6-7's cross-references have something to resolve against. A `Proof` block appends a QED mark (`∎`) after its last child — CSS only, never stored. All six reachable from `/`; the print stylesheet gets a palette pass and `break-inside: avoid` alongside the existing callout types. A collapsed `Details` section stays in the DOM (hidden via CSS, not unmounted) specifically so PDF export/print can force it visible — otherwise a collapsed section would silently vanish from the exported PDF.
 
 ### P6-2 Algorithm blocks — **M** *(after P6-1, reuse its machinery)*
 - [ ] Complexity / Pseudocode / Implementation / References slots

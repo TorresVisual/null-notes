@@ -106,6 +106,83 @@ const COMMANDS: Cmd[] = [
         .run(),
   },
   {
+    title: 'Theorem',
+    description: 'Numbered theorem block',
+    run: ({ editor, range }) =>
+      editor
+        .chain()
+        .focus()
+        .deleteRange(range)
+        .insertContent({ type: 'callout', attrs: { calloutType: 'theorem', title: '', number: '' }, content: [{ type: 'paragraph' }] })
+        .run(),
+  },
+  {
+    title: 'Lemma',
+    description: 'Numbered lemma block',
+    run: ({ editor, range }) =>
+      editor
+        .chain()
+        .focus()
+        .deleteRange(range)
+        .insertContent({ type: 'callout', attrs: { calloutType: 'lemma', title: '', number: '' }, content: [{ type: 'paragraph' }] })
+        .run(),
+  },
+  {
+    title: 'Corollary',
+    description: 'Numbered corollary block',
+    run: ({ editor, range }) =>
+      editor
+        .chain()
+        .focus()
+        .deleteRange(range)
+        .insertContent({ type: 'callout', attrs: { calloutType: 'corollary', title: '', number: '' }, content: [{ type: 'paragraph' }] })
+        .run(),
+  },
+  {
+    title: 'Proof',
+    description: 'Proof block',
+    run: ({ editor, range }) =>
+      editor
+        .chain()
+        .focus()
+        .deleteRange(range)
+        .insertContent({ type: 'callout', attrs: { calloutType: 'proof', title: '', number: '' }, content: [{ type: 'paragraph' }] })
+        .run(),
+  },
+  {
+    title: 'Definition',
+    description: 'Numbered definition block',
+    run: ({ editor, range }) =>
+      editor
+        .chain()
+        .focus()
+        .deleteRange(range)
+        .insertContent({ type: 'callout', attrs: { calloutType: 'definition', title: '', number: '' }, content: [{ type: 'paragraph' }] })
+        .run(),
+  },
+  {
+    title: 'Example',
+    description: 'Numbered example block',
+    run: ({ editor, range }) =>
+      editor
+        .chain()
+        .focus()
+        .deleteRange(range)
+        .insertContent({ type: 'callout', attrs: { calloutType: 'example', title: '', number: '' }, content: [{ type: 'paragraph' }] })
+        .run(),
+  },
+  {
+    title: 'Collapsible Section',
+    description: 'Toggle block — click the summary to expand or collapse',
+    run: ({ editor, range }) =>
+      editor
+        .chain()
+        .focus()
+        .deleteRange(range)
+        .insertContent({ type: 'details', attrs: { summary: '' }, content: [{ type: 'paragraph' }] })
+        .run(),
+  },
+  {
     title: 'Task List',
     description: 'Checkable to-do list',
     run: ({ editor, range }) =>
