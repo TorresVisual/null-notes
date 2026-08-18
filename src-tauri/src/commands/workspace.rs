@@ -54,14 +54,13 @@ async fn push_recent(dir: &Path, workspace: &str) -> anyhow::Result<Vec<String>>
     Ok(recents)
 }
 
+// A single `--workspace=<path>` token, not a `--workspace <path>` pair: some
+// launchers in the E2E toolchain reorder and re-split multi-token argv lists,
+// which silently detaches a flag from its value. One token can't be reordered
+// relative to anything.
 pub fn initial_workspace_from_args<I: IntoIterator<Item = String>>(args: I) -> Option<String> {
-    let mut iter = args.into_iter();
-    while let Some(arg) = iter.next() {
-        if arg == "--workspace" {
-            return iter.next();
-        }
-    }
-    None
+    args.into_iter()
+        .find_map(|arg| arg.strip_prefix("--workspace=").map(str::to_string))
 }
 
 pub struct InitialWorkspace(pub Option<String>);
@@ -246,7 +245,7 @@ mod tests {
 
     #[test]
     fn test_initial_workspace_from_args_finds_the_flag() {
-        let args = vec!["--workspace".to_string(), "/tmp/ws".to_string()];
+        let args = vec!["--workspace=/tmp/ws".to_string()];
         assert_eq!(initial_workspace_from_args(args), Some("/tmp/ws".to_string()));
     }
 
@@ -257,17 +256,16 @@ mod tests {
     }
 
     #[test]
-    fn test_initial_workspace_from_args_trailing_flag_with_no_value_returns_none() {
-        let args = vec!["--workspace".to_string()];
+    fn test_initial_workspace_from_args_unjoined_flag_without_equals_is_ignored() {
+        let args = vec!["--workspace".to_string(), "/tmp/ws".to_string()];
         assert_eq!(initial_workspace_from_args(args), None);
     }
 
     #[test]
-    fn test_initial_workspace_from_args_takes_the_value_immediately_after_the_flag() {
+    fn test_initial_workspace_from_args_finds_the_flag_among_others_in_any_position() {
         let args = vec![
             "--debug".to_string(),
-            "--workspace".to_string(),
-            "/tmp/ws".to_string(),
+            "--workspace=/tmp/ws".to_string(),
             "--other".to_string(),
         ];
         assert_eq!(initial_workspace_from_args(args), Some("/tmp/ws".to_string()));
