@@ -60,6 +60,14 @@ describe('useWorkspace', () => {
     expect(useWorkspaceStore.getState().git).toEqual({ prompted: true, autoCommit: true, idleMinutes: 10, skipHooks: false, autoPush: true })
   })
 
+  it('does not persist to recent workspaces when remember is false', async () => {
+    const { result } = renderHook(() => useWorkspace())
+
+    await result.current.openWorkspaceAt('/ws', { remember: false })
+
+    expect(workspace.remember).not.toHaveBeenCalled()
+  })
+
   it('detects the repo mode after opening and stores it', async () => {
     git.detectRepo.mockResolvedValue('notesOnly')
     const { result } = renderHook(() => useWorkspace())

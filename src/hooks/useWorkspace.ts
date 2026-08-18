@@ -38,7 +38,8 @@ export function useWorkspace() {
   // Read the folder before touching any state: a recent workspace can be gone
   // by the time it's clicked, and a failed scan must leave the current one open.
   const openWorkspaceAt = useCallback(
-    async (selected: string) => {
+    async (selected: string, opts: { remember?: boolean } = {}) => {
+      const { remember = true } = opts
       const { setFolderError, setRecentWorkspaces, setGit, setRepoMode } = useWorkspaceStore.getState()
       let tree, session
       try {
@@ -64,7 +65,9 @@ export function useWorkspace() {
         openTab(tab)
       }
       await refreshTags()
-      setRecentWorkspaces(await api.workspace.remember(selected))
+      if (remember) {
+        setRecentWorkspaces(await api.workspace.remember(selected))
+      }
 
       // Best-effort: a missing `git` binary or any other detection failure
       // just means no repo prompt, never a blocked workspace open.

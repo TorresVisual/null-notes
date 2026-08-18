@@ -65,6 +65,8 @@ export const api = {
       invoke<string[]>('recent_workspaces'),
     remember: (path: string) =>
       invoke<string[]>('remember_workspace', { path }),
+    initialWorkspace: () =>
+      invoke<string | null>('initial_workspace'),
   },
   git: {
     detectRepo: (workspace: string) =>

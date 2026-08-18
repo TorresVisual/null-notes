@@ -51,7 +51,7 @@ export function Layout() {
     keepMine,
     reloadTheirs,
   } = useNote(activeTab)
-  const { saveSession, openWorkspace } = useWorkspace()
+  const { saveSession, openWorkspace, openWorkspaceAt } = useWorkspace()
   const { updateGit } = useGitConfig()
   const { flushGitCommit } = useGitAutoCommit()
   const repoMode = useWorkspaceStore((s) => s.repoMode)
@@ -203,9 +203,12 @@ export function Layout() {
   }, [])
 
   useEffect(() => {
+    void api.workspace.initialWorkspace().then((path) => {
+      if (path) void openWorkspaceAt(path, { remember: false })
+    })
     void refreshRecents()
     void api.settings.load().then(setSettings)
-  }, [setSettings])
+  }, [setSettings, openWorkspaceAt])
 
   useEffect(() => {
     setViewMode('wysiwyg')
