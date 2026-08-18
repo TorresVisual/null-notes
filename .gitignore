@@ -41,3 +41,6 @@ src-tauri/pix2tex-venv/
 .claude/
 .playwright-mcp/
 .null/
+!.claude/
+.claude/*
+!.claude/skills/
