@@ -73,6 +73,8 @@ fn build_menu(handle: &tauri::AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    let initial_workspace = commands::workspace::initial_workspace_from_args(std::env::args().skip(1));
+
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
@@ -92,13 +94,14 @@ pub fn run() {
                 let _ = window.emit("close-requested", ());
             }
         })
-        .setup(|app| {
+        .setup(move |app| {
             let data_dir = app.path().app_data_dir()?;
             let pool = tauri::async_runtime::block_on(db::init_db(&data_dir))
                 .expect("failed to initialise database");
             app.manage(pool);
             app.manage(commands::watcher::WatcherState::default());
             app.manage(commands::terminal::PtyState::default());
+            app.manage(commands::workspace::InitialWorkspace(initial_workspace));
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -139,6 +142,7 @@ pub fn run() {
             commands::workspace::save_workspace,
             commands::workspace::recent_workspaces,
             commands::workspace::remember_workspace,
+            commands::workspace::initial_workspace,
             commands::settings::load_settings,
             commands::settings::save_settings,
             commands::ink::ensure_ink_dir,
