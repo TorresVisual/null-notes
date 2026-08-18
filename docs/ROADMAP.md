@@ -2,6 +2,8 @@
 
 **Last updated:** 2026-08-17 (**the dogfood slice is complete.** P8-1 shipped — a PTY-backed terminal pane (`portable-pty` + `xterm.js`), toggled with `Ctrl+\``, rooted at the workspace, with the active note's path as an env var plus a one-key insert. **M8 reached.** The full slice — P7-3a's scan ignore list → P7-3 → P7-4 + P7-1 → P8-1 — is now done end to end; this project's own `docs/` can be opened, edited, and worked on from inside null-notes itself. Same day, P7-2 ("Open in IDE" on a code block that names its own source path) landed too, reusing P7-1's launcher and cache outright — **M7 reached**. §6's step 5 (wait for a couple of weeks of real dogfood use before continuing P5/P6/P9) is now **superseded** — see §1's third closed question, 2026-08-17: the maintainer's mode is implementing and verifying features, not daily use, so the wait never resolves on its own. Step 6 (P5 → P6 → P9) is underway: **P5-1 shipped same day** — `git rev-parse --show-toplevel`, canonicalized against the workspace path, classifies notes-only vs. code-repo mode; the opt-in config lives on `WorkspaceState` next to `.workspace.json`'s other machine-local UI state; no Git command runs until a human answers the one-time prompt. **P5-2 through P5-5 are now also done — M5 reached.** Batched auto-commit is pathspec-scoped and backs off on any unsafe repo state; push never happens for a code-repo workspace, enforced at both the Rust and frontend layers; auto-pull is fast-forward-only, reusing P0-5's watcher for the resulting file changes rather than adding new reload logic; a plain notes folder can become a private GitHub-backed repo in one Settings action. **Next: P6**, STEM authoring.)
 
+*2026-08-18 update: a review pass (*`notes/Roadmap-Update.md`*) proposed a batch of P6/P9 additions and a few speculative subsystems. Folded in where they earned their keep: P6-7 (cross-references, reusing P7-1's link-recognition pattern), P6-3 generalized to named placeholders, P6-5 extended with bounded* `type:`*/*`task:` *filter keys, and P9-4 (a workspace dashboard, sequenced as a P9 capstone since it has nothing to show until P9-1/P9-3/P5 exist). A new §8 collects the small editor/navigation polish items with no phase to sit in. Three ideas were challenged rather than scheduled — a per-note document map (redundant with P3-3 + P6-7), source-aware PDF↔note links (would touch the frozen P4 pipeline), and a unified command palette (every action it'd list already has a path via P2-2's menu and P6's slash commands) — see §4.*
+
 *2026-08-13 revision, kept for context — see `specs/roadmap-revision-design.md`: the two weeks before that went almost entirely into PDF pipeline refinement, which the roadmap had no boundary for; that revision added one (§Phase 4, "Pipeline completion criteria"), recorded the app's actual identity and two closed questions (§1), and replaced the execution order in §6 — phase numbers are identity, not order. Ruled fractions landed, freezing the pipeline (§Phase 4, P4-2e); all three open bugs were triaged (two fixed, one didn't reproduce); P4-3 closed M4.*
 
 *Previously, 2026-07-30: M0–M3 all reached — P2-3 closed M2; P4-1 + P4-2 done — PDF→Markdown converts from the embedded text layer with no OCR, and equations are rebuilt as LaTeX rather than mangled into text; re-scoped against* `notes/Plan.md`*; Phases 5 "Versioned Workspaces" and 9 "Study & Revision" added — the first features that go beyond the original brief*.**Audience of this doc:** the maintainer (solo dev). **Product audience:** you — a personal, offline, daily-driver note app for CS coursework. This is **not** aimed at public distribution yet, which deliberately pushes packaging, cross-platform, auto-update, branding, and onboarding *down* the priority list. Correctness, data integrity, and the editor/ink/PDF workflow come first.
@@ -633,9 +635,9 @@ Cheap phase with a high hit rate: the callout node, the slash-command menu, and 
 
 ### P6-3 — Templates — **S/M**
 
-- A `templates/` folder in the workspace; "New from template" in the sidebar and File menu. Minimal placeholder substitution (date, title) and nothing more.
-- The exercise-sheet layout from P4-3 becomes the first real template.
-- **DoD:** Creating a note from a template produces the template's content with placeholders filled; templates are plain `.md` files, editable as normal notes.
+- A `templates/` folder in the workspace; "New from template" in the sidebar and File menu. Placeholder substitution — `{{date}}`, `{{title}}`, and any other `{{name}}` a template author writes, prompted for at creation time. Still no logic: no conditionals, no computed fields, no per-field types — a template stays a `.md` file with blanks, not a form.
+- The exercise-sheet layout from P4-3 becomes the first real template; a lecture/proof template (`{{course}}`, `{{topic}}`, `{{theorem}}`) is a natural second and third once P6-1 lands.
+- **DoD:** Creating a note from a template prompts for every `{{placeholder}}` the template uses and produces the filled content; templates are plain `.md` files, editable as normal notes, with no substitution engine beyond literal find-and-replace.
 
 ### P6-4 — Equation snippets — **S**
 
@@ -653,12 +655,22 @@ Long lecture notes are hard to move around in, and P6 is the phase that makes no
 
 *Placement note: this was proposed alongside the P9 study features, but it is an **S**-effort navigation aid that serves any long note — parking it behind three phases would waste it. Moved here deliberately.*
 
+### P6-7 — Cross-references — **S**
+
+Extends the numbering P6-1 gives Theorem/Lemma/Definition blocks into a reference, the same way P7-1 turned `file:line` text into a clickable code link: recognise `Theorem 3.2` (block-type keyword + its own number) in prose and resolve it to the numbered block, in this note or any other.
+
+- `[[Theorem: name]]` continues to work as-is — it's an ordinary wiki-link pointed at a note; the new part is resolving a bare numeral reference to a specific *block*, not just a note.
+- **Dependency:** P6-1 (block numbering is the referent).
+- **DoD:** Typing `See Theorem 3.2` renders it clickable once such a block exists anywhere in the workspace, jumping to it on click; an unresolvable reference renders inert — matching P7-1's and P1-1's "prefer a miss" posture rather than guessing at the wrong block.
+
 ### P6-5 — Search refinement — **S**
 
 The brief asks search to cover "equations, code, handwritten notes, PDFs." Equations and code already work (FTS indexes the raw `.md`); PDFs arrive with P4-1; handwriting is cut (§4). What's actually missing is **scoping**.
 
 - Filter results by folder and by tag; keep a short recent-searches list (a brief workspace-memory item).
-- **DoD:** Search can be narrowed to a folder or tag without leaving the keyboard; recent searches persist per workspace.
+- Extend the same syntax to `type:` (block type — theorem, definition, algorithm, once P6-1/P6-2 exist) and `task:open`/`task:done` (once P9-1's `note_tasks` table exists) — same filter mechanism, more keys, not a query language. This is the bounded version of "Dataview-lite," already rejected below (§4) for being open-ended; a fixed, small key list is not the same risk.
+- **Dependency:** folder/tag filtering ships standalone; `type:` needs P6-1/P6-2, `task:` needs P9-1 — both are optional extensions, not blockers.
+- **DoD:** Search can be narrowed to a folder or tag without leaving the keyboard; recent searches persist per workspace; `type:` and `task:` filter the same way once their underlying data exists.
 
 ---
 
@@ -796,6 +808,18 @@ Then, once decided:
 - **Dependency:** the fork above; P6-1 for theorem-block cards; **this is the concrete trigger for the frontmatter decision** deferred in §5 — if Option A wins, frontmatter may never be needed at all.
 - **DoD:** Cards are authored inside normal notes and remain readable as plain Markdown in any other editor; a review session schedules correctly across restarts; deleting `index.db` and reopening loses no scheduling state; moving or renaming a note does not orphan its cards.
 
+### P9-4 — Workspace dashboard — **M**
+
+A single home screen instead of always opening to the last note — a capstone that pulls together threads P5 and P9 already built rather than adding new state of its own.
+
+- **Continue** — the last few open notes, from `.workspace.json`'s existing tab/session state.
+- **Recent** — recently edited notes, from the note list's existing mtime.
+- **Tasks** — open task count, from P9-1's `note_tasks` table.
+- **Study** — cards due today, from P9-3's derived `review_cards` table.
+- **Git** — up-to-date / N unpushed / diverged, from P5's existing status calls.
+- **Dependency:** P9-1, P9-3, P5-2/P5-3/P5-4. Sequence it last in P9 — it has nothing to show until the others exist.
+- **DoD:** Opening a workspace with no tab restored (or an explicit "Home" command) shows all five sections, each read from existing data with no new derived state introduced for this task; clicking any item opens it exactly like its source view would.
+
 **Exit check for M9:** a real course folder yields a usable formula sheet, its open tasks are visible in one place, and a revision session runs off the semester's own notes without any content having been re-entered by hand.
 
 ---
@@ -840,6 +864,9 @@ Per the mandate to remove work that doesn't earn its keep:
 | **Lecture audio recording + timestamped notes** | **Cut** | A real student workflow, but a different product surface (capture device, audio storage, playback sync) attached to an app whose entire value is plain-text portability. An audio file is not a `.md`. |
 | **Citations / BibTeX / reference manager** | **Cut** | Coursework cites rarely; this is a thesis-writing need, and Zotero already exists. |
 | **Presentation / slides mode** | **Cut** | Niche, and P3-2's PDF export already covers sharing a note with a study group. |
+| **Per-note "document map" (block-reference graph)** | **Challenged — not scheduled** | Redundant with two things that already cover the same underlying data: P3-3's connections graph (global, notes+tags+links) and P6-7's cross-references (in-note, click-through). A third, note-scoped visualization is a presentation choice, not a missing capability — revisit only if P6-7 in practice turns out to need a picture, not just a jump-to-block. |
+| **Source-aware PDF notes** (click a converted exercise's "Source: Sheet.pdf, Page 4" back to the original PDF page) | **Challenged — blocked by the P4 freeze** | Genuinely useful, and distinct in kind from 2D-layout reconstruction (P4-2e's freeze target) — but recording page provenance still means touching the conversion path in `pdf/extract.rs`/`layout.rs`, and the freeze's re-entry condition is "real coursework use produces a document that fails the by-hand bar," not "a good idea arrives." No such document has. If the freeze ever lifts, this is a reasonable first thing to build — not a reason to lift it early. |
+| **Unified command palette** (`Ctrl+Shift+P`, "Create theorem" / "Insert equation" / …) | **Challenged — not scheduled** | Every action it would list already has a path: the P2-2 native menu, the shortcut sheet, and P6's own `/` slash commands. A fuzzy-searchable palette earns its keep once the action count makes menu-hunting slow — revisit after P6 ships and the slash-command list has actually grown, not speculatively now. |
 
 ---
 
@@ -868,8 +895,9 @@ Completed phases (P0–P3) are collapsed to their outbound edges; the live criti
              └─> P2-1 settings ─────────────> P7-4 editor command      └─> P4-3 exercise split + add-next-task
              └─> P2-3 .assets sidecar ──────> P4-2 maths region crops   └─> P6-3 templates
 P6-1 proof blocks + collapsible ──┬─> P6-2 algorithm blocks
+                                  ├─> P6-7 cross-references
                                   └─> P9-3 spaced repetition (theorem blocks = cards)
-P6-4 equation snippets (independent) ; P6-5 search refinement (independent)
+P6-4 equation snippets (independent) ; P6-5 search refinement (independent; type:/task: extend it once P6-1/P6-2/P9-1 exist)
 P6-6 outline panel (independent, no backend)
 P7-1 deep links ──> P7-2 open-in-IDE ;  P7-4 lands *with* P7-1, not after
 P7-3 project awareness (independent)
@@ -879,6 +907,7 @@ P5-1 repo detection ──┬─> P5-2 auto-commit ──> P5-3 push policy
 P7-3 project awareness ──> P5-2's code-repo mode is most useful once this exists
 [reindex_note path] ──> P9-1 task view      [P3-2 export] ──> P9-2 formula sheet
 P9-3 storage fork ──> P9-3 implementation ──> (frontmatter decision resolves here)
+P9-1, P9-3, P5-2/3/4 ──> P9-4 workspace dashboard (capstone, last in P9)
 P10-* gated behind M9
 ```
 
@@ -923,3 +952,28 @@ The following are **intentionally not on this roadmap**. Adding any of them is a
 - **Resolving merge conflicts.** P5 automates commits and fast-forward pulls only. The app never merges, rebases, force-pushes, resets, or edits a conflicted file. When Git needs a human, it gets one.
 - **Becoming an IDE.** P7 integrates with your editor; it does not grow into one. No project-wide code navigation, no refactoring, no debugger, no language servers. The moment a P7 task starts wanting a language server, it is out of scope.
 ```
+
+---
+
+## 8. Polish backlog
+
+Small, low-effort quality-of-life items collected from a 2026-08-18 review pass (`notes/Roadmap-Update.md`). None are phased — none gate anything, and folding them into a phase would make that phase's milestone about the wrong thing. Pull one out into a real task (with its own DoD) when it's actually being built; until then this is just the list, so a good suggestion doesn't evaporate between reviews.
+
+**Editor**
+
+- Find/replace within a note.
+- Focus mode / zen mode — hide chrome, dim everything but the active block.
+- Drag to reorder blocks; duplicate block; move block up/down; convert block type — all "block handle" affordances, natural extensions of the existing `BlockHandle` extension once one of them is actually built.
+
+**Navigation**
+
+- Recently closed tabs (reopen).
+- `Ctrl+Tab` tab switching.
+- Jump back / forward through navigation history — wiki-links, code deep links (P7-1), and cross-references (P6-7) all currently jump one-way with no way back except the tab itself.
+- "Go to definition" for a wiki-link or code deep link under the cursor, without clicking through.
+
+**Backlinks**
+
+- Context snippets in the backlinks panel — the surrounding line or block, not just the linking note's title.
+
+**Deliberately left off this list:** multi-cursor editing. TipTap/ProseMirror's selection model has no clean multi-cursor primitive — it would be a real subsystem, not a backlog item, and belongs in its own phase if it ever turns out to matter.

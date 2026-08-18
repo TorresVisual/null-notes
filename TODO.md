@@ -221,7 +221,7 @@ Two modes, different defaults — everything here follows from this:
 
 > **Finding, 2026-08-13, still worth knowing before diving in: a stream of editor work has no roadmap representation at all.** `BlockHandle`, `Divider`, `TextAlignment`, `Highlight`, `Kbd`, `HTMLBlock`, `HTMLInline`, `SpanStyle`, `Superscript`/`Subscript` and `NoteImage` all exist in `src/editor/extensions/` and correspond to no phase or task here. The Notion half of the app — which [ROADMAP.md](docs/ROADMAP.md) §1 now names as a pillar — is being built off-book, which suggests "STEM authoring" is only part of the real frame ("Notion parity" is the other part). **No longer a blocking rescope** (the step-5 wait it was tied to is superseded, ROADMAP.md §1 2026-08-17) — just a caveat to keep in mind while working through the boxes below, which are genuinely missing either way.
 >
-> Still genuinely unbuilt: proof/theorem blocks, algorithm blocks (P6-2), templates (P6-3), equation snippets (P6-4), search refinement (P6-5), outline panel (P6-6).
+> Still genuinely unbuilt: proof/theorem blocks, algorithm blocks (P6-2), templates (P6-3), equation snippets (P6-4), search refinement (P6-5), outline panel (P6-6), cross-references (P6-7).
 
 ### P6-1 Proof blocks + collapsible sections — **M**
 - [ ] Theorem / Lemma / Corollary / Proof / Definition / Example blocks, optional numbering + title
@@ -239,16 +239,12 @@ Two modes, different defaults — everything here follows from this:
 
 ### P6-3 Templates — **S/M**
 - [ ] `templates/` folder in the workspace; "New from template" in sidebar + File menu
-- [ ] Minimal placeholder substitution (date, title) — nothing more
+- [ ] Placeholder substitution — `{{date}}`, `{{title}}`, and any `{{name}}` the template uses, prompted at creation time; no logic beyond literal find-and-replace
 - [ ] Ship the P4-3 exercise-sheet layout as the first template
 
 ### P6-4 Equation snippets — **S**
 - [ ] `/gradient` → `\nabla f(x)` and friends, as one editable table
 - [ ] Offered only in a maths context
-
-### P6-5 Search refinement — **S**
-- [ ] Filter results by folder and by tag, without leaving the keyboard
-- [ ] Recent-searches list, persisted per workspace
 
 ### P6-6 Outline / TOC panel — **S**
 - [ ] Current note's headings in the right rail, click to jump
@@ -257,6 +253,18 @@ Two modes, different defaults — everything here follows from this:
 - [ ] Toggle on the P2-2 shortcut layer
 
 > No backend work — heading data is already in the ProseMirror doc. Proposed with the P9 study features but moved here: it's **S** and serves any long note, so parking it behind three phases would waste it.
+
+### P6-7 Cross-references — **S** *(added 2026-08-18, from a review pass)*
+- [ ] Recognise `Theorem 3.2` (block-type keyword + its own number) in prose, resolved against P6-1's numbered blocks
+- [ ] `[[Theorem: name]]` continues to work unchanged — an ordinary wiki-link, just pointed at a block-bearing note
+- [ ] Clicking a resolved reference jumps to the block; an unresolvable one renders inert, same "prefer a miss" posture as P7-1/P1-1
+
+> **Dependency:** P6-1 (block numbering is the referent).
+
+### P6-5 Search refinement — **S**
+- [ ] Filter results by folder and by tag, without leaving the keyboard
+- [ ] Recent-searches list, persisted per workspace
+- [ ] `type:` (block type, once P6-1/P6-2 exist) and `task:open`/`task:done` (once P9-1's `note_tasks` table exists) — same filter mechanism, bounded key list, not a query language
 
 ---
 
@@ -355,6 +363,17 @@ The only phase not from the brief. Everything before it is *capture*; this is *r
 - [ ] Renaming/moving a note does not orphan its cards
 
 > This is the named trigger for the **frontmatter** decision deferred in the roadmap. If Option A wins, frontmatter may never be needed at all.
+
+### P9-4 Workspace dashboard — **M** *(added 2026-08-18, from a review pass; capstone — sequence last in P9)*
+- [ ] **Continue** — last few open notes, from `.workspace.json`'s existing session state
+- [ ] **Recent** — recently edited notes, from existing mtime
+- [ ] **Tasks** — open count, from P9-1's `note_tasks`
+- [ ] **Study** — cards due today, from P9-3's `review_cards`
+- [ ] **Git** — up-to-date / unpushed / diverged, from P5's existing status calls
+- [ ] No new derived state — every section reads data another task already produces
+- [ ] Clicking an item opens it exactly like its source view would
+
+> **Dependency:** P9-1, P9-3, P5-2/P5-3/P5-4 — it has nothing to show without them.
 
 ---
 
