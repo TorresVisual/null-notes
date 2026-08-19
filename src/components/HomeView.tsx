@@ -39,6 +39,18 @@ export function HomeView({ onOpenTaskView }: HomeViewProps) {
 
   const taskItems = tasks.slice(0, SECTION_CAP)
 
+  const repoMode = useWorkspaceStore((s) => s.repoMode)
+  const gitDiverged = useWorkspaceStore((s) => s.gitDiverged)
+  const gitPendingPaths = useWorkspaceStore((s) => s.gitPendingPaths)
+
+  const gitStatus = !repoMode
+    ? null
+    : gitDiverged
+      ? `${gitDiverged.ahead} ahead, ${gitDiverged.behind} behind`
+      : gitPendingPaths.length > 0
+        ? `${gitPendingPaths.length} unpushed`
+        : 'Up to date'
+
   return (
     <div className="home-view">
       <section className="home-section">
@@ -95,6 +107,16 @@ export function HomeView({ onOpenTaskView }: HomeViewProps) {
           </>
         )}
       </section>
+      <section className="home-section home-section-disabled">
+        <h2>Study</h2>
+        <p className="home-empty">Spaced repetition isn't set up yet.</p>
+      </section>
+      {gitStatus && (
+        <section className="home-section">
+          <h2>Git</h2>
+          <p className="home-status">{gitStatus}</p>
+        </section>
+      )}
     </div>
   )
 }

@@ -68,7 +68,8 @@ describe('HomeView', () => {
     const { getByText, getAllByRole } = render(<HomeView onOpenTaskView={() => {}} />)
     const recentSection = getByText('Recent').closest('section')!
     const buttons = getAllByRole('button', { name: /Older|Newer/ })
-    expect(recentSection.contains(buttons[0])).toBe(true)
+    expect(buttons).toHaveLength(2)
+    expect(recentSection.contains(buttons[0]!)).toBe(true)
     expect(buttons[0]).toHaveTextContent('Newer')
     expect(buttons[1]).toHaveTextContent('Older')
 
@@ -108,5 +109,42 @@ describe('HomeView', () => {
     await findByText('Finish proof')
     await userEvent.click(getByText('View all'))
     expect(onOpenTaskView).toHaveBeenCalledOnce()
+  })
+
+  it('shows Study as a disabled placeholder', () => {
+    const { getByText } = render(<HomeView onOpenTaskView={() => {}} />)
+    expect(getByText("Spaced repetition isn't set up yet.")).toBeInTheDocument()
+  })
+
+  it('hides the Git section when the workspace is not a Git repo', () => {
+    useWorkspaceStore.setState({ repoMode: null })
+    const { queryByText } = render(<HomeView onOpenTaskView={() => {}} />)
+    expect(queryByText('Git')).not.toBeInTheDocument()
+  })
+
+  it('shows "Up to date" when there is no divergence and nothing pending', () => {
+    useWorkspaceStore.setState({ repoMode: 'notesOnly', gitDiverged: null, gitPendingPaths: [] })
+    const { getByText } = render(<HomeView onOpenTaskView={() => {}} />)
+    expect(getByText('Up to date')).toBeInTheDocument()
+  })
+
+  it('shows an unpushed count when paths are pending and there is no divergence', () => {
+    useWorkspaceStore.setState({
+      repoMode: 'notesOnly',
+      gitDiverged: null,
+      gitPendingPaths: ['/ws/a.md', '/ws/b.md'],
+    })
+    const { getByText } = render(<HomeView onOpenTaskView={() => {}} />)
+    expect(getByText('2 unpushed')).toBeInTheDocument()
+  })
+
+  it('shows the ahead/behind count when diverged, taking priority over pending paths', () => {
+    useWorkspaceStore.setState({
+      repoMode: 'notesOnly',
+      gitDiverged: { ahead: 1, behind: 3 },
+      gitPendingPaths: ['/ws/a.md'],
+    })
+    const { getByText } = render(<HomeView onOpenTaskView={() => {}} />)
+    expect(getByText('1 ahead, 3 behind')).toBeInTheDocument()
   })
 })
