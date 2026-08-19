@@ -152,7 +152,10 @@ fn splits_a_row_into_n_groups_at_its_widest_gaps() {
     row.extend(set("y3", 160.0, 700.0, Style::default()));
 
     let groups = split_into_terms(&row, 3).expect("expected a confident 3-way split");
-    let texts: Vec<String> = groups.iter().map(|g| g.iter().map(|c| c.ch).collect()).collect();
+    let texts: Vec<String> = groups
+        .iter()
+        .map(|g| g.iter().map(|c| c.ch).collect())
+        .collect();
     assert_eq!(texts, ["1", "y2", "y3"]);
 }
 
@@ -175,7 +178,10 @@ fn a_single_term_is_the_whole_row_unsplit() {
     let row = set("x + y", 100.0, 700.0, Style::default());
     let groups = split_into_terms(&row, 1).expect("n=1 always succeeds");
     assert_eq!(groups.len(), 1);
-    assert_eq!(groups[0].len(), row.iter().filter(|c| !c.ch.is_whitespace()).count());
+    assert_eq!(
+        groups[0].len(),
+        row.iter().filter(|c| !c.ch.is_whitespace()).count()
+    );
 }
 
 // "für t ≥ b" — a German connector word followed by a maths comparison, the
@@ -277,7 +283,12 @@ fn a_bare_bracket_pair_row_has_no_leading_text() {
 // the sentence's own leading prose ahead of the open bracket.
 #[test]
 fn a_bracket_pair_row_keeps_its_leading_prose() {
-    let mut row = set("3. Gegeben ist das Vektorfeld ", 71.00, 211.34, Style::default());
+    let mut row = set(
+        "3. Gegeben ist das Vektorfeld ",
+        71.00,
+        211.34,
+        Style::default(),
+    );
     row.extend(set("\u{12}", 320.53, 211.34, extensible()));
     row.extend(set(" ", 329.33, 211.34, Style::default()));
     row.extend(set("\u{13}", 347.32, 211.34, extensible()));
@@ -665,8 +676,22 @@ fn an_assembled_delimiter_vector_with_a_fused_prefix_row_becomes_one_pmatrix() {
         real(' ', 300.574, 0.000, 625.258, 11.96, Family::Text),
         real('=', 300.574, 9.098, 625.258, 11.96, Family::Text),
         // Open bracket, both pieces.
-        real('\u{f8eb}', 313.007, 10.461, 649.288, 11.96, Family::Extensible),
-        real('\u{f8ed}', 313.007, 10.461, 627.769, 11.96, Family::Extensible),
+        real(
+            '\u{f8eb}',
+            313.007,
+            10.461,
+            649.288,
+            11.96,
+            Family::Extensible,
+        ),
+        real(
+            '\u{f8ed}',
+            313.007,
+            10.461,
+            627.769,
+            11.96,
+            Family::Extensible,
+        ),
         // First content row: "x + y".
         real('x', 328.760, 6.647, 639.804, 11.96, Family::Italic),
         real('+', 338.069, 9.098, 639.804, 11.96, Family::Text),
@@ -682,14 +707,29 @@ fn an_assembled_delimiter_vector_with_a_fused_prefix_row_becomes_one_pmatrix() {
         real('y', 336.310, 5.715, 610.912, 11.96, Family::Italic),
         real('z', 342.443, 5.499, 610.912, 11.96, Family::Italic),
         // Close bracket, both pieces.
-        real('\u{f8f6}', 361.260, 10.461, 649.288, 11.96, Family::Extensible),
-        real('\u{f8f8}', 361.260, 10.461, 627.769, 11.96, Family::Extensible),
+        real(
+            '\u{f8f6}',
+            361.260,
+            10.461,
+            649.288,
+            11.96,
+            Family::Extensible,
+        ),
+        real(
+            '\u{f8f8}',
+            361.260,
+            10.461,
+            627.769,
+            11.96,
+            Family::Extensible,
+        ),
     ];
 
     let markdown = chars_to_markdown(&chars);
 
     assert!(
-        markdown.contains(r"\vec{v}(x, y, z) = \begin{pmatrix} x + y \\ x + 2y^2 \\ yz \end{pmatrix}"),
+        markdown
+            .contains(r"\vec{v}(x, y, z) = \begin{pmatrix} x + y \\ x + 2y^2 \\ yz \end{pmatrix}"),
         "got: {markdown}"
     );
 }
@@ -790,7 +830,15 @@ fn a_coincidentally_aligned_row_far_down_the_page_is_not_mistaken_for_a_third_ca
 #[test]
 fn keeps_a_slightly_raised_glyph_on_its_own_line() {
     let mut chars = set("x", 72.0, 700.0, Style::default());
-    chars.extend(set("2", 77.0, 703.0, Style { size: 7.0, ..Style::default() }));
+    chars.extend(set(
+        "2",
+        77.0,
+        703.0,
+        Style {
+            size: 7.0,
+            ..Style::default()
+        },
+    ));
     chars.extend(set(" ok", 82.0, 700.0, Style::default()));
 
     let lines = group_lines(&chars);
@@ -804,7 +852,12 @@ fn keeps_a_slightly_raised_glyph_on_its_own_line() {
 #[test]
 fn synthesises_a_space_from_a_wide_cursor_jump() {
     let mut chars = set("hello", 72.0, 700.0, Style::default());
-    chars.extend(set("world", 72.0 + 5.0 * 5.0 + 6.0, 700.0, Style::default()));
+    chars.extend(set(
+        "world",
+        72.0 + 5.0 * 5.0 + 6.0,
+        700.0,
+        Style::default(),
+    ));
 
     let lines = group_lines(&chars);
 
@@ -834,7 +887,12 @@ fn a_space_with_a_misleading_x_still_lands_between_its_words() {
 
     let lines = group_lines(&chars);
 
-    assert_eq!(lines[0].text(), "wird jeweils", "got: {:?}", lines[0].text());
+    assert_eq!(
+        lines[0].text(),
+        "wird jeweils",
+        "got: {:?}",
+        lines[0].text()
+    );
 }
 
 #[test]
@@ -845,9 +903,28 @@ fn does_not_invent_a_space_between_adjacent_glyphs() {
 
 #[test]
 fn body_size_is_the_size_most_characters_use_not_the_commonest_line() {
-    let mut chars = set("Big", 72.0, 700.0, Style { size: 20.0, ..Style::default() });
-    chars.extend(set("Also", 72.0, 660.0, Style { size: 20.0, ..Style::default() }));
-    chars.extend(page_at(600.0, &["a much longer run of ordinary body text here"]));
+    let mut chars = set(
+        "Big",
+        72.0,
+        700.0,
+        Style {
+            size: 20.0,
+            ..Style::default()
+        },
+    );
+    chars.extend(set(
+        "Also",
+        72.0,
+        660.0,
+        Style {
+            size: 20.0,
+            ..Style::default()
+        },
+    ));
+    chars.extend(page_at(
+        600.0,
+        &["a much longer run of ordinary body text here"],
+    ));
 
     let lines = group_lines(&chars);
 
@@ -856,12 +933,26 @@ fn body_size_is_the_size_most_characters_use_not_the_commonest_line() {
 
 #[test]
 fn a_larger_line_becomes_a_heading_and_body_stays_prose() {
-    let mut chars = set("Exercise Sheet 3", 72.0, 700.0, Style { size: 17.0, ..Style::default() });
-    chars.extend(page_at(680.0, &["some ordinary body text that sets the body size"]));
+    let mut chars = set(
+        "Exercise Sheet 3",
+        72.0,
+        700.0,
+        Style {
+            size: 17.0,
+            ..Style::default()
+        },
+    );
+    chars.extend(page_at(
+        680.0,
+        &["some ordinary body text that sets the body size"],
+    ));
 
     let markdown = chars_to_markdown(&chars);
 
-    assert!(markdown.starts_with("# Exercise Sheet 3\n"), "got: {markdown}");
+    assert!(
+        markdown.starts_with("# Exercise Sheet 3\n"),
+        "got: {markdown}"
+    );
     assert!(markdown.contains("some ordinary body text"));
 }
 
@@ -870,7 +961,15 @@ fn heading_level_follows_relative_size() {
     let body_line = "ordinary body text long enough to dominate the size vote";
 
     for (size, expected) in [(17.0, "#"), (14.0, "##"), (12.0, "###")] {
-        let mut chars = set("Title", 72.0, 700.0, Style { size, ..Style::default() });
+        let mut chars = set(
+            "Title",
+            72.0,
+            700.0,
+            Style {
+                size,
+                ..Style::default()
+            },
+        );
         chars.extend(page_at(680.0, &[body_line]));
 
         let markdown = chars_to_markdown(&chars);
@@ -936,11 +1035,24 @@ fn a_line_that_merely_ends_still_gets_its_space() {
 #[test]
 fn a_wide_vertical_gap_splits_paragraphs() {
     let mut chars = Vec::new();
-    for (index, text) in ["first para line one", "first para line two"].iter().enumerate() {
-        chars.extend(set(text, 72.0, 700.0 - index as f32 * 12.0, Style::default()));
+    for (index, text) in ["first para line one", "first para line two"]
+        .iter()
+        .enumerate()
+    {
+        chars.extend(set(
+            text,
+            72.0,
+            700.0 - index as f32 * 12.0,
+            Style::default(),
+        ));
     }
     // Two blank lines' worth of space.
-    chars.extend(set("second paragraph", 72.0, 700.0 - 2.0 * 12.0 - 24.0, Style::default()));
+    chars.extend(set(
+        "second paragraph",
+        72.0,
+        700.0 - 2.0 * 12.0 - 24.0,
+        Style::default(),
+    ));
 
     let markdown = chars_to_markdown(&chars);
 
@@ -953,7 +1065,10 @@ fn a_wide_vertical_gap_splits_paragraphs() {
 #[test]
 fn a_monospace_run_becomes_a_fenced_code_block_keeping_its_line_breaks() {
     let mut chars = page(&["Consider the following program."]);
-    let code = Style { fixed: true, ..Style::default() };
+    let code = Style {
+        fixed: true,
+        ..Style::default()
+    };
     chars.extend(set("fn main() {", 72.0, 660.0, code));
     chars.extend(set("    println!();", 72.0, 648.0, code));
     chars.extend(set("}", 72.0, 636.0, code));
@@ -968,13 +1083,27 @@ fn a_monospace_run_becomes_a_fenced_code_block_keeping_its_line_breaks() {
 
 #[test]
 fn code_does_not_swallow_the_prose_that_follows_it() {
-    let mut chars = set("fn main() {}", 72.0, 700.0, Style { fixed: true, ..Style::default() });
+    let mut chars = set(
+        "fn main() {}",
+        72.0,
+        700.0,
+        Style {
+            fixed: true,
+            ..Style::default()
+        },
+    );
     chars.extend(set("That was the program.", 72.0, 688.0, Style::default()));
 
     let markdown = chars_to_markdown(&chars);
 
-    assert!(markdown.contains("```\nfn main() {}\n```"), "got: {markdown}");
-    assert!(markdown.ends_with("That was the program.\n"), "got: {markdown}");
+    assert!(
+        markdown.contains("```\nfn main() {}\n```"),
+        "got: {markdown}"
+    );
+    assert!(
+        markdown.ends_with("That was the program.\n"),
+        "got: {markdown}"
+    );
 }
 
 #[test]
@@ -1005,7 +1134,10 @@ fn an_unresolved_placeholder_glyph_becomes_a_bullet() {
 
     assert!(markdown.contains("- first claim"), "got: {markdown}");
     assert!(markdown.contains("- second claim"), "got: {markdown}");
-    assert!(!markdown.contains('\u{FFFD}'), "marker survived: {markdown}");
+    assert!(
+        !markdown.contains('\u{FFFD}'),
+        "marker survived: {markdown}"
+    );
 }
 
 #[test]
@@ -1038,14 +1170,25 @@ fn a_sub_part_label_becomes_a_list_item() {
 fn a_lettered_sub_part_nests_under_its_digit_numbered_parent() {
     let mut chars = page(&["Answer the following."]);
     chars.extend(set("1. Solve the system:", 72.0, 660.0, Style::default()));
-    chars.extend(set("(a) find the fixed points", 72.0, 648.0, Style::default()));
+    chars.extend(set(
+        "(a) find the fixed points",
+        72.0,
+        648.0,
+        Style::default(),
+    ));
     chars.extend(set("(b) classify each one", 72.0, 636.0, Style::default()));
 
     let markdown = chars_to_markdown(&chars);
 
     assert!(markdown.contains("1. Solve the system:"), "got: {markdown}");
-    assert!(markdown.contains("    1. find the fixed points"), "got: {markdown}");
-    assert!(markdown.contains("    2. classify each one"), "got: {markdown}");
+    assert!(
+        markdown.contains("    1. find the fixed points"),
+        "got: {markdown}"
+    );
+    assert!(
+        markdown.contains("    2. classify each one"),
+        "got: {markdown}"
+    );
 }
 
 #[test]
@@ -1060,16 +1203,45 @@ fn each_digit_items_own_sub_list_restarts_its_own_numbering() {
 
     let markdown = chars_to_markdown(&chars);
 
-    assert_eq!(markdown.matches("    1. part one").count(), 2, "got: {markdown}");
-    assert_eq!(markdown.matches("    2. part two").count(), 2, "got: {markdown}");
+    assert_eq!(
+        markdown.matches("    1. part one").count(),
+        2,
+        "got: {markdown}"
+    );
+    assert_eq!(
+        markdown.matches("    2. part two").count(),
+        2,
+        "got: {markdown}"
+    );
 }
 
 #[test]
 fn a_heading_resets_running_list_numbering() {
-    let mut chars = set("Warm-up", 72.0, 700.0, Style { size: 15.0, ..Style::default() });
+    let mut chars = set(
+        "Warm-up",
+        72.0,
+        700.0,
+        Style {
+            size: 15.0,
+            ..Style::default()
+        },
+    );
     chars.extend(set("(a) first warm-up part", 72.0, 680.0, Style::default()));
-    chars.extend(set("(b) second warm-up part", 72.0, 668.0, Style::default()));
-    chars.extend(set("Main Task", 72.0, 648.0, Style { size: 15.0, ..Style::default() }));
+    chars.extend(set(
+        "(b) second warm-up part",
+        72.0,
+        668.0,
+        Style::default(),
+    ));
+    chars.extend(set(
+        "Main Task",
+        72.0,
+        648.0,
+        Style {
+            size: 15.0,
+            ..Style::default()
+        },
+    ));
     chars.extend(set("(a) first main part", 72.0, 628.0, Style::default()));
     chars.extend(set("(b) second main part", 72.0, 616.0, Style::default()));
 
@@ -1090,14 +1262,28 @@ fn an_equation_between_a_digit_item_and_its_deeper_sub_parts_is_indented_to_matc
     let mut chars = page(&["Answer the following."]);
     chars.extend(set("6. Solve the system:", 72.0, 660.0, Style::default()));
     chars.extend(set("y = 1", 200.0, 636.0, maths()));
-    chars.extend(set("(a) find the fixed points", 72.0, 612.0, Style::default()));
+    chars.extend(set(
+        "(a) find the fixed points",
+        72.0,
+        612.0,
+        Style::default(),
+    ));
     chars.extend(set("(b) classify each one", 72.0, 600.0, Style::default()));
 
     let markdown = chars_to_markdown(&chars);
 
-    assert!(markdown.contains("    $\n    y = 1\n    $"), "got: {markdown}");
-    assert!(markdown.contains("    1. find the fixed points"), "got: {markdown}");
-    assert!(markdown.contains("    2. classify each one"), "got: {markdown}");
+    assert!(
+        markdown.contains("    $\n    y = 1\n    $"),
+        "got: {markdown}"
+    );
+    assert!(
+        markdown.contains("    1. find the fixed points"),
+        "got: {markdown}"
+    );
+    assert!(
+        markdown.contains("    2. classify each one"),
+        "got: {markdown}"
+    );
 }
 
 // The other real shape on the same sheet: an equation and follow-up prose
@@ -1114,9 +1300,18 @@ fn an_equation_between_two_same_depth_digit_items_is_not_indented() {
     let markdown = chars_to_markdown(&chars);
 
     assert!(markdown.contains("$\ny = 1\n$"), "got: {markdown}");
-    assert!(!markdown.contains("    $\n    y = 1\n    $"), "got: {markdown}");
-    assert!(markdown.contains("Some follow-up prose."), "got: {markdown}");
-    assert!(!markdown.contains("    Some follow-up prose."), "got: {markdown}");
+    assert!(
+        !markdown.contains("    $\n    y = 1\n    $"),
+        "got: {markdown}"
+    );
+    assert!(
+        markdown.contains("Some follow-up prose."),
+        "got: {markdown}"
+    );
+    assert!(
+        !markdown.contains("    Some follow-up prose."),
+        "got: {markdown}"
+    );
 }
 
 // A heading always ends a list (assign_list_numbers's own reset rule) — but
@@ -1129,13 +1324,29 @@ fn a_heading_between_a_list_item_and_a_deeper_item_prevents_indenting() {
     let mut chars = page(&["Two unrelated sections."]);
     chars.extend(set("• outer bullet", 72.0, 660.0, Style::default()));
     chars.extend(set("y = 1", 200.0, 636.0, maths()));
-    chars.extend(set("Unrelated Heading", 72.0, 612.0, Style { size: 15.0, ..Style::default() }));
-    chars.extend(set("• inner bullet", 72.0 + 2.0 * BODY, 588.0, Style::default()));
+    chars.extend(set(
+        "Unrelated Heading",
+        72.0,
+        612.0,
+        Style {
+            size: 15.0,
+            ..Style::default()
+        },
+    ));
+    chars.extend(set(
+        "• inner bullet",
+        72.0 + 2.0 * BODY,
+        588.0,
+        Style::default(),
+    ));
 
     let markdown = chars_to_markdown(&chars);
 
     assert!(markdown.contains("$\ny = 1\n$"), "got: {markdown}");
-    assert!(!markdown.contains("    $\n    y = 1\n    $"), "got: {markdown}");
+    assert!(
+        !markdown.contains("    $\n    y = 1\n    $"),
+        "got: {markdown}"
+    );
 }
 
 // An equation between two sub-parts of the *same* depth has to be indented to
@@ -1146,16 +1357,40 @@ fn a_heading_between_a_list_item_and_a_deeper_item_prevents_indenting() {
 #[test]
 fn an_equation_between_two_same_depth_sub_parts_stays_inside_the_list() {
     let mut chars = page(&["Answer both parts."]);
-    chars.extend(set("1. Ein Bauteil hat die Form:", 72.0, 660.0, Style::default()));
-    chars.extend(set("(a) compute the total mass", 72.0, 636.0, Style::default()));
+    chars.extend(set(
+        "1. Ein Bauteil hat die Form:",
+        72.0,
+        660.0,
+        Style::default(),
+    ));
+    chars.extend(set(
+        "(a) compute the total mass",
+        72.0,
+        636.0,
+        Style::default(),
+    ));
     chars.extend(set("M = 1", 200.0, 612.0, maths()));
-    chars.extend(set("(b) compute the centroid", 72.0, 588.0, Style::default()));
+    chars.extend(set(
+        "(b) compute the centroid",
+        72.0,
+        588.0,
+        Style::default(),
+    ));
 
     let markdown = chars_to_markdown(&chars);
 
-    assert!(markdown.contains("    1. compute the total mass"), "got: {markdown}");
-    assert!(markdown.contains("    2. compute the centroid"), "got: {markdown}");
-    assert!(markdown.contains("    $\n    M = 1\n    $"), "not indented: {markdown}");
+    assert!(
+        markdown.contains("    1. compute the total mass"),
+        "got: {markdown}"
+    );
+    assert!(
+        markdown.contains("    2. compute the centroid"),
+        "got: {markdown}"
+    );
+    assert!(
+        markdown.contains("    $\n    M = 1\n    $"),
+        "not indented: {markdown}"
+    );
 }
 
 #[test]
@@ -1170,7 +1405,10 @@ fn a_bare_letter_marker_becomes_a_list_item() {
     assert!(markdown.contains("1. the first part"), "got: {markdown}");
     assert!(markdown.contains("2. the second part"), "got: {markdown}");
     assert!(markdown.contains("3. the third part"), "got: {markdown}");
-    assert!(!markdown.contains("a) the first part"), "marker survived: {markdown}");
+    assert!(
+        !markdown.contains("a) the first part"),
+        "marker survived: {markdown}"
+    );
 }
 
 // "Solution) ..." is a real word directly followed by a parenthesis, not
@@ -1200,19 +1438,34 @@ fn a_raised_footnote_marker_does_not_push_a_diacritic_off_the_line() {
     // whatever follows it) is done — confirmed against a real document, where
     // the diaeresis for "Analysis" landed immediately after the letter it
     // marks, not at the end of the run.
-    let body = Style { size: 12.0, ..Style::default() };
+    let body = Style {
+        size: 12.0,
+        ..Style::default()
+    };
     let mut chars = set("abzuscha", 111.7, 495.73, body);
     // The umlaut, at exactly the x of the second "a" it sits over — an accent
     // shares its letter's position rather than following it.
     let second_a = 111.7 + 7.0 * 12.0 * ADVANCE;
     chars.extend(set("\u{00A8}", second_a, 495.26, body));
     chars.extend(set("tzen", 111.7 + 8.0 * 12.0 * ADVANCE, 495.73, body));
-    chars.extend(set("1", 179.1, 500.0, Style { size: 8.0, ..Style::default() }));
+    chars.extend(set(
+        "1",
+        179.1,
+        500.0,
+        Style {
+            size: 8.0,
+            ..Style::default()
+        },
+    ));
 
     let lines = group_lines(&chars);
 
     assert_eq!(lines.len(), 1, "expected one line, got {lines:?}");
-    assert!(lines[0].text().contains("abzuschätzen"), "got: {}", lines[0].text());
+    assert!(
+        lines[0].text().contains("abzuschätzen"),
+        "got: {}",
+        lines[0].text()
+    );
 }
 
 // Found against a second real document (Ue14.pdf): this producer draws the
@@ -1224,7 +1477,10 @@ fn a_raised_footnote_marker_does_not_push_a_diacritic_off_the_line() {
 // it was drawn from. Coordinates are the real ones read off that document.
 #[test]
 fn a_standalone_accent_before_its_letter_recomposes_forward() {
-    let body = Style { size: 12.0, ..Style::default() };
+    let body = Style {
+        size: 12.0,
+        ..Style::default()
+    };
     let mut chars = set("l", 85.04, 623.06, body);
     chars.extend(set("\u{00A8}", 87.71, 622.58, body));
     chars.extend(set("osen", 87.83, 623.06, body));
@@ -1249,7 +1505,10 @@ fn an_accent_with_no_letter_before_it_is_left_alone() {
 // nowhere near an immediate stream neighbour of it.
 #[test]
 fn a_heading_accent_deferred_far_past_its_word_still_finds_its_letter() {
-    let body = Style { size: 11.96, ..Style::default() };
+    let body = Style {
+        size: 11.96,
+        ..Style::default()
+    };
     let mut chars = set("Ubungsblatt", 69.700, 739.092, body);
     chars.extend(set("\u{00A8}", 71.161, 741.643, body));
 
@@ -1297,16 +1556,86 @@ fn an_unrepresentable_glyph_stays_inside_its_word_not_a_false_space() {
 // Real coordinates via dump_chars_range on Analysis_2_Blatt12.pdf.
 #[test]
 fn a_compact_fraction_survives_when_its_numerator_has_a_nested_exponent() {
-    let body = Style { size: 11.96, ..Style::default() };
-    let script_e = Style { size: 7.97, family: Family::Italic, ..Style::default() };
-    let script_exp = Style { size: 5.98, ..Style::default() };
+    let body = Style {
+        size: 11.96,
+        ..Style::default()
+    };
+    let script_e = Style {
+        size: 7.97,
+        family: Family::Italic,
+        ..Style::default()
+    };
+    let script_exp = Style {
+        size: 5.98,
+        ..Style::default()
+    };
 
     let mut chars = set("Kontext: ist ", 85.96, 364.367, body);
-    chars.push(CharBox { ch: 'e', x: 484.506, y: 369.074, width: 3.921, top: 373.0, bottom: 367.0, font_size: script_e.size, bold: false, italic: false, fixed_pitch: false, family: script_e.family });
-    chars.push(CharBox { ch: '\u{2212}', x: 488.434, y: 371.887, width: 5.756, top: 375.0, bottom: 369.0, font_size: script_exp.size, bold: false, italic: false, fixed_pitch: false, family: Family::Symbol });
-    chars.push(CharBox { ch: 'b', x: 494.190, y: 371.887, width: 3.270, top: 375.0, bottom: 369.0, font_size: script_exp.size, bold: false, italic: false, fixed_pitch: false, family: Family::Italic });
-    chars.push(CharBox { ch: 's', x: 497.460, y: 371.887, width: 3.491, top: 375.0, bottom: 369.0, font_size: script_exp.size, bold: false, italic: false, fixed_pitch: false, family: Family::Italic });
-    chars.push(CharBox { ch: 's', x: 491.023, y: 360.245, width: 3.913, top: 364.0, bottom: 358.0, font_size: script_e.size, bold: false, italic: false, fixed_pitch: false, family: Family::Italic });
+    chars.push(CharBox {
+        ch: 'e',
+        x: 484.506,
+        y: 369.074,
+        width: 3.921,
+        top: 373.0,
+        bottom: 367.0,
+        font_size: script_e.size,
+        bold: false,
+        italic: false,
+        fixed_pitch: false,
+        family: script_e.family,
+    });
+    chars.push(CharBox {
+        ch: '\u{2212}',
+        x: 488.434,
+        y: 371.887,
+        width: 5.756,
+        top: 375.0,
+        bottom: 369.0,
+        font_size: script_exp.size,
+        bold: false,
+        italic: false,
+        fixed_pitch: false,
+        family: Family::Symbol,
+    });
+    chars.push(CharBox {
+        ch: 'b',
+        x: 494.190,
+        y: 371.887,
+        width: 3.270,
+        top: 375.0,
+        bottom: 369.0,
+        font_size: script_exp.size,
+        bold: false,
+        italic: false,
+        fixed_pitch: false,
+        family: Family::Italic,
+    });
+    chars.push(CharBox {
+        ch: 's',
+        x: 497.460,
+        y: 371.887,
+        width: 3.491,
+        top: 375.0,
+        bottom: 369.0,
+        font_size: script_exp.size,
+        bold: false,
+        italic: false,
+        fixed_pitch: false,
+        family: Family::Italic,
+    });
+    chars.push(CharBox {
+        ch: 's',
+        x: 491.023,
+        y: 360.245,
+        width: 3.913,
+        top: 364.0,
+        bottom: 358.0,
+        font_size: script_e.size,
+        bold: false,
+        italic: false,
+        fixed_pitch: false,
+        family: Family::Italic,
+    });
     chars.extend(set(". Dabei", 502.651, 364.367, body));
 
     let markdown = chars_to_markdown(&chars);
@@ -1337,7 +1666,12 @@ fn a_bare_hyphen_or_asterisk_does_not_start_a_list() {
 fn a_wrapped_list_item_keeps_its_continuation_line() {
     let mut chars = page(&["Prove each of the following claims carefully."]);
     chars.extend(set("• a claim that runs on", 72.0, 660.0, Style::default()));
-    chars.extend(set("past the end of the line", 72.0 + 5.0, 648.0, Style::default()));
+    chars.extend(set(
+        "past the end of the line",
+        72.0 + 5.0,
+        648.0,
+        Style::default(),
+    ));
 
     let markdown = chars_to_markdown(&chars);
 
@@ -1350,9 +1684,25 @@ fn a_wrapped_list_item_keeps_its_continuation_line() {
 #[test]
 fn bold_and_italic_runs_become_markdown_emphasis() {
     let mut chars = set("plain ", 72.0, 700.0, Style::default());
-    chars.extend(set("bold", 72.0 + 6.0 * 5.0, 700.0, Style { bold: true, ..Style::default() }));
+    chars.extend(set(
+        "bold",
+        72.0 + 6.0 * 5.0,
+        700.0,
+        Style {
+            bold: true,
+            ..Style::default()
+        },
+    ));
     chars.extend(set(" and ", 72.0 + 10.0 * 5.0, 700.0, Style::default()));
-    chars.extend(set("italic", 72.0 + 15.0 * 5.0, 700.0, Style { italic: true, ..Style::default() }));
+    chars.extend(set(
+        "italic",
+        72.0 + 15.0 * 5.0,
+        700.0,
+        Style {
+            italic: true,
+            ..Style::default()
+        },
+    ));
 
     let markdown = chars_to_markdown(&chars);
 
@@ -1363,7 +1713,15 @@ fn bold_and_italic_runs_become_markdown_emphasis() {
 #[test]
 fn emphasis_markers_never_wrap_surrounding_whitespace() {
     let mut chars = set("see ", 72.0, 700.0, Style::default());
-    chars.extend(set("word ", 72.0 + 4.0 * 5.0, 700.0, Style { bold: true, ..Style::default() }));
+    chars.extend(set(
+        "word ",
+        72.0 + 4.0 * 5.0,
+        700.0,
+        Style {
+            bold: true,
+            ..Style::default()
+        },
+    ));
     chars.extend(set("after", 72.0 + 9.0 * 5.0, 700.0, Style::default()));
 
     let markdown = chars_to_markdown(&chars);
@@ -1423,11 +1781,19 @@ fn a_sentence_that_merely_contains_a_formula_stays_inline_not_display() {
     let after = 72.0 + "Die Zahl ".chars().count() as f32 * BODY * ADVANCE;
     chars.extend(set("x", after, 700.0, maths_italic()));
     let after_x = after + BODY * ADVANCE;
-    chars.extend(set(" ist eine gerade Zahl.", after_x, 700.0, Style::default()));
+    chars.extend(set(
+        " ist eine gerade Zahl.",
+        after_x,
+        700.0,
+        Style::default(),
+    ));
 
     let markdown = chars_to_markdown(&chars);
 
-    assert!(markdown.contains("Die Zahl $x$ ist eine gerade Zahl."), "got: {markdown}");
+    assert!(
+        markdown.contains("Die Zahl $x$ ist eine gerade Zahl."),
+        "got: {markdown}"
+    );
     assert!(
         !markdown.lines().any(|l| l.trim() == "$"),
         "should not become a display block: {markdown}"
@@ -1438,7 +1804,12 @@ fn a_sentence_that_merely_contains_a_formula_stays_inline_not_display() {
 fn maths_inside_a_sentence_stays_inline() {
     let mut chars = set("Sei ", 72.0, 700.0, Style::default());
     chars.extend(set("f", 72.0 + 4.0 * 5.0, 700.0, maths_italic()));
-    chars.extend(set(" gegeben und stetig", 72.0 + 5.0 * 5.0, 700.0, Style::default()));
+    chars.extend(set(
+        " gegeben und stetig",
+        72.0 + 5.0 * 5.0,
+        700.0,
+        Style::default(),
+    ));
 
     assert_eq!(chars_to_markdown(&chars), "Sei $f$ gegeben und stetig\n");
 }
@@ -1458,7 +1829,12 @@ fn a_region_bridges_body_font_characters_inside_an_equation() {
         .iter()
         .filter(|i| matches!(i, Inline::Maths(_)))
         .collect();
-    assert_eq!(regions.len(), 1, "expected one region, got {:?}", lines[0].content);
+    assert_eq!(
+        regions.len(),
+        1,
+        "expected one region, got {:?}",
+        lines[0].content
+    );
 }
 
 // Found on a real sheet: growing outward can leave two regions at
@@ -1483,7 +1859,12 @@ fn regions_separated_by_a_wide_gap_do_not_merge_just_because_nothing_sits_betwee
         .iter()
         .filter(|i| matches!(i, Inline::Maths(_)))
         .collect();
-    assert_eq!(regions.len(), 2, "wide gap merged into one region: {:?}", lines[0].content);
+    assert_eq!(
+        regions.len(),
+        2,
+        "wide gap merged into one region: {:?}",
+        lines[0].content
+    );
 }
 
 #[test]
@@ -1495,9 +1876,17 @@ fn prose_far_from_an_equation_is_not_swallowed_into_it() {
 
     let lines = group_lines(&chars);
 
-    let regions = lines[0].content.iter().filter(|i| matches!(i, Inline::Maths(_))).count();
+    let regions = lines[0]
+        .content
+        .iter()
+        .filter(|i| matches!(i, Inline::Maths(_)))
+        .count();
     assert_eq!(regions, 2, "got: {:?}", lines[0].content);
-    assert!(lines[0].text().contains("und"), "prose lost: {}", lines[0].text());
+    assert!(
+        lines[0].text().contains("und"),
+        "prose lost: {}",
+        lines[0].text()
+    );
 }
 
 // Found on Assignment10_DA.pdf: "O(m log n)" set "log" directly against the
@@ -1521,7 +1910,12 @@ fn an_operator_name_touching_its_variable_with_no_space_is_still_absorbed() {
         .iter()
         .filter(|i| matches!(i, Inline::Maths(_)))
         .collect();
-    assert_eq!(regions.len(), 1, "expected one region, got {:?}", lines[0].content);
+    assert_eq!(
+        regions.len(),
+        1,
+        "expected one region, got {:?}",
+        lines[0].content
+    );
     if let Inline::Maths(latex) = regions[0] {
         assert!(latex.contains("\\log"), "got: {latex}");
     }
@@ -1549,11 +1943,20 @@ fn a_lone_greek_symbol_touching_its_word_is_still_absorbed() {
         .iter()
         .filter(|i| matches!(i, Inline::Maths(_)))
         .collect();
-    assert_eq!(regions.len(), 1, "expected one region, got {:?}", lines[0].content);
+    assert_eq!(
+        regions.len(),
+        1,
+        "expected one region, got {:?}",
+        lines[0].content
+    );
     if let Inline::Maths(latex) = regions[0] {
         assert!(latex.contains("\\Phi"), "got: {latex}");
     }
-    assert!(lines[0].text().contains("Potenzialfunktion"), "prose lost: {}", lines[0].text());
+    assert!(
+        lines[0].text().contains("Potenzialfunktion"),
+        "prose lost: {}",
+        lines[0].text()
+    );
 }
 
 // Found on Assignment10_DA.pdf: two single-letter maths variables close
@@ -1574,7 +1977,12 @@ fn an_ordinary_word_between_two_maths_variables_is_not_absorbed_as_an_operator()
         .iter()
         .filter(|i| matches!(i, Inline::Maths(_)))
         .collect();
-    assert_eq!(regions.len(), 2, "\"to\" was absorbed into the equation: {:?}", lines[0].content);
+    assert_eq!(
+        regions.len(),
+        2,
+        "\"to\" was absorbed into the equation: {:?}",
+        lines[0].content
+    );
     assert!(lines[0].text().contains(" to "), "got: {}", lines[0].text());
 }
 
@@ -1599,15 +2007,24 @@ fn a_footnote_marker_after_an_equation_does_not_bleed_into_it() {
         "3",
         72.0 + 22.0 * 5.0 + 5.0,
         704.0,
-        Style { size: BODY * 0.7, ..Style::default() },
+        Style {
+            size: BODY * 0.7,
+            ..Style::default()
+        },
     ));
 
     let markdown = chars_to_markdown(&chars);
 
-    assert!(!markdown.contains("^3"), "footnote leaked into the equation: {markdown}");
+    assert!(
+        !markdown.contains("^3"),
+        "footnote leaked into the equation: {markdown}"
+    );
     // The footnote digit itself must survive as ordinary trailing text, not
     // vanish — it is the mark a reader follows to the footnote.
-    assert!(markdown.trim_end().ends_with('3'), "footnote digit lost: {markdown}");
+    assert!(
+        markdown.trim_end().ends_with('3'),
+        "footnote digit lost: {markdown}"
+    );
 }
 
 // Found on a real sheet: "(a) C ist der Kreis..." (an enumeration label
@@ -1625,7 +2042,10 @@ fn an_enumeration_labels_closing_paren_does_not_leak_into_a_following_equation()
     let markdown = chars_to_markdown(&chars);
 
     assert!(markdown.contains("$C$"), "got: {markdown}");
-    assert!(!markdown.contains(")$"), "closing paren leaked into the region: {markdown}");
+    assert!(
+        !markdown.contains(")$"),
+        "closing paren leaked into the region: {markdown}"
+    );
 }
 
 // Found on a real sheet: a fraction's numerator sits on its own row, with its
@@ -1667,8 +2087,14 @@ fn an_exponent_attaches_to_its_own_base_row_not_a_nearby_tall_symbol() {
 
     let markdown = chars_to_markdown(&chars);
 
-    assert!(markdown.contains("z^2"), "exponent lost its base: {markdown}");
-    assert!(!markdown.contains("∮^2") && !markdown.contains("oint}^2"), "got: {markdown}");
+    assert!(
+        markdown.contains("z^2"),
+        "exponent lost its base: {markdown}"
+    );
+    assert!(
+        !markdown.contains("∮^2") && !markdown.contains("oint}^2"),
+        "got: {markdown}"
+    );
 }
 
 // The other half of the same real bug: the operator's *own* subscript sits at
@@ -1704,9 +2130,16 @@ fn a_subscript_far_below_a_tall_operator_still_attaches_to_it() {
     // The body-text paragraph is its own line; the operator and its subscript
     // together are the second. Three would mean the subscript split off on
     // its own instead of joining the operator's row.
-    assert_eq!(lines.len(), 2, "the subscript split off into its own line: {lines:?}");
+    assert_eq!(
+        lines.len(),
+        2,
+        "the subscript split off into its own line: {lines:?}"
+    );
     assert!(
-        lines[1].content.iter().any(|i| matches!(i, Inline::Maths(s) if s.contains("mathcal{C}"))),
+        lines[1]
+            .content
+            .iter()
+            .any(|i| matches!(i, Inline::Maths(s) if s.contains("mathcal{C}"))),
         "subscript missing from the operator's line: {:?}",
         lines[1].content
     );
@@ -1746,8 +2179,14 @@ fn a_big_operator_stacked_over_its_limit_becomes_a_subscript_not_a_fraction() {
 
     let markdown = chars_to_markdown(&chars);
 
-    assert!(markdown.contains(r"M = \iiint_{K} a + b"), "got: {markdown}");
-    assert!(!markdown.contains("\\frac"), "misread as a fraction: {markdown}");
+    assert!(
+        markdown.contains(r"M = \iiint_{K} a + b"),
+        "got: {markdown}"
+    );
+    assert!(
+        !markdown.contains("\\frac"),
+        "misread as a fraction: {markdown}"
+    );
 }
 
 // Trailing content beside a fraction ("dz" after an integral) sits close to
@@ -1767,7 +2206,10 @@ fn trailing_content_beside_a_fraction_stays_after_it_not_before() {
 
     let markdown = chars_to_markdown(&chars);
 
-    assert!(markdown.contains(r"\frac{a + b}{c + d} dz"), "got: {markdown}");
+    assert!(
+        markdown.contains(r"\frac{a + b}{c + d} dz"),
+        "got: {markdown}"
+    );
 }
 
 // The baseline-splitting pattern in `regions_separated_by_a_wide_gap_...`
@@ -1786,7 +2228,10 @@ fn a_baseline_shaped_line_is_never_mistaken_for_the_other_half_of_a_fraction() {
     // the fraction itself, a median of two samples is unstable and the check
     // misfires on this fixture in a way a real page never gives it the
     // chance to.
-    let mut chars = page_at(900.0, &["ordinary paragraph text", "with a normal line spacing"]);
+    let mut chars = page_at(
+        900.0,
+        &["ordinary paragraph text", "with a normal line spacing"],
+    );
     chars.extend(set("a + b", 300.0, 700.0, maths_italic()));
     // Closer to the numerator than the real denominator is, and — because of
     // the wide gap between "f(z) =" and "." — reads as is_display_maths, the
@@ -1798,7 +2243,10 @@ fn a_baseline_shaped_line_is_never_mistaken_for_the_other_half_of_a_fraction() {
     let markdown = chars_to_markdown(&chars);
 
     assert!(markdown.contains(r"\frac{a + b}{c + d}"), "got: {markdown}");
-    assert!(!markdown.contains(r"\frac{a + b}{f(z) ="), "paired with the baseline instead: {markdown}");
+    assert!(
+        !markdown.contains(r"\frac{a + b}{f(z) ="),
+        "paired with the baseline instead: {markdown}"
+    );
 }
 
 // A \binom vector's large open/close parens land on their own line — their
@@ -1822,7 +2270,10 @@ fn a_binom_flanked_pair_of_lines_is_not_mistaken_for_a_bare_fraction() {
     // numerator-denominator gap look like a paragraph break by comparison —
     // confirmed necessary by first observing this fixture fail for that
     // unrelated reason with a closer delimiter placement.
-    let mut chars = page_at(900.0, &["ordinary paragraph text", "with a normal line spacing"]);
+    let mut chars = page_at(
+        900.0,
+        &["ordinary paragraph text", "with a normal line spacing"],
+    );
     chars.extend(set("(", 290.0, 720.0, extensible()));
     chars.extend(set(")", 340.0, 720.0, extensible()));
     chars.extend(set("a + b", 300.0, 700.0, maths_italic()));
@@ -1830,9 +2281,18 @@ fn a_binom_flanked_pair_of_lines_is_not_mistaken_for_a_bare_fraction() {
 
     let markdown = chars_to_markdown(&chars);
 
-    assert!(!markdown.contains(r"\frac{a + b}{c + d}"), "got: {markdown}");
-    assert!(markdown.contains("a + b"), "numerator content lost: {markdown}");
-    assert!(markdown.contains("c + d"), "denominator content lost: {markdown}");
+    assert!(
+        !markdown.contains(r"\frac{a + b}{c + d}"),
+        "got: {markdown}"
+    );
+    assert!(
+        markdown.contains("a + b"),
+        "numerator content lost: {markdown}"
+    );
+    assert!(
+        markdown.contains("c + d"),
+        "denominator content lost: {markdown}"
+    );
 }
 
 // Reconstructs the shape exercise 1(b) on Analysis_1_Blatt2_2025.pdf takes:
@@ -1907,7 +2367,9 @@ fn whitespace_only_lines_are_dropped_rather_than_becoming_paragraphs() {
     let blocks = group_blocks(&group_lines(&chars));
 
     assert!(
-        blocks.iter().all(|b| !matches!(b, Block::Paragraph { content } if content.is_empty())),
+        blocks
+            .iter()
+            .all(|b| !matches!(b, Block::Paragraph { content } if content.is_empty())),
         "got: {blocks:?}"
     );
 }
@@ -1915,9 +2377,27 @@ fn whitespace_only_lines_are_dropped_rather_than_becoming_paragraphs() {
 // The shape a real exercise sheet arrives in, end to end.
 #[test]
 fn converts_a_representative_exercise_sheet() {
-    let mut chars = set("Aufgabe 1", 72.0, 700.0, Style { size: 15.0, ..Style::default() });
-    chars.extend(set("Sei G eine endliche Gruppe. Zeigen Sie, dass", 72.0, 680.0, Style::default()));
-    chars.extend(set("die folgenden Aussagen gelten.", 72.0, 668.0, Style::default()));
+    let mut chars = set(
+        "Aufgabe 1",
+        72.0,
+        700.0,
+        Style {
+            size: 15.0,
+            ..Style::default()
+        },
+    );
+    chars.extend(set(
+        "Sei G eine endliche Gruppe. Zeigen Sie, dass",
+        72.0,
+        680.0,
+        Style::default(),
+    ));
+    chars.extend(set(
+        "die folgenden Aussagen gelten.",
+        72.0,
+        668.0,
+        Style::default(),
+    ));
     chars.extend(set("• G ist abelsch", 72.0, 644.0, Style::default()));
     chars.extend(set("• G ist zyklisch", 72.0, 632.0, Style::default()));
 
@@ -1948,8 +2428,16 @@ fn table_row_line(cells: Vec<Vec<Inline>>) -> Line {
 #[test]
 fn a_table_row_line_is_not_blank() {
     let line = table_row_line(vec![
-        vec![Inline::Text(Span { text: "a".into(), bold: false, italic: false })],
-        vec![Inline::Text(Span { text: "b".into(), bold: false, italic: false })],
+        vec![Inline::Text(Span {
+            text: "a".into(),
+            bold: false,
+            italic: false,
+        })],
+        vec![Inline::Text(Span {
+            text: "b".into(),
+            bold: false,
+            italic: false,
+        })],
     ]);
     assert!(!line.is_blank());
 }
@@ -2004,13 +2492,17 @@ fn split_row_into_cells_buckets_by_the_cut_points() {
 
 #[test]
 fn cell_has_content_is_false_for_whitespace_or_nothing() {
-    let whitespace_only: Vec<(usize, CharBox)> =
-        set("  ", 72.0, 700.0, Style::default()).into_iter().enumerate().collect();
+    let whitespace_only: Vec<(usize, CharBox)> = set("  ", 72.0, 700.0, Style::default())
+        .into_iter()
+        .enumerate()
+        .collect();
     assert!(!cell_has_content(&whitespace_only));
     assert!(!cell_has_content(&[]));
 
-    let real: Vec<(usize, CharBox)> =
-        set("x", 72.0, 700.0, Style::default()).into_iter().enumerate().collect();
+    let real: Vec<(usize, CharBox)> = set("x", 72.0, 700.0, Style::default())
+        .into_iter()
+        .enumerate()
+        .collect();
     assert!(cell_has_content(&real));
 }
 
@@ -2073,7 +2565,12 @@ fn a_wrapped_cell_merges_into_the_row_above_it_instead_of_a_new_row() {
     chars.extend(set("Owner", 430.0, 700.0, Style::default()));
 
     chars.extend(set("Core", 72.0, 688.0, Style::default()));
-    chars.extend(set("Handles extraction of text", 150.0, 688.0, Style::default()));
+    chars.extend(set(
+        "Handles extraction of text",
+        150.0,
+        688.0,
+        Style::default(),
+    ));
     chars.extend(set("A", 430.0, 688.0, Style::default()));
 
     // Continuation row: only the Description column has content.
@@ -2127,7 +2624,9 @@ fn a_maths_heavy_two_by_two_grid_is_not_mistaken_for_a_table() {
     let lines = group_lines(&chars);
 
     assert!(
-        lines.iter().all(|l| !matches!(l.content.as_slice(), [Inline::TableRow(_, _)])),
+        lines
+            .iter()
+            .all(|l| !matches!(l.content.as_slice(), [Inline::TableRow(_, _)])),
         "expected no TableRow lines, got {lines:?}"
     );
 }
@@ -2172,7 +2671,12 @@ fn a_wrapped_cell_produces_one_clean_data_row() {
     chars.extend(set("Description", 150.0, 700.0, Style::default()));
     chars.extend(set("Owner", 430.0, 700.0, Style::default()));
     chars.extend(set("Core", 72.0, 688.0, Style::default()));
-    chars.extend(set("Handles extraction of text", 150.0, 688.0, Style::default()));
+    chars.extend(set(
+        "Handles extraction of text",
+        150.0,
+        688.0,
+        Style::default(),
+    ));
     chars.extend(set("A", 430.0, 688.0, Style::default()));
     chars.extend(set("and more here", 150.0, 676.0, Style::default()));
 
@@ -2204,19 +2708,44 @@ fn two_separate_tables_with_wrapped_rows_stay_separate_and_intact() {
     let mut chars = set("ID", 72.0, 700.0, Style::default());
     chars.extend(set("Note", 150.0, 700.0, Style::default()));
     chars.extend(set("1", 72.0, 688.0, Style::default()));
-    chars.extend(set("first row of the note text", 150.0, 688.0, Style::default()));
+    chars.extend(set(
+        "first row of the note text",
+        150.0,
+        688.0,
+        Style::default(),
+    ));
     chars.extend(set("continues down here", 150.0, 676.0, Style::default()));
     chars.extend(set("2", 72.0, 664.0, Style::default()));
-    chars.extend(set("second entry text goes here", 150.0, 664.0, Style::default()));
+    chars.extend(set(
+        "second entry text goes here",
+        150.0,
+        664.0,
+        Style::default(),
+    ));
 
     // A real gap — a new, unrelated table starts well below.
     chars.extend(set("Component", 72.0, 600.0, Style::default()));
     chars.extend(set("Description", 150.0, 600.0, Style::default()));
     chars.extend(set("Core", 72.0, 588.0, Style::default()));
-    chars.extend(set("first wrapped line of text", 150.0, 588.0, Style::default()));
-    chars.extend(set("second wrapped line here", 150.0, 576.0, Style::default()));
+    chars.extend(set(
+        "first wrapped line of text",
+        150.0,
+        588.0,
+        Style::default(),
+    ));
+    chars.extend(set(
+        "second wrapped line here",
+        150.0,
+        576.0,
+        Style::default(),
+    ));
     chars.extend(set("Engine", 72.0, 564.0, Style::default()));
-    chars.extend(set("another data row entry", 150.0, 564.0, Style::default()));
+    chars.extend(set(
+        "another data row entry",
+        150.0,
+        564.0,
+        Style::default(),
+    ));
 
     let blocks = group_blocks(&group_lines(&chars));
 
@@ -2227,9 +2756,21 @@ fn two_separate_tables_with_wrapped_rows_stay_separate_and_intact() {
             _ => None,
         })
         .collect();
-    assert_eq!(tables.len(), 2, "expected exactly two separate tables, got {blocks:?}");
-    assert_eq!(tables[0].len(), 3, "first table should keep all 3 logical rows");
-    assert_eq!(tables[1].len(), 3, "second table should keep all 3 logical rows");
+    assert_eq!(
+        tables.len(),
+        2,
+        "expected exactly two separate tables, got {blocks:?}"
+    );
+    assert_eq!(
+        tables[0].len(),
+        3,
+        "first table should keep all 3 logical rows"
+    );
+    assert_eq!(
+        tables[1].len(),
+        3,
+        "second table should keep all 3 logical rows"
+    );
 }
 
 fn image_ref_line(placeholder: &str, alt: &str, y: f32, left: f32, right: f32) -> Line {
@@ -2252,7 +2793,10 @@ fn an_image_ref_line_is_not_blank() {
 
 #[test]
 fn an_image_ref_lines_own_text_is_empty() {
-    assert_eq!(image_ref_line("pdf-image://0", "a figure", 700.0, 72.0, 200.0).text(), "");
+    assert_eq!(
+        image_ref_line("pdf-image://0", "a figure", 700.0, 72.0, 200.0).text(),
+        ""
+    );
 }
 
 #[test]
@@ -2267,7 +2811,12 @@ fn a_block_image_renders_as_a_markdown_image_reference() {
 #[test]
 fn an_image_lands_between_the_two_paragraphs_it_sits_between() {
     let mut chars = set("first paragraph text here", 72.0, 700.0, Style::default());
-    chars.extend(set("second paragraph text here", 72.0, 640.0, Style::default()));
+    chars.extend(set(
+        "second paragraph text here",
+        72.0,
+        640.0,
+        Style::default(),
+    ));
 
     let images = vec![ImageRef {
         placeholder: "pdf-image://0".to_string(),
@@ -2289,8 +2838,20 @@ fn an_image_lands_between_the_two_paragraphs_it_sits_between() {
 #[test]
 fn two_images_never_merge_into_one_block() {
     let images = vec![
-        ImageRef { placeholder: "pdf-image://0".to_string(), alt: String::new(), left: 72.0, right: 300.0, y: 700.0 },
-        ImageRef { placeholder: "pdf-image://1".to_string(), alt: String::new(), left: 72.0, right: 300.0, y: 680.0 },
+        ImageRef {
+            placeholder: "pdf-image://0".to_string(),
+            alt: String::new(),
+            left: 72.0,
+            right: 300.0,
+            y: 700.0,
+        },
+        ImageRef {
+            placeholder: "pdf-image://1".to_string(),
+            alt: String::new(),
+            left: 72.0,
+            right: 300.0,
+            y: 680.0,
+        },
     ];
 
     let markdown = chars_and_images_to_markdown(&[], &images);
@@ -2304,7 +2865,10 @@ fn two_images_never_merge_into_one_block() {
 #[test]
 fn no_images_behaves_exactly_like_chars_to_markdown() {
     let chars = set("ordinary text", 72.0, 700.0, Style::default());
-    assert_eq!(chars_and_images_to_markdown(&chars, &[]), chars_to_markdown(&chars));
+    assert_eq!(
+        chars_and_images_to_markdown(&chars, &[]),
+        chars_to_markdown(&chars)
+    );
 }
 
 #[test]
@@ -2321,7 +2885,12 @@ fn strips_an_isolated_bare_number_footer() {
 #[test]
 fn strips_an_isolated_labelled_footer() {
     let mut chars = page(&["Body text on the page."]);
-    chars.extend(set("Page 3 of 10", 72.0, 700.0 - 12.0 - 40.0, Style::default()));
+    chars.extend(set(
+        "Page 3 of 10",
+        72.0,
+        700.0 - 12.0 - 40.0,
+        Style::default(),
+    ));
 
     let markdown = chars_to_markdown(&chars);
 
@@ -2343,7 +2912,12 @@ fn a_number_at_normal_line_spacing_is_kept() {
 #[test]
 fn a_numbered_list_item_is_never_mistaken_for_a_page_number() {
     let mut chars = page(&["Body paragraph here."]);
-    chars.extend(set("1. Aufgabe", 72.0, 700.0 - 12.0 - 40.0, Style::default()));
+    chars.extend(set(
+        "1. Aufgabe",
+        72.0,
+        700.0 - 12.0 - 40.0,
+        Style::default(),
+    ));
 
     let markdown = chars_to_markdown(&chars);
 
@@ -2367,7 +2941,10 @@ fn a_single_row_page_is_left_untouched() {
 fn a_page_with_no_rules_converts_exactly_as_before() {
     let chars = page_at(700.0, &["Hello world", "a second line of prose"]);
 
-    assert_eq!(chars_and_rules_to_markdown(&chars, &[]), chars_to_markdown(&chars));
+    assert_eq!(
+        chars_and_rules_to_markdown(&chars, &[]),
+        chars_to_markdown(&chars)
+    );
 }
 
 #[test]
@@ -2380,7 +2957,12 @@ fn group_lines_with_no_rules_matches_group_lines() {
 use super::rules::RuleBox;
 
 fn rule_at(x0: f32, x1: f32, y: f32) -> RuleBox {
-    RuleBox { x0, x1, y, thickness: 0.96 }
+    RuleBox {
+        x0,
+        x1,
+        y,
+        thickness: 0.96,
+    }
 }
 
 // The bar states outright what the geometric pass has to infer: the row above
@@ -2503,7 +3085,11 @@ fn three_bars_on_one_row_become_three_fractions_around_their_connectors() {
     assert!(markdown.contains(r"\frac{b}{y}"), "got: {markdown}");
     assert!(markdown.contains(r"\frac{c}{z}"), "got: {markdown}");
     let frac_lines: Vec<&str> = markdown.lines().filter(|l| l.contains(r"\frac")).collect();
-    assert_eq!(frac_lines.len(), 1, "all three belong to one line: {markdown}");
+    assert_eq!(
+        frac_lines.len(),
+        1,
+        "all three belong to one line: {markdown}"
+    );
     // Order is the whole point. Leaving the baseline row unconsumed already
     // gets its content onto this line — `group_blocks` merges the two rows
     // into one display block — but strands it all at the end, reading
@@ -2525,7 +3111,12 @@ fn three_bars_on_one_row_become_three_fractions_around_their_connectors() {
 #[test]
 fn a_full_width_separator_rule_is_not_a_fraction_bar() {
     let mut chars = set("11. Ubungsblatt", 72.0, 750.0, Style::default());
-    chars.extend(set("1. Berechnen Sie das komplexe Kurvenintegral", 72.0, 720.0, Style::default()));
+    chars.extend(set(
+        "1. Berechnen Sie das komplexe Kurvenintegral",
+        72.0,
+        720.0,
+        Style::default(),
+    ));
     // As wide as the text column itself, sitting between the two rows.
     let rules = [rule_at(70.0, 290.0, 737.0)];
 

@@ -1,12 +1,12 @@
-use tauri::State;
-use tokio::io::AsyncWriteExt;
-use uuid::Uuid;
+use crate::db::{self, DbPool};
+use crate::models::{GraphLink, GraphTag, NoteMetadata, SearchResult, WorkspaceTree};
 use regex::Regex;
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
-use crate::db::{self, DbPool};
-use crate::models::{GraphLink, GraphTag, NoteMetadata, SearchResult, WorkspaceTree};
+use tauri::State;
+use tokio::io::AsyncWriteExt;
+use uuid::Uuid;
 
 fn now_ms() -> i64 {
     SystemTime::now()
@@ -208,7 +208,10 @@ pub async fn scan_workspace(
         .await
         .map_err(|e| e.to_string())?;
 
-    Ok(WorkspaceTree { notes: indexed, folders })
+    Ok(WorkspaceTree {
+        notes: indexed,
+        folders,
+    })
 }
 
 #[tauri::command]
@@ -242,7 +245,9 @@ async fn write_atomic(path: &Path, content: &str) -> anyhow::Result<()> {
     };
 
     let result = match write.await {
-        Ok(()) => tokio::fs::rename(&tmp, path).await.map_err(anyhow::Error::from),
+        Ok(()) => tokio::fs::rename(&tmp, path)
+            .await
+            .map_err(anyhow::Error::from),
         Err(e) => Err(e),
     };
     if result.is_err() {
@@ -419,7 +424,9 @@ pub async fn create_note(
     title: String,
     db: State<'_, DbPool>,
 ) -> Result<NoteMetadata, String> {
-    let path = create_note_file(&folder, &title).await.map_err(|e| e.to_string())?;
+    let path = create_note_file(&folder, &title)
+        .await
+        .map_err(|e| e.to_string())?;
     let body = format!("# {}\n", title);
 
     let meta = NoteMetadata {
@@ -437,10 +444,7 @@ pub async fn create_note(
 }
 
 #[tauri::command]
-pub async fn delete_note(
-    path: String,
-    db: State<'_, DbPool>,
-) -> Result<(), String> {
+pub async fn delete_note(path: String, db: State<'_, DbPool>) -> Result<(), String> {
     tokio::fs::remove_file(&path)
         .await
         .map_err(|e| e.to_string())?;
@@ -514,24 +518,43 @@ pub async fn backlinks_for(
 }
 
 #[tauri::command]
-pub async fn graph_links(workspace: String, db: State<'_, DbPool>) -> Result<Vec<GraphLink>, String> {
-    let rows = db::notes::all_links(&db, &workspace).await.map_err(|e| e.to_string())?;
+pub async fn graph_links(
+    workspace: String,
+    db: State<'_, DbPool>,
+) -> Result<Vec<GraphLink>, String> {
+    let rows = db::notes::all_links(&db, &workspace)
+        .await
+        .map_err(|e| e.to_string())?;
     Ok(rows
         .into_iter()
-        .map(|(source_path, target_title)| GraphLink { source_path, target_title })
+        .map(|(source_path, target_title)| GraphLink {
+            source_path,
+            target_title,
+        })
         .collect())
 }
 
 #[tauri::command]
 pub async fn graph_tags(workspace: String, db: State<'_, DbPool>) -> Result<Vec<GraphTag>, String> {
-    let rows = db::notes::all_note_tags(&db, &workspace).await.map_err(|e| e.to_string())?;
-    Ok(rows.into_iter().map(|(note_path, tag)| GraphTag { note_path, tag }).collect())
+    let rows = db::notes::all_note_tags(&db, &workspace)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(rows
+        .into_iter()
+        .map(|(note_path, tag)| GraphTag { note_path, tag })
+        .collect())
 }
 
 fn note_filename(title: &str) -> String {
     let safe_name: String = title
         .chars()
-        .map(|c| if c.is_alphanumeric() || c == ' ' { c } else { '-' })
+        .map(|c| {
+            if c.is_alphanumeric() || c == ' ' {
+                c
+            } else {
+                '-'
+            }
+        })
         .collect();
     format!("{}.md", safe_name.trim())
 }
@@ -601,13 +624,17 @@ pub async fn scaffold_project_notes(
     workspace: String,
     db: State<'_, DbPool>,
 ) -> Result<Vec<NoteMetadata>, String> {
-    let paths = scaffold_project_notes_at(&workspace).await.map_err(|e| e.to_string())?;
+    let paths = scaffold_project_notes_at(&workspace)
+        .await
+        .map_err(|e| e.to_string())?;
 
     let mut created = Vec::new();
     for (title, path) in paths {
         let path = path.to_string_lossy().into_owned();
         let body = format!("# {title}\n");
-        index_note_at(&path, &workspace, &body, &db).await.map_err(|e| e.to_string())?;
+        index_note_at(&path, &workspace, &body, &db)
+            .await
+            .map_err(|e| e.to_string())?;
         created.push(NoteMetadata {
             id: Uuid::new_v4().to_string(),
             title: title.to_string(),
@@ -650,7 +677,11 @@ async fn move_note_at(path: &str, dest_folder: &str, db: &DbPool) -> anyhow::Res
 
     let ink_dir = path.trim_end_matches(".md").to_string() + ".ink";
     if tokio::fs::metadata(&ink_dir).await.is_ok() {
-        let new_ink_dir = new_path.to_string_lossy().trim_end_matches(".md").to_string() + ".ink";
+        let new_ink_dir = new_path
+            .to_string_lossy()
+            .trim_end_matches(".md")
+            .to_string()
+            + ".ink";
         tokio::fs::rename(&ink_dir, &new_ink_dir).await?;
     }
 
@@ -661,22 +692,38 @@ async fn move_note_at(path: &str, dest_folder: &str, db: &DbPool) -> anyhow::Res
 
 #[tauri::command]
 pub async fn create_folder(parent: String, name: String) -> Result<String, String> {
-    create_folder_at(&parent, &name).await.map_err(|e| e.to_string())
+    create_folder_at(&parent, &name)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-pub async fn rename_folder(old_path: String, new_path: String, db: State<'_, DbPool>) -> Result<(), String> {
-    rename_folder_at(&old_path, &new_path, &db).await.map_err(|e| e.to_string())
+pub async fn rename_folder(
+    old_path: String,
+    new_path: String,
+    db: State<'_, DbPool>,
+) -> Result<(), String> {
+    rename_folder_at(&old_path, &new_path, &db)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 pub async fn delete_folder(path: String, db: State<'_, DbPool>) -> Result<(), String> {
-    delete_folder_at(&path, &db).await.map_err(|e| e.to_string())
+    delete_folder_at(&path, &db)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-pub async fn move_note(path: String, dest_folder: String, db: State<'_, DbPool>) -> Result<String, String> {
-    move_note_at(&path, &dest_folder, &db).await.map_err(|e| e.to_string())
+pub async fn move_note(
+    path: String,
+    dest_folder: String,
+    db: State<'_, DbPool>,
+) -> Result<String, String> {
+    move_note_at(&path, &dest_folder, &db)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[cfg(test)]
@@ -714,7 +761,10 @@ mod tests {
 
     #[test]
     fn test_title_from_content_heading() {
-        assert_eq!(title_from_content("# Hello World\nsome text"), "Hello World");
+        assert_eq!(
+            title_from_content("# Hello World\nsome text"),
+            "Hello World"
+        );
     }
 
     #[test]
@@ -876,8 +926,8 @@ mod tests {
 #[cfg(test)]
 mod save_tests {
     use super::*;
-    use tempfile::tempdir;
     use crate::db::schema::run_migrations;
+    use tempfile::tempdir;
 
     fn temp_files_in(dir: &Path) -> Vec<String> {
         std::fs::read_dir(dir)
@@ -930,7 +980,9 @@ mod save_tests {
     async fn test_create_note_file_seeds_a_heading() {
         let tmp = tempdir().unwrap();
 
-        let path = create_note_file(&tmp.path().to_string_lossy(), "Missing").await.unwrap();
+        let path = create_note_file(&tmp.path().to_string_lossy(), "Missing")
+            .await
+            .unwrap();
 
         assert_eq!(path, tmp.path().join("Missing.md"));
         assert_eq!(std::fs::read_to_string(&path).unwrap(), "# Missing\n");
@@ -945,7 +997,10 @@ mod save_tests {
             .unwrap();
 
         assert_eq!(path, tmp.path().join("CS-101- Week 1.md"));
-        assert_eq!(std::fs::read_to_string(&path).unwrap(), "# CS/101: Week 1\n");
+        assert_eq!(
+            std::fs::read_to_string(&path).unwrap(),
+            "# CS/101: Week 1\n"
+        );
     }
 
     // Clicking an unresolved [[link]] creates a note from a title alone, so a
@@ -979,14 +1034,20 @@ mod save_tests {
         .await
         .unwrap();
 
-        let hits = db::notes::search_notes(&pool, "\"shortest\"*").await.unwrap();
+        let hits = db::notes::search_notes(&pool, "\"shortest\"*")
+            .await
+            .unwrap();
         assert_eq!(hits.len(), 1);
         assert_eq!(hits[0].title, "Dijkstra");
 
-        let tagged = db::notes::notes_with_tag(&pool, "/ws", "graphs").await.unwrap();
+        let tagged = db::notes::notes_with_tag(&pool, "/ws", "graphs")
+            .await
+            .unwrap();
         assert_eq!(tagged.len(), 1);
 
-        let backlinks = db::notes::backlinks_for(&pool, "/ws", "Big O Notation").await.unwrap();
+        let backlinks = db::notes::backlinks_for(&pool, "/ws", "Big O Notation")
+            .await
+            .unwrap();
         assert_eq!(backlinks.len(), 1);
     }
 
@@ -1067,9 +1128,13 @@ mod save_tests {
             "# Source\nSee [[Asymptotic Notation]] for details.\n"
         );
 
-        let old_backlinks = db::notes::backlinks_for(&pool, &ws, "Big O Notation").await.unwrap();
+        let old_backlinks = db::notes::backlinks_for(&pool, &ws, "Big O Notation")
+            .await
+            .unwrap();
         assert!(old_backlinks.is_empty());
-        let new_backlinks = db::notes::backlinks_for(&pool, &ws, "Asymptotic Notation").await.unwrap();
+        let new_backlinks = db::notes::backlinks_for(&pool, &ws, "Asymptotic Notation")
+            .await
+            .unwrap();
         assert_eq!(new_backlinks.len(), 1);
         assert_eq!(new_backlinks[0].path, source.to_string_lossy());
     }
@@ -1111,9 +1176,9 @@ mod save_tests {
 #[cfg(test)]
 mod folder_tests {
     use super::*;
-    use tempfile::tempdir;
-    use crate::db::schema::run_migrations;
     use crate::db::notes::index_note as db_index_note;
+    use crate::db::schema::run_migrations;
+    use tempfile::tempdir;
 
     async fn make_pool() -> DbPool {
         let pool = DbPool::connect("sqlite::memory:").await.unwrap();
@@ -1143,8 +1208,12 @@ mod folder_tests {
         let tmp = tempdir().unwrap();
         let src = tmp.path().join("src");
         tokio::fs::create_dir(&src).await.unwrap();
-        tokio::fs::write(src.join("main.rs"), "fn main() {}").await.unwrap();
-        let before = tokio::fs::read_to_string(src.join("main.rs")).await.unwrap();
+        tokio::fs::write(src.join("main.rs"), "fn main() {}")
+            .await
+            .unwrap();
+        let before = tokio::fs::read_to_string(src.join("main.rs"))
+            .await
+            .unwrap();
 
         scaffold_project_notes_at(&tmp.path().to_string_lossy())
             .await
@@ -1157,7 +1226,9 @@ mod folder_tests {
         }
         assert_eq!(names, ["main.rs"], "source folder gained files");
         assert_eq!(
-            tokio::fs::read_to_string(src.join("main.rs")).await.unwrap(),
+            tokio::fs::read_to_string(src.join("main.rs"))
+                .await
+                .unwrap(),
             before
         );
     }
@@ -1180,7 +1251,9 @@ mod folder_tests {
 
         assert_eq!(created.len(), 3, "Todo was rewritten");
         assert_eq!(
-            tokio::fs::read_to_string(notes.join("Todo.md")).await.unwrap(),
+            tokio::fs::read_to_string(notes.join("Todo.md"))
+                .await
+                .unwrap(),
             "# Todo\n\n- real work\n"
         );
     }
@@ -1214,20 +1287,32 @@ mod folder_tests {
 
         let pool = make_pool().await;
         let old_note_path = old_dir.join("note.md").to_string_lossy().into_owned();
-        db_index_note(&pool, &NoteMetadata {
-            id: "a".into(),
-            title: "Note".into(),
-            path: old_note_path,
-            workspace: root.to_string_lossy().into_owned(),
-            updated_at: 1000,
-        }).await.unwrap();
+        db_index_note(
+            &pool,
+            &NoteMetadata {
+                id: "a".into(),
+                title: "Note".into(),
+                path: old_note_path,
+                workspace: root.to_string_lossy().into_owned(),
+                updated_at: 1000,
+            },
+        )
+        .await
+        .unwrap();
 
         let new_dir = root.join("New").to_string_lossy().into_owned();
-        rename_folder_at(&old_dir.to_string_lossy(), &new_dir, &pool).await.unwrap();
+        rename_folder_at(&old_dir.to_string_lossy(), &new_dir, &pool)
+            .await
+            .unwrap();
 
         assert!(std::path::Path::new(&new_dir).join("note.md").exists());
-        let notes = db::notes::list_by_workspace(&pool, &root.to_string_lossy()).await.unwrap();
-        let expected = std::path::Path::new(&new_dir).join("note.md").to_string_lossy().into_owned();
+        let notes = db::notes::list_by_workspace(&pool, &root.to_string_lossy())
+            .await
+            .unwrap();
+        let expected = std::path::Path::new(&new_dir)
+            .join("note.md")
+            .to_string_lossy()
+            .into_owned();
         assert_eq!(notes[0].path, expected);
     }
 
@@ -1240,18 +1325,27 @@ mod folder_tests {
         std::fs::write(dir.join("note.md"), "# Note").unwrap();
 
         let pool = make_pool().await;
-        db_index_note(&pool, &NoteMetadata {
-            id: "a".into(),
-            title: "Note".into(),
-            path: dir.join("note.md").to_string_lossy().into_owned(),
-            workspace: root.to_string_lossy().into_owned(),
-            updated_at: 1000,
-        }).await.unwrap();
+        db_index_note(
+            &pool,
+            &NoteMetadata {
+                id: "a".into(),
+                title: "Note".into(),
+                path: dir.join("note.md").to_string_lossy().into_owned(),
+                workspace: root.to_string_lossy().into_owned(),
+                updated_at: 1000,
+            },
+        )
+        .await
+        .unwrap();
 
-        delete_folder_at(&dir.to_string_lossy(), &pool).await.unwrap();
+        delete_folder_at(&dir.to_string_lossy(), &pool)
+            .await
+            .unwrap();
 
         assert!(!dir.exists());
-        let notes = db::notes::list_by_workspace(&pool, &root.to_string_lossy()).await.unwrap();
+        let notes = db::notes::list_by_workspace(&pool, &root.to_string_lossy())
+            .await
+            .unwrap();
         assert!(notes.is_empty());
     }
 
@@ -1269,20 +1363,29 @@ mod folder_tests {
 
         let pool = make_pool().await;
         let old_path = src_dir.join("note.md").to_string_lossy().into_owned();
-        db_index_note(&pool, &NoteMetadata {
-            id: "a".into(),
-            title: "Note".into(),
-            path: old_path.clone(),
-            workspace: root.to_string_lossy().into_owned(),
-            updated_at: 1000,
-        }).await.unwrap();
+        db_index_note(
+            &pool,
+            &NoteMetadata {
+                id: "a".into(),
+                title: "Note".into(),
+                path: old_path.clone(),
+                workspace: root.to_string_lossy().into_owned(),
+                updated_at: 1000,
+            },
+        )
+        .await
+        .unwrap();
 
-        let new_path = move_note_at(&old_path, &dest_dir.to_string_lossy(), &pool).await.unwrap();
+        let new_path = move_note_at(&old_path, &dest_dir.to_string_lossy(), &pool)
+            .await
+            .unwrap();
 
         assert!(std::path::Path::new(&new_path).exists());
         assert!(dest_dir.join("note.ink").join("sketch-1.svg").exists());
         assert!(!src_dir.join("note.md").exists());
-        let notes = db::notes::list_by_workspace(&pool, &root.to_string_lossy()).await.unwrap();
+        let notes = db::notes::list_by_workspace(&pool, &root.to_string_lossy())
+            .await
+            .unwrap();
         assert_eq!(notes[0].path, new_path);
     }
 }

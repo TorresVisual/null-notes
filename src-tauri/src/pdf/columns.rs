@@ -143,12 +143,17 @@ fn split_by_horizontal_gap(group: &[(usize, CharBox)]) -> Vec<Row> {
 pub(super) fn region_extent(rows: &[Row]) -> (f32, f32) {
     rows.iter()
         .map(|r| layout::row_x_extent(&plain(r)))
-        .fold((f32::MAX, f32::MIN), |(lo, hi), (x0, x1)| (lo.min(x0), hi.max(x1)))
+        .fold((f32::MAX, f32::MIN), |(lo, hi), (x0, x1)| {
+            (lo.min(x0), hi.max(x1))
+        })
 }
 
 /// The region's dominant font size, read off its rows' own font sizes.
 pub(super) fn region_font_size(rows: &[Row]) -> f32 {
-    let mut sizes: Vec<f32> = rows.iter().map(|r| layout::row_font_size(&plain(r))).collect();
+    let mut sizes: Vec<f32> = rows
+        .iter()
+        .map(|r| layout::row_font_size(&plain(r)))
+        .collect();
     median(&mut sizes)
 }
 
@@ -221,7 +226,10 @@ pub(super) fn try_column_split(rows: &[Row]) -> Option<Columns> {
     let take = candidates.len().min(MAX_COLUMN_CUTS);
     let cuts = &candidates[..take];
     if let Some((next_width, _, _)) = candidates.get(take) {
-        let narrowest_kept = cuts.iter().map(|(w, _, _)| *w).fold(f32::INFINITY, f32::min);
+        let narrowest_kept = cuts
+            .iter()
+            .map(|(w, _, _)| *w)
+            .fold(f32::INFINITY, f32::min);
         if narrowest_kept <= next_width * GUTTER_DOMINANCE_RATIO {
             return None;
         }
@@ -270,7 +278,9 @@ pub(super) fn split_into_bands(rows: &[Row]) -> Columns {
     let mut current: Vec<Row> = vec![rows[0].clone()];
     for pair in rows.windows(2) {
         let (prev, next) = (&pair[0], &pair[1]);
-        let size = layout::row_font_size(&plain(prev)).max(layout::row_font_size(&plain(next))).max(1.0);
+        let size = layout::row_font_size(&plain(prev))
+            .max(layout::row_font_size(&plain(next)))
+            .max(1.0);
         let gap = layout::row_y(&plain(prev)) - layout::row_y(&plain(next));
         if gap > size * BAND_GAP_EMS {
             bands.push(std::mem::take(&mut current));

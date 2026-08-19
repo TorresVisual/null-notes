@@ -50,7 +50,9 @@ impl Family {
 /// rather than on equality.
 pub fn family_of(font_name: &str) -> Family {
     // Subset prefixes are six uppercase letters and a '+'.
-    let name = font_name.split_once('+').map_or(font_name, |(_, rest)| rest);
+    let name = font_name
+        .split_once('+')
+        .map_or(font_name, |(_, rest)| rest);
     let upper = name.to_ascii_uppercase();
 
     // Ordered: the specific faces before the generic "…Math" catch-all, so
@@ -113,7 +115,16 @@ mod tests {
     // runs on, and the single most damaging false positive available.
     #[test]
     fn does_not_mistake_body_text_for_maths() {
-        for name in ["CMR12", "CMR8", "ABCDEF+CMR17", "CMBX12", "CMTI12", "Times-Roman", "Helvetica", ""] {
+        for name in [
+            "CMR12",
+            "CMR8",
+            "ABCDEF+CMR17",
+            "CMBX12",
+            "CMTI12",
+            "Times-Roman",
+            "Helvetica",
+            "",
+        ] {
             assert_eq!(family_of(name), Family::Text, "{name} read as maths");
             assert!(!family_of(name).is_maths());
         }

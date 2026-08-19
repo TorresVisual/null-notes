@@ -67,7 +67,11 @@ pub(crate) fn tokenize(template: &str) -> Vec<String> {
 ///
 /// A token is substituted in place, so `{file}:{line}` stays one argument
 /// however many spaces the resolved path contains.
-pub fn build_command(template: &str, file: &str, line: u32) -> Result<(String, Vec<String>), String> {
+pub fn build_command(
+    template: &str,
+    file: &str,
+    line: u32,
+) -> Result<(String, Vec<String>), String> {
     let tokens = tokenize(template);
     let (program, args) = tokens.split_first().ok_or("editor command is empty")?;
     if program.contains("{file}") || program.contains("{line}") {
@@ -76,7 +80,10 @@ pub fn build_command(template: &str, file: &str, line: u32) -> Result<(String, V
 
     let filled: Vec<String> = args
         .iter()
-        .map(|arg| arg.replace("{file}", file).replace("{line}", &line.to_string()))
+        .map(|arg| {
+            arg.replace("{file}", file)
+                .replace("{line}", &line.to_string())
+        })
         .collect();
     Ok((program.clone(), filled))
 }
@@ -110,11 +117,7 @@ pub async fn open_in_editor(
     template: String,
 ) -> Result<(), String> {
     let resolved = resolve_in_workspace(&workspace, &target)?;
-    let (program, args) = build_command(
-        &template,
-        &resolved.to_string_lossy(),
-        line.unwrap_or(1),
-    )?;
+    let (program, args) = build_command(&template, &resolved.to_string_lossy(), line.unwrap_or(1))?;
 
     std::process::Command::new(program)
         .args(args)
@@ -128,7 +131,10 @@ pub async fn open_in_editor(
 /// Batched deliberately: a link renders inert unless its file exists, and
 /// asking per link on every render is what would make the feature feel slow.
 #[tauri::command]
-pub async fn resolve_code_links(workspace: String, targets: Vec<String>) -> Result<Vec<bool>, String> {
+pub async fn resolve_code_links(
+    workspace: String,
+    targets: Vec<String>,
+) -> Result<Vec<bool>, String> {
     Ok(targets
         .iter()
         .map(|target| resolve_in_workspace(&workspace, target).is_ok())
@@ -191,7 +197,8 @@ mod tests {
 
     #[test]
     fn builds_the_program_and_its_arguments() {
-        let (program, args) = build_command("code -g {file}:{line}", "/ws/src/main.rs", 58).unwrap();
+        let (program, args) =
+            build_command("code -g {file}:{line}", "/ws/src/main.rs", 58).unwrap();
 
         assert_eq!(program, "code");
         assert_eq!(args, ["-g", "/ws/src/main.rs:58"]);

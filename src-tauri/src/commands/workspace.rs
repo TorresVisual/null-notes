@@ -1,6 +1,6 @@
+use crate::models::WorkspaceState;
 use std::path::Path;
 use tauri::{AppHandle, Manager};
-use crate::models::WorkspaceState;
 
 const STATE_FILE: &str = ".workspace.json";
 const RECENTS_FILE: &str = "recent-workspaces.json";
@@ -50,7 +50,11 @@ async fn push_recent(dir: &Path, workspace: &str) -> anyhow::Result<Vec<String>>
     recents.truncate(MAX_RECENTS);
 
     tokio::fs::create_dir_all(dir).await?;
-    tokio::fs::write(dir.join(RECENTS_FILE), serde_json::to_string_pretty(&recents)?).await?;
+    tokio::fs::write(
+        dir.join(RECENTS_FILE),
+        serde_json::to_string_pretty(&recents)?,
+    )
+    .await?;
     Ok(recents)
 }
 
@@ -84,12 +88,16 @@ pub async fn remember_workspace(app: AppHandle, path: String) -> Result<Vec<Stri
 
 #[tauri::command]
 pub async fn load_workspace(path: String) -> Result<WorkspaceState, String> {
-    load_workspace_from_dir(&path).await.map_err(|e| e.to_string())
+    load_workspace_from_dir(&path)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 pub async fn save_workspace(path: String, state: WorkspaceState) -> Result<(), String> {
-    save_workspace_to_dir(&path, &state).await.map_err(|e| e.to_string())
+    save_workspace_to_dir(&path, &state)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[cfg(test)]
@@ -170,9 +178,12 @@ mod tests {
     async fn test_load_legacy_file_without_expanded_folders() {
         let dir = tempdir().unwrap();
         let state_path = dir.path().join(".workspace.json");
-        tokio::fs::write(&state_path, r#"{"openTabs":["/ws/a.md"],"activeTab":"/ws/a.md"}"#)
-            .await
-            .unwrap();
+        tokio::fs::write(
+            &state_path,
+            r#"{"openTabs":["/ws/a.md"],"activeTab":"/ws/a.md"}"#,
+        )
+        .await
+        .unwrap();
         let state = load_workspace_from_dir(&dir.path().to_string_lossy())
             .await
             .unwrap();
@@ -208,7 +219,11 @@ mod tests {
         let dir = tempdir().unwrap();
         let path = dir.path().to_string_lossy().into_owned();
         let original = WorkspaceState {
-            git: GitWorkspaceConfig { prompted: true, auto_commit: true, ..Default::default() },
+            git: GitWorkspaceConfig {
+                prompted: true,
+                auto_commit: true,
+                ..Default::default()
+            },
             ..Default::default()
         };
 
@@ -246,7 +261,10 @@ mod tests {
     #[test]
     fn test_initial_workspace_from_args_finds_the_flag() {
         let args = vec!["--workspace=/tmp/ws".to_string()];
-        assert_eq!(initial_workspace_from_args(args), Some("/tmp/ws".to_string()));
+        assert_eq!(
+            initial_workspace_from_args(args),
+            Some("/tmp/ws".to_string())
+        );
     }
 
     #[test]
@@ -268,6 +286,9 @@ mod tests {
             "--workspace=/tmp/ws".to_string(),
             "--other".to_string(),
         ];
-        assert_eq!(initial_workspace_from_args(args), Some("/tmp/ws".to_string()));
+        assert_eq!(
+            initial_workspace_from_args(args),
+            Some("/tmp/ws".to_string())
+        );
     }
 }

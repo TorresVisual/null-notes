@@ -1,6 +1,6 @@
+use crate::models::{NoteMetadata, SearchResult};
 use anyhow::Result;
 use sqlx::SqlitePool;
-use crate::models::{NoteMetadata, SearchResult};
 
 pub async fn index_note(pool: &SqlitePool, note: &NoteMetadata) -> Result<()> {
     sqlx::query(
@@ -28,7 +28,12 @@ pub async fn remove_note(pool: &SqlitePool, path: &str) -> Result<()> {
     Ok(())
 }
 
-pub async fn index_note_content(pool: &SqlitePool, path: &str, title: &str, body: &str) -> Result<()> {
+pub async fn index_note_content(
+    pool: &SqlitePool,
+    path: &str,
+    title: &str,
+    body: &str,
+) -> Result<()> {
     sqlx::query("DELETE FROM notes_fts WHERE path = ?")
         .bind(path)
         .execute(pool)
@@ -52,12 +57,17 @@ fn escape_like(input: &str) -> String {
         .replace('_', "\\_")
 }
 
-pub async fn rename_path_prefix(pool: &SqlitePool, old_prefix: &str, new_prefix: &str) -> Result<()> {
+pub async fn rename_path_prefix(
+    pool: &SqlitePool,
+    old_prefix: &str,
+    new_prefix: &str,
+) -> Result<()> {
     let like_pattern = format!("{}%", escape_like(old_prefix));
-    let rows: Vec<(String,)> = sqlx::query_as("SELECT path FROM notes WHERE path LIKE ? ESCAPE '\\'")
-        .bind(&like_pattern)
-        .fetch_all(pool)
-        .await?;
+    let rows: Vec<(String,)> =
+        sqlx::query_as("SELECT path FROM notes WHERE path LIKE ? ESCAPE '\\'")
+            .bind(&like_pattern)
+            .fetch_all(pool)
+            .await?;
 
     for (old_path,) in rows {
         let new_path = format!("{}{}", new_prefix, &old_path[old_prefix.len()..]);
@@ -177,7 +187,11 @@ pub async fn list_tags(pool: &SqlitePool, workspace: &str) -> Result<Vec<String>
     Ok(rows.into_iter().map(|(t,)| t).collect())
 }
 
-pub async fn notes_with_tag(pool: &SqlitePool, workspace: &str, tag: &str) -> Result<Vec<NoteMetadata>> {
+pub async fn notes_with_tag(
+    pool: &SqlitePool,
+    workspace: &str,
+    tag: &str,
+) -> Result<Vec<NoteMetadata>> {
     let rows = sqlx::query_as::<_, NoteMetadata>(
         "SELECT n.id, n.title, n.path, n.workspace, n.updated_at
          FROM notes n
@@ -192,7 +206,11 @@ pub async fn notes_with_tag(pool: &SqlitePool, workspace: &str, tag: &str) -> Re
     Ok(rows)
 }
 
-pub async fn backlinks_for(pool: &SqlitePool, workspace: &str, title: &str) -> Result<Vec<NoteMetadata>> {
+pub async fn backlinks_for(
+    pool: &SqlitePool,
+    workspace: &str,
+    title: &str,
+) -> Result<Vec<NoteMetadata>> {
     let rows = sqlx::query_as::<_, NoteMetadata>(
         "SELECT n.id, n.title, n.path, n.workspace, n.updated_at
          FROM notes n
@@ -272,7 +290,9 @@ mod tests {
     #[tokio::test]
     async fn test_index_and_list() {
         let pool = make_pool().await;
-        index_note(&pool, &note("a", "Note A", "/ws/a.md", "/ws")).await.unwrap();
+        index_note(&pool, &note("a", "Note A", "/ws/a.md", "/ws"))
+            .await
+            .unwrap();
         let notes = list_by_workspace(&pool, "/ws").await.unwrap();
         assert_eq!(notes.len(), 1);
         assert_eq!(notes[0].title, "Note A");
@@ -281,7 +301,9 @@ mod tests {
     #[tokio::test]
     async fn test_upsert_updates_title() {
         let pool = make_pool().await;
-        index_note(&pool, &note("a", "Old Title", "/ws/a.md", "/ws")).await.unwrap();
+        index_note(&pool, &note("a", "Old Title", "/ws/a.md", "/ws"))
+            .await
+            .unwrap();
         let updated = NoteMetadata {
             id: "a".into(),
             title: "New Title".into(),
@@ -298,7 +320,9 @@ mod tests {
     #[tokio::test]
     async fn test_remove_note() {
         let pool = make_pool().await;
-        index_note(&pool, &note("b", "B", "/ws/b.md", "/ws")).await.unwrap();
+        index_note(&pool, &note("b", "B", "/ws/b.md", "/ws"))
+            .await
+            .unwrap();
         remove_note(&pool, "/ws/b.md").await.unwrap();
         let notes = list_by_workspace(&pool, "/ws").await.unwrap();
         assert_eq!(notes.len(), 0);
@@ -307,11 +331,19 @@ mod tests {
     #[tokio::test]
     async fn test_rename_path_prefix_updates_matching_notes_and_fts() {
         let pool = make_pool().await;
-        index_note(&pool, &note("a", "A", "/ws/Course1/a.md", "/ws")).await.unwrap();
-        index_note_content(&pool, "/ws/Course1/a.md", "A", "body text").await.unwrap();
-        index_note(&pool, &note("b", "B", "/ws/Course10/b.md", "/ws")).await.unwrap();
+        index_note(&pool, &note("a", "A", "/ws/Course1/a.md", "/ws"))
+            .await
+            .unwrap();
+        index_note_content(&pool, "/ws/Course1/a.md", "A", "body text")
+            .await
+            .unwrap();
+        index_note(&pool, &note("b", "B", "/ws/Course10/b.md", "/ws"))
+            .await
+            .unwrap();
 
-        rename_path_prefix(&pool, "/ws/Course1/", "/ws/Renamed/").await.unwrap();
+        rename_path_prefix(&pool, "/ws/Course1/", "/ws/Renamed/")
+            .await
+            .unwrap();
 
         let notes = list_by_workspace(&pool, "/ws").await.unwrap();
         let a = notes.iter().find(|n| n.id == "a").unwrap();
@@ -329,9 +361,15 @@ mod tests {
     #[tokio::test]
     async fn test_remove_notes_under_deletes_matching_notes_and_fts_only() {
         let pool = make_pool().await;
-        index_note(&pool, &note("a", "A", "/ws/Course1/a.md", "/ws")).await.unwrap();
-        index_note_content(&pool, "/ws/Course1/a.md", "A", "body").await.unwrap();
-        index_note(&pool, &note("b", "B", "/ws/Course10/b.md", "/ws")).await.unwrap();
+        index_note(&pool, &note("a", "A", "/ws/Course1/a.md", "/ws"))
+            .await
+            .unwrap();
+        index_note_content(&pool, "/ws/Course1/a.md", "A", "body")
+            .await
+            .unwrap();
+        index_note(&pool, &note("b", "B", "/ws/Course10/b.md", "/ws"))
+            .await
+            .unwrap();
 
         remove_notes_under(&pool, "/ws/Course1/").await.unwrap();
 
@@ -349,8 +387,12 @@ mod tests {
     #[tokio::test]
     async fn test_update_path_changes_a_single_note() {
         let pool = make_pool().await;
-        index_note(&pool, &note("a", "A", "/ws/old.md", "/ws")).await.unwrap();
-        update_path(&pool, "/ws/old.md", "/ws/Folder/old.md").await.unwrap();
+        index_note(&pool, &note("a", "A", "/ws/old.md", "/ws"))
+            .await
+            .unwrap();
+        update_path(&pool, "/ws/old.md", "/ws/Folder/old.md")
+            .await
+            .unwrap();
         let notes = list_by_workspace(&pool, "/ws").await.unwrap();
         assert_eq!(notes[0].path, "/ws/Folder/old.md");
     }
@@ -358,9 +400,19 @@ mod tests {
     #[tokio::test]
     async fn test_set_tags_replaces_existing_tags_for_a_note() {
         let pool = make_pool().await;
-        index_note(&pool, &note("a", "A", "/ws/a.md", "/ws")).await.unwrap();
-        set_tags(&pool, "/ws/a.md", &["cs101".to_string(), "midterm".to_string()]).await.unwrap();
-        set_tags(&pool, "/ws/a.md", &["final".to_string()]).await.unwrap();
+        index_note(&pool, &note("a", "A", "/ws/a.md", "/ws"))
+            .await
+            .unwrap();
+        set_tags(
+            &pool,
+            "/ws/a.md",
+            &["cs101".to_string(), "midterm".to_string()],
+        )
+        .await
+        .unwrap();
+        set_tags(&pool, "/ws/a.md", &["final".to_string()])
+            .await
+            .unwrap();
 
         let tags = list_tags(&pool, "/ws").await.unwrap();
         assert_eq!(tags, vec!["final".to_string()]);
@@ -369,10 +421,18 @@ mod tests {
     #[tokio::test]
     async fn test_notes_with_tag_returns_matching_notes_only() {
         let pool = make_pool().await;
-        index_note(&pool, &note("a", "A", "/ws/a.md", "/ws")).await.unwrap();
-        index_note(&pool, &note("b", "B", "/ws/b.md", "/ws")).await.unwrap();
-        set_tags(&pool, "/ws/a.md", &["cs101".to_string()]).await.unwrap();
-        set_tags(&pool, "/ws/b.md", &["cs102".to_string()]).await.unwrap();
+        index_note(&pool, &note("a", "A", "/ws/a.md", "/ws"))
+            .await
+            .unwrap();
+        index_note(&pool, &note("b", "B", "/ws/b.md", "/ws"))
+            .await
+            .unwrap();
+        set_tags(&pool, "/ws/a.md", &["cs101".to_string()])
+            .await
+            .unwrap();
+        set_tags(&pool, "/ws/b.md", &["cs102".to_string()])
+            .await
+            .unwrap();
 
         let notes = notes_with_tag(&pool, "/ws", "cs101").await.unwrap();
         assert_eq!(notes.len(), 1);
@@ -382,8 +442,12 @@ mod tests {
     #[tokio::test]
     async fn test_notes_with_tag_matches_case_insensitively() {
         let pool = make_pool().await;
-        index_note(&pool, &note("a", "A", "/ws/a.md", "/ws")).await.unwrap();
-        set_tags(&pool, "/ws/a.md", &["CS101".to_string()]).await.unwrap();
+        index_note(&pool, &note("a", "A", "/ws/a.md", "/ws"))
+            .await
+            .unwrap();
+        set_tags(&pool, "/ws/a.md", &["CS101".to_string()])
+            .await
+            .unwrap();
 
         let notes = notes_with_tag(&pool, "/ws", "cs101").await.unwrap();
         assert_eq!(notes.len(), 1);
@@ -392,9 +456,15 @@ mod tests {
     #[tokio::test]
     async fn test_set_links_and_backlinks_for() {
         let pool = make_pool().await;
-        index_note(&pool, &note("a", "A", "/ws/a.md", "/ws")).await.unwrap();
-        index_note(&pool, &note("b", "B", "/ws/b.md", "/ws")).await.unwrap();
-        set_links(&pool, "/ws/a.md", &["B".to_string()]).await.unwrap();
+        index_note(&pool, &note("a", "A", "/ws/a.md", "/ws"))
+            .await
+            .unwrap();
+        index_note(&pool, &note("b", "B", "/ws/b.md", "/ws"))
+            .await
+            .unwrap();
+        set_links(&pool, "/ws/a.md", &["B".to_string()])
+            .await
+            .unwrap();
 
         let backlinks = backlinks_for(&pool, "/ws", "B").await.unwrap();
         assert_eq!(backlinks.len(), 1);
@@ -404,8 +474,12 @@ mod tests {
     #[tokio::test]
     async fn test_backlinks_for_matches_case_insensitively() {
         let pool = make_pool().await;
-        index_note(&pool, &note("a", "A", "/ws/a.md", "/ws")).await.unwrap();
-        set_links(&pool, "/ws/a.md", &["big o notation".to_string()]).await.unwrap();
+        index_note(&pool, &note("a", "A", "/ws/a.md", "/ws"))
+            .await
+            .unwrap();
+        set_links(&pool, "/ws/a.md", &["big o notation".to_string()])
+            .await
+            .unwrap();
 
         let backlinks = backlinks_for(&pool, "/ws", "Big O Notation").await.unwrap();
         assert_eq!(backlinks.len(), 1);
@@ -414,11 +488,19 @@ mod tests {
     #[tokio::test]
     async fn test_update_path_also_rewrites_tags_and_links() {
         let pool = make_pool().await;
-        index_note(&pool, &note("a", "A", "/ws/old.md", "/ws")).await.unwrap();
-        set_tags(&pool, "/ws/old.md", &["cs101".to_string()]).await.unwrap();
-        set_links(&pool, "/ws/old.md", &["Target".to_string()]).await.unwrap();
+        index_note(&pool, &note("a", "A", "/ws/old.md", "/ws"))
+            .await
+            .unwrap();
+        set_tags(&pool, "/ws/old.md", &["cs101".to_string()])
+            .await
+            .unwrap();
+        set_links(&pool, "/ws/old.md", &["Target".to_string()])
+            .await
+            .unwrap();
 
-        update_path(&pool, "/ws/old.md", "/ws/Folder/old.md").await.unwrap();
+        update_path(&pool, "/ws/old.md", "/ws/Folder/old.md")
+            .await
+            .unwrap();
 
         let notes = notes_with_tag(&pool, "/ws", "cs101").await.unwrap();
         assert_eq!(notes[0].path, "/ws/Folder/old.md");
@@ -430,11 +512,21 @@ mod tests {
     #[tokio::test]
     async fn test_remove_notes_under_also_deletes_tags_and_links() {
         let pool = make_pool().await;
-        index_note(&pool, &note("a", "A", "/ws/Course1/a.md", "/ws")).await.unwrap();
-        set_tags(&pool, "/ws/Course1/a.md", &["cs101".to_string()]).await.unwrap();
-        set_links(&pool, "/ws/Course1/a.md", &["Target".to_string()]).await.unwrap();
-        index_note(&pool, &note("b", "B", "/ws/Course10/b.md", "/ws")).await.unwrap();
-        set_tags(&pool, "/ws/Course10/b.md", &["cs102".to_string()]).await.unwrap();
+        index_note(&pool, &note("a", "A", "/ws/Course1/a.md", "/ws"))
+            .await
+            .unwrap();
+        set_tags(&pool, "/ws/Course1/a.md", &["cs101".to_string()])
+            .await
+            .unwrap();
+        set_links(&pool, "/ws/Course1/a.md", &["Target".to_string()])
+            .await
+            .unwrap();
+        index_note(&pool, &note("b", "B", "/ws/Course10/b.md", "/ws"))
+            .await
+            .unwrap();
+        set_tags(&pool, "/ws/Course10/b.md", &["cs102".to_string()])
+            .await
+            .unwrap();
 
         remove_notes_under(&pool, "/ws/Course1/").await.unwrap();
 
@@ -447,10 +539,18 @@ mod tests {
     #[tokio::test]
     async fn test_all_links_returns_every_link_in_the_workspace() {
         let pool = make_pool().await;
-        index_note(&pool, &note("a", "A", "/ws/a.md", "/ws")).await.unwrap();
-        index_note(&pool, &note("b", "B", "/ws/b.md", "/ws")).await.unwrap();
-        set_links(&pool, "/ws/a.md", &["B".to_string(), "Missing".to_string()]).await.unwrap();
-        set_links(&pool, "/ws/b.md", &["A".to_string()]).await.unwrap();
+        index_note(&pool, &note("a", "A", "/ws/a.md", "/ws"))
+            .await
+            .unwrap();
+        index_note(&pool, &note("b", "B", "/ws/b.md", "/ws"))
+            .await
+            .unwrap();
+        set_links(&pool, "/ws/a.md", &["B".to_string(), "Missing".to_string()])
+            .await
+            .unwrap();
+        set_links(&pool, "/ws/b.md", &["A".to_string()])
+            .await
+            .unwrap();
 
         let mut links = all_links(&pool, "/ws").await.unwrap();
         links.sort();
@@ -468,10 +568,18 @@ mod tests {
     #[tokio::test]
     async fn test_all_links_excludes_other_workspaces() {
         let pool = make_pool().await;
-        index_note(&pool, &note("a", "A", "/ws/a.md", "/ws")).await.unwrap();
-        index_note(&pool, &note("c", "C", "/other/c.md", "/other")).await.unwrap();
-        set_links(&pool, "/ws/a.md", &["X".to_string()]).await.unwrap();
-        set_links(&pool, "/other/c.md", &["Y".to_string()]).await.unwrap();
+        index_note(&pool, &note("a", "A", "/ws/a.md", "/ws"))
+            .await
+            .unwrap();
+        index_note(&pool, &note("c", "C", "/other/c.md", "/other"))
+            .await
+            .unwrap();
+        set_links(&pool, "/ws/a.md", &["X".to_string()])
+            .await
+            .unwrap();
+        set_links(&pool, "/other/c.md", &["Y".to_string()])
+            .await
+            .unwrap();
 
         let links = all_links(&pool, "/ws").await.unwrap();
 
@@ -481,10 +589,22 @@ mod tests {
     #[tokio::test]
     async fn test_all_note_tags_returns_every_tag_in_the_workspace() {
         let pool = make_pool().await;
-        index_note(&pool, &note("a", "A", "/ws/a.md", "/ws")).await.unwrap();
-        index_note(&pool, &note("b", "B", "/ws/b.md", "/ws")).await.unwrap();
-        set_tags(&pool, "/ws/a.md", &["cs101".to_string(), "exam".to_string()]).await.unwrap();
-        set_tags(&pool, "/ws/b.md", &["cs101".to_string()]).await.unwrap();
+        index_note(&pool, &note("a", "A", "/ws/a.md", "/ws"))
+            .await
+            .unwrap();
+        index_note(&pool, &note("b", "B", "/ws/b.md", "/ws"))
+            .await
+            .unwrap();
+        set_tags(
+            &pool,
+            "/ws/a.md",
+            &["cs101".to_string(), "exam".to_string()],
+        )
+        .await
+        .unwrap();
+        set_tags(&pool, "/ws/b.md", &["cs101".to_string()])
+            .await
+            .unwrap();
 
         let mut tags = all_note_tags(&pool, "/ws").await.unwrap();
         tags.sort();

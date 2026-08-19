@@ -1,7 +1,7 @@
 pub mod columns;
 pub mod extract;
-pub mod layout;
 pub mod latex;
+pub mod layout;
 pub mod ligatures;
 pub mod maths;
 pub mod models;

@@ -167,7 +167,11 @@ fn ordered_starts(lines: &[&str]) -> Vec<Start> {
         // editor into something that matches nothing — Blatt12 arrives as
         // 13, 2, 3, 4, 5, 6, 1, 2. Counting at least numbers the tasks in the
         // order they are read.
-        .map(|(i, &(line, _))| Start { line, label: (i + 1).to_string(), indent: 0 })
+        .map(|(i, &(line, _))| Start {
+            line,
+            label: (i + 1).to_string(),
+            indent: 0,
+        })
         .collect()
 }
 
@@ -184,7 +188,11 @@ fn leads_with_a_title(lines: &[&str], candidates: &[(usize, u32)]) -> bool {
     let Some(text) = lines.get(*line) else {
         return false;
     };
-    let after_marker = text.trim_start().split_once(". ").map(|(_, rest)| rest).unwrap_or("");
+    let after_marker = text
+        .trim_start()
+        .split_once(". ")
+        .map(|(_, rest)| rest)
+        .unwrap_or("");
     !after_marker.is_empty() && after_marker.split_whitespace().count() <= TITLE_MAX_WORDS
 }
 
@@ -243,7 +251,10 @@ mod tests {
         assert!(out.contains("## Task 1"), "got: {out}");
         assert!(out.contains("## Task 2"), "got: {out}");
         assert!(!out.contains("## Task 11"), "the sheet number: {out}");
-        assert!(out.contains("11. Übungsblatt"), "kept above the first task: {out}");
+        assert!(
+            out.contains("11. Übungsblatt"),
+            "kept above the first task: {out}"
+        );
     }
 
     #[test]
@@ -253,7 +264,10 @@ mod tests {
         let out = split_into_tasks(&md);
 
         assert_eq!(out.matches("### Solution").count(), 2, "got: {out}");
-        assert!(out.trim_end().ends_with("### Solution"), "empty, not seeded: {out}");
+        assert!(
+            out.trim_end().ends_with("### Solution"),
+            "empty, not seeded: {out}"
+        );
     }
 
     // A sub-part sits four spaces under its parent's marker. Stripping the
@@ -273,9 +287,19 @@ mod tests {
 
         let out = split_into_tasks(&md);
 
-        assert_eq!(out.matches("## Task").count(), 2, "sub-parts are not tasks: {out}");
-        assert!(out.contains("    1. Bestimmen Sie alle Fixpunkte."), "got: {out}");
-        assert!(out.contains("1. Gegeben ist das nichtlineare System:"), "got: {out}");
+        assert_eq!(
+            out.matches("## Task").count(),
+            2,
+            "sub-parts are not tasks: {out}"
+        );
+        assert!(
+            out.contains("    1. Bestimmen Sie alle Fixpunkte."),
+            "got: {out}"
+        );
+        assert!(
+            out.contains("1. Gegeben ist das nichtlineare System:"),
+            "got: {out}"
+        );
     }
 
     // Ue9 inverts the shape: its exercises are `Beispiel N.M.` paragraphs and
@@ -299,7 +323,10 @@ mod tests {
         let out = split_into_tasks(&md);
 
         assert_eq!(out.matches("## Task").count(), 2, "got: {out}");
-        assert!(out.contains("## Task 9.1"), "labelled from the source: {out}");
+        assert!(
+            out.contains("## Task 9.1"),
+            "labelled from the source: {out}"
+        );
         assert!(out.contains("## Task 9.2"), "got: {out}");
     }
 
@@ -364,7 +391,11 @@ mod tests {
     // would be a worse note than the one that arrived.
     #[test]
     fn a_lone_ordered_item_is_not_enough_to_split_on() {
-        let md = sheet(&["1. The only numbered thing here", "", "Some following prose."]);
+        let md = sheet(&[
+            "1. The only numbered thing here",
+            "",
+            "Some following prose.",
+        ]);
 
         assert_eq!(split_into_tasks(&md), md);
     }
@@ -438,12 +469,20 @@ mod tests {
         assert_eq!(out.matches("## Task").count(), 8, "got: {out}");
         assert_eq!(out.matches("### Solution").count(), 8);
         assert!(!out.contains("## Task 12"), "the sheet number: {out}");
-        assert!(out.contains("12. Übungsblatt"), "kept above the first task: {out}");
+        assert!(
+            out.contains("12. Übungsblatt"),
+            "kept above the first task: {out}"
+        );
         // Numbered in reading order, so the first six match the paper even
         // though the markers the editor left behind do not.
         for n in 1..=8 {
-            assert!(out.contains(&format!("## Task {n}
-")), "missing Task {n}: {out}");
+            assert!(
+                out.contains(&format!(
+                    "## Task {n}
+"
+                )),
+                "missing Task {n}: {out}"
+            );
         }
     }
 
@@ -463,7 +502,11 @@ mod tests {
 
         let out = split_into_tasks(&md);
 
-        assert_eq!(out.matches("## Task").count(), 2, "sub-parts became tasks: {out}");
+        assert_eq!(
+            out.matches("## Task").count(),
+            2,
+            "sub-parts became tasks: {out}"
+        );
     }
 
     // The fallback only drops a *leading, label-like* item. An exercise is an
@@ -520,6 +563,9 @@ mod tests {
 
         assert_eq!(out.matches("## Task").count(), 3, "got: {out}");
         assert!(out.contains("## Task 1"), "counted, not copied: {out}");
-        assert!(!out.contains("## Task 7"), "the source number means nothing here: {out}");
+        assert!(
+            !out.contains("## Task 7"),
+            "the source number means nothing here: {out}"
+        );
     }
 }

@@ -23,7 +23,10 @@ fn leaves_a_word_with_two_placeholders_untouched() {
 
 #[test]
 fn resolves_an_opening_quote_touching_its_word() {
-    assert_eq!(disambiguate("Art \u{FFFD}Ableitung\u{FFFD} der"), "Art „Ableitung\u{201C} der");
+    assert_eq!(
+        disambiguate("Art \u{FFFD}Ableitung\u{FFFD} der"),
+        "Art „Ableitung\u{201C} der"
+    );
 }
 
 #[test]
@@ -41,7 +44,10 @@ fn resolves_an_opening_quote_at_the_start_of_text() {
 // and has no dictionary word to resolve either; must stay a visible loss.
 #[test]
 fn a_standalone_marker_with_space_on_both_sides_is_left_alone() {
-    assert_eq!(disambiguate(".\n\u{FFFD} Wenn alle"), ".\n\u{FFFD} Wenn alle");
+    assert_eq!(
+        disambiguate(".\n\u{FFFD} Wenn alle"),
+        ".\n\u{FFFD} Wenn alle"
+    );
 }
 
 // Empirical coverage probe, not a correctness assertion — prints which of

@@ -79,7 +79,10 @@ fn same_baseline_columns_split_into_separate_row_runs() {
     let rows = rough_rows(&chars);
 
     assert_eq!(rows.len(), 2);
-    let texts: Vec<String> = rows.iter().map(|r| r.iter().map(|(_, c)| c.ch).collect()).collect();
+    let texts: Vec<String> = rows
+        .iter()
+        .map(|r| r.iter().map(|(_, c)| c.ch).collect())
+        .collect();
     assert_eq!(texts, ["left column text", "right column text"]);
 }
 
@@ -93,15 +96,24 @@ fn different_baselines_never_merge() {
 
 #[test]
 fn region_extent_spans_every_row() {
-    let rows = vec![indexed(line("left", 100.0, 700.0)), indexed(line("right side", 300.0, 680.0))];
+    let rows = vec![
+        indexed(line("left", 100.0, 700.0)),
+        indexed(line("right side", 300.0, 680.0)),
+    ];
     let (x0, x1) = region_extent(&rows);
     assert_eq!(x0, 100.0);
-    assert_eq!(x1, 300.0 + "right side".chars().count() as f32 * BODY * ADVANCE);
+    assert_eq!(
+        x1,
+        300.0 + "right side".chars().count() as f32 * BODY * ADVANCE
+    );
 }
 
 #[test]
 fn flatten_collects_every_row_into_one_vec() {
-    let rows = vec![indexed(line("a", 100.0, 700.0)), indexed(line("b", 100.0, 680.0))];
+    let rows = vec![
+        indexed(line("a", 100.0, 700.0)),
+        indexed(line("b", 100.0, 680.0)),
+    ];
     assert_eq!(flatten(&rows).len(), 2);
 }
 
@@ -184,7 +196,13 @@ fn splits_three_columns_when_two_gutters_clearly_dominate() {
 #[test]
 fn refuses_a_split_when_theres_no_gap_at_all() {
     let rows: Vec<Vec<(usize, CharBox)>> = (0..8)
-        .map(|i| indexed(line("ordinary prose line goes right here", 72.0, 700.0 - i as f32 * 12.0)))
+        .map(|i| {
+            indexed(line(
+                "ordinary prose line goes right here",
+                72.0,
+                700.0 - i as f32 * 12.0,
+            ))
+        })
         .collect();
     assert_eq!(try_column_split(&rows), None);
 }
@@ -197,7 +215,11 @@ fn refuses_a_split_when_theres_no_gap_at_all() {
 fn refuses_a_split_when_one_side_has_too_few_rows() {
     let mut rows: Vec<Vec<(usize, CharBox)>> = Vec::new();
     for i in 0..6 {
-        rows.push(indexed(line("a wide paragraph line here", 72.0, 700.0 - i as f32 * 12.0)));
+        rows.push(indexed(line(
+            "a wide paragraph line here",
+            72.0,
+            700.0 - i as f32 * 12.0,
+        )));
     }
     rows.push(indexed(line("num", 400.0, 700.0)));
     rows.push(indexed(line("den", 400.0, 688.0)));
@@ -210,7 +232,11 @@ fn refuses_a_split_when_columns_are_very_unequal_width() {
     let mut rows: Vec<Vec<(usize, CharBox)>> = Vec::new();
     for i in 0..5 {
         let y = 700.0 - i as f32 * 12.0;
-        rows.push(indexed(line("a very long wide body paragraph line", 72.0, y)));
+        rows.push(indexed(line(
+            "a very long wide body paragraph line",
+            72.0,
+            y,
+        )));
         rows.push(indexed(line("sb", 500.0, y)));
     }
     assert_eq!(try_column_split(&rows), None);
@@ -250,14 +276,18 @@ fn splits_into_bands_wherever_the_gap_exceeds_the_threshold() {
 
 #[test]
 fn ordinary_line_spacing_stays_in_one_band() {
-    let rows: Vec<Vec<(usize, CharBox)>> =
-        (0..5).map(|i| indexed(line("line", 72.0, 700.0 - i as f32 * 12.0))).collect();
+    let rows: Vec<Vec<(usize, CharBox)>> = (0..5)
+        .map(|i| indexed(line("line", 72.0, 700.0 - i as f32 * 12.0)))
+        .collect();
     assert_eq!(split_into_bands(&rows).len(), 1);
 }
 
 #[test]
 fn an_empty_row_list_produces_no_bands() {
-    assert_eq!(split_into_bands(&[]), Vec::<Vec<Vec<(usize, CharBox)>>>::new());
+    assert_eq!(
+        split_into_bands(&[]),
+        Vec::<Vec<Vec<(usize, CharBox)>>>::new()
+    );
 }
 
 #[test]
@@ -329,7 +359,12 @@ fn segment_regions_on_empty_input_is_empty() {
 use super::rules::RuleBox;
 
 fn rule_at(x0: f32, x1: f32, y: f32) -> RuleBox {
-    RuleBox { x0, x1, y, thickness: 0.96 }
+    RuleBox {
+        x0,
+        x1,
+        y,
+        thickness: 0.96,
+    }
 }
 
 // A rule joins the column its span overlaps, so a two-column page's fraction

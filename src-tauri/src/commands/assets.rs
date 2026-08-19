@@ -154,11 +154,8 @@ mod tests {
         std::fs::create_dir_all(note.parent().unwrap()).unwrap();
         std::fs::write(tmp.path().join("secret.txt"), "sensitive").unwrap();
 
-        let result = read_note_asset(
-            note.to_string_lossy().into_owned(),
-            "../secret.txt".into(),
-        )
-        .await;
+        let result =
+            read_note_asset(note.to_string_lossy().into_owned(), "../secret.txt".into()).await;
 
         assert!(result.is_err());
     }

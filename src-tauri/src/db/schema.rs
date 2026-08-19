@@ -14,11 +14,9 @@ pub async fn run_migrations(pool: &SqlitePool) -> Result<()> {
     .execute(pool)
     .await?;
 
-    sqlx::query(
-        "CREATE INDEX IF NOT EXISTS notes_workspace ON notes(workspace)",
-    )
-    .execute(pool)
-    .await?;
+    sqlx::query("CREATE INDEX IF NOT EXISTS notes_workspace ON notes(workspace)")
+        .execute(pool)
+        .await?;
 
     sqlx::query(
         "CREATE VIRTUAL TABLE IF NOT EXISTS notes_fts USING fts5(
@@ -40,11 +38,9 @@ pub async fn run_migrations(pool: &SqlitePool) -> Result<()> {
     .execute(pool)
     .await?;
 
-    sqlx::query(
-        "CREATE INDEX IF NOT EXISTS note_tags_tag ON note_tags(tag)",
-    )
-    .execute(pool)
-    .await?;
+    sqlx::query("CREATE INDEX IF NOT EXISTS note_tags_tag ON note_tags(tag)")
+        .execute(pool)
+        .await?;
 
     sqlx::query(
         "CREATE TABLE IF NOT EXISTS note_links (
@@ -55,11 +51,9 @@ pub async fn run_migrations(pool: &SqlitePool) -> Result<()> {
     .execute(pool)
     .await?;
 
-    sqlx::query(
-        "CREATE INDEX IF NOT EXISTS note_links_target ON note_links(target_title)",
-    )
-    .execute(pool)
-    .await?;
+    sqlx::query("CREATE INDEX IF NOT EXISTS note_links_target ON note_links(target_title)")
+        .execute(pool)
+        .await?;
 
     Ok(())
 }

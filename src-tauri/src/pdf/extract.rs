@@ -100,10 +100,8 @@ pub fn pages_to_markdown(pages: &[ExtractedPage]) -> models::PdfMarkdownImport {
         let mut images_by_region: Vec<Vec<&ExtractedImage>> = vec![Vec::new(); regions.len()];
         for img in &page.images {
             let center_x = (img.left + img.right) / 2.0;
-            if let Some((best_index, _)) = region_bounds
-                .iter()
-                .enumerate()
-                .min_by(|(_, a), (_, b)| {
+            if let Some((best_index, _)) =
+                region_bounds.iter().enumerate().min_by(|(_, a), (_, b)| {
                     x_distance(center_x, a)
                         .partial_cmp(&x_distance(center_x, b))
                         .unwrap_or(std::cmp::Ordering::Equal)
@@ -129,7 +127,10 @@ pub fn pages_to_markdown(pages: &[ExtractedPage]) -> models::PdfMarkdownImport {
     if !markdown.is_empty() {
         markdown.push('\n');
     }
-    models::PdfMarkdownImport { markdown, images: pending }
+    models::PdfMarkdownImport {
+        markdown,
+        images: pending,
+    }
 }
 
 /// Distance from `x` to the nearest edge of `bounds` — `0.0` when `x` falls
@@ -198,7 +199,11 @@ pub fn extract_pages(pdf_path: &Path) -> Result<Vec<ExtractedPage>> {
 /// placeholder the same way it already recognizes printable ones like `'Z'`
 /// or `'H'`. Collapsed to `U+FFFD` for body text, where the letters it
 /// actually represents are producer- and font-specific and unsafe to guess.
-fn resolve_fallback_char(value: char, family: super::maths::Family, hyphenation_break: bool) -> char {
+fn resolve_fallback_char(
+    value: char,
+    family: super::maths::Family,
+    hyphenation_break: bool,
+) -> char {
     if !hyphenation_break && value.is_control() && !family.is_maths() {
         '\u{FFFD}'
     } else {
@@ -283,7 +288,10 @@ fn extract_pages_native(pdf_path: &Path) -> Result<Vec<ExtractedPage>> {
             // the sentence as broken. Keeping it as U+FFFD keeps the glyph's
             // geometry in its row, so the word stays one word, and makes the
             // loss visible instead of silent.
-            let value = correct_known_font_misdecode(resolve_fallback_char(value, family, hyphenation_break), family);
+            let value = correct_known_font_misdecode(
+                resolve_fallback_char(value, family, hyphenation_break),
+                family,
+            );
             // loose_bounds covers the glyph's advance box rather than its inked
             // extent, which is what the space-detection gap logic needs — a
             // comma's tight bounds would leave a gap wide enough to fake a
@@ -340,7 +348,12 @@ fn extract_pages_native(pdf_path: &Path) -> Result<Vec<ExtractedPage>> {
             rules.clear();
         }
 
-        pages.push(ExtractedPage { index, chars, images, rules });
+        pages.push(ExtractedPage {
+            index,
+            chars,
+            images,
+            rules,
+        });
     }
 
     Ok(pages)
@@ -403,7 +416,10 @@ fn extract_image(
 
     let mut data = Vec::new();
     image::DynamicImage::ImageRgba8(img)
-        .write_to(&mut std::io::Cursor::new(&mut data), image::ImageOutputFormat::Png)
+        .write_to(
+            &mut std::io::Cursor::new(&mut data),
+            image::ImageOutputFormat::Png,
+        )
         .ok()?;
 
     Some(ExtractedImage {
@@ -443,7 +459,10 @@ mod tests {
     // only signal that told the two apart.
     #[test]
     fn an_empty_font_name_alone_is_not_evidence_of_filler() {
-        assert!(!is_layout_filler(11.96), "a real 11.96pt glyph must never read as filler regardless of its font name");
+        assert!(
+            !is_layout_filler(11.96),
+            "a real 11.96pt glyph must never read as filler regardless of its font name"
+        );
     }
 
     #[test]
@@ -464,8 +483,14 @@ mod tests {
 
     #[test]
     fn a_printable_fallback_is_never_touched_regardless_of_family() {
-        assert_eq!(resolve_fallback_char('R', super::super::maths::Family::Extensible, false), 'R');
-        assert_eq!(resolve_fallback_char('Z', super::super::maths::Family::Text, false), 'Z');
+        assert_eq!(
+            resolve_fallback_char('R', super::super::maths::Family::Extensible, false),
+            'R'
+        );
+        assert_eq!(
+            resolve_fallback_char('Z', super::super::maths::Family::Text, false),
+            'Z'
+        );
     }
 
     #[test]
@@ -494,7 +519,10 @@ mod tests {
 
     #[test]
     fn ordinary_characters_are_never_touched_by_the_misdecode_correction() {
-        assert_eq!(correct_known_font_misdecode('a', super::super::maths::Family::Text), 'a');
+        assert_eq!(
+            correct_known_font_misdecode('a', super::super::maths::Family::Text),
+            'a'
+        );
     }
 
     fn char_at(ch: char, x: f32, y: f32) -> CharBox {
@@ -529,12 +557,20 @@ mod tests {
     #[test]
     fn a_page_with_almost_no_text_reads_as_empty() {
         assert!(page_of("Fig. 1").is_effectively_empty());
-        assert!(ExtractedPage { index: 0, chars: vec![], images: Vec::new(), rules: Vec::new() }.is_effectively_empty());
+        assert!(ExtractedPage {
+            index: 0,
+            chars: vec![],
+            images: Vec::new(),
+            rules: Vec::new()
+        }
+        .is_effectively_empty());
     }
 
     #[test]
     fn a_page_of_real_prose_does_not_read_as_empty() {
-        assert!(!page_of("This is a real sentence with plenty of characters.").is_effectively_empty());
+        assert!(
+            !page_of("This is a real sentence with plenty of characters.").is_effectively_empty()
+        );
     }
 
     // Whitespace is not content — a page of spaces is still a scan.
@@ -545,11 +581,17 @@ mod tests {
 
     #[test]
     fn pages_are_concatenated_into_one_document() {
-        let pages = vec![page_of("First page text here."), page_of("Second page text.")];
+        let pages = vec![
+            page_of("First page text here."),
+            page_of("Second page text."),
+        ];
 
         let result = pages_to_markdown(&pages);
 
-        assert_eq!(result.markdown, "First page text here.\n\nSecond page text.\n");
+        assert_eq!(
+            result.markdown,
+            "First page text here.\n\nSecond page text.\n"
+        );
         assert!(result.images.is_empty());
     }
 
@@ -568,7 +610,10 @@ mod tests {
         let markdown = pages_to_markdown(&pages).markdown;
 
         assert!(!markdown.contains("## Task"), "import split it: {markdown}");
-        assert!(!markdown.contains("### Solution"), "import scaffolded it: {markdown}");
+        assert!(
+            !markdown.contains("### Solution"),
+            "import scaffolded it: {markdown}"
+        );
         assert!(markdown.contains("1. Berechnen Sie das Kurvenintegral."));
     }
 
@@ -576,15 +621,29 @@ mod tests {
     fn a_blank_page_does_not_leave_a_hole_in_the_document() {
         let pages = vec![
             page_of("Real content."),
-            ExtractedPage { index: 1, chars: vec![], images: Vec::new(), rules: Vec::new() },
+            ExtractedPage {
+                index: 1,
+                chars: vec![],
+                images: Vec::new(),
+                rules: Vec::new(),
+            },
             page_of("More content."),
         ];
 
-        assert_eq!(pages_to_markdown(&pages).markdown, "Real content.\n\nMore content.\n");
+        assert_eq!(
+            pages_to_markdown(&pages).markdown,
+            "Real content.\n\nMore content.\n"
+        );
     }
 
     fn image_at(left: f32, bottom: f32, right: f32, top: f32) -> ExtractedImage {
-        ExtractedImage { data: vec![1, 2, 3, 4], left, bottom, right, top }
+        ExtractedImage {
+            data: vec![1, 2, 3, 4],
+            left,
+            bottom,
+            right,
+            top,
+        }
     }
 
     #[test]
@@ -598,7 +657,9 @@ mod tests {
         assert_eq!(result.images[0].mime, "image/png");
         assert_eq!(result.images[0].data, vec![1, 2, 3, 4]);
         assert!(
-            result.markdown.contains(&format!("![]({})", result.images[0].placeholder)),
+            result
+                .markdown
+                .contains(&format!("![]({})", result.images[0].placeholder)),
             "got: {}",
             result.markdown
         );
@@ -606,7 +667,12 @@ mod tests {
 
     #[test]
     fn a_page_that_is_only_an_image_still_keeps_it() {
-        let mut page = ExtractedPage { index: 0, chars: vec![], images: Vec::new(), rules: Vec::new() };
+        let mut page = ExtractedPage {
+            index: 0,
+            chars: vec![],
+            images: Vec::new(),
+            rules: Vec::new(),
+        };
         page.images.push(image_at(72.0, 690.0, 300.0, 710.0));
 
         let result = pages_to_markdown(&[page]);
@@ -617,7 +683,12 @@ mod tests {
 
     #[test]
     fn a_page_with_no_text_and_no_images_produces_nothing() {
-        let page = ExtractedPage { index: 0, chars: vec![], images: Vec::new(), rules: Vec::new() };
+        let page = ExtractedPage {
+            index: 0,
+            chars: vec![],
+            images: Vec::new(),
+            rules: Vec::new(),
+        };
         let result = pages_to_markdown(&[page]);
         assert_eq!(result.markdown, "");
         assert!(result.images.is_empty());

@@ -40,10 +40,10 @@ pub fn detect_terminal_shell() -> String {
     }
 }
 
-use std::io::{Read, Write};
-use std::sync::Mutex;
 use base64::Engine;
 use portable_pty::{native_pty_system, Child, CommandBuilder, MasterPty, PtySize};
+use std::io::{Read, Write};
+use std::sync::Mutex;
 use tauri::{AppHandle, Emitter, State};
 
 pub struct PtySession {
@@ -76,7 +76,12 @@ pub fn terminal_open(
 
     let pty_system = native_pty_system();
     let pair = pty_system
-        .openpty(PtySize { rows: 24, cols: 80, pixel_width: 0, pixel_height: 0 })
+        .openpty(PtySize {
+            rows: 24,
+            cols: 80,
+            pixel_width: 0,
+            pixel_height: 0,
+        })
         .map_err(|e| e.to_string())?;
 
     let mut cmd = CommandBuilder::new(&program);
@@ -115,7 +120,11 @@ pub fn terminal_open(
         }
     });
 
-    *guard = Some(PtySession { master: pair.master, writer, child });
+    *guard = Some(PtySession {
+        master: pair.master,
+        writer,
+        child,
+    });
     Ok(())
 }
 
@@ -123,7 +132,10 @@ pub fn terminal_open(
 pub fn terminal_write(data: String, state: State<'_, PtyState>) -> Result<(), String> {
     let mut guard = state.0.lock().map_err(|e| e.to_string())?;
     let session = guard.as_mut().ok_or("no terminal session is open")?;
-    session.writer.write_all(data.as_bytes()).map_err(|e| e.to_string())?;
+    session
+        .writer
+        .write_all(data.as_bytes())
+        .map_err(|e| e.to_string())?;
     session.writer.flush().map_err(|e| e.to_string())
 }
 
@@ -133,7 +145,12 @@ pub fn terminal_resize(cols: u16, rows: u16, state: State<'_, PtyState>) -> Resu
     let session = guard.as_ref().ok_or("no terminal session is open")?;
     session
         .master
-        .resize(PtySize { rows, cols, pixel_width: 0, pixel_height: 0 })
+        .resize(PtySize {
+            rows,
+            cols,
+            pixel_width: 0,
+            pixel_height: 0,
+        })
         .map_err(|e| e.to_string())
 }
 

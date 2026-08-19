@@ -65,7 +65,12 @@ pub fn horizontal_rule(x0: f32, x1: f32, y0: f32, y1: f32) -> Option<RuleBox> {
         return None;
     }
 
-    Some(RuleBox { x0, x1, y: (y0 + y1) / 2.0, thickness })
+    Some(RuleBox {
+        x0,
+        x1,
+        y: (y0 + y1) / 2.0,
+        thickness,
+    })
 }
 
 /// Rules grouped into visual rows, bands ordered down the page and each
@@ -140,7 +145,12 @@ mod tests {
     use crate::pdf::maths::Family;
 
     fn bar(x0: f32, x1: f32, y: f32) -> RuleBox {
-        RuleBox { x0, x1, y, thickness: 0.96 }
+        RuleBox {
+            x0,
+            x1,
+            y,
+            thickness: 0.96,
+        }
     }
 
     fn char_at(ch: char, x: f32, y: f32) -> CharBox {
@@ -167,7 +177,11 @@ mod tests {
         assert_eq!(rule.x0, 241.00);
         assert_eq!(rule.x1, 272.70);
         assert!((rule.y - 242.53).abs() < 0.01, "centre y, got {}", rule.y);
-        assert!((rule.thickness - 0.96).abs() < 0.01, "got {}", rule.thickness);
+        assert!(
+            (rule.thickness - 0.96).abs() < 0.01,
+            "got {}",
+            rule.thickness
+        );
     }
 
     #[test]

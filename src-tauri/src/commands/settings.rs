@@ -1,6 +1,6 @@
+use crate::models::AppSettings;
 use std::path::Path;
 use tauri::{AppHandle, Manager};
-use crate::models::AppSettings;
 
 const SETTINGS_FILE: &str = "settings.json";
 
@@ -33,13 +33,17 @@ async fn save_settings_to_dir(dir: &Path, settings: &AppSettings) -> anyhow::Res
 #[tauri::command]
 pub async fn load_settings(app: AppHandle) -> Result<AppSettings, String> {
     let dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
-    load_settings_from_dir(&dir).await.map_err(|e| e.to_string())
+    load_settings_from_dir(&dir)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 pub async fn save_settings(app: AppHandle, settings: AppSettings) -> Result<(), String> {
     let dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
-    save_settings_to_dir(&dir, &settings).await.map_err(|e| e.to_string())
+    save_settings_to_dir(&dir, &settings)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[cfg(test)]
@@ -74,7 +78,10 @@ mod tests {
         assert!(loaded.spellcheck);
         assert_eq!(loaded.spellcheck_language, "en");
         assert_eq!(loaded.editor_command, "nvim +{line} {file}");
-        assert_eq!(loaded.pdf_import_mode, crate::models::PdfImportMode::Markdown);
+        assert_eq!(
+            loaded.pdf_import_mode,
+            crate::models::PdfImportMode::Markdown
+        );
         assert_eq!(loaded.terminal_shell, "wsl -d Ubuntu");
     }
 
@@ -105,7 +112,11 @@ mod tests {
 
         let loaded = load_settings_from_dir(dir.path()).await.unwrap();
 
-        assert!(loaded.editor_command.contains("{file}"), "got {:?}", loaded.editor_command);
+        assert!(
+            loaded.editor_command.contains("{file}"),
+            "got {:?}",
+            loaded.editor_command
+        );
     }
 
     #[tokio::test]
@@ -120,7 +131,11 @@ mod tests {
 
         let loaded = load_settings_from_dir(dir.path()).await.unwrap();
 
-        assert!(!loaded.terminal_shell.trim().is_empty(), "got {:?}", loaded.terminal_shell);
+        assert!(
+            !loaded.terminal_shell.trim().is_empty(),
+            "got {:?}",
+            loaded.terminal_shell
+        );
     }
 
     // A shell the user typed is never replaced by detection, same guarantee
@@ -164,7 +179,9 @@ mod tests {
     async fn test_save_creates_the_app_data_dir_if_missing() {
         let parent = tempdir().unwrap();
         let dir = parent.path().join("nested").join("app-data");
-        save_settings_to_dir(&dir, &AppSettings::default()).await.unwrap();
+        save_settings_to_dir(&dir, &AppSettings::default())
+            .await
+            .unwrap();
         assert!(dir.join(SETTINGS_FILE).exists());
     }
 }

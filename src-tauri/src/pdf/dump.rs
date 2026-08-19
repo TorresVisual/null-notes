@@ -52,7 +52,10 @@ mod tests {
     #[test]
     #[ignore]
     fn dump_line_pieces_page() {
-        let page_index: usize = std::env::var("NULL_NOTES_PAGE").ok().and_then(|s| s.parse().ok()).unwrap_or(0);
+        let page_index: usize = std::env::var("NULL_NOTES_PAGE")
+            .ok()
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(0);
         let pages = crate::pdf::extract::extract_pages(&pdf_or_skip!()).unwrap();
         for line in crate::pdf::layout::group_lines(&pages[page_index].chars) {
             println!(
@@ -136,7 +139,9 @@ mod tests {
         let doc = pdfium.load_pdf_from_file(&pdf, None).unwrap();
         let page = doc.pages().first().unwrap();
         use pdfium_render::prelude::PdfRenderConfig;
-        let bitmap = page.render_with_config(&PdfRenderConfig::new().set_target_width(1600)).unwrap();
+        let bitmap = page
+            .render_with_config(&PdfRenderConfig::new().set_target_width(1600))
+            .unwrap();
         let (w, h) = (bitmap.width() as u32, bitmap.height() as u32);
         let img = image::RgbaImage::from_raw(w, h, bitmap.as_rgba_bytes()).unwrap();
         img.save(&out).unwrap();
@@ -201,7 +206,10 @@ mod tests {
             let text = page.text().unwrap();
             let chars = text.chars();
             let raw: Vec<_> = chars.iter().collect();
-            let joined: String = raw.iter().map(|c| c.unicode_char().unwrap_or('\u{FFFD}')).collect();
+            let joined: String = raw
+                .iter()
+                .map(|c| c.unicode_char().unwrap_or('\u{FFFD}'))
+                .collect();
             let mut search_from = 0;
             while let Some(byte_idx) = joined[search_from..].find(&needle) {
                 let idx = joined[..search_from + byte_idx].chars().count();
@@ -244,7 +252,9 @@ mod tests {
             let chars = text.chars();
             let raw: Vec<_> = chars.iter().collect();
             for (i, c) in raw.iter().enumerate() {
-                let Some(value) = c.unicode_char() else { continue };
+                let Some(value) = c.unicode_char() else {
+                    continue;
+                };
                 if value.is_control() && c.scaled_font_size().value > 1.5 {
                     examples.entry(value as u32).or_insert_with(|| {
                         let lo = i.saturating_sub(3);
@@ -277,10 +287,17 @@ mod tests {
         let page = doc.pages().first().unwrap();
         let text = page.text().unwrap();
         let all = text.all();
-        for needle in ["Differential", "trifft", "getroffen", "Koeffizient", "Klassifizieren"] {
+        for needle in [
+            "Differential",
+            "trifft",
+            "getroffen",
+            "Koeffizient",
+            "Klassifizieren",
+        ] {
             match all.find(needle) {
                 Some(idx) => {
-                    let window = &all[idx.saturating_sub(5)..(idx + needle.len() + 10).min(all.len())];
+                    let window =
+                        &all[idx.saturating_sub(5)..(idx + needle.len() + 10).min(all.len())];
                     println!("FOUND {needle:?} -> {window:?}");
                 }
                 None => println!("NOT FOUND: {needle:?}"),
@@ -294,7 +311,10 @@ mod tests {
                 let lo = char_idx.saturating_sub(5);
                 let hi = (char_idx + needle.chars().count() + 5).min(chars.len());
                 let window: String = chars[lo..hi].iter().collect();
-                println!("near {needle:?}: {window:?} (codepoints: {:?})", chars[lo..hi].iter().map(|c| *c as u32).collect::<Vec<_>>());
+                println!(
+                    "near {needle:?}: {window:?} (codepoints: {:?})",
+                    chars[lo..hi].iter().map(|c| *c as u32).collect::<Vec<_>>()
+                );
             }
         }
     }
@@ -350,13 +370,19 @@ mod tests {
         for page in doc.pages().iter() {
             let text = page.text().unwrap();
             for c in text.chars().iter() {
-                let Some(value) = c.unicode_char() else { continue };
-                let Ok(bounds) = c.loose_bounds() else { continue };
+                let Some(value) = c.unicode_char() else {
+                    continue;
+                };
+                let Ok(bounds) = c.loose_bounds() else {
+                    continue;
+                };
                 let size = c.scaled_font_size().value;
                 if matches!(value, 'f' | 'i' | 'l' | 'o' | 'e' | 'r' | 'n' | 't')
                     && (size - 11.96).abs() < 0.1
                 {
-                    single_letter_widths.entry(value).or_insert(bounds.width().value);
+                    single_letter_widths
+                        .entry(value)
+                        .or_insert(bounds.width().value);
                 }
                 if value.is_control() && size > 1.5 {
                     control_widths.push((value as u32, bounds.width().value, size));
@@ -370,9 +396,18 @@ mod tests {
     #[test]
     #[ignore]
     fn dump_chars_range() {
-        let lo: usize = std::env::var("NULL_NOTES_LO").ok().and_then(|s| s.parse().ok()).unwrap_or(0);
-        let hi: usize = std::env::var("NULL_NOTES_HI").ok().and_then(|s| s.parse().ok()).unwrap_or(50);
-        let page_index: usize = std::env::var("NULL_NOTES_PAGE").ok().and_then(|s| s.parse().ok()).unwrap_or(0);
+        let lo: usize = std::env::var("NULL_NOTES_LO")
+            .ok()
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(0);
+        let hi: usize = std::env::var("NULL_NOTES_HI")
+            .ok()
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(50);
+        let page_index: usize = std::env::var("NULL_NOTES_PAGE")
+            .ok()
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(0);
         let pages = crate::pdf::extract::extract_pages(&pdf_or_skip!()).unwrap();
         let page = &pages[page_index];
         for (i, c) in page.chars.iter().enumerate().skip(lo).take(hi - lo) {
@@ -478,11 +513,17 @@ mod tests {
         println!("{} region(s)", regions.len());
         for (i, region) in regions.iter().enumerate() {
             let (x0, x1) = crate::pdf::layout::row_x_extent(region);
-            println!("--- region {i}: x=[{x0:.2}, {x1:.2}], {} chars ---", region.len());
+            println!(
+                "--- region {i}: x=[{x0:.2}, {x1:.2}], {} chars ---",
+                region.len()
+            );
             for line in crate::pdf::layout::group_lines(region) {
                 println!(
                     "  y={:8.2} x={:7.2} size={:5.2} | {}",
-                    line.y, line.x, line.font_size, line.text()
+                    line.y,
+                    line.x,
+                    line.font_size,
+                    line.text()
                 );
             }
         }

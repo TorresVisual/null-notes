@@ -1,8 +1,8 @@
+use crate::pdf::models::PdfPage;
 use base64::Engine;
+use serde::Serialize;
 use std::path::Path;
 use tauri::{AppHandle, Emitter};
-use crate::pdf::models::PdfPage;
-use serde::Serialize;
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -15,13 +15,17 @@ fn pdf_dir_for(note_path: &str) -> String {
     let p = Path::new(note_path);
     let stem = p.file_stem().unwrap_or_default().to_string_lossy();
     let dir = p.parent().unwrap_or(Path::new("."));
-    dir.join(format!("{stem}.pdf")).to_string_lossy().into_owned()
+    dir.join(format!("{stem}.pdf"))
+        .to_string_lossy()
+        .into_owned()
 }
 
 #[tauri::command]
 pub async fn ensure_pdf_dir(note_path: String) -> Result<String, String> {
     let dir = pdf_dir_for(&note_path);
-    tokio::fs::create_dir_all(&dir).await.map_err(|e| e.to_string())?;
+    tokio::fs::create_dir_all(&dir)
+        .await
+        .map_err(|e| e.to_string())?;
     Ok(dir)
 }
 
@@ -32,7 +36,9 @@ pub async fn import_pdf_pages(
     app: AppHandle,
 ) -> Result<Vec<PdfPage>, String> {
     let out_dir = pdf_dir_for(&note_path);
-    tokio::fs::create_dir_all(&out_dir).await.map_err(|e| e.to_string())?;
+    tokio::fs::create_dir_all(&out_dir)
+        .await
+        .map_err(|e| e.to_string())?;
 
     crate::pdf::renderer::render_pages(
         Path::new(&pdf_path),
@@ -53,8 +59,8 @@ pub async fn import_pdf_pages(
 #[tauri::command]
 pub async fn pdf_has_text_layer(pdf_path: String) -> Result<bool, String> {
     tokio::task::spawn_blocking(move || {
-        let pages = crate::pdf::extract::extract_pages(Path::new(&pdf_path))
-            .map_err(|e| e.to_string())?;
+        let pages =
+            crate::pdf::extract::extract_pages(Path::new(&pdf_path)).map_err(|e| e.to_string())?;
         Ok(!pages.iter().all(|page| page.is_effectively_empty()))
     })
     .await
@@ -79,12 +85,14 @@ pub async fn pdf_has_text_layer(pdf_path: String) -> Result<bool, String> {
 /// image via the existing `write_note_asset` once the note's path is known,
 /// substituting the real path for each placeholder.
 #[tauri::command]
-pub async fn import_pdf_markdown(pdf_path: String) -> Result<crate::pdf::models::PdfMarkdownImport, String> {
+pub async fn import_pdf_markdown(
+    pdf_path: String,
+) -> Result<crate::pdf::models::PdfMarkdownImport, String> {
     // pdfium is synchronous and a long sheet is real work, so it must not run
     // on the async executor.
     tokio::task::spawn_blocking(move || {
-        let pages = crate::pdf::extract::extract_pages(Path::new(&pdf_path))
-            .map_err(|e| e.to_string())?;
+        let pages =
+            crate::pdf::extract::extract_pages(Path::new(&pdf_path)).map_err(|e| e.to_string())?;
 
         if pages.iter().all(|page| page.is_effectively_empty()) {
             return Err(
@@ -130,8 +138,13 @@ mod tests {
         let png_path = tmp.path().join("page-0.png");
         std::fs::write(&png_path, [1, 2, 3, 4]).unwrap();
 
-        let encoded = read_pdf_page(png_path.to_string_lossy().into_owned()).await.unwrap();
+        let encoded = read_pdf_page(png_path.to_string_lossy().into_owned())
+            .await
+            .unwrap();
 
-        assert_eq!(encoded, base64::engine::general_purpose::STANDARD.encode([1, 2, 3, 4]));
+        assert_eq!(
+            encoded,
+            base64::engine::general_purpose::STANDARD.encode([1, 2, 3, 4])
+        );
     }
 }

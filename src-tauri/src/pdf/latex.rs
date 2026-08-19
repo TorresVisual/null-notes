@@ -96,11 +96,11 @@ fn synthesize_gaps(chars: &[CharBox]) -> Vec<CharBox> {
     let mut previous_end: Option<f32> = None;
     for &c in chars {
         let gap = previous_end.is_some_and(|end| c.x - end > base * SPACE_GAP);
-        if gap && !c.ch.is_whitespace() && !out.last().is_some_and(|p: &CharBox| p.ch.is_whitespace()) {
-            out.push(CharBox {
-                ch: ' ',
-                ..c
-            });
+        if gap
+            && !c.ch.is_whitespace()
+            && !out.last().is_some_and(|p: &CharBox| p.ch.is_whitespace())
+        {
+            out.push(CharBox { ch: ' ', ..c });
         }
         previous_end = Some(c.x + c.width);
         out.push(c);
@@ -174,8 +174,10 @@ fn render(chars: &[CharBox], base_size: f32, base_y: f32) -> String {
                         index += 1;
                     }
                     let denominator = &chars[den_start..index];
-                    let den_size =
-                        denominator.iter().map(|c| c.font_size).fold(0.0_f32, f32::max);
+                    let den_size = denominator
+                        .iter()
+                        .map(|c| c.font_size)
+                        .fold(0.0_f32, f32::max);
                     let num = render(run, inner_size, run[0].y);
                     let den = render(denominator, den_size, denominator[0].y);
                     out.push_str("\\frac{");
@@ -246,7 +248,10 @@ fn render(chars: &[CharBox], base_size: f32, base_y: f32) -> String {
         // never a product of variables: "cos" must not become "c·o·s" in
         // italics.
         if let Some(word_len) = upright_word(&chars[index..]) {
-            let word: String = chars[index..index + word_len].iter().map(|c| c.ch).collect();
+            let word: String = chars[index..index + word_len]
+                .iter()
+                .map(|c| c.ch)
+                .collect();
             push_latex(&mut out, &operator_name(&word));
             index += word_len;
             continue;
@@ -337,8 +342,7 @@ fn is_oint(ch: &CharBox) -> bool {
 /// above the body-text baseline, immediately followed by an italic 'S'
 /// subscript.
 fn is_integral(ch: &CharBox) -> bool {
-    ch.ch == '∫'
-        || (ch.family == Family::Extensible && matches!(ch.ch, 'Z' | 'R'))
+    ch.ch == '∫' || (ch.family == Family::Extensible && matches!(ch.ch, 'Z' | 'R'))
 }
 
 /// CMEX's large Σ has no Unicode entry in this font subset either —
@@ -1000,14 +1004,26 @@ mod tests {
         assert_eq!(bracket_glyph(&close), Some(false));
 
         // The second confirmed codepoint pair (Ue9.pdf's outer nesting level).
-        assert_eq!(bracket_glyph(&ch('\u{10}', 300.0, 700.0, 11.96, Family::Extensible)), Some(true));
-        assert_eq!(bracket_glyph(&ch('\u{11}', 300.0, 700.0, 11.96, Family::Extensible)), Some(false));
+        assert_eq!(
+            bracket_glyph(&ch('\u{10}', 300.0, 700.0, 11.96, Family::Extensible)),
+            Some(true)
+        );
+        assert_eq!(
+            bracket_glyph(&ch('\u{11}', 300.0, 700.0, 11.96, Family::Extensible)),
+            Some(false)
+        );
 
         // The cases-brace glyph is a real Extensible glyph but not a bracket.
-        assert_eq!(bracket_glyph(&ch('\u{1a}', 300.0, 700.0, 11.96, Family::Extensible)), None);
+        assert_eq!(
+            bracket_glyph(&ch('\u{1a}', 300.0, 700.0, 11.96, Family::Extensible)),
+            None
+        );
 
         // Same codepoint outside Family::Extensible is not a bracket at all.
-        assert_eq!(bracket_glyph(&ch('\u{12}', 300.0, 700.0, 11.96, Family::Text)), None);
+        assert_eq!(
+            bracket_glyph(&ch('\u{12}', 300.0, 700.0, 11.96, Family::Text)),
+            None
+        );
     }
 
     #[test]
@@ -1020,10 +1036,22 @@ mod tests {
         // lands glued to the vector's own prefix/content row. Both pieces of
         // both sides must be recognised, so the bottom piece can be stripped
         // from whatever row it lands on.
-        assert_eq!(bracket_glyph(&ch('\u{f8eb}', 313.0, 649.0, 11.96, Family::Extensible)), Some(true));
-        assert_eq!(bracket_glyph(&ch('\u{f8ed}', 313.0, 627.0, 11.96, Family::Extensible)), Some(true));
-        assert_eq!(bracket_glyph(&ch('\u{f8f6}', 361.0, 649.0, 11.96, Family::Extensible)), Some(false));
-        assert_eq!(bracket_glyph(&ch('\u{f8f8}', 361.0, 627.0, 11.96, Family::Extensible)), Some(false));
+        assert_eq!(
+            bracket_glyph(&ch('\u{f8eb}', 313.0, 649.0, 11.96, Family::Extensible)),
+            Some(true)
+        );
+        assert_eq!(
+            bracket_glyph(&ch('\u{f8ed}', 313.0, 627.0, 11.96, Family::Extensible)),
+            Some(true)
+        );
+        assert_eq!(
+            bracket_glyph(&ch('\u{f8f6}', 361.0, 649.0, 11.96, Family::Extensible)),
+            Some(false)
+        );
+        assert_eq!(
+            bracket_glyph(&ch('\u{f8f8}', 361.0, 627.0, 11.96, Family::Extensible)),
+            Some(false)
+        );
     }
 
     // Ue9.pdf Beispiel 9.1(a): ¬∀y((∃xP(x,y)) → ∀z¬(∃xQ(x,y,z))). rendered

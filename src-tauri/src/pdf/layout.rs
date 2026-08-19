@@ -168,7 +168,10 @@ const DISPLAY_MATHS_TEXT_RATIO: f32 = 0.75;
 /// of them, silently erasing the separate list items a real document
 /// found on Analysis_2_Blatt10.pdf and Ue5.pdf actually has.
 fn is_mostly_maths(content: &[Inline]) -> bool {
-    if content.iter().any(|i| matches!(i, Inline::TableRow(_, _) | Inline::ImageRef(_, _))) {
+    if content
+        .iter()
+        .any(|i| matches!(i, Inline::TableRow(_, _) | Inline::ImageRef(_, _)))
+    {
         return false;
     }
     let text_only: String = content
@@ -197,12 +200,21 @@ fn is_mostly_maths(content: &[Inline]) -> bool {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Block {
-    Heading { level: u8, content: Vec<Inline> },
-    Paragraph { content: Vec<Inline> },
-    Code { text: String },
+    Heading {
+        level: u8,
+        content: Vec<Inline>,
+    },
+    Paragraph {
+        content: Vec<Inline>,
+    },
+    Code {
+        text: String,
+    },
     /// A standalone equation, cropped whole rather than inlined into a
     /// paragraph.
-    MathsDisplay { latex: String },
+    MathsDisplay {
+        latex: String,
+    },
     ListItem {
         ordered: bool,
         number: Option<u32>,
@@ -212,10 +224,15 @@ pub enum Block {
     /// Every row's cells, first row always the header — a table with no
     /// natural header row is out of scope (see the design spec's
     /// Non-goals).
-    Table { rows: Vec<Vec<Vec<Inline>>> },
+    Table {
+        rows: Vec<Vec<Vec<Inline>>>,
+    },
     /// A single embedded image, referenced by placeholder — see
     /// `Inline::ImageRef`.
-    Image { placeholder: String, alt: String },
+    Image {
+        placeholder: String,
+        alt: String,
+    },
 }
 
 // Chars on one line share a baseline, but superscripts, subscripts and inline
@@ -394,7 +411,9 @@ fn dominant_font_size(chars: &[CharBox]) -> f32 {
 pub(super) fn row_x_extent(row: &[CharBox]) -> (f32, f32) {
     row.iter()
         .filter(|c| !c.ch.is_whitespace())
-        .fold((f32::MAX, f32::MIN), |(lo, hi), c| (lo.min(c.x), hi.max(c.x + c.width)))
+        .fold((f32::MAX, f32::MIN), |(lo, hi), c| {
+            (lo.min(c.x), hi.max(c.x + c.width))
+        })
 }
 
 /// A row's own baseline `y` — every character on it shares one by
@@ -504,7 +523,11 @@ pub(super) fn row_crosses_gutters(row: &[CharBox], cut_xs: &[f32]) -> bool {
 /// narrowest cut chosen must be markedly wider than the widest gap left
 /// uncut, or forcing a split would be a guess rather than a measurement.
 pub(super) fn split_into_terms(row: &[CharBox], n: usize) -> Option<Vec<Vec<CharBox>>> {
-    let mut sorted: Vec<CharBox> = row.iter().copied().filter(|c| !c.ch.is_whitespace()).collect();
+    let mut sorted: Vec<CharBox> = row
+        .iter()
+        .copied()
+        .filter(|c| !c.ch.is_whitespace())
+        .collect();
     if n == 0 || sorted.len() < n {
         return None;
     }
@@ -557,7 +580,11 @@ pub(super) fn split_into_terms(row: &[CharBox], n: usize) -> Option<Vec<Vec<Char
 /// Returns the connectors in left-to-right order and whether the row ends
 /// in a trailing period.
 pub(super) fn connector_baseline(row: &[CharBox]) -> Option<(Vec<char>, bool)> {
-    let mut sorted: Vec<CharBox> = row.iter().copied().filter(|c| !c.ch.is_whitespace()).collect();
+    let mut sorted: Vec<CharBox> = row
+        .iter()
+        .copied()
+        .filter(|c| !c.ch.is_whitespace())
+        .collect();
     sorted.sort_by(|a, b| a.x.partial_cmp(&b.x).unwrap_or(std::cmp::Ordering::Equal));
 
     let after_label = match sorted.iter().position(|c| c.ch == ')') {
@@ -646,7 +673,10 @@ fn reconstruct_ruled_fractions(
         return (Vec::new(), rows);
     }
 
-    let plain: Vec<Vec<CharBox>> = rows.iter().map(|r| r.iter().map(|(_, c)| *c).collect()).collect();
+    let plain: Vec<Vec<CharBox>> = rows
+        .iter()
+        .map(|r| r.iter().map(|(_, c)| *c).collect())
+        .collect();
     let mut consumed = vec![false; rows.len()];
     let mut synthesized: Vec<Line> = Vec::new();
 
@@ -687,7 +717,11 @@ fn reconstruct_ruled_fractions(
         let mut content: Vec<Inline> = Vec::new();
         for (i, (n, d)) in num_groups.iter().zip(den_groups.iter()).enumerate() {
             if let Some(b) = baseline_i {
-                let from = if i == 0 { f32::NEG_INFINITY } else { bars[i - 1].x1 };
+                let from = if i == 0 {
+                    f32::NEG_INFINITY
+                } else {
+                    bars[i - 1].x1
+                };
                 content.extend(baseline_segment(&rows[b], from, bars[i].x0));
             }
             content.push(Inline::Maths(format!(
@@ -757,7 +791,11 @@ fn flanking_row(
         .enumerate()
         .filter(|(i, row)| !consumed[*i] && !row.is_empty())
         .filter_map(|(i, row)| {
-            let gap = if above { row_y(row) - band_y } else { band_y - row_y(row) };
+            let gap = if above {
+                row_y(row) - band_y
+            } else {
+                band_y - row_y(row)
+            };
             (gap > 0.0).then_some((i, gap))
         })
         .filter(|(i, gap)| *gap <= row_font_size(&plain[*i]).max(1.0) * FRACTION_MAX_ROW_GAP)
@@ -823,7 +861,11 @@ fn baseline_segment(row: &[(usize, CharBox)], from: f32, to: f32) -> Vec<Inline>
 /// when any bar ends up with nothing under it.
 fn bucket_by_span(row: &[CharBox], bars: &[RuleBox], slack: f32) -> Option<Vec<Vec<CharBox>>> {
     let mut groups: Vec<Vec<CharBox>> = vec![Vec::new(); bars.len()];
-    let mut sorted: Vec<CharBox> = row.iter().copied().filter(|c| !c.ch.is_whitespace()).collect();
+    let mut sorted: Vec<CharBox> = row
+        .iter()
+        .copied()
+        .filter(|c| !c.ch.is_whitespace())
+        .collect();
     sorted.sort_by(|a, b| a.x.partial_cmp(&b.x).unwrap_or(std::cmp::Ordering::Equal));
 
     for ch in sorted {
@@ -854,8 +896,13 @@ fn bucket_by_span(row: &[CharBox], bars: &[RuleBox], slack: f32) -> Option<Vec<V
 ///
 /// Returns the finished `Line`s for whatever matched, and every row that
 /// didn't — for the caller to run through the normal `build_line` path.
-fn reconstruct_fraction_sums(rows: Vec<Vec<(usize, CharBox)>>) -> (Vec<Line>, Vec<Vec<(usize, CharBox)>>) {
-    let plain: Vec<Vec<CharBox>> = rows.iter().map(|r| r.iter().map(|(_, c)| *c).collect()).collect();
+fn reconstruct_fraction_sums(
+    rows: Vec<Vec<(usize, CharBox)>>,
+) -> (Vec<Line>, Vec<Vec<(usize, CharBox)>>) {
+    let plain: Vec<Vec<CharBox>> = rows
+        .iter()
+        .map(|r| r.iter().map(|(_, c)| *c).collect())
+        .collect();
     let mut consumed = vec![false; rows.len()];
     let mut synthesized: Vec<Line> = Vec::new();
 
@@ -892,11 +939,19 @@ fn reconstruct_fraction_sums(rows: Vec<Vec<(usize, CharBox)>>) -> (Vec<Line>, Ve
                 })
         };
 
-        let Some(num_i) = nearest((0..baseline_i).collect()) else { continue };
-        let Some(den_i) = nearest((baseline_i + 1..plain.len()).collect()) else { continue };
+        let Some(num_i) = nearest((0..baseline_i).collect()) else {
+            continue;
+        };
+        let Some(den_i) = nearest((baseline_i + 1..plain.len()).collect()) else {
+            continue;
+        };
 
-        let Some(num_groups) = split_into_terms(&plain[num_i], terms) else { continue };
-        let Some(den_groups) = split_into_terms(&plain[den_i], terms) else { continue };
+        let Some(num_groups) = split_into_terms(&plain[num_i], terms) else {
+            continue;
+        };
+        let Some(den_groups) = split_into_terms(&plain[den_i], terms) else {
+            continue;
+        };
 
         let fracs: Vec<String> = num_groups
             .iter()
@@ -907,7 +962,11 @@ fn reconstruct_fraction_sums(rows: Vec<Vec<(usize, CharBox)>>) -> (Vec<Line>, Ve
         let mut content: Vec<Inline> = Vec::new();
         let label = baseline_label(&plain[baseline_i]);
         if !label.is_empty() {
-            content.push(Inline::Text(Span { text: label, bold: false, italic: false }));
+            content.push(Inline::Text(Span {
+                text: label,
+                bold: false,
+                italic: false,
+            }));
         }
         for (i, frac) in fracs.iter().enumerate() {
             content.push(Inline::Maths(frac.clone()));
@@ -921,7 +980,11 @@ fn reconstruct_fraction_sums(rows: Vec<Vec<(usize, CharBox)>>) -> (Vec<Line>, Ve
             }
         }
         if trailing_period {
-            content.push(Inline::Text(Span { text: ".".to_string(), bold: false, italic: false }));
+            content.push(Inline::Text(Span {
+                text: ".".to_string(),
+                bold: false,
+                italic: false,
+            }));
         }
 
         let is_display_maths = content.iter().all(|i| match i {
@@ -1044,7 +1107,13 @@ fn try_table_at(
     let cells_of = |row: &[(usize, CharBox)]| -> Vec<Vec<Inline>> {
         split_row_into_cells(row, &cut_xs)
             .into_iter()
-            .map(|cell| if cell.is_empty() { Vec::new() } else { build_line(cell).content })
+            .map(|cell| {
+                if cell.is_empty() {
+                    Vec::new()
+                } else {
+                    build_line(cell).content
+                }
+            })
             .collect()
     };
 
@@ -1087,7 +1156,13 @@ fn try_table_at(
         anchor_row = i;
         anchor_cells = raw_cells
             .into_iter()
-            .map(|cell| if cell.is_empty() { Vec::new() } else { build_line(cell).content })
+            .map(|cell| {
+                if cell.is_empty() {
+                    Vec::new()
+                } else {
+                    build_line(cell).content
+                }
+            })
             .collect();
         i += 1;
     }
@@ -1111,7 +1186,10 @@ fn try_table_at(
         return None;
     }
 
-    Some(TableMatch { logical_rows, consumed_rows })
+    Some(TableMatch {
+        logical_rows,
+        consumed_rows,
+    })
 }
 
 /// Finds and reconstructs runs of rows whose text aligns into a shared grid
@@ -1121,7 +1199,10 @@ fn try_table_at(
 /// consumes, and for the same reason: this needs the raw `CharBox`
 /// x-positions a `Line` no longer carries once `build_line` collapses a row.
 fn reconstruct_tables(rows: Vec<Vec<(usize, CharBox)>>) -> (Vec<Line>, Vec<Vec<(usize, CharBox)>>) {
-    let plain: Vec<Vec<CharBox>> = rows.iter().map(|r| r.iter().map(|(_, c)| *c).collect()).collect();
+    let plain: Vec<Vec<CharBox>> = rows
+        .iter()
+        .map(|r| r.iter().map(|(_, c)| *c).collect())
+        .collect();
     let mut consumed = vec![false; rows.len()];
     let mut synthesized: Vec<Line> = Vec::new();
 
@@ -1152,7 +1233,13 @@ fn reconstruct_tables(rows: Vec<Vec<(usize, CharBox)>>) -> (Vec<Line>, Vec<Vec<(
                 ends_hyphenated: false,
             });
         }
-        start = table.consumed_rows.iter().copied().max().map(|m| m + 1).unwrap_or(start + 1);
+        start = table
+            .consumed_rows
+            .iter()
+            .copied()
+            .max()
+            .map(|m| m + 1)
+            .unwrap_or(start + 1);
     }
 
     let remaining: Vec<Vec<(usize, CharBox)>> = rows
@@ -1254,7 +1341,11 @@ pub fn group_lines_with_rules(chars: &[CharBox], rules: &[RuleBox]) -> Vec<Line>
         // nested script sizes. Placing "e" before "-bs" gives "-bs" a real
         // sibling already sitting in the row by the time it's placed, which
         // the tolerance check below can then measure against directly.
-        scripts.sort_by(|(_, a), (_, b)| b.font_size.partial_cmp(&a.font_size).unwrap_or(std::cmp::Ordering::Equal));
+        scripts.sort_by(|(_, a), (_, b)| {
+            b.font_size
+                .partial_cmp(&a.font_size)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
 
         for (index, ch) in scripts {
             let best_row = rows
@@ -1271,10 +1362,13 @@ pub fn group_lines_with_rules(chars: &[CharBox], rules: &[RuleBox]) -> Vec<Line>
                     // flat, single-level thing; real nesting needs whichever
                     // member is actually `ch`'s neighbour.
                     let anchor = row.iter().min_by(|(_, a), (_, b)| {
-                        (a.y - ch.y).abs().partial_cmp(&(b.y - ch.y).abs()).unwrap_or(std::cmp::Ordering::Equal)
+                        (a.y - ch.y)
+                            .abs()
+                            .partial_cmp(&(b.y - ch.y).abs())
+                            .unwrap_or(std::cmp::Ordering::Equal)
                     })?;
-                    let y_ok = baseline_tolerance_ok(&anchor.1, &ch)
-                        || fits_below_big_operator(row, &ch);
+                    let y_ok =
+                        baseline_tolerance_ok(&anchor.1, &ch) || fits_below_big_operator(row, &ch);
                     y_ok.then(|| {
                         let distance = row
                             .iter()
@@ -1295,10 +1389,11 @@ pub fn group_lines_with_rules(chars: &[CharBox], rules: &[RuleBox]) -> Vec<Line>
         // The second pass appends by best match, not by position, so a script
         // that opened its own new row may now sit out of top-to-bottom order.
         rows.sort_by(|a, b| {
-            let y_of = |row: &[(usize, CharBox)]| {
-                row.iter().map(|(_, c)| c.y).fold(f32::MIN, f32::max)
-            };
-            y_of(b).partial_cmp(&y_of(a)).unwrap_or(std::cmp::Ordering::Equal)
+            let y_of =
+                |row: &[(usize, CharBox)]| row.iter().map(|(_, c)| c.y).fold(f32::MIN, f32::max);
+            y_of(b)
+                .partial_cmp(&y_of(a))
+                .unwrap_or(std::cmp::Ordering::Equal)
         });
     }
 
@@ -1396,9 +1491,14 @@ fn looks_like_page_number(text: &str) -> bool {
     match tokens.as_slice() {
         [only] => is_bare_number(only) || is_number_pair_no_space(only),
         [prefix, number] if is_page_word(prefix) => is_bare_number(number),
-        [number, sep, total] => is_bare_number(number) && is_pair_separator(sep) && is_bare_number(total),
+        [number, sep, total] => {
+            is_bare_number(number) && is_pair_separator(sep) && is_bare_number(total)
+        }
         [prefix, number, sep, total] => {
-            is_page_word(prefix) && is_bare_number(number) && is_pair_separator(sep) && is_bare_number(total)
+            is_page_word(prefix)
+                && is_bare_number(number)
+                && is_pair_separator(sep)
+                && is_bare_number(total)
         }
         _ => false,
     }
@@ -1435,7 +1535,10 @@ fn is_number_pair_no_space(s: &str) -> bool {
 }
 
 fn is_page_word(s: &str) -> bool {
-    matches!(s.to_lowercase().trim_end_matches('.'), "seite" | "page" | "s" | "p")
+    matches!(
+        s.to_lowercase().trim_end_matches('.'),
+        "seite" | "page" | "s" | "p"
+    )
 }
 
 fn is_pair_separator(s: &str) -> bool {
@@ -1637,7 +1740,9 @@ fn build_line(mut row: Vec<(usize, CharBox)>) -> Line {
         // closer in x is the one it combines with.
         if let Some(combining) = combining_form(ch.ch) {
             let backward_dist = previous_char_x.map(|x| (ch.x - x).abs());
-            let forward = row.get(index).filter(|n| !n.ch.is_whitespace() && combining_form(n.ch).is_none());
+            let forward = row
+                .get(index)
+                .filter(|n| !n.ch.is_whitespace() && combining_form(n.ch).is_none());
             let forward_dist = forward.map(|n| (ch.x - n.x).abs());
 
             let attach_forward = match (backward_dist, forward_dist) {
@@ -1689,10 +1794,7 @@ fn build_line(mut row: Vec<(usize, CharBox)>) -> Line {
 
     let is_display_maths = is_mostly_maths(&content);
 
-    let right = row
-        .iter()
-        .map(|c| c.x + c.width)
-        .fold(f32::MIN, f32::max);
+    let right = row.iter().map(|c| c.x + c.width).fold(f32::MIN, f32::max);
 
     Line {
         x: row.first().map(|c| c.x).unwrap_or_default(),
@@ -1846,9 +1948,7 @@ fn maths_runs(row: &[CharBox], font_size: f32) -> Vec<(usize, usize)> {
     // closing bracket and "(x0, y0) = (0, 0)" shatters into pieces with stray
     // punctuation between them. Growing outward over non-letters collects them.
     // Letters stop the growth, which is what keeps the surrounding prose out.
-    let gap_ok = |left: usize, right: usize| {
-        row[right].x - (row[left].x + row[left].width) <= em
-    };
+    let gap_ok = |left: usize, right: usize| row[right].x - (row[left].x + row[left].width) <= em;
     for run in &mut runs {
         while run.0 > 0 && gap_ok(run.0 - 1, run.0) {
             if is_bridgeable_symbol(row[run.0 - 1].ch) {
@@ -1912,8 +2012,7 @@ fn maths_runs(row: &[CharBox], font_size: f32) -> Vec<(usize, usize)> {
             // geometry a genuine exponent has, except for what it follows. An
             // exponent is never preceded by terminal punctuation, so growth
             // stops there rather than pulling a footnote call into the maths.
-            let after_terminal =
-                matches!(row[run.1 - 1].ch, '.' | ',' | ';' | ':' | '!' | '?');
+            let after_terminal = matches!(row[run.1 - 1].ch, '.' | ',' | ';' | ':' | '!' | '?');
             let candidate = &row[run.1];
             let is_script = candidate.font_size < font_size * SCRIPT_SIZE_RATIO
                 && candidate.y > row[run.1 - 1].y + font_size * 0.1;
@@ -2045,7 +2144,10 @@ fn list_marker(text: &str) -> Option<Marker> {
     let rest = &chars[leading..];
     let first = *rest.first()?;
 
-    if matches!(first, '•' | '●' | '▪' | '◦' | '‣' | '·' | '−' | '–' | '-' | '*' | '\u{FFFD}') {
+    if matches!(
+        first,
+        '•' | '●' | '▪' | '◦' | '‣' | '·' | '−' | '–' | '-' | '*' | '\u{FFFD}'
+    ) {
         // A bullet is only a bullet when something separates it from the text,
         // or "-3 degrees" and "*emphasis*" become list items.
         return rest.get(1).filter(|c| c.is_whitespace()).map(|_| Marker {
@@ -2366,7 +2468,12 @@ fn assign_list_numbers(blocks: &mut [Block]) {
                 counters.clear();
                 last_was_digit.clear();
             }
-            Block::ListItem { ordered: true, number, depth, .. } => {
+            Block::ListItem {
+                ordered: true,
+                number,
+                depth,
+                ..
+            } => {
                 let orig_depth = *depth;
                 let bump = number.is_none() && last_was_digit.get(&orig_depth) == Some(&true);
                 let effective_depth = if bump { orig_depth + 1 } else { orig_depth };
@@ -2436,10 +2543,7 @@ fn finish_block(lines: &[&Line], kind: LineKind) -> Block {
             let marker = list_marker(&lines[0].text());
             // Declared before `refs` so it outlives the reference to it.
             let first = Line {
-                content: strip_leading_chars(
-                    &lines[0].content,
-                    marker.map(|m| m.len).unwrap_or(0),
-                ),
+                content: strip_leading_chars(&lines[0].content, marker.map(|m| m.len).unwrap_or(0)),
                 ..lines[0].clone()
             };
             let mut refs: Vec<&Line> = vec![&first];
@@ -2474,7 +2578,9 @@ fn finish_block(lines: &[&Line], kind: LineKind) -> Block {
             let (placeholder, alt) = lines
                 .first()
                 .and_then(|l| match l.content.as_slice() {
-                    [Inline::ImageRef(placeholder, alt)] => Some((placeholder.clone(), alt.clone())),
+                    [Inline::ImageRef(placeholder, alt)] => {
+                        Some((placeholder.clone(), alt.clone()))
+                    }
                     _ => None,
                 })
                 .unwrap_or_default();
@@ -2505,7 +2611,9 @@ pub(super) fn escape_table_cell(text: &str) -> String {
 /// through this, so it must not silently corrupt the equation around it if
 /// one ever does.
 fn escape_text_for_maths(text: &str) -> String {
-    text.replace('\\', "\\textbackslash ").replace('{', "\\{").replace('}', "\\}")
+    text.replace('\\', "\\textbackslash ")
+        .replace('{', "\\{")
+        .replace('}', "\\}")
 }
 
 /// Renders a case row's condition half ("für t ≥ b") as LaTeX: each maximal
@@ -2522,7 +2630,11 @@ fn escape_text_for_maths(text: &str) -> String {
 /// and `latex::to_latex` already use) — never unconditionally, which would
 /// insert spaces a tightly-kerned run never had.
 pub(super) fn render_condition(chars: &[CharBox]) -> String {
-    let em = chars.iter().map(|c| c.font_size).fold(0.0_f32, f32::max).max(1.0);
+    let em = chars
+        .iter()
+        .map(|c| c.font_size)
+        .fold(0.0_f32, f32::max)
+        .max(1.0);
     let mut out = String::new();
     let mut previous_end: Option<f32> = None;
     let mut index = 0;
@@ -2622,15 +2734,20 @@ pub(super) fn matrix_bracket_row(row: &[CharBox]) -> Option<(Vec<BracketPair>, V
         }
         if i > 0 {
             let prev_pos = bracket_positions[i - 1];
-            if sorted[prev_pos + 1..pos].iter().any(|c| !c.ch.is_whitespace()) {
+            if sorted[prev_pos + 1..pos]
+                .iter()
+                .any(|c| !c.ch.is_whitespace())
+            {
                 return None;
             }
         }
     }
 
     let first_pos = bracket_positions[0];
-    let brackets: Vec<BracketPair> =
-        bracket_positions.chunks_exact(2).map(|pair| (sorted[pair[0]], sorted[pair[1]])).collect();
+    let brackets: Vec<BracketPair> = bracket_positions
+        .chunks_exact(2)
+        .map(|pair| (sorted[pair[0]], sorted[pair[1]]))
+        .collect();
     let leading = sorted[..first_pos].to_vec();
     Some((brackets, leading))
 }
@@ -2658,7 +2775,10 @@ pub(super) fn matrix_bracket_row(row: &[CharBox]) -> Option<(Vec<BracketPair>, V
 /// didn't — for the caller to run through the remaining reconstruction
 /// passes and finally `build_line`, unchanged.
 fn reconstruct_cases(rows: Vec<Vec<(usize, CharBox)>>) -> (Vec<Line>, Vec<Vec<(usize, CharBox)>>) {
-    let plain: Vec<Vec<CharBox>> = rows.iter().map(|r| r.iter().map(|(_, c)| *c).collect()).collect();
+    let plain: Vec<Vec<CharBox>> = rows
+        .iter()
+        .map(|r| r.iter().map(|(_, c)| *c).collect())
+        .collect();
     let mut consumed = vec![false; rows.len()];
     let mut synthesized: Vec<Line> = Vec::new();
 
@@ -2666,7 +2786,9 @@ fn reconstruct_cases(rows: Vec<Vec<(usize, CharBox)>>) -> (Vec<Line>, Vec<Vec<(u
         if consumed[brace_i] {
             continue;
         }
-        let Some((brace, leading)) = cases_brace_row(&plain[brace_i]) else { continue };
+        let Some((brace, leading)) = cases_brace_row(&plain[brace_i]) else {
+            continue;
+        };
         let brace_size = brace.font_size.max(1.0);
         let brace_left = brace.x;
         let brace_right = brace.x + brace.width;
@@ -2675,17 +2797,23 @@ fn reconstruct_cases(rows: Vec<Vec<(usize, CharBox)>>) -> (Vec<Line>, Vec<Vec<(u
             .filter(|&i| i != brace_i && !consumed[i])
             .filter(|&i| row_y(&plain[i]) < brace.y)
             .filter(|&i| brace.y - row_y(&plain[i]) <= brace_size * CASES_MAX_ROW_GAP)
-            .filter(|&i| (row_x_extent(&plain[i]).0 - brace_right).abs() <= brace_size * CASES_MAX_COLUMN_GAP)
+            .filter(|&i| {
+                (row_x_extent(&plain[i]).0 - brace_right).abs() <= brace_size * CASES_MAX_COLUMN_GAP
+            })
             .collect();
         if case_candidates.len() < 2 {
             continue;
         }
-        case_candidates.sort_by(|&a, &b| row_y(&plain[b]).partial_cmp(&row_y(&plain[a])).unwrap_or(std::cmp::Ordering::Equal));
+        case_candidates.sort_by(|&a, &b| {
+            row_y(&plain[b])
+                .partial_cmp(&row_y(&plain[a]))
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
 
         let column_x = row_x_extent(&plain[case_candidates[0]]).0;
-        let aligned = case_candidates
-            .iter()
-            .all(|&i| (row_x_extent(&plain[i]).0 - column_x).abs() <= brace_size * CASES_COLUMN_TOLERANCE);
+        let aligned = case_candidates.iter().all(|&i| {
+            (row_x_extent(&plain[i]).0 - column_x).abs() <= brace_size * CASES_COLUMN_TOLERANCE
+        });
         if !aligned {
             continue;
         }
@@ -2696,7 +2824,8 @@ fn reconstruct_cases(rows: Vec<Vec<(usize, CharBox)>>) -> (Vec<Line>, Vec<Vec<(u
             i != brace_i
                 && !consumed[i]
                 && !case_candidates.contains(&i)
-                && (row_x_extent(&plain[i]).1 - brace_left).abs() <= brace_size * CASES_MAX_COLUMN_GAP
+                && (row_x_extent(&plain[i]).1 - brace_left).abs()
+                    <= brace_size * CASES_MAX_COLUMN_GAP
                 && row_y(&plain[i]) <= top_y
                 && row_y(&plain[i]) >= bottom_y
         });
@@ -2731,9 +2860,13 @@ fn reconstruct_cases(rows: Vec<Vec<(usize, CharBox)>>) -> (Vec<Line>, Vec<Vec<(u
             x = x.min(x0);
             right = right.max(x1);
         }
-        if let Some(leading_x0) = leading.iter().map(|c| c.x).fold(None, |acc: Option<f32>, v| {
-            Some(acc.map_or(v, |a| a.min(v)))
-        }) {
+        if let Some(leading_x0) = leading
+            .iter()
+            .map(|c| c.x)
+            .fold(None, |acc: Option<f32>, v| {
+                Some(acc.map_or(v, |a| a.min(v)))
+            })
+        {
             x = x.min(leading_x0);
         }
 
@@ -2768,7 +2901,9 @@ fn reconstruct_cases(rows: Vec<Vec<(usize, CharBox)>>) -> (Vec<Line>, Vec<Vec<(u
         // larger gap than normal to whatever paragraph line precedes it and
         // wrongly starting a new one (found against the real document,
         // where "Dabei" and this block's own "ist" are one sentence).
-        let block_top_y = row_y(&plain[brace_i]).max(top_y).max(row_y(&plain[prefix_i]));
+        let block_top_y = row_y(&plain[brace_i])
+            .max(top_y)
+            .max(row_y(&plain[prefix_i]));
 
         synthesized.push(Line {
             content,
@@ -2822,8 +2957,13 @@ fn reconstruct_cases(rows: Vec<Vec<(usize, CharBox)>>) -> (Vec<Line>, Vec<Vec<(u
 /// Returns the finished `Line`s for whatever matched, and every row that
 /// didn't — for the caller to run through the remaining reconstruction
 /// passes and finally `build_line`, unchanged.
-fn reconstruct_matrices(rows: Vec<Vec<(usize, CharBox)>>) -> (Vec<Line>, Vec<Vec<(usize, CharBox)>>) {
-    let plain: Vec<Vec<CharBox>> = rows.iter().map(|r| r.iter().map(|(_, c)| *c).collect()).collect();
+fn reconstruct_matrices(
+    rows: Vec<Vec<(usize, CharBox)>>,
+) -> (Vec<Line>, Vec<Vec<(usize, CharBox)>>) {
+    let plain: Vec<Vec<CharBox>> = rows
+        .iter()
+        .map(|r| r.iter().map(|(_, c)| *c).collect())
+        .collect();
     let mut consumed = vec![false; rows.len()];
     let mut synthesized: Vec<Line> = Vec::new();
 
@@ -2831,7 +2971,9 @@ fn reconstruct_matrices(rows: Vec<Vec<(usize, CharBox)>>) -> (Vec<Line>, Vec<Vec
         if consumed[bracket_i] {
             continue;
         }
-        let Some((brackets, leading)) = matrix_bracket_row(&plain[bracket_i]) else { continue };
+        let Some((brackets, leading)) = matrix_bracket_row(&plain[bracket_i]) else {
+            continue;
+        };
         let bracket_size = brackets[0].0.font_size.max(1.0);
         // The overall span from the first bracket's own interior to the
         // last bracket's own interior — content rows are found once and
@@ -2870,14 +3012,20 @@ fn reconstruct_matrices(rows: Vec<Vec<(usize, CharBox)>>) -> (Vec<Line>, Vec<Vec
             // and) to sit at a y between the numerator/denominator rows
             // and pass the checks above without ever touching a bracket.
             .filter(|&i| {
-                brackets.iter().any(|b| plain[i].iter().any(|c| c.x >= b.0.x && c.x <= b.1.x + b.1.width))
+                brackets.iter().any(|b| {
+                    plain[i]
+                        .iter()
+                        .any(|c| c.x >= b.0.x && c.x <= b.1.x + b.1.width)
+                })
             })
             .collect();
         if content_candidates.len() < 2 {
             continue;
         }
         content_candidates.sort_by(|&a, &b| {
-            row_y(&plain[b]).partial_cmp(&row_y(&plain[a])).unwrap_or(std::cmp::Ordering::Equal)
+            row_y(&plain[b])
+                .partial_cmp(&row_y(&plain[a]))
+                .unwrap_or(std::cmp::Ordering::Equal)
         });
 
         let top_y = row_y(&plain[content_candidates[0]]);
@@ -2919,7 +3067,9 @@ fn reconstruct_matrices(rows: Vec<Vec<(usize, CharBox)>>) -> (Vec<Line>, Vec<Vec
             if brackets.iter().any(|b| !inside_of(pi, b).is_empty()) {
                 content_candidates.push(pi);
                 content_candidates.sort_by(|&a, &b| {
-                    row_y(&plain[b]).partial_cmp(&row_y(&plain[a])).unwrap_or(std::cmp::Ordering::Equal)
+                    row_y(&plain[b])
+                        .partial_cmp(&row_y(&plain[a]))
+                        .unwrap_or(std::cmp::Ordering::Equal)
                 });
             }
         }
@@ -2935,7 +3085,9 @@ fn reconstruct_matrices(rows: Vec<Vec<(usize, CharBox)>>) -> (Vec<Line>, Vec<Vec
         // which of its rows to keep would be exactly the kind of forced
         // fix this pipeline's own practice warns against.
         if content_candidates.iter().any(|&i| {
-            plain[i].iter().any(|c| c.family == Family::Extensible && latex::bracket_glyph(c).is_none())
+            plain[i]
+                .iter()
+                .any(|c| c.family == Family::Extensible && latex::bracket_glyph(c).is_none())
         }) {
             continue;
         }
@@ -2957,7 +3109,9 @@ fn reconstruct_matrices(rows: Vec<Vec<(usize, CharBox)>>) -> (Vec<Line>, Vec<Vec
         if brackets.len() > 1 {
             let leading_present = !leading.is_empty();
             let before_present = prefix_i.is_some_and(|pi| {
-                plain[pi].iter().any(|c| c.x < brackets[0].0.x && !c.ch.is_whitespace())
+                plain[pi]
+                    .iter()
+                    .any(|c| c.x < brackets[0].0.x && !c.ch.is_whitespace())
             });
             if !leading_present && !before_present {
                 continue;
@@ -2973,15 +3127,24 @@ fn reconstruct_matrices(rows: Vec<Vec<(usize, CharBox)>>) -> (Vec<Line>, Vec<Vec
         let mut x = brackets[0].0.x;
         let mut right = brackets[brackets.len() - 1].1.x + brackets[brackets.len() - 1].1.width;
         for bracket in &brackets {
-            let content_rows: Vec<Vec<(usize, CharBox)>> =
-                content_candidates.iter().map(|&ci| inside_of(ci, bracket)).collect();
-            let content_plain: Vec<Vec<CharBox>> =
-                content_rows.iter().map(|row| row.iter().map(|(_, c)| *c).collect()).collect();
+            let content_rows: Vec<Vec<(usize, CharBox)>> = content_candidates
+                .iter()
+                .map(|&ci| inside_of(ci, bracket))
+                .collect();
+            let content_plain: Vec<Vec<CharBox>> = content_rows
+                .iter()
+                .map(|row| row.iter().map(|(_, c)| *c).collect())
+                .collect();
             let cut_xs = table_gutters(&content_plain).filter(|cuts| {
                 !cuts.is_empty()
-                    && content_plain.iter().all(|row| !row_crosses_gutters(row, cuts))
+                    && content_plain
+                        .iter()
+                        .all(|row| !row_crosses_gutters(row, cuts))
                     && content_rows.iter().all(|row| {
-                        split_row_into_cells(row, cuts).iter().filter(|c| cell_has_content(c)).count()
+                        split_row_into_cells(row, cuts)
+                            .iter()
+                            .filter(|c| cell_has_content(c))
+                            .count()
                             == cuts.len() + 1
                     })
             });
@@ -2992,15 +3155,20 @@ fn reconstruct_matrices(rows: Vec<Vec<(usize, CharBox)>>) -> (Vec<Line>, Vec<Vec
                     Some(cuts) => split_row_into_cells(row, cuts)
                         .into_iter()
                         .map(|cell| {
-                            let mut cell_chars: Vec<CharBox> = cell.into_iter().map(|(_, c)| c).collect();
-                            cell_chars.sort_by(|a, b| a.x.partial_cmp(&b.x).unwrap_or(std::cmp::Ordering::Equal));
+                            let mut cell_chars: Vec<CharBox> =
+                                cell.into_iter().map(|(_, c)| c).collect();
+                            cell_chars.sort_by(|a, b| {
+                                a.x.partial_cmp(&b.x).unwrap_or(std::cmp::Ordering::Equal)
+                            });
                             latex::to_latex(&cell_chars)
                         })
                         .collect::<Vec<_>>()
                         .join(" & "),
                     None => {
                         let mut row_chars: Vec<CharBox> = row.iter().map(|(_, c)| *c).collect();
-                        row_chars.sort_by(|a, b| a.x.partial_cmp(&b.x).unwrap_or(std::cmp::Ordering::Equal));
+                        row_chars.sort_by(|a, b| {
+                            a.x.partial_cmp(&b.x).unwrap_or(std::cmp::Ordering::Equal)
+                        });
                         latex::to_latex(&row_chars)
                     }
                 })
@@ -3012,7 +3180,10 @@ fn reconstruct_matrices(rows: Vec<Vec<(usize, CharBox)>>) -> (Vec<Line>, Vec<Vec
                 right = right.max(x1);
             }
 
-            pmatrices.push(format!("\\begin{{pmatrix}} {} \\end{{pmatrix}}", row_lines.join(" \\\\ ")));
+            pmatrices.push(format!(
+                "\\begin{{pmatrix}} {} \\end{{pmatrix}}",
+                row_lines.join(" \\\\ ")
+            ));
         }
 
         // The prefix splits into one fragment more than there are
@@ -3037,7 +3208,8 @@ fn reconstruct_matrices(rows: Vec<Vec<(usize, CharBox)>>) -> (Vec<Line>, Vec<Vec
                             after_prev && before_next && latex::bracket_glyph(c).is_none()
                         })
                         .collect();
-                    fragment_chars.sort_by(|a, b| a.x.partial_cmp(&b.x).unwrap_or(std::cmp::Ordering::Equal));
+                    fragment_chars
+                        .sort_by(|a, b| a.x.partial_cmp(&b.x).unwrap_or(std::cmp::Ordering::Equal));
                     latex::to_latex(&fragment_chars)
                 })
                 .collect()
@@ -3079,9 +3251,16 @@ fn reconstruct_matrices(rows: Vec<Vec<(usize, CharBox)>>) -> (Vec<Line>, Vec<Vec
             Inline::TableRow(_, _) | Inline::ImageRef(_, _) => false,
         });
 
-        let base_size = prefix_i.map(|pi| row_font_size(&plain[pi])).unwrap_or(bracket_size).max(1.0);
-        if let Some(leading_x0) =
-            leading.iter().map(|c| c.x).fold(None, |acc: Option<f32>, v| Some(acc.map_or(v, |a| a.min(v))))
+        let base_size = prefix_i
+            .map(|pi| row_font_size(&plain[pi]))
+            .unwrap_or(bracket_size)
+            .max(1.0);
+        if let Some(leading_x0) = leading
+            .iter()
+            .map(|c| c.x)
+            .fold(None, |acc: Option<f32>, v| {
+                Some(acc.map_or(v, |a| a.min(v)))
+            })
         {
             x = x.min(leading_x0);
         }
@@ -3184,10 +3363,15 @@ fn intervening_block_indent(blocks: &[Block]) -> Vec<usize> {
             continue;
         };
         let mut j = i + 1;
-        while j < blocks.len() && !matches!(blocks[j], Block::ListItem { .. } | Block::Heading { .. }) {
+        while j < blocks.len()
+            && !matches!(blocks[j], Block::ListItem { .. } | Block::Heading { .. })
+        {
             j += 1;
         }
-        if let Some(Block::ListItem { depth: next_depth, .. }) = blocks.get(j) {
+        if let Some(Block::ListItem {
+            depth: next_depth, ..
+        }) = blocks.get(j)
+        {
             // `>=`, not `>`. A block between two items of the *same* depth has
             // to be indented to that depth too, or it closes the list it sits
             // inside: Analysis_2_Blatt5_2026 and Blatt10 put a display equation
@@ -3246,10 +3430,7 @@ pub fn blocks_to_markdown(blocks: &[Block]) -> String {
                     (true, None) => "1.".to_string(),
                     (false, _) => "-".to_string(),
                 };
-                parts.push(format!(
-                    "{indent}{marker} {}",
-                    render_content(content)
-                ));
+                parts.push(format!("{indent}{marker} {}", render_content(content)));
             }
             Block::Table { rows } => {
                 let mut table_lines: Vec<String> = Vec::new();
@@ -3462,10 +3643,7 @@ fn is_single_region(line: &Line) -> bool {
 /// exercise's own equation, pairing unrelated content — found happening
 /// exactly that way on the real document this was built against.
 fn find_stacked_pair(lines: &[Line], top_ok: impl Fn(&Line) -> bool) -> Option<(usize, usize)> {
-    let mut gaps: Vec<f32> = lines
-        .windows(2)
-        .map(|w| (w[0].y - w[1].y).abs())
-        .collect();
+    let mut gaps: Vec<f32> = lines.windows(2).map(|w| (w[0].y - w[1].y).abs()).collect();
     let typical_gap = median(&mut gaps);
 
     let mut best: Option<(usize, usize, f32)> = None;
@@ -3500,9 +3678,11 @@ fn find_stacked_pair(lines: &[Line], top_ok: impl Fn(&Line) -> bool) -> Option<(
                 continue;
             }
             let margin = body * FRACTION_MAX_ROW_GAP;
-            let flanked = lines
-                .iter()
-                .any(|l| is_delimiter_only_line(l) && l.y <= lines[i].y + margin && l.y >= lines[j].y - margin);
+            let flanked = lines.iter().any(|l| {
+                is_delimiter_only_line(l)
+                    && l.y <= lines[i].y + margin
+                    && l.y >= lines[j].y - margin
+            });
             if flanked {
                 continue;
             }
@@ -3554,7 +3734,10 @@ fn is_repeated_operator_token(latex: &str) -> Option<(&'static str, usize)> {
     }
     BIG_OPERATOR_LATEX_TOKENS.iter().find_map(|&tok| {
         (stripped.len().is_multiple_of(tok.len())
-            && stripped.as_bytes().chunks(tok.len()).all(|c| c == tok.as_bytes()))
+            && stripped
+                .as_bytes()
+                .chunks(tok.len())
+                .all(|c| c == tok.as_bytes()))
         .then(|| (tok, stripped.len() / tok.len()))
     })
 }
@@ -3670,9 +3853,7 @@ fn reconstruct_fractions(lines: Vec<Line>) -> Vec<Line> {
 /// operator-only row stacked above its limit row — see
 /// [`reconstruct_stacked_pairs`] and [`is_big_operator_only_line`].
 fn reconstruct_operator_limits(lines: Vec<Line>) -> Vec<Line> {
-    reconstruct_stacked_pairs(
-        lines,
-        is_big_operator_only_line,
-        |op, limit| format!("{}_{{{limit}}}", collapse_operator_run(op)),
-    )
+    reconstruct_stacked_pairs(lines, is_big_operator_only_line, |op, limit| {
+        format!("{}_{{{limit}}}", collapse_operator_run(op))
+    })
 }

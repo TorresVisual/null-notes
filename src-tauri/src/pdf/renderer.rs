@@ -14,7 +14,10 @@ pub async fn render_pages(
     #[cfg(not(feature = "pdf-native"))]
     {
         let _ = (out_dir, progress);
-        anyhow::bail!("PDF rendering requires the pdf-native feature: {:?}", pdf_path)
+        anyhow::bail!(
+            "PDF rendering requires the pdf-native feature: {:?}",
+            pdf_path
+        )
     }
 }
 

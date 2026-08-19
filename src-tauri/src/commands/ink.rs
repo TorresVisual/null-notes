@@ -54,8 +54,14 @@ mod tests {
     #[tokio::test]
     async fn test_write_and_read_ink() {
         let tmp = tempdir().unwrap();
-        let svg_path = tmp.path().join("sketch-1.svg").to_string_lossy().into_owned();
-        write_ink(svg_path.clone(), "<svg></svg>".into()).await.unwrap();
+        let svg_path = tmp
+            .path()
+            .join("sketch-1.svg")
+            .to_string_lossy()
+            .into_owned();
+        write_ink(svg_path.clone(), "<svg></svg>".into())
+            .await
+            .unwrap();
         let content = read_ink(svg_path).await.unwrap();
         assert_eq!(content, "<svg></svg>");
     }

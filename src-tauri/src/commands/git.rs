@@ -10,10 +10,10 @@
 //!
 //! Design: `docs/ROADMAP.md` §Phase 5.
 
+use crate::models::RepoMode;
+use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use serde::{Deserialize, Serialize};
-use crate::models::RepoMode;
 
 /// `git -C <workspace> rev-parse --show-toplevel`, classified against the
 /// workspace path itself.
@@ -82,19 +82,25 @@ impl UnsafeRepoState {
 
 fn absolute_git_dir(workspace: &str) -> anyhow::Result<PathBuf> {
     let output = Command::new("git")
-        .arg("-C").arg(workspace)
-        .arg("rev-parse").arg("--absolute-git-dir")
+        .arg("-C")
+        .arg(workspace)
+        .arg("rev-parse")
+        .arg("--absolute-git-dir")
         .output()?;
     if !output.status.success() {
         anyhow::bail!("not a git repository: {workspace}");
     }
-    Ok(PathBuf::from(String::from_utf8_lossy(&output.stdout).trim().to_string()))
+    Ok(PathBuf::from(
+        String::from_utf8_lossy(&output.stdout).trim().to_string(),
+    ))
 }
 
 fn has_unresolved_conflicts(workspace: &str) -> anyhow::Result<bool> {
     let output = Command::new("git")
-        .arg("-C").arg(workspace)
-        .arg("ls-files").arg("-u")
+        .arg("-C")
+        .arg(workspace)
+        .arg("ls-files")
+        .arg("-u")
         .output()?;
     Ok(!output.stdout.is_empty())
 }
@@ -159,8 +165,11 @@ fn has_pending_changes(workspace: &str, paths: &[String]) -> anyhow::Result<bool
         return Ok(false);
     }
     let output = Command::new("git")
-        .arg("-C").arg(workspace)
-        .arg("status").arg("--porcelain").arg("--")
+        .arg("-C")
+        .arg(workspace)
+        .arg("status")
+        .arg("--porcelain")
+        .arg("--")
         .args(paths)
         .output()?;
     Ok(!output.stdout.is_empty())
@@ -175,15 +184,19 @@ pub fn checked_auto_commit(
     skip_hooks: bool,
 ) -> anyhow::Result<CommitOutcome> {
     if let Some(state) = unsafe_repo_state(workspace)? {
-        return Ok(CommitOutcome::Skipped { reason: state.reason().to_string() });
+        return Ok(CommitOutcome::Skipped {
+            reason: state.reason().to_string(),
+        });
     }
     if !has_pending_changes(workspace, paths)? {
         return Ok(CommitOutcome::NothingToCommit);
     }
 
     let add_status = Command::new("git")
-        .arg("-C").arg(workspace)
-        .arg("add").arg("--")
+        .arg("-C")
+        .arg(workspace)
+        .arg("add")
+        .arg("--")
         .args(paths)
         .status()?;
     if !add_status.success() {
@@ -230,7 +243,11 @@ pub enum PushOutcome {
 }
 
 fn has_remote(workspace: &str) -> anyhow::Result<bool> {
-    let output = Command::new("git").arg("-C").arg(workspace).arg("remote").output()?;
+    let output = Command::new("git")
+        .arg("-C")
+        .arg(workspace)
+        .arg("remote")
+        .output()?;
     Ok(!String::from_utf8_lossy(&output.stdout).trim().is_empty())
 }
 
@@ -244,7 +261,11 @@ pub fn checked_push(workspace: &str, mode: RepoMode) -> anyhow::Result<PushOutco
         return Ok(PushOutcome::NoRemote);
     }
 
-    let output = Command::new("git").arg("-C").arg(workspace).arg("push").output()?;
+    let output = Command::new("git")
+        .arg("-C")
+        .arg(workspace)
+        .arg("push")
+        .output()?;
     if output.status.success() {
         return Ok(PushOutcome::Pushed);
     }
@@ -278,8 +299,11 @@ pub enum PullOutcome {
 
 fn count_commits(workspace: &str, range: &str) -> anyhow::Result<u32> {
     let output = Command::new("git")
-        .arg("-C").arg(workspace)
-        .arg("rev-list").arg("--count").arg(range)
+        .arg("-C")
+        .arg(workspace)
+        .arg("rev-list")
+        .arg("--count")
+        .arg(range)
         .output()?;
     if !output.status.success() {
         anyhow::bail!("git rev-list --count {range} failed for {workspace}");
@@ -297,7 +321,11 @@ pub fn checked_pull(workspace: &str) -> anyhow::Result<PullOutcome> {
         return Ok(PullOutcome::NoRemote);
     }
 
-    let fetch_status = Command::new("git").arg("-C").arg(workspace).arg("fetch").status()?;
+    let fetch_status = Command::new("git")
+        .arg("-C")
+        .arg(workspace)
+        .arg("fetch")
+        .status()?;
     if !fetch_status.success() {
         anyhow::bail!("git fetch failed for {workspace}");
     }
@@ -316,7 +344,11 @@ pub fn checked_pull(workspace: &str) -> anyhow::Result<PullOutcome> {
     // fast-forward, and refuses (rather than merging) if a local
     // uncommitted change would be overwritten.
     let merge_status = Command::new("git")
-        .arg("-C").arg(workspace).arg("merge").arg("--ff-only").arg("@{u}")
+        .arg("-C")
+        .arg(workspace)
+        .arg("merge")
+        .arg("--ff-only")
+        .arg("@{u}")
         .status()?;
     if !merge_status.success() {
         anyhow::bail!("fast-forward merge unexpectedly failed for {workspace}");
@@ -361,7 +393,11 @@ pub fn checked_init_notes_repo(
     workspace: &str,
     create_github_remote: bool,
 ) -> anyhow::Result<RepoInitOutcome> {
-    let init_status = Command::new("git").arg("-C").arg(workspace).arg("init").status()?;
+    let init_status = Command::new("git")
+        .arg("-C")
+        .arg(workspace)
+        .arg("init")
+        .status()?;
     if !init_status.success() {
         anyhow::bail!("git init failed for {workspace}");
     }
@@ -375,10 +411,13 @@ pub fn checked_init_notes_repo(
         // Private by default: lecture notes must not become public by
         // accident.
         let status = Command::new("gh")
-            .arg("repo").arg("create")
-            .arg("--source").arg(workspace)
+            .arg("repo")
+            .arg("create")
+            .arg("--source")
+            .arg(workspace)
             .arg("--private")
-            .arg("--remote").arg("origin")
+            .arg("--remote")
+            .arg("origin")
             .status()?;
         if status.success() {
             return Ok(RepoInitOutcome::InitializedWithRemote);
@@ -466,9 +505,19 @@ mod tests {
 
     fn commit_file(dir: &Path, name: &str, content: &str) {
         std::fs::write(dir.join(name), content).unwrap();
-        Command::new("git").arg("-C").arg(dir).arg("add").arg(name).status().unwrap();
         Command::new("git")
-            .arg("-C").arg(dir).arg("commit").arg("-m").arg(format!("add {name}"))
+            .arg("-C")
+            .arg(dir)
+            .arg("add")
+            .arg(name)
+            .status()
+            .unwrap();
+        Command::new("git")
+            .arg("-C")
+            .arg(dir)
+            .arg("commit")
+            .arg("-m")
+            .arg(format!("add {name}"))
             .status()
             .unwrap();
     }
@@ -479,7 +528,10 @@ mod tests {
         git_init(tmp.path());
         commit_file(tmp.path(), "a.md", "hello");
 
-        assert_eq!(unsafe_repo_state(&tmp.path().to_string_lossy()).unwrap(), None);
+        assert_eq!(
+            unsafe_repo_state(&tmp.path().to_string_lossy()).unwrap(),
+            None
+        );
     }
 
     #[test]
@@ -488,10 +540,20 @@ mod tests {
         git_init(tmp.path());
         commit_file(tmp.path(), "a.md", "hello");
         let sha = Command::new("git")
-            .arg("-C").arg(tmp.path()).arg("rev-parse").arg("HEAD")
-            .output().unwrap();
+            .arg("-C")
+            .arg(tmp.path())
+            .arg("rev-parse")
+            .arg("HEAD")
+            .output()
+            .unwrap();
         let sha = String::from_utf8_lossy(&sha.stdout).trim().to_string();
-        Command::new("git").arg("-C").arg(tmp.path()).arg("checkout").arg(&sha).status().unwrap();
+        Command::new("git")
+            .arg("-C")
+            .arg(tmp.path())
+            .arg("checkout")
+            .arg(&sha)
+            .status()
+            .unwrap();
 
         assert_eq!(
             unsafe_repo_state(&tmp.path().to_string_lossy()).unwrap(),
@@ -552,13 +614,27 @@ mod tests {
         commit_file(tmp.path(), "a.md", "base\n");
 
         std::fs::write(tmp.path().join("a.md"), "stashed\n").unwrap();
-        Command::new("git").arg("-C").arg(tmp.path()).arg("stash").arg("push").status().unwrap();
+        Command::new("git")
+            .arg("-C")
+            .arg(tmp.path())
+            .arg("stash")
+            .arg("push")
+            .status()
+            .unwrap();
         commit_file(tmp.path(), "a.md", "conflicting\n");
         // Expected to fail with a real conflict — that's the point.
-        let _ = Command::new("git").arg("-C").arg(tmp.path()).arg("stash").arg("pop").status();
+        let _ = Command::new("git")
+            .arg("-C")
+            .arg(tmp.path())
+            .arg("stash")
+            .arg("pop")
+            .status();
 
         let git_dir = absolute_git_dir(&tmp.path().to_string_lossy()).unwrap();
-        assert!(!git_dir.join("MERGE_HEAD").exists(), "a stash pop must not set MERGE_HEAD");
+        assert!(
+            !git_dir.join("MERGE_HEAD").exists(),
+            "a stash pop must not set MERGE_HEAD"
+        );
 
         assert_eq!(
             unsafe_repo_state(&tmp.path().to_string_lossy()).unwrap(),
@@ -592,9 +668,19 @@ mod tests {
         // survive the auto-commit byte-for-byte. This is the one
         // unforgivable failure per P5-2's own DoD.
         std::fs::write(tmp.path().join("src.rs"), "fn main() { staged() }\n").unwrap();
-        Command::new("git").arg("-C").arg(tmp.path()).arg("add").arg("src.rs").status().unwrap();
+        Command::new("git")
+            .arg("-C")
+            .arg(tmp.path())
+            .arg("add")
+            .arg("src.rs")
+            .status()
+            .unwrap();
         std::fs::write(tmp.path().join("note.md"), "# Note\nmore\n").unwrap();
-        std::fs::write(tmp.path().join("src.rs"), "fn main() { staged() } // unstaged\n").unwrap();
+        std::fs::write(
+            tmp.path().join("src.rs"),
+            "fn main() { staged() } // unstaged\n",
+        )
+        .unwrap();
 
         // Scoped to src.rs specifically — the whole-repo diff listing is
         // *expected* to shrink once note.md's own change is committed, so
@@ -602,32 +688,67 @@ mod tests {
         // assertion. What must be identical is src.rs's own staged and
         // unstaged content.
         let staged_before = Command::new("git")
-            .arg("-C").arg(tmp.path()).arg("diff").arg("--cached").arg("--").arg("src.rs")
-            .output().unwrap();
+            .arg("-C")
+            .arg(tmp.path())
+            .arg("diff")
+            .arg("--cached")
+            .arg("--")
+            .arg("src.rs")
+            .output()
+            .unwrap();
         let unstaged_before = Command::new("git")
-            .arg("-C").arg(tmp.path()).arg("diff").arg("--").arg("src.rs")
-            .output().unwrap();
+            .arg("-C")
+            .arg(tmp.path())
+            .arg("diff")
+            .arg("--")
+            .arg("src.rs")
+            .output()
+            .unwrap();
 
         let outcome = checked_auto_commit(
             &tmp.path().to_string_lossy(),
             &["note.md".to_string()],
             false,
-        ).unwrap();
+        )
+        .unwrap();
 
         assert_eq!(outcome, CommitOutcome::Committed);
 
         let staged_after = Command::new("git")
-            .arg("-C").arg(tmp.path()).arg("diff").arg("--cached").arg("--").arg("src.rs")
-            .output().unwrap();
+            .arg("-C")
+            .arg(tmp.path())
+            .arg("diff")
+            .arg("--cached")
+            .arg("--")
+            .arg("src.rs")
+            .output()
+            .unwrap();
         let unstaged_after = Command::new("git")
-            .arg("-C").arg(tmp.path()).arg("diff").arg("--").arg("src.rs")
-            .output().unwrap();
-        assert_eq!(staged_before.stdout, staged_after.stdout, "src.rs's staged change must be untouched");
-        assert_eq!(unstaged_before.stdout, unstaged_after.stdout, "src.rs's unstaged change must be untouched");
+            .arg("-C")
+            .arg(tmp.path())
+            .arg("diff")
+            .arg("--")
+            .arg("src.rs")
+            .output()
+            .unwrap();
+        assert_eq!(
+            staged_before.stdout, staged_after.stdout,
+            "src.rs's staged change must be untouched"
+        );
+        assert_eq!(
+            unstaged_before.stdout, unstaged_after.stdout,
+            "src.rs's unstaged change must be untouched"
+        );
 
         let last_commit_files = Command::new("git")
-            .arg("-C").arg(tmp.path()).arg("show").arg("--stat").arg("--format=").arg("HEAD")
-            .output().unwrap();
+            .arg("-C")
+            .arg(tmp.path())
+            .arg("show")
+            .arg("--stat")
+            .arg("--format=")
+            .arg("HEAD")
+            .output()
+            .unwrap();
         let files = String::from_utf8_lossy(&last_commit_files.stdout);
         assert!(files.contains("note.md"));
         assert!(!files.contains("src.rs"));
@@ -643,7 +764,8 @@ mod tests {
             &tmp.path().to_string_lossy(),
             &["note.md".to_string()],
             false,
-        ).unwrap();
+        )
+        .unwrap();
 
         assert_eq!(outcome, CommitOutcome::NothingToCommit);
     }
@@ -656,19 +778,35 @@ mod tests {
         write_failing_pre_commit_hook(tmp.path());
         std::fs::write(tmp.path().join("note.md"), "# Note\nchanged\n").unwrap();
 
-        let before = Command::new("git").arg("-C").arg(tmp.path()).arg("rev-list").arg("--count").arg("HEAD")
-            .output().unwrap();
+        let before = Command::new("git")
+            .arg("-C")
+            .arg(tmp.path())
+            .arg("rev-list")
+            .arg("--count")
+            .arg("HEAD")
+            .output()
+            .unwrap();
 
         let outcome = checked_auto_commit(
             &tmp.path().to_string_lossy(),
             &["note.md".to_string()],
             false,
-        ).unwrap();
+        )
+        .unwrap();
 
         assert!(matches!(outcome, CommitOutcome::HookFailed { .. }));
-        let after = Command::new("git").arg("-C").arg(tmp.path()).arg("rev-list").arg("--count").arg("HEAD")
-            .output().unwrap();
-        assert_eq!(before.stdout, after.stdout, "a failed hook must not leave a commit behind");
+        let after = Command::new("git")
+            .arg("-C")
+            .arg(tmp.path())
+            .arg("rev-list")
+            .arg("--count")
+            .arg("HEAD")
+            .output()
+            .unwrap();
+        assert_eq!(
+            before.stdout, after.stdout,
+            "a failed hook must not leave a commit behind"
+        );
     }
 
     #[cfg(unix)]
@@ -684,7 +822,8 @@ mod tests {
             &tmp.path().to_string_lossy(),
             &["note.md".to_string()],
             true,
-        ).unwrap();
+        )
+        .unwrap();
 
         assert_eq!(outcome, CommitOutcome::Committed);
     }
@@ -701,23 +840,47 @@ mod tests {
             &tmp.path().to_string_lossy(),
             &["note.md".to_string()],
             false,
-        ).unwrap();
+        )
+        .unwrap();
 
-        assert_eq!(outcome, CommitOutcome::Skipped { reason: "a rebase is in progress".to_string() });
+        assert_eq!(
+            outcome,
+            CommitOutcome::Skipped {
+                reason: "a rebase is in progress".to_string()
+            }
+        );
     }
 
     // A bare "remote" plus one clone that already has commits pushed to it —
     // the shared fixture every push/pull test in this file builds on.
     fn bare_remote_with_clone() -> (tempfile::TempDir, tempfile::TempDir) {
         let remote = tempdir().unwrap();
-        Command::new("git").arg("init").arg("--bare").arg("-q").arg(remote.path()).status().unwrap();
+        Command::new("git")
+            .arg("init")
+            .arg("--bare")
+            .arg("-q")
+            .arg(remote.path())
+            .status()
+            .unwrap();
 
         let clone = tempdir().unwrap();
         Command::new("git")
-            .arg("clone").arg("-q").arg(remote.path()).arg(clone.path())
-            .status().unwrap();
+            .arg("clone")
+            .arg("-q")
+            .arg(remote.path())
+            .arg(clone.path())
+            .status()
+            .unwrap();
         commit_file(clone.path(), "note.md", "# Note\n");
-        Command::new("git").arg("-C").arg(clone.path()).arg("push").arg("-q").arg("origin").arg("HEAD").status().unwrap();
+        Command::new("git")
+            .arg("-C")
+            .arg(clone.path())
+            .arg("push")
+            .arg("-q")
+            .arg("origin")
+            .arg("HEAD")
+            .status()
+            .unwrap();
 
         (remote, clone)
     }
@@ -747,10 +910,24 @@ mod tests {
     fn a_non_fast_forward_push_is_rejected_not_forced() {
         let (remote, clone_a) = bare_remote_with_clone();
         let clone_b = tempdir().unwrap();
-        Command::new("git").arg("clone").arg("-q").arg(remote.path()).arg(clone_b.path()).status().unwrap();
+        Command::new("git")
+            .arg("clone")
+            .arg("-q")
+            .arg(remote.path())
+            .arg(clone_b.path())
+            .status()
+            .unwrap();
 
         commit_file(clone_a.path(), "a.md", "from a\n");
-        Command::new("git").arg("-C").arg(clone_a.path()).arg("push").arg("-q").arg("origin").arg("HEAD").status().unwrap();
+        Command::new("git")
+            .arg("-C")
+            .arg(clone_a.path())
+            .arg("push")
+            .arg("-q")
+            .arg("origin")
+            .arg("HEAD")
+            .status()
+            .unwrap();
 
         commit_file(clone_b.path(), "b.md", "from b\n");
         let outcome = checked_push(&clone_b.path().to_string_lossy(), RepoMode::NotesOnly).unwrap();
@@ -771,10 +948,24 @@ mod tests {
     fn fast_forwards_when_purely_behind() {
         let (remote, clone_a) = bare_remote_with_clone();
         let clone_b = tempdir().unwrap();
-        Command::new("git").arg("clone").arg("-q").arg(remote.path()).arg(clone_b.path()).status().unwrap();
+        Command::new("git")
+            .arg("clone")
+            .arg("-q")
+            .arg(remote.path())
+            .arg(clone_b.path())
+            .status()
+            .unwrap();
 
         commit_file(clone_a.path(), "a.md", "from a\n");
-        Command::new("git").arg("-C").arg(clone_a.path()).arg("push").arg("-q").arg("origin").arg("HEAD").status().unwrap();
+        Command::new("git")
+            .arg("-C")
+            .arg(clone_a.path())
+            .arg("push")
+            .arg("-q")
+            .arg("origin")
+            .arg("HEAD")
+            .status()
+            .unwrap();
 
         let outcome = checked_pull(&clone_b.path().to_string_lossy()).unwrap();
 
@@ -795,15 +986,35 @@ mod tests {
     fn diverged_reports_counts_and_writes_no_conflict_marker() {
         let (remote, clone_a) = bare_remote_with_clone();
         let clone_b = tempdir().unwrap();
-        Command::new("git").arg("clone").arg("-q").arg(remote.path()).arg(clone_b.path()).status().unwrap();
+        Command::new("git")
+            .arg("clone")
+            .arg("-q")
+            .arg(remote.path())
+            .arg(clone_b.path())
+            .status()
+            .unwrap();
 
         commit_file(clone_a.path(), "a.md", "from a\n");
-        Command::new("git").arg("-C").arg(clone_a.path()).arg("push").arg("-q").arg("origin").arg("HEAD").status().unwrap();
+        Command::new("git")
+            .arg("-C")
+            .arg(clone_a.path())
+            .arg("push")
+            .arg("-q")
+            .arg("origin")
+            .arg("HEAD")
+            .status()
+            .unwrap();
         commit_file(clone_b.path(), "b.md", "from b, unpushed\n");
 
         let outcome = checked_pull(&clone_b.path().to_string_lossy()).unwrap();
 
-        assert_eq!(outcome, PullOutcome::Diverged { ahead: 1, behind: 1 });
+        assert_eq!(
+            outcome,
+            PullOutcome::Diverged {
+                ahead: 1,
+                behind: 1
+            }
+        );
         // The whole point of ff-only: a diverged pull must never touch any
         // file's content, so there is nothing to search for a marker in.
         assert!(!clone_b.path().join("a.md").exists());
@@ -826,7 +1037,10 @@ mod tests {
 
         let outcome = checked_init_notes_repo(&tmp.path().to_string_lossy(), false).unwrap();
 
-        assert!(matches!(outcome, RepoInitOutcome::InitializedLocalOnly { .. }));
+        assert!(matches!(
+            outcome,
+            RepoInitOutcome::InitializedLocalOnly { .. }
+        ));
         assert!(tmp.path().join(".git").is_dir());
         let gitignore = std::fs::read_to_string(tmp.path().join(".gitignore")).unwrap();
         assert_eq!(gitignore, NOTES_GITIGNORE);

@@ -16,18 +16,42 @@ fn build_menu(handle: &tauri::AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
         true,
         &[
             &MenuItem::with_id(handle, "new-note", "New Note", true, Some("CmdOrCtrl+N"))?,
-            &MenuItem::with_id(handle, "new-folder", "New Folder", true, Some("CmdOrCtrl+Shift+N"))?,
+            &MenuItem::with_id(
+                handle,
+                "new-folder",
+                "New Folder",
+                true,
+                Some("CmdOrCtrl+Shift+N"),
+            )?,
             &MenuItem::with_id(handle, "new-canvas", "New Canvas Note", true, None::<&str>)?,
             &PredefinedMenuItem::separator(handle)?,
-            &MenuItem::with_id(handle, "open-workspace", "Open Workspace…", true, Some("CmdOrCtrl+O"))?,
+            &MenuItem::with_id(
+                handle,
+                "open-workspace",
+                "Open Workspace…",
+                true,
+                Some("CmdOrCtrl+O"),
+            )?,
             // A menu item and nothing else: scaffolding is on request only, so
             // it must never be reachable by opening a workspace.
-            &MenuItem::with_id(handle, "scaffold-notes", "Scaffold Project Notes", true, None::<&str>)?,
+            &MenuItem::with_id(
+                handle,
+                "scaffold-notes",
+                "Scaffold Project Notes",
+                true,
+                None::<&str>,
+            )?,
             &PredefinedMenuItem::separator(handle)?,
             // On request only: a PDF import never does this on its own, because
             // "this document is an exercise sheet" is a claim about the
             // document that only the reader can make.
-            &MenuItem::with_id(handle, "split-tasks", "Split Into Tasks", true, None::<&str>)?,
+            &MenuItem::with_id(
+                handle,
+                "split-tasks",
+                "Split Into Tasks",
+                true,
+                None::<&str>,
+            )?,
             &PredefinedMenuItem::separator(handle)?,
             &MenuItem::with_id(handle, "export-pdf", "Export to PDF…", true, None::<&str>)?,
             &PredefinedMenuItem::separator(handle)?,
@@ -58,13 +82,49 @@ fn build_menu(handle: &tauri::AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
         true,
         &[
             &MenuItem::with_id(handle, "search", "Search", true, Some("CmdOrCtrl+K"))?,
-            &MenuItem::with_id(handle, "quick-switch", "Quick Switcher", true, Some("CmdOrCtrl+P"))?,
-            &MenuItem::with_id(handle, "toggle-view", "Toggle Source/Preview", true, Some("CmdOrCtrl+E"))?,
-            &MenuItem::with_id(handle, "insert-ink", "Insert Ink Block", true, Some("CmdOrCtrl+Shift+I"))?,
-            &MenuItem::with_id(handle, "graph-view", "Connections Graph", true, Some("CmdOrCtrl+G"))?,
-            &MenuItem::with_id(handle, "toggle-terminal", "Toggle Terminal", true, Some("CmdOrCtrl+`"))?,
+            &MenuItem::with_id(
+                handle,
+                "quick-switch",
+                "Quick Switcher",
+                true,
+                Some("CmdOrCtrl+P"),
+            )?,
+            &MenuItem::with_id(
+                handle,
+                "toggle-view",
+                "Toggle Source/Preview",
+                true,
+                Some("CmdOrCtrl+E"),
+            )?,
+            &MenuItem::with_id(
+                handle,
+                "insert-ink",
+                "Insert Ink Block",
+                true,
+                Some("CmdOrCtrl+Shift+I"),
+            )?,
+            &MenuItem::with_id(
+                handle,
+                "graph-view",
+                "Connections Graph",
+                true,
+                Some("CmdOrCtrl+G"),
+            )?,
+            &MenuItem::with_id(
+                handle,
+                "toggle-terminal",
+                "Toggle Terminal",
+                true,
+                Some("CmdOrCtrl+`"),
+            )?,
             &PredefinedMenuItem::separator(handle)?,
-            &MenuItem::with_id(handle, "shortcuts-help", "Keyboard Shortcuts", true, None::<&str>)?,
+            &MenuItem::with_id(
+                handle,
+                "shortcuts-help",
+                "Keyboard Shortcuts",
+                true,
+                None::<&str>,
+            )?,
         ],
     )?;
 
@@ -73,7 +133,8 @@ fn build_menu(handle: &tauri::AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let initial_workspace = commands::workspace::initial_workspace_from_args(std::env::args().skip(1));
+    let initial_workspace =
+        commands::workspace::initial_workspace_from_args(std::env::args().skip(1));
 
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
