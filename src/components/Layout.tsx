@@ -200,6 +200,15 @@ export function Layout() {
     return () => void unlisten.then((off) => off())
   }, [runCommand])
 
+  // WebDriver automates the WebView, not the native menu bar, so a
+  // menu-only action (this one, graph-view, toggle-terminal, …) has no path
+  // e2e can reach — which is exactly how the outline panel's freeze (P6-6
+  // postmortem, docs/ROADMAP.md) shipped with zero coverage. This is the
+  // same dispatcher a real menu click uses, just reachable from a test.
+  useEffect(() => {
+    ;(window as unknown as { __e2eRunCommand?: (id: string) => void }).__e2eRunCommand = runCommand
+  }, [runCommand])
+
   // `?` has no natural menu-accelerator form and is safe to double-fire
   // (opening an already-open overlay is a no-op), so it stays a plain
   // DOM listener rather than a menu item.
@@ -303,7 +312,7 @@ export function Layout() {
               </p>
             )}
             {!isLoading && activeTab && viewMode === 'wysiwyg' && outlineOpen && (
-              <OutlinePanel containerRef={editorPaneRef} scrollRef={scrollRef} />
+              <OutlinePanel content={content} containerRef={editorPaneRef} scrollRef={scrollRef} />
             )}
             {!isLoading && activeTab && currentNote && (
               <BacklinksPanel notePath={activeTab} noteTitle={currentNote.title} />

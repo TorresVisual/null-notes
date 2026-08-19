@@ -17,21 +17,23 @@ afterEach(() => {
 })
 
 describe('OutlinePanel', () => {
-  it('lists the headings found in the container, in document order', async () => {
-    const container = document.createElement('div')
-    container.innerHTML = '<h1>Intro</h1><p>text</p><h2>Details</h2>'
-
+  it('lists the headings parsed from the note content, in document order', () => {
     const { getByText } = render(
-      <OutlinePanel containerRef={ref(container)} scrollRef={ref(document.createElement('div'))} />,
+      <OutlinePanel
+        content={'# Intro\n\ntext\n\n## Details\n'}
+        containerRef={ref(document.createElement('div'))}
+        scrollRef={ref(document.createElement('div'))}
+      />,
     )
 
-    await waitFor(() => expect(getByText('Intro')).toBeInTheDocument())
+    expect(getByText('Intro')).toBeInTheDocument()
     expect(getByText('Details')).toBeInTheDocument()
   })
 
   it('shows an empty hint when the note has no headings', () => {
     const { getByText } = render(
       <OutlinePanel
+        content={'just some prose'}
         containerRef={ref(document.createElement('div'))}
         scrollRef={ref(document.createElement('div'))}
       />,
@@ -47,9 +49,12 @@ describe('OutlinePanel', () => {
     Element.prototype.scrollIntoView = scrollIntoView
 
     const { getByText } = render(
-      <OutlinePanel containerRef={ref(container)} scrollRef={ref(document.createElement('div'))} />,
+      <OutlinePanel
+        content={'# Intro\n\n## Details\n'}
+        containerRef={ref(container)}
+        scrollRef={ref(document.createElement('div'))}
+      />,
     )
-    await waitFor(() => expect(getByText('Details')).toBeInTheDocument())
 
     await userEvent.click(getByText('Details'))
 
@@ -61,8 +66,9 @@ describe('OutlinePanel', () => {
     container.innerHTML = '<h1>Intro</h1><h2>Details</h2>'
     const scroller = document.createElement('div')
 
-    const { getByText } = render(<OutlinePanel containerRef={ref(container)} scrollRef={ref(scroller)} />)
-    await waitFor(() => expect(getByText('Details')).toBeInTheDocument())
+    const { getByText } = render(
+      <OutlinePanel content={'# Intro\n\n## Details\n'} containerRef={ref(container)} scrollRef={ref(scroller)} />,
+    )
 
     const headingEls = Array.from(container.querySelectorAll('h1, h2')) as HTMLElement[]
     const h1 = headingEls[0]!
