@@ -34,6 +34,9 @@ src-tauri/target/
 # Scratch workspace used for manual QA of the app
 /notes/
 
+# e2e screenshots (visual verification output — regenerated per run)
+e2e/.artifacts/
+
 # Brainstorming visual companion mockups
 .superpowers/
 

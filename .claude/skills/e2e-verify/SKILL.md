@@ -1,6 +1,6 @@
 ---
 name: e2e-verify
-description: Use when asked to verify, test, or confirm that a new null-notes feature actually works end to end — driving the real compiled null-notes.exe with WebdriverIO, not just running unit tests or reading the code. Covers launching the app, writing a new spec, and known gotchas (native dialogs, the --workspace arg, click/type timing, save debounce).
+description: Use when asked to verify, test, or confirm that a new null-notes feature actually works end to end — driving the real compiled null-notes.exe with WebdriverIO, not just running unit tests or reading the code. Covers launching the app, writing a new spec, screenshotting and visually inspecting the result, and known gotchas (native dialogs, the --workspace arg, click/type timing, save debounce).
 ---
 
 # Verifying a null-notes feature end to end
@@ -12,6 +12,15 @@ actual compiled desktop app — the only way to verify anything that
 touches the real save path, file I/O, PDF import, or git, matching
 CLAUDE.md's "use the feature" guidance for changes `tauri dev` alone
 can't automate away.
+
+**Passing assertions are not the finish line.** DOM/disk assertions
+prove the right data landed in the right place; they cannot see a
+clipped label, an overlapping element, a wrong color, or an ugly
+wrap. A spec isn't done verifying a visual feature until it has
+screenshotted the result and put the PNG in front of the user to
+look at — see "Visual verification" below. Skipping that because the
+assertions passed defeats the point of driving the real app instead
+of a unit test.
 
 ## One-time setup
 
@@ -84,11 +93,44 @@ Two things that aren't obvious and cost real time to find:
    `SAVE_DEBOUNCE_MS` (600ms default, `src/hooks/useNote.ts`) and
    reindex debounces `REINDEX_DEBOUNCE_MS` (2500ms). Use
    `browser.waitUntil(...)` polling the expected on-disk state.
+8. **If the feature has any visible surface, screenshot it.** Import
+   `screenshot` from `../screenshot.js` and call it right after the
+   feature's on-screen state settles (after the same waits you'd use
+   for a DOM assertion — don't screenshot mid-animation or before a
+   waitUntil resolves):
+
+   ```ts
+   import { screenshot } from '../screenshot.js'
+   // ...
+   await screenshot('p6-theorem-callout')
+   ```
+
+   One screenshot per visually distinct state is enough — before/after
+   a toggle, or one per block type — not one per keystroke.
 
 ## Running
 
     npm run test:e2e                                        # whole suite
     npm run test:e2e -- --spec e2e/specs/<feature>.e2e.ts    # one spec
+
+## Visual verification
+
+DOM assertions can confirm a `.callout-theorem` element exists; they
+can't tell you its padding collapsed or its label overlaps the body
+text. That gap is why this section exists — a run isn't actually
+verified until a person has looked at the rendered result.
+
+`screenshot()` (`e2e/screenshot.ts`) saves PNGs to `e2e/.artifacts/`
+(gitignored — regenerated per run, not committed). After a run:
+
+    start e2e\.artifacts    # opens the folder in Explorer (PowerShell/cmd)
+
+Open the folder (or the individual PNGs) for the user to look at
+rather than reading the images into the conversation yourself — a
+screenshot is image tokens, and burning them by default on every run
+isn't the point when the user can just look at the file. Only `Read`
+a screenshot into the conversation if the user explicitly asks you to
+look at it or describe what's in it.
 
 ## Known gotchas
 

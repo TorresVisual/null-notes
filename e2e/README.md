@@ -23,6 +23,13 @@ Every spec shares one fixture workspace directory — see the comment in
 `mkdtemp`'d one per run — so a spec should clean up whatever files it
 expects to assert on at the start of its own test, not assume a blank slate.
 
+Specs covering anything with a visible surface should also call
+`screenshot()` (`screenshot.ts`) so a person can actually look at the
+result — DOM assertions can't catch a clipped label or a broken layout.
+Screenshots land in `e2e/.artifacts/` (gitignored); `start e2e\.artifacts`
+opens the folder after a run. See `.claude/skills/e2e-verify/SKILL.md`'s
+"Visual verification" section.
+
 `@wdio/tauri-service`'s official driver has occasional per-command timing
 flakiness in this environment unrelated to app behavior (see
 `mochaOpts.retries` in `wdio.conf.ts`). A test failing once and passing on
