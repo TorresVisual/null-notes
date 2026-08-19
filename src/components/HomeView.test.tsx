@@ -76,4 +76,37 @@ describe('HomeView', () => {
     expect(useWorkspaceStore.getState().openTabs).toContain('/ws/newer.md')
     expect(useWorkspaceStore.getState().activeTab).toBe('/ws/newer.md')
   })
+
+  it('shows an open-task count and preview list under Tasks, opening a note on click', async () => {
+    listOpenTasks.mockResolvedValue([
+      { notePath: '/ws/a.md', noteTitle: 'A', text: 'Finish proof', position: 0 },
+      { notePath: '/ws/b.md', noteTitle: 'B', text: 'Review notes', position: 3 },
+    ])
+
+    const { findByText, getByText } = render(<HomeView onOpenTaskView={() => {}} />)
+
+    expect(await findByText('2 open')).toBeInTheDocument()
+    expect(getByText('Finish proof')).toBeInTheDocument()
+
+    await userEvent.click(getByText('Finish proof'))
+    expect(useWorkspaceStore.getState().openTabs).toContain('/ws/a.md')
+  })
+
+  it('shows an empty hint under Tasks when there are none', async () => {
+    listOpenTasks.mockResolvedValue([])
+    const { findByText } = render(<HomeView onOpenTaskView={() => {}} />)
+    expect(await findByText('No open tasks.')).toBeInTheDocument()
+  })
+
+  it('opens the full task view from "View all"', async () => {
+    listOpenTasks.mockResolvedValue([
+      { notePath: '/ws/a.md', noteTitle: 'A', text: 'Finish proof', position: 0 },
+    ])
+    const onOpenTaskView = vi.fn()
+    const { findByText, getByText } = render(<HomeView onOpenTaskView={onOpenTaskView} />)
+
+    await findByText('Finish proof')
+    await userEvent.click(getByText('View all'))
+    expect(onOpenTaskView).toHaveBeenCalledOnce()
+  })
 })

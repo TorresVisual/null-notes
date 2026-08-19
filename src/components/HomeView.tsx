@@ -1,6 +1,8 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useWorkspaceStore } from '../store/workspace'
 import { useNotesStore } from '../store/notes'
+import { api } from '../lib/tauri'
+import type { OpenTask } from '../types'
 
 const SECTION_CAP = 5
 
@@ -26,6 +28,16 @@ export function HomeView({ onOpenTaskView }: HomeViewProps) {
     () => [...notes].sort((a, b) => b.updatedAt - a.updatedAt).slice(0, SECTION_CAP),
     [notes],
   )
+
+  const workspacePath = useWorkspaceStore((s) => s.path)
+  const [tasks, setTasks] = useState<OpenTask[]>([])
+
+  useEffect(() => {
+    if (!workspacePath) return
+    api.notes.listOpenTasks(workspacePath).then(setTasks)
+  }, [workspacePath])
+
+  const taskItems = tasks.slice(0, SECTION_CAP)
 
   return (
     <div className="home-view">
@@ -59,6 +71,28 @@ export function HomeView({ onOpenTaskView }: HomeViewProps) {
               </li>
             ))}
           </ul>
+        )}
+      </section>
+      <section className="home-section">
+        <h2>Tasks</h2>
+        {tasks.length === 0 ? (
+          <p className="home-empty">No open tasks.</p>
+        ) : (
+          <>
+            <p className="home-count">{tasks.length} open</p>
+            <ul>
+              {taskItems.map((task) => (
+                <li key={`${task.notePath}:${task.position}`}>
+                  <button className="home-section-item" onClick={() => openTab(task.notePath)}>
+                    {task.text}
+                  </button>
+                </li>
+              ))}
+            </ul>
+            <button className="home-view-all" onClick={onOpenTaskView}>
+              View all
+            </button>
+          </>
         )}
       </section>
     </div>
