@@ -15,6 +15,7 @@ import { ShortcutsOverlay } from './ShortcutsOverlay'
 import { TemplateDialog } from './TemplateDialog'
 import { GraphView } from './GraphView'
 import { TaskView } from './TaskView'
+import { HomeView } from './HomeView'
 import { FormulaSheetPrompt } from './FormulaSheetPrompt'
 import { TerminalPane } from './TerminalPane'
 import { useWorkspaceStore } from '../store/workspace'
@@ -39,6 +40,7 @@ type ViewMode = 'wysiwyg' | 'raw'
 
 export function Layout() {
   const activeTab = useWorkspaceStore((s) => s.activeTab)
+  const setActiveTab = useWorkspaceStore((s) => s.setActiveTab)
   const workspacePath = useWorkspaceStore((s) => s.path)
   const notes = useNotesStore((s) => s.notes)
   const currentNote = notes.find((n) => n.path === activeTab)
@@ -148,6 +150,9 @@ export function Layout() {
         case 'quick-switch':
           setSwitcherOpen(true)
           break
+        case 'home':
+          if (workspacePath) setActiveTab(null)
+          break
         case 'toggle-view':
           if (activeTab) setViewMode((m) => (m === 'wysiwyg' ? 'raw' : 'wysiwyg'))
           break
@@ -197,6 +202,7 @@ export function Layout() {
       activeTab,
       viewMode,
       workspacePath,
+      setActiveTab,
       createNote,
       createFolder,
       createCanvasNote,
@@ -319,9 +325,7 @@ export function Layout() {
               </p>
             )}
             {!activeTab && workspacePath && notes.length > 0 && (
-              <p className="empty-state">
-                Select a note, press Ctrl P to jump to one, or press ? for shortcuts
-              </p>
+              <HomeView onOpenTaskView={() => setTaskViewOpen(true)} />
             )}
             {!isLoading && activeTab && viewMode === 'wysiwyg' && outlineOpen && (
               <OutlinePanel content={content} containerRef={editorPaneRef} scrollRef={scrollRef} />

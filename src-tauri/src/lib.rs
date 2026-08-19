@@ -95,6 +95,8 @@ fn build_menu(handle: &tauri::AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
         "View",
         true,
         &[
+            &MenuItem::with_id(handle, "home", "Home", true, Some("CmdOrCtrl+H"))?,
+            &PredefinedMenuItem::separator(handle)?,
             &MenuItem::with_id(handle, "search", "Search", true, Some("CmdOrCtrl+K"))?,
             &MenuItem::with_id(
                 handle,

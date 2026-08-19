@@ -9,6 +9,7 @@ const SHORTCUTS: Array<{ keys: string; label: string }> = [
   { keys: 'Ctrl O', label: 'Open workspace' },
   { keys: 'Ctrl K', label: 'Search notes' },
   { keys: 'Ctrl P', label: 'Jump to a note by title' },
+  { keys: 'Ctrl H', label: 'Home' },
   { keys: 'Ctrl E', label: 'Toggle source / preview' },
   { keys: 'Ctrl Shift I', label: 'Insert ink block' },
   { keys: 'Ctrl G', label: 'Connections graph' },
