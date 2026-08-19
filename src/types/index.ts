@@ -87,3 +87,8 @@ export interface GraphTag {
   notePath: string
   tag: string
 }
+
+export interface TemplateMetadata {
+  name: string
+  path: string
+}

@@ -5,6 +5,7 @@ interface ShortcutsOverlayProps {
 const SHORTCUTS: Array<{ keys: string; label: string }> = [
   { keys: 'Ctrl N', label: 'New note' },
   { keys: 'Ctrl Shift N', label: 'New folder' },
+  { keys: 'Ctrl Shift T', label: 'New from template' },
   { keys: 'Ctrl O', label: 'Open workspace' },
   { keys: 'Ctrl K', label: 'Search notes' },
   { keys: 'Ctrl P', label: 'Jump to a note by title' },

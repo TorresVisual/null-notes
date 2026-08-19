@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { FilePlus, FolderPlus, PenLine, Search, Settings } from 'lucide-react'
+import { FilePlus, FolderPlus, LayoutTemplate, PenLine, Search, Settings } from 'lucide-react'
 import { useNotesStore } from '../store/notes'
 import { useWorkspaceStore } from '../store/workspace'
 import { useWorkspace } from '../hooks/useWorkspace'
@@ -18,9 +18,10 @@ import type { NoteMetadata } from '../types'
 interface SidebarProps {
   onSearchOpen: () => void
   onSettingsOpen: () => void
+  onTemplateOpen: () => void
 }
 
-export function Sidebar({ onSearchOpen, onSettingsOpen }: SidebarProps) {
+export function Sidebar({ onSearchOpen, onSettingsOpen, onTemplateOpen }: SidebarProps) {
   const notes = useNotesStore((s) => s.notes)
   const folders = useNotesStore((s) => s.folders)
   const workspacePath = useWorkspaceStore((s) => s.path)
@@ -76,6 +77,9 @@ export function Sidebar({ onSearchOpen, onSettingsOpen }: SidebarProps) {
         </button>
         <button onClick={() => void handleCreateCanvasNote()} disabled={!workspacePath}>
           <PenLine size={14} /> New Canvas
+        </button>
+        <button onClick={onTemplateOpen} disabled={!workspacePath}>
+          <LayoutTemplate size={14} /> New from Template
         </button>
       </div>
       <ImportButton />

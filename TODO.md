@@ -221,7 +221,7 @@ Two modes, different defaults — everything here follows from this:
 
 > **Finding, 2026-08-13, still worth knowing before diving in: a stream of editor work has no roadmap representation at all.** `BlockHandle`, `Divider`, `TextAlignment`, `Highlight`, `Kbd`, `HTMLBlock`, `HTMLInline`, `SpanStyle`, `Superscript`/`Subscript` and `NoteImage` all exist in `src/editor/extensions/` and correspond to no phase or task here. The Notion half of the app — which [ROADMAP.md](docs/ROADMAP.md) §1 now names as a pillar — is being built off-book, which suggests "STEM authoring" is only part of the real frame ("Notion parity" is the other part). **No longer a blocking rescope** (the step-5 wait it was tied to is superseded, ROADMAP.md §1 2026-08-17) — just a caveat to keep in mind while working through the boxes below, which are genuinely missing either way.
 >
-> Still genuinely unbuilt: templates (P6-3), equation snippets (P6-4), search refinement (P6-5), outline panel (P6-6), cross-references (P6-7).
+> Still genuinely unbuilt: equation snippets (P6-4), search refinement (P6-5), outline panel (P6-6), cross-references (P6-7).
 
 ### P6-1 Proof blocks + collapsible sections — **M** ✅
 - [x] Theorem / Lemma / Corollary / Proof / Definition / Example blocks, optional numbering + title
@@ -243,10 +243,12 @@ Two modes, different defaults — everything here follows from this:
 >
 > **Filed, not fixed — a separate, narrower bug surfaced while testing the fix above:** a `<strong>` (or presumably any mark) run that ends immediately adjacent to more plain text with **no space or line break between them**, inside a `Callout`'s `wrapBlock`-serialized body, round-trips with its closing `**` misplaced (`**Complexity**:X` instead of `**Complexity:**X`) — confirmed via raw JSON content, so it's in `wrapBlock`/`renderContent`'s interaction with prosemirror-markdown's own mark-boundary logic, not in the parser fixed above. Doesn't reproduce through the actual `/` insertion path (each slot's label and value are separate paragraphs), only through hand-typed Markdown with a mark glued straight onto trailing text. Single, narrow trigger condition — recorded rather than chased, same posture as the frozen PDF pipeline's filed-bugs list.
 
-### P6-3 Templates — **S/M**
-- [ ] `templates/` folder in the workspace; "New from template" in sidebar + File menu
-- [ ] Placeholder substitution — `{{date}}`, `{{title}}`, and any `{{name}}` the template uses, prompted at creation time; no logic beyond literal find-and-replace
-- [ ] Ship the P4-3 exercise-sheet layout as the first template
+### P6-3 Templates — **S/M** ✅
+- [x] `templates/` folder in the workspace; "New from template" in sidebar + File menu (`Ctrl Shift T`)
+- [x] Placeholder substitution — `{{date}}`, `{{title}}`, and any `{{name}}` the template uses, prompted at creation time; no logic beyond literal find-and-replace
+- [x] Ship the P4-3 exercise-sheet layout as the first template
+
+> `templates/` is excluded from the ordinary note scan (`is_excluded_dir`, same plumbing as `node_modules`/sidecars) — a template is authored to be filled in, not a note in its own right. The dialog always asks for a note title (needed for the filename regardless of what the template contains) plus one field per `{{name}}` the template actually uses, `{{date}}` pre-filled with today. Seeding the starter template is its own opt-in button in the empty state — nothing writes into `templates/` until asked, same posture as P7-3's project-notes scaffold. `create_note_from_template` writes the filled content verbatim rather than synthesizing a `# {title}` heading, so a template's own structure survives exactly as authored.
 
 ### P6-4 Equation snippets — **S**
 - [ ] `/gradient` → `\nabla f(x)` and friends, as one editable table

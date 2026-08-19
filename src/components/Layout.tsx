@@ -11,6 +11,7 @@ import { BacklinksPanel } from './BacklinksPanel'
 import { WorkspacePicker } from './WorkspacePicker'
 import { SettingsPanel } from './SettingsPanel'
 import { ShortcutsOverlay } from './ShortcutsOverlay'
+import { TemplateDialog } from './TemplateDialog'
 import { GraphView } from './GraphView'
 import { TerminalPane } from './TerminalPane'
 import { useWorkspaceStore } from '../store/workspace'
@@ -68,6 +69,7 @@ export function Layout() {
   const [switcherOpen, setSwitcherOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [shortcutsOpen, setShortcutsOpen] = useState(false)
+  const [templateDialogOpen, setTemplateDialogOpen] = useState(false)
   const [graphOpen, setGraphOpen] = useState(false)
   const [terminalMounted, setTerminalMounted] = useState(false)
   const [terminalOpen, setTerminalOpen] = useState(false)
@@ -114,6 +116,9 @@ export function Layout() {
           if (title) await createCanvasNote(title)
           break
         }
+        case 'new-from-template':
+          if (workspacePath) setTemplateDialogOpen(true)
+          break
         case 'open-workspace':
           await openWorkspace()
           break
@@ -224,8 +229,13 @@ export function Layout() {
       {switcherOpen && <QuickSwitcher onClose={() => setSwitcherOpen(false)} />}
       {settingsOpen && <SettingsPanel onClose={() => setSettingsOpen(false)} />}
       {shortcutsOpen && <ShortcutsOverlay onClose={() => setShortcutsOpen(false)} />}
+      {templateDialogOpen && <TemplateDialog onClose={() => setTemplateDialogOpen(false)} />}
       {graphOpen && <GraphView onClose={() => setGraphOpen(false)} />}
-      <Sidebar onSearchOpen={() => setSearchOpen(true)} onSettingsOpen={() => setSettingsOpen(true)} />
+      <Sidebar
+        onSearchOpen={() => setSearchOpen(true)}
+        onSettingsOpen={() => setSettingsOpen(true)}
+        onTemplateOpen={() => setTemplateDialogOpen(true)}
+      />
       <div className="main">
         <TabBar
           viewMode={viewMode}

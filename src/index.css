@@ -1671,6 +1671,27 @@ body {
   cursor: pointer;
 }
 
+/* New from Template (P6-3) — reuses .settings-panel for chrome and
+   .import-mode-option for the template list; these two are its own. */
+.template-empty-hint {
+  color: var(--text-tertiary);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.template-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.template-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-sm);
+  margin-top: var(--space-xs);
+}
+
 /* Pasted/dropped images, stored in the note's .assets sidecar */
 .note-image {
   display: inline-block;

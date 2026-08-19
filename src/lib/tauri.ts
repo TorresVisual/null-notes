@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core'
-import type { NoteMetadata, WorkspaceState, WorkspaceTree, SearchResult, AppSettings, GraphLink, GraphTag, RepoMode, CommitOutcome, PushOutcome, PullOutcome, RepoInitOutcome } from '../types'
+import type { NoteMetadata, WorkspaceState, WorkspaceTree, SearchResult, AppSettings, GraphLink, GraphTag, RepoMode, CommitOutcome, PushOutcome, PullOutcome, RepoInitOutcome, TemplateMetadata } from '../types'
 import type { PdfPage, PdfMarkdownImport } from '../pdf/types'
 
 export const api = {
@@ -50,6 +50,16 @@ export const api = {
       invoke<GraphLink[]>('graph_links', { workspace }),
     graphTags: (workspace: string) =>
       invoke<GraphTag[]>('graph_tags', { workspace }),
+  },
+  templates: {
+    list: (workspace: string) =>
+      invoke<TemplateMetadata[]>('list_templates', { workspace }),
+    read: (path: string) =>
+      invoke<string>('read_template', { path }),
+    seedDefaults: (workspace: string) =>
+      invoke<TemplateMetadata[]>('seed_default_templates', { workspace }),
+    createNote: (workspace: string, folder: string, title: string, content: string) =>
+      invoke<NoteMetadata>('create_note_from_template', { workspace, folder, title, content }),
   },
   window: {
     confirmClose: () => invoke<void>('confirm_close'),

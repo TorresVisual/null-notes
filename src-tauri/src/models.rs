@@ -10,6 +10,16 @@ pub struct NoteMetadata {
     pub updated_at: i64,
 }
 
+/// A `.md` file under a workspace's `templates/` folder (P6-3). `name` is the
+/// filename stem, not derived from the file's own heading — a template's
+/// first line is typically a placeholder like `{{course}}`, not a title.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TemplateMetadata {
+    pub name: String,
+    pub path: String,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 #[serde(rename_all = "camelCase")]
 pub struct SearchResult {

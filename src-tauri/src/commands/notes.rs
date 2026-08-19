@@ -126,10 +126,17 @@ const EXCLUDED_DIRS: [&str; 4] = ["node_modules", "target", "dist", "build"];
 /// place to file a note that nothing should ever file a note in.
 const SIDECAR_SUFFIXES: [&str; 3] = [".ink", ".pdf", ".assets"];
 
+/// The workspace folder templates live in (P6-3). Excluded from the ordinary
+/// scan for the same reason as the sidecar suffixes above: a template is
+/// authored to be filled in, not a note in its own right, so it has no
+/// business showing up in the tree or the search index.
+const TEMPLATES_DIR: &str = "templates";
+
 fn is_excluded_dir(name: &str) -> bool {
     name.starts_with('.')
         || SIDECAR_SUFFIXES.iter().any(|suffix| name.ends_with(suffix))
         || EXCLUDED_DIRS.contains(&name)
+        || name == TEMPLATES_DIR
 }
 
 async fn scan_dir_recursive(
@@ -644,6 +651,141 @@ pub async fn scaffold_project_notes(
         });
     }
     Ok(created)
+}
+
+/// P6-3's required first template: P4-3's own Task/Solution layout, so the
+/// feature ships with something usable in `templates/` rather than an empty
+/// folder and a promise. `{{course}}`/`{{sheet}}` are literal find-and-replace
+/// placeholders — no substitution engine beyond that, per the DoD.
+const EXERCISE_SHEET_TEMPLATE: &str = "# {{course}} — {{sheet}}\n\n## Task 1\n\n### Solution\n\n\n## Task 2\n\n### Solution\n\n\n## Task 3\n\n### Solution\n";
+
+const DEFAULT_TEMPLATES: [(&str, &str); 1] = [("Exercise Sheet", EXERCISE_SHEET_TEMPLATE)];
+
+fn template_metadata(name: &str, path: &Path) -> crate::models::TemplateMetadata {
+    crate::models::TemplateMetadata {
+        name: name.to_string(),
+        path: path.to_string_lossy().into_owned(),
+    }
+}
+
+/// Lists the `.md` files directly under `templates/`, flat — no recursion,
+/// no logic. A missing folder is an empty list, not an error: nothing has
+/// asked for the folder to exist yet.
+async fn list_templates_at(
+    workspace: &str,
+) -> anyhow::Result<Vec<crate::models::TemplateMetadata>> {
+    let dir = Path::new(workspace).join(TEMPLATES_DIR);
+    let mut entries = match tokio::fs::read_dir(&dir).await {
+        Ok(entries) => entries,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
+        Err(e) => return Err(e.into()),
+    };
+
+    let mut templates = Vec::new();
+    while let Some(entry) = entries.next_entry().await? {
+        let path = entry.path();
+        if path.extension().and_then(|e| e.to_str()) != Some("md") {
+            continue;
+        }
+        let name = path
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or("Untitled")
+            .to_string();
+        templates.push(template_metadata(&name, &path));
+    }
+    templates.sort_by(|a, b| a.name.cmp(&b.name));
+    Ok(templates)
+}
+
+/// Seeds `templates/` with whichever starter templates aren't already there.
+/// Never overwrites — same "top up, don't replace" rule as
+/// `scaffold_project_notes_at` — and runs only when the empty-state button
+/// asks for it, never on workspace open.
+async fn seed_default_templates_at(
+    workspace: &str,
+) -> anyhow::Result<Vec<crate::models::TemplateMetadata>> {
+    let dir = Path::new(workspace).join(TEMPLATES_DIR);
+    tokio::fs::create_dir_all(&dir).await?;
+
+    let mut created = Vec::new();
+    for (name, content) in DEFAULT_TEMPLATES {
+        let path = dir.join(note_filename(name));
+        if tokio::fs::try_exists(&path).await? {
+            continue;
+        }
+        write_atomic(&path, content).await?;
+        created.push(template_metadata(name, &path));
+    }
+    Ok(created)
+}
+
+// Same collision rule as `create_note_file`: refuse rather than silently
+// destroy an existing note. The only difference is the body comes from the
+// caller (a filled-in template) instead of a synthesized `# {title}` heading.
+async fn create_note_file_with_content(
+    folder: &str,
+    title: &str,
+    content: &str,
+) -> anyhow::Result<PathBuf> {
+    let filename = note_filename(title);
+    let path = Path::new(folder).join(&filename);
+    if tokio::fs::try_exists(&path).await? {
+        anyhow::bail!("a note named \"{filename}\" already exists here");
+    }
+    write_atomic(&path, content).await?;
+    Ok(path)
+}
+
+#[tauri::command]
+pub async fn list_templates(
+    workspace: String,
+) -> Result<Vec<crate::models::TemplateMetadata>, String> {
+    list_templates_at(&workspace)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn read_template(path: String) -> Result<String, String> {
+    tokio::fs::read_to_string(&path)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn seed_default_templates(
+    workspace: String,
+) -> Result<Vec<crate::models::TemplateMetadata>, String> {
+    seed_default_templates_at(&workspace)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn create_note_from_template(
+    workspace: String,
+    folder: String,
+    title: String,
+    content: String,
+    db: State<'_, DbPool>,
+) -> Result<NoteMetadata, String> {
+    let path = create_note_file_with_content(&folder, &title, &content)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let meta = NoteMetadata {
+        id: Uuid::new_v4().to_string(),
+        title: title.clone(),
+        path: path.to_string_lossy().into_owned(),
+        workspace,
+        updated_at: now_ms(),
+    };
+    index_note_at(&meta.path, &meta.workspace, &content, &db)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    Ok(meta)
 }
 
 async fn create_folder_at(parent: &str, name: &str) -> anyhow::Result<String> {
@@ -1267,6 +1409,101 @@ mod folder_tests {
         let again = scaffold_project_notes_at(&workspace).await.unwrap();
 
         assert!(again.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_list_templates_at_missing_folder_is_an_empty_list_not_an_error() {
+        let tmp = tempdir().unwrap();
+        let templates = list_templates_at(&tmp.path().to_string_lossy())
+            .await
+            .unwrap();
+        assert!(templates.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_list_templates_at_lists_only_markdown_files() {
+        let tmp = tempdir().unwrap();
+        let dir = tmp.path().join("templates");
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("Exercise Sheet.md"), "# {{course}}").unwrap();
+        std::fs::write(dir.join("notes.txt"), "not a template").unwrap();
+
+        let templates = list_templates_at(&tmp.path().to_string_lossy())
+            .await
+            .unwrap();
+
+        assert_eq!(templates.len(), 1);
+        assert_eq!(templates[0].name, "Exercise Sheet");
+    }
+
+    #[tokio::test]
+    async fn test_seed_default_templates_at_writes_the_exercise_sheet_template() {
+        let tmp = tempdir().unwrap();
+        let workspace = tmp.path().to_string_lossy().into_owned();
+
+        let created = seed_default_templates_at(&workspace).await.unwrap();
+
+        assert_eq!(created.len(), 1);
+        assert_eq!(created[0].name, "Exercise Sheet");
+        let content =
+            std::fs::read_to_string(tmp.path().join("templates/Exercise Sheet.md")).unwrap();
+        assert!(content.contains("{{course}}"));
+        assert!(content.contains("## Task 1"));
+    }
+
+    // Mirrors the scaffold-notes "top up, don't replace" guarantee: a template
+    // the user has since edited must survive re-running the seed command.
+    #[tokio::test]
+    async fn test_seed_default_templates_at_never_overwrites_an_edited_template() {
+        let tmp = tempdir().unwrap();
+        let workspace = tmp.path().to_string_lossy().into_owned();
+        seed_default_templates_at(&workspace).await.unwrap();
+        let path = tmp.path().join("templates/Exercise Sheet.md");
+        std::fs::write(&path, "# my own edits").unwrap();
+
+        let created = seed_default_templates_at(&workspace).await.unwrap();
+
+        assert!(created.is_empty());
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), "# my own edits");
+    }
+
+    #[tokio::test]
+    async fn test_create_note_file_with_content_writes_the_given_content_verbatim() {
+        let tmp = tempdir().unwrap();
+
+        let path = create_note_file_with_content(
+            &tmp.path().to_string_lossy(),
+            "Blatt 4",
+            "# Analysis — Blatt 4\n\n## Task 1\n",
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(path, tmp.path().join("Blatt 4.md"));
+        assert_eq!(
+            std::fs::read_to_string(&path).unwrap(),
+            "# Analysis — Blatt 4\n\n## Task 1\n"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_create_note_file_with_content_refuses_to_overwrite_an_existing_note() {
+        let tmp = tempdir().unwrap();
+        std::fs::write(tmp.path().join("Blatt 4.md"), "# real work").unwrap();
+
+        let result =
+            create_note_file_with_content(&tmp.path().to_string_lossy(), "Blatt 4", "# new").await;
+
+        assert!(result.is_err());
+        assert_eq!(
+            std::fs::read_to_string(tmp.path().join("Blatt 4.md")).unwrap(),
+            "# real work"
+        );
+    }
+
+    #[test]
+    fn test_templates_dir_is_not_scanned_as_notes() {
+        assert!(is_excluded_dir("templates"));
     }
 
     #[tokio::test]
