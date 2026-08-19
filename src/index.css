@@ -1570,6 +1570,28 @@ body {
   cursor: default;
 }
 
+/* Cross-references (P6-7) — "Theorem 3.2" in prose, resolved against a
+   numbered Callout block anywhere in the workspace. Same visual language
+   as .code-link: solid underline once resolved, dashed and inert until. */
+.cross-ref {
+  color: var(--accent);
+  border-bottom: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+  cursor: pointer;
+}
+
+.cross-ref-missing {
+  color: var(--text-tertiary);
+  border-bottom: 1px dashed var(--text-tertiary);
+  cursor: default;
+}
+
+/* Briefly marks the block a cross-reference jumped to. */
+.callout.cross-ref-target {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  transition: outline-color 1.2s ease;
+}
+
 /* "Open in IDE" (P7-2) — only ever rendered once the path resolves, so
    there is no disabled/missing variant to style here. */
 .note-editor pre { position: relative; }

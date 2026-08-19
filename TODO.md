@@ -266,12 +266,14 @@ Two modes, different defaults — everything here follows from this:
 >
 > The "rail" isn't literal — `BacklinksPanel` is an inline strip at the bottom of the note, not a persistent column — so `OutlinePanel` sits directly above it in the same flow rather than in a new column. Shown only via **Toggle Outline** (`Ctrl Shift O`), lifted to `Layout` state like `toggle-terminal`/`graph-view`. Headings come from a `MutationObserver` on `.editor-pane`'s own rendered DOM; the active heading tracks `getBoundingClientRect()` against `.editor-scroll` on every scroll event.
 
-### P6-7 Cross-references — **S** *(added 2026-08-18, from a review pass)*
-- [ ] Recognise `Theorem 3.2` (block-type keyword + its own number) in prose, resolved against P6-1's numbered blocks
-- [ ] `[[Theorem: name]]` continues to work unchanged — an ordinary wiki-link, just pointed at a block-bearing note
-- [ ] Clicking a resolved reference jumps to the block; an unresolvable one renders inert, same "prefer a miss" posture as P7-1/P1-1
+### P6-7 Cross-references — **S** *(added 2026-08-18, from a review pass)* ✅
+- [x] Recognise `Theorem 3.2` (block-type keyword + its own number) in prose, resolved against P6-1's numbered blocks
+- [x] `[[Theorem: name]]` continues to work unchanged — an ordinary wiki-link, just pointed at a block-bearing note
+- [x] Clicking a resolved reference jumps to the block; an unresolvable one renders inert, same "prefer a miss" posture as P7-1/P1-1
 
 > **Dependency:** P6-1 (block numbering is the referent).
+>
+> Built as `CodeLink`'s structural cousin: `src/lib/crossRefs.ts` recognises the seven numbered `calloutType` keywords + a dotted number; `CrossRef.ts` decorates and resolves them batched-and-cached, exactly like P7-1. Resolution reuses the FTS index rather than a new one — `db::notes::marker_like_pattern`/`note_containing_marker` LIKE-match a callout's own serialized `> [!TYPE NUMBER]` marker against `notes_fts`'s stored body, escaping `%`/`_` so a number containing `_` can't act as a wildcard. Jumping to the exact block needed `Callout.tsx`'s node view to actually carry `data-callout-type`/`data-callout-number` on its DOM, which it never had — the schema's own `renderHTML` attribute mapping is bypassed once a node view takes over.
 
 ### P6-5 Search refinement — **S**
 - [ ] Filter results by folder and by tag, without leaving the keyboard

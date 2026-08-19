@@ -206,6 +206,42 @@ pub async fn notes_with_tag(
     Ok(rows)
 }
 
+/// The LIKE pattern for a numbered callout's own serialized marker line (see
+/// `Callout.tsx`: `> [!TYPE NUMBER]`). Used by P6-7's cross-references to
+/// find which note defines a given `Theorem 3.2`-style reference — a plain
+/// substring match against `notes_fts`'s own stored body is simpler and more
+/// robust here than an FTS5 `MATCH` query, whose tokenizer would mangle a
+/// marker built from brackets and punctuation.
+pub fn marker_like_pattern(callout_type: &str, number: &str) -> String {
+    format!(
+        "%[!{} {}]%",
+        escape_like(&callout_type.to_uppercase()),
+        escape_like(number)
+    )
+}
+
+/// The path of a note in `workspace` whose raw content matches
+/// `like_pattern` (built by [`marker_like_pattern`]), or `None` if no note
+/// defines it.
+pub async fn note_containing_marker(
+    pool: &SqlitePool,
+    workspace: &str,
+    like_pattern: &str,
+) -> Result<Option<String>> {
+    let row: Option<(String,)> = sqlx::query_as(
+        "SELECT n.path
+         FROM notes n
+         JOIN notes_fts f ON f.path = n.path
+         WHERE n.workspace = ? AND f.body LIKE ? ESCAPE '\\'
+         LIMIT 1",
+    )
+    .bind(workspace)
+    .bind(like_pattern)
+    .fetch_optional(pool)
+    .await?;
+    Ok(row.map(|(p,)| p))
+}
+
 pub async fn backlinks_for(
     pool: &SqlitePool,
     workspace: &str,
@@ -483,6 +519,75 @@ mod tests {
 
         let backlinks = backlinks_for(&pool, "/ws", "Big O Notation").await.unwrap();
         assert_eq!(backlinks.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_note_containing_marker_finds_the_defining_note() {
+        let pool = make_pool().await;
+        index_note(&pool, &note("a", "Analysis", "/ws/a.md", "/ws"))
+            .await
+            .unwrap();
+        index_note_content(
+            &pool,
+            "/ws/a.md",
+            "Analysis",
+            "prose\n\n> [!THEOREM 3.2] Squeeze Theorem\n> body\n",
+        )
+        .await
+        .unwrap();
+
+        let pattern = marker_like_pattern("theorem", "3.2");
+        let found = note_containing_marker(&pool, "/ws", &pattern)
+            .await
+            .unwrap();
+
+        assert_eq!(found, Some("/ws/a.md".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_note_containing_marker_is_none_when_no_note_defines_it() {
+        let pool = make_pool().await;
+        index_note(&pool, &note("a", "Analysis", "/ws/a.md", "/ws"))
+            .await
+            .unwrap();
+        index_note_content(&pool, "/ws/a.md", "Analysis", "> [!THEOREM 3.2]\n> body\n")
+            .await
+            .unwrap();
+
+        let pattern = marker_like_pattern("theorem", "9.9");
+        let found = note_containing_marker(&pool, "/ws", &pattern)
+            .await
+            .unwrap();
+
+        assert_eq!(found, None);
+    }
+
+    // The marker's own number can contain characters LIKE treats as
+    // wildcards (`_` in particular, common in a numbering scheme); those must
+    // match literally, not as a wildcard that would resolve to the wrong
+    // block or silently match too broadly.
+    #[tokio::test]
+    async fn test_note_containing_marker_escapes_like_wildcards_in_the_number() {
+        let pool = make_pool().await;
+        index_note(&pool, &note("a", "A", "/ws/a.md", "/ws"))
+            .await
+            .unwrap();
+        index_note_content(&pool, "/ws/a.md", "A", "> [!LEMMA 3x2]\n> body\n")
+            .await
+            .unwrap();
+        index_note(&pool, &note("b", "B", "/ws/b.md", "/ws"))
+            .await
+            .unwrap();
+        index_note_content(&pool, "/ws/b.md", "B", "> [!LEMMA 3_2]\n> body\n")
+            .await
+            .unwrap();
+
+        let pattern = marker_like_pattern("lemma", "3_2");
+        let found = note_containing_marker(&pool, "/ws", &pattern)
+            .await
+            .unwrap();
+
+        assert_eq!(found, Some("/ws/b.md".to_string()));
     }
 
     #[tokio::test]

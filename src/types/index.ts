@@ -92,3 +92,8 @@ export interface TemplateMetadata {
   name: string
   path: string
 }
+
+export interface CrossRefTarget {
+  calloutType: string
+  number: string
+}

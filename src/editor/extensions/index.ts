@@ -22,6 +22,7 @@ import { Callout } from './Callout'
 import { WikiLink } from './WikiLink'
 import { CodeLink } from './CodeLink'
 import { CodeBlockOpenInIde } from './CodeBlockOpenInIde'
+import { CrossRef } from './CrossRef'
 import { Tag } from './Tag'
 import { NoteContext } from './NoteContext'
 import { SlashCommands } from './SlashCommands'
@@ -157,6 +158,7 @@ export const coreExtensions = [
   Tag,
   CodeLink,
   CodeBlockOpenInIde,
+  CrossRef,
   NoteContext,
   SlashCommands,
   // Typography marks

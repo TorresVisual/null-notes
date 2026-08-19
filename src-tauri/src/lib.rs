@@ -205,6 +205,7 @@ pub fn run() {
             commands::notes::create_note_from_template,
             commands::editor_launch::open_in_editor,
             commands::editor_launch::resolve_code_links,
+            commands::crossref::resolve_cross_refs,
             commands::git::detect_repo,
             commands::git::auto_commit,
             commands::git::push_notes,

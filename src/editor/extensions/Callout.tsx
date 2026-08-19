@@ -78,7 +78,11 @@ function CalloutView({ node }: ReactNodeViewProps) {
   const Icon = CALLOUT_ICON[calloutType] ?? Info
   const label = CALLOUT_LABEL[calloutType] ?? calloutType.toUpperCase()
   return (
-    <NodeViewWrapper className={`callout callout-${calloutType}`}>
+    <NodeViewWrapper
+      className={`callout callout-${calloutType}`}
+      data-callout-type={calloutType}
+      data-callout-number={number}
+    >
       <div className="callout-header" contentEditable={false}>
         <Icon size={13} />
         <span className="callout-label">{number ? `${label} ${number}` : label}</span>
