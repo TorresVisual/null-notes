@@ -11,6 +11,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:ui": "vitest --ui",
+    "test:coverage": "vitest run --coverage",
     "pretest:e2e": "npm run tauri build -- --debug",
     "test:e2e": "wdio run e2e/wdio.conf.ts"
   },
@@ -62,6 +63,7 @@
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",
     "@vitejs/plugin-react": "^4.6.0",
+    "@vitest/coverage-v8": "^4.1.11",
     "@vitest/ui": "^4.1.9",
     "@wdio/cli": "^9.31.1",
     "@wdio/globals": "^9.31.1",

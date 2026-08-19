@@ -62,6 +62,7 @@ Use `tokio` for all async. Long-running operations (OCR, PDF render) run in `tok
 - Derive `Debug` on all structs
 - Keep Tauri commands thin: parse input, delegate to a domain module, return result
 - Run `cargo clippy -- -D warnings` before committing — no clippy warnings allowed
+- Run `cargo fmt --check` before committing — no unformatted diffs allowed (`cargo fmt` to apply)
 
 ---
 
@@ -234,13 +235,16 @@ Key handling that must run *before* the keymap plugins (and so before StarterKit
 cargo build                  # build Tauri backend
 cargo test                   # run Rust tests
 cargo clippy -- -D warnings  # lint (must pass clean)
+cargo fmt --check            # formatting gate (must pass clean); cargo fmt to apply
 cargo audit                  # scan Rust deps for known vulnerabilities (from src-tauri/)
+cargo llvm-cov --summary-only  # coverage report (from src-tauri/); no enforced threshold
 
 # Frontend
 npm run dev                  # Vite dev server
 npm run build                # production build
 npm run typecheck            # tsc --noEmit
 npm test                     # vitest run
+npm run test:coverage        # vitest run --coverage; no enforced threshold
 npm audit                    # scan npm deps for known vulnerabilities
 
 # Full app
