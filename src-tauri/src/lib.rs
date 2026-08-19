@@ -3,6 +3,7 @@ pub mod db;
 pub mod exercises;
 pub mod models;
 pub mod pdf;
+pub mod sm2;
 
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem, Submenu};
 use tauri::{Emitter, Manager};
