@@ -35,6 +35,12 @@ pub struct WorkspaceState {
     pub active_tab: Option<String>,
     #[serde(default)]
     pub expanded_folders: Vec<String>,
+    /// P6-5: the search box's own recent-queries list, capped and
+    /// most-recent-first. Persisted here rather than a new file, the same
+    /// choice already made for `open_tabs`/`expanded_folders` — this is
+    /// UI state a rebuild of `index.db` has no bearing on.
+    #[serde(default)]
+    pub recent_searches: Vec<String>,
     // Machine-local: whether this machine should auto-commit here at all (P5).
     // Lives on `WorkspaceState` because `.workspace.json` is already the one
     // workspace-folder file P3-4 gitignores — the exact "per-workspace but

@@ -3,6 +3,7 @@ import { Search } from 'lucide-react'
 import type { SearchResult } from '../types'
 import { api } from '../lib/tauri'
 import { useWorkspaceStore } from '../store/workspace'
+import { parseSearchQuery } from '../lib/searchQuery'
 
 interface SearchModalProps {
   onClose: () => void
@@ -13,29 +14,43 @@ export function SearchModal({ onClose }: SearchModalProps) {
   const [results, setResults] = useState<SearchResult[]>([])
   const [selected, setSelected] = useState(0)
   const inputRef = useRef<HTMLInputElement>(null)
+  const workspacePath = useWorkspaceStore((s) => s.path)
   const openTab = useWorkspaceStore((s) => s.openTab)
+  const recentSearches = useWorkspaceStore((s) => s.recentSearches)
+  const addRecentSearch = useWorkspaceStore((s) => s.addRecentSearch)
 
   useEffect(() => {
     inputRef.current?.focus()
   }, [])
 
   useEffect(() => {
-    if (!query.trim()) {
+    if (!workspacePath) return
+    const { text, folder, tag, type } = parseSearchQuery(query)
+    if (!text && !folder && !tag && !type) {
       setResults([])
       return
     }
     const timer = setTimeout(() => {
-      api.notes.search(query).then((res) => {
-        setResults(res)
-        setSelected(0)
-      }).catch(() => setResults([]))
+      api.notes
+        .search(workspacePath, text, folder, tag, type)
+        .then((res) => {
+          setResults(res)
+          setSelected(0)
+        })
+        .catch(() => setResults([]))
     }, 150)
     return () => clearTimeout(timer)
-  }, [query])
+  }, [query, workspacePath])
 
   function open(path: string) {
+    addRecentSearch(query)
     openTab(path)
     onClose()
+  }
+
+  function runRecentSearch(q: string) {
+    setQuery(q)
+    inputRef.current?.focus()
   }
 
   function handleKeyDown(e: React.KeyboardEvent) {
@@ -66,11 +81,22 @@ export function SearchModal({ onClose }: SearchModalProps) {
             ref={inputRef}
             className="search-modal-input"
             type="text"
-            placeholder="Search notes…"
+            placeholder="Search notes… (try folder:, tag:, or type:)"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
         </div>
+        {query.trim() === '' && recentSearches.length > 0 && (
+          <ul className="search-recent">
+            {recentSearches.map((q) => (
+              <li key={q}>
+                <button className="search-recent-item" onClick={() => runRecentSearch(q)}>
+                  {q}
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
         {results.length > 0 && (
           <ul className="search-results" role="listbox">
             {results.map((r, i) => (

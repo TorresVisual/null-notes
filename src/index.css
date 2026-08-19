@@ -984,6 +984,28 @@ body {
   color: var(--text-tertiary);
 }
 
+/* Recent searches (P6-5) — shown in place of results while the box is
+   empty; a click re-runs it exactly like typing it in would. */
+.search-recent {
+  list-style: none;
+  padding: 6px 0;
+}
+
+.search-recent-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 7px 18px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-family: inherit;
+}
+
+.search-recent-item:hover { background: var(--bg-hover); color: var(--text-primary); }
+
 /* Workspace picker (shown until a workspace is open) */
 .workspace-picker {
   max-width: 420px;

@@ -129,18 +129,64 @@ pub async fn remove_from_fts(pool: &SqlitePool, path: &str) -> Result<()> {
     Ok(())
 }
 
-pub async fn search_notes(pool: &SqlitePool, fts_query: &str) -> Result<Vec<SearchResult>> {
-    let rows = sqlx::query_as::<_, SearchResult>(
-        "SELECT path, title,
-                snippet(notes_fts, 2, '[[', ']]', '\u{2026}', 20) as snippet
-         FROM notes_fts
-         WHERE notes_fts MATCH ?
-         ORDER BY rank
-         LIMIT 20",
-    )
-    .bind(fts_query)
-    .fetch_all(pool)
-    .await?;
+/// P6-5's scoping: `folder:`/`tag:`/`type:` narrow a search without leaving
+/// the keyboard, on top of (or instead of) an ordinary free-text query.
+/// Always scoped to `workspace` — search previously reached across every
+/// workspace this app's shared `index.db` has ever indexed, which a folder
+/// or tag filter would otherwise silently inherit.
+///
+/// Built as one dynamic SQL string rather than `? IS NULL OR …` placeholders
+/// throughout: `rank` is only a meaningful ORDER BY when a `MATCH` clause is
+/// actually present, and a fixed query can't conditionally drop a JOIN.
+pub async fn search_notes(
+    pool: &SqlitePool,
+    workspace: &str,
+    fts_query: Option<&str>,
+    folder: Option<&str>,
+    tag: Option<&str>,
+    block_type: Option<&str>,
+) -> Result<Vec<SearchResult>> {
+    let mut sql = String::from(
+        "SELECT notes_fts.path, notes_fts.title, \
+         snippet(notes_fts, 2, '[[', ']]', '\u{2026}', 20) as snippet \
+         FROM notes_fts JOIN notes n ON n.path = notes_fts.path",
+    );
+    if tag.is_some() {
+        sql.push_str(
+            " JOIN note_tags nt ON nt.note_path = notes_fts.path AND nt.tag = ? COLLATE NOCASE",
+        );
+    }
+    sql.push_str(" WHERE n.workspace = ?");
+    if fts_query.is_some() {
+        sql.push_str(" AND notes_fts MATCH ?");
+    }
+    if folder.is_some() {
+        sql.push_str(" AND n.path LIKE ? ESCAPE '\\'");
+    }
+    if block_type.is_some() {
+        sql.push_str(" AND notes_fts.body LIKE ? ESCAPE '\\'");
+    }
+    sql.push_str(if fts_query.is_some() {
+        " ORDER BY rank LIMIT 20"
+    } else {
+        " ORDER BY n.updated_at DESC LIMIT 20"
+    });
+
+    let mut q = sqlx::query_as::<_, SearchResult>(&sql);
+    if let Some(tag) = tag {
+        q = q.bind(tag.to_string());
+    }
+    q = q.bind(workspace.to_string());
+    if let Some(fts_query) = fts_query {
+        q = q.bind(fts_query.to_string());
+    }
+    if let Some(folder) = folder {
+        q = q.bind(format!("%{}%", escape_like(folder)));
+    }
+    if let Some(block_type) = block_type {
+        q = q.bind(format!("%[!{}%", escape_like(&block_type.to_uppercase())));
+    }
+    let rows = q.fetch_all(pool).await?;
     Ok(rows)
 }
 
@@ -362,6 +408,111 @@ mod tests {
         remove_note(&pool, "/ws/b.md").await.unwrap();
         let notes = list_by_workspace(&pool, "/ws").await.unwrap();
         assert_eq!(notes.len(), 0);
+    }
+
+    async fn seed_search_fixture(pool: &SqlitePool) {
+        index_note(pool, &note("a", "Analysis", "/ws/CS101/a.md", "/ws"))
+            .await
+            .unwrap();
+        index_note_content(
+            pool,
+            "/ws/CS101/a.md",
+            "Analysis",
+            "shortest paths\n\n> [!THEOREM 3.2] Squeeze Theorem\n> body\n",
+        )
+        .await
+        .unwrap();
+        set_tags(pool, "/ws/CS101/a.md", &["graphs".to_string()])
+            .await
+            .unwrap();
+
+        index_note(pool, &note("b", "Networks", "/ws/CS102/b.md", "/ws"))
+            .await
+            .unwrap();
+        index_note_content(pool, "/ws/CS102/b.md", "Networks", "routing tables")
+            .await
+            .unwrap();
+
+        // A note with the same title/body shape, indexed under a different
+        // workspace — the property every filter below has to respect, since
+        // this app's index.db is shared across every workspace ever opened.
+        index_note(pool, &note("c", "Analysis", "/other/c.md", "/other"))
+            .await
+            .unwrap();
+        index_note_content(pool, "/other/c.md", "Analysis", "shortest paths")
+            .await
+            .unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_search_notes_is_scoped_to_the_given_workspace() {
+        let pool = make_pool().await;
+        seed_search_fixture(&pool).await;
+
+        let hits = search_notes(&pool, "/ws", Some("\"shortest\"*"), None, None, None)
+            .await
+            .unwrap();
+
+        assert_eq!(hits.len(), 1);
+        assert_eq!(hits[0].path, "/ws/CS101/a.md");
+    }
+
+    #[tokio::test]
+    async fn test_search_notes_filters_by_folder() {
+        let pool = make_pool().await;
+        seed_search_fixture(&pool).await;
+
+        let hits = search_notes(&pool, "/ws", None, Some("CS102"), None, None)
+            .await
+            .unwrap();
+
+        assert_eq!(hits.len(), 1);
+        assert_eq!(hits[0].path, "/ws/CS102/b.md");
+    }
+
+    #[tokio::test]
+    async fn test_search_notes_filters_by_tag() {
+        let pool = make_pool().await;
+        seed_search_fixture(&pool).await;
+
+        let hits = search_notes(&pool, "/ws", None, None, Some("graphs"), None)
+            .await
+            .unwrap();
+
+        assert_eq!(hits.len(), 1);
+        assert_eq!(hits[0].path, "/ws/CS101/a.md");
+    }
+
+    #[tokio::test]
+    async fn test_search_notes_filters_by_block_type() {
+        let pool = make_pool().await;
+        seed_search_fixture(&pool).await;
+
+        let hits = search_notes(&pool, "/ws", None, None, None, Some("theorem"))
+            .await
+            .unwrap();
+
+        assert_eq!(hits.len(), 1);
+        assert_eq!(hits[0].path, "/ws/CS101/a.md");
+    }
+
+    #[tokio::test]
+    async fn test_search_notes_combines_text_and_filters() {
+        let pool = make_pool().await;
+        seed_search_fixture(&pool).await;
+
+        let hits = search_notes(
+            &pool,
+            "/ws",
+            Some("\"routing\"*"),
+            Some("CS101"),
+            None,
+            None,
+        )
+        .await
+        .unwrap();
+
+        assert!(hits.is_empty(), "routing text only appears outside CS101");
     }
 
     #[tokio::test]

@@ -33,6 +33,7 @@ export interface WorkspaceState {
   openTabs: string[]
   activeTab: string | null
   expandedFolders: string[]
+  recentSearches: string[]
   git: GitWorkspaceConfig
 }
 

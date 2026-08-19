@@ -2,6 +2,10 @@ import { create } from 'zustand'
 import { isUnderPath, replacePathPrefix } from '../lib/pathPrefix'
 import type { GitWorkspaceConfig, RepoMode, GitCommitStatus } from '../types'
 
+// Matches P1-2's recent-workspaces cap — a "recent list" this long is
+// already more than a keyboard-driven picker needs to scroll through.
+const RECENT_SEARCHES_CAP = 8
+
 const DEFAULT_GIT_CONFIG: GitWorkspaceConfig = {
   prompted: false,
   autoCommit: false,
@@ -40,6 +44,12 @@ interface WorkspaceStore {
   setTagFilter: (tag: string | null) => void
   recentWorkspaces: string[]
   setRecentWorkspaces: (paths: string[]) => void
+  // P6-5: the search box's own recent-queries list, persisted per workspace
+  // via WorkspaceState (same checkpoints as openTabs/expandedFolders — no
+  // separate save path).
+  recentSearches: string[]
+  setRecentSearches: (queries: string[]) => void
+  addRecentSearch: (query: string) => void
   resetForNewWorkspace: () => void
   // P5-1: which Git mode the open workspace is in (re-detected on every
   // open, never persisted — it's a fact about the disk, not a preference),
@@ -70,6 +80,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   folderError: null,
   tagFilter: null,
   recentWorkspaces: [],
+  recentSearches: [],
   repoMode: null,
   git: DEFAULT_GIT_CONFIG,
   gitPendingPaths: [],
@@ -130,6 +141,14 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   setFolderError: (message) => set({ folderError: message }),
   setTagFilter: (tag) => set({ tagFilter: tag }),
   setRecentWorkspaces: (paths) => set({ recentWorkspaces: paths }),
+  setRecentSearches: (queries) => set({ recentSearches: queries }),
+  addRecentSearch: (query) => {
+    const trimmed = query.trim()
+    if (!trimmed) return
+    const { recentSearches } = get()
+    const deduped = recentSearches.filter((q) => q !== trimmed)
+    set({ recentSearches: [trimmed, ...deduped].slice(0, RECENT_SEARCHES_CAP) })
+  },
   setRepoMode: (mode) => set({ repoMode: mode }),
   setGit: (git) => set({ git }),
 
@@ -151,6 +170,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
       folderContextMenu: null,
       folderError: null,
       tagFilter: null,
+      recentSearches: [],
       repoMode: null,
       git: DEFAULT_GIT_CONFIG,
       gitPendingPaths: [],

@@ -22,8 +22,13 @@ export const api = {
       invoke<NoteMetadata>('rename_note', { path, newTitle, workspace }),
     delete: (path: string) =>
       invoke<void>('delete_note', { path }),
-    search: (query: string) =>
-      invoke<SearchResult[]>('search_notes', { query }),
+    search: (
+      workspace: string,
+      query: string,
+      folder: string | null,
+      tag: string | null,
+      blockType: string | null,
+    ) => invoke<SearchResult[]>('search_notes', { workspace, query, folder, tag, blockType }),
     listTags: (workspace: string) =>
       invoke<string[]>('list_tags', { workspace }),
     notesWithTag: (workspace: string, tag: string) =>

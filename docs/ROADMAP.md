@@ -1,6 +1,8 @@
 # null-notes — Product & Technical Roadmap
 
-**Last updated:** 2026-08-19 (**P6-7 done — cross-references.** `Theorem 3.2` in prose is now clickable, resolving against a numbered `Callout` block anywhere in the workspace — a `LIKE` match against the FTS index's own stored body (`db::notes::marker_like_pattern`), not a new index. Built as a close structural cousin of P7-1's `CodeLink`: decoration not node, batched-and-cached resolution, unresolved renders inert. Closing the loop needed one gap fixed in `Callout.tsx` — its node view never put `data-callout-type`/`data-callout-number` on the live DOM, so there was nothing for a click handler to find. Six of P6's seven tasks done; only P6-5 remains.)
+**Last updated:** 2026-08-19 (**P6-5 done — search refinement, closing M6.** `folder:`/`tag:`/`type:` narrow a search inline, composing freely with free text and each other; recent searches persist per workspace through the same `WorkspaceState` channel as open tabs. `task:` is the one named extension left out — P9-1's `note_tasks` table doesn't exist yet. Implementing the filters correctly surfaced and fixed a real pre-existing gap: `search_notes` had never scoped to a workspace, so a search could silently return a hit from a different workspace sharing the same `index.db`. **All seven of P6's tasks are done — M6 reached.**)
+
+*Same day, earlier: **P6-7 done — cross-references.** `Theorem 3.2` in prose is now clickable, resolving against a numbered `Callout` block anywhere in the workspace — a `LIKE` match against the FTS index's own stored body (`db::notes::marker_like_pattern`), not a new index. Built as a close structural cousin of P7-1's `CodeLink`: decoration not node, batched-and-cached resolution, unresolved renders inert. Closing the loop needed one gap fixed in `Callout.tsx` — its node view never put `data-callout-type`/`data-callout-number` on the live DOM, so there was nothing for a click handler to find. Six of P6's seven tasks done; only P6-5 remained.*
 
 *Same day, earlier: **P6-6 done — the outline panel.** Headings collected live off ProseMirror's own rendered DOM via a `MutationObserver`, no lifted editor instance and no backend work, per the task's own note. The "share the rail with `BacklinksPanel`" instruction turned out to describe a rail that doesn't exist yet — `BacklinksPanel` is an inline strip, not a persistent column — so `OutlinePanel` sits directly above it in the same flow instead, shown only via **Toggle Outline** (`Ctrl Shift O`). Five of P6's seven tasks done; P6-5 and P6-7 remained.*
 
@@ -167,7 +169,7 @@ Given "personal daily driver," priority = `(daily-use value) × (risk of data lo
 | **P3** | Headline features & power tools | **M3:** the CS-specific superpowers land | ✅ | PDF-as-reference, export, graph |
 | **P4** | PDF→Markdown & exercise sheets | **M4:** an exercise sheet becomes a workable note in one step | ✅ | The brief's own flagship; the biggest single time-saver |
 | **P5** | Versioned workspaces (Git automation) | **M5:** my notes commit themselves, in both kinds of repo | ✅ | The next tier of P0's data safety — a commit is a recoverable backup |
-| **P6** | STEM authoring | **M6:** writing maths/algorithms is faster here than anywhere else |  | Compounds on every note; cheap, since the infra exists |
+| **P6** | STEM authoring | **M6:** writing maths/algorithms is faster here than anywhere else | ✅ | Compounds on every note; cheap, since the infra exists |
 | **P7** | IDE integration | **M7:** notes and code are one workflow, not two | ✅ | The brief's second pillar — "integrate, don't replace" |
 | **P8** | Embedded terminal | **M8:** `claude` runs against the open note without leaving the app | ✅ | Small effort; delivers the brief's AI ask without AI code |
 | **P9** | Study & revision | **M9:** the app helps me *revise*, not just capture |  | The only phase not derived from the brief — see below |
@@ -624,9 +626,9 @@ The laptop→desktop case, and **the most dangerous task on the roadmap** — a 
 
 ---
 
-## Phase 6 — STEM Authoring (P6)
+## Phase 6 — STEM Authoring (P6) ✅
 
-**Milestone M6:** *Writing maths, proofs and algorithms is faster in this app than in any general note app.*
+**Milestone M6 reached (2026-08-19):** *Writing maths, proofs and algorithms is faster in this app than in any general note app.* All seven tasks done: theorem/proof/algorithm blocks and collapsible sections (P6-1, P6-2), templates (P6-3), equation snippets (P6-4), the outline panel (P6-6), cross-references (P6-7), and scoped search (P6-5).
 
 Cheap phase with a high hit rate: the callout node, the slash-command menu, and the markdown-serialisation pattern all already exist, so most of these are configuration and a serializer rather than new subsystems. **Every new node must carry its own** `addStorage().markdown.serialize/parse` — per `CLAUDE.md`, a node without one silently serialises as escaped plain text, which is data loss in slow motion.
 
@@ -708,7 +710,7 @@ Extends the numbering P6-1 gives Theorem/Lemma/Definition blocks into a referenc
 
 *Covered by* `crossRefs.test.ts` *(the pure recognizer),* `crossRef.test.ts` *(batched resolution, click-to-navigate, unresolved-stays-inert, a failed lookup fails closed, no decoration without a workspace, and — the wiki-link boundary — `[[Theorem: name]]` decorates nothing), and three backend tests covering a found marker, a genuinely absent one, and the LIKE-wildcard-escaping case specifically.*
 
-### P6-5 — Search refinement — **S**
+### P6-5 — Search refinement — **S** ✅ *(closes M6)*
 
 The brief asks search to cover "equations, code, handwritten notes, PDFs." Equations and code already work (FTS indexes the raw `.md`); PDFs arrive with P4-1; handwriting is cut (§4). What's actually missing is **scoping**.
 
@@ -716,6 +718,16 @@ The brief asks search to cover "equations, code, handwritten notes, PDFs." Equat
 - Extend the same syntax to `type:` (block type — theorem, definition, algorithm, once P6-1/P6-2 exist) and `task:open`/`task:done` (once P9-1's `note_tasks` table exists) — same filter mechanism, more keys, not a query language. This is the bounded version of "Dataview-lite," already rejected below (§4) for being open-ended; a fixed, small key list is not the same risk.
 - **Dependency:** folder/tag filtering ships standalone; `type:` needs P6-1/P6-2, `task:` needs P9-1 — both are optional extensions, not blockers.
 - **DoD:** Search can be narrowed to a folder or tag without leaving the keyboard; recent searches persist per workspace; `type:` and `task:` filter the same way once their underlying data exists.
+
+*Done — folder, tag and* `type:` *all shipped;* `task:` *is the one named extension left out, exactly as the dependency line allows: P9-1's* `note_tasks` *table doesn't exist yet, so there is nothing for it to filter.* `src/lib/searchQuery.ts` *is the pure parser — a fixed* `folder:`*/*`tag:`*/*`type:` *key list, one space-free token per value, deliberately no quoting syntax that would start turning this into a query language. Search stays a single box: typed keys are stripped out of the query text and sent to the backend as separate parameters alongside whatever free text remains.*
+
+**Fixing this correctly surfaced a real, pre-existing gap:** `search_notes` had never scoped to a workspace at all. This app's* `index.db` *is one shared file across every workspace ever opened (per the storage boundary in* `CLAUDE.md`*), so a search in workspace A could return a hit from workspace B — silently, since nothing ever exercised two workspaces in the same index during testing. A* `tag:` *or* `folder:` *filter would have inherited that same leak, so `search_notes` now always takes and filters by `workspace`, joining `notes_fts` against `notes` (which already carries it) — the fix a filter feature needed anyway, not a scope-creep detour.*
+
+*The four filters compose freely (free text, folder, tag, type, any combination) via one dynamically-built SQL string per call rather than a single static query with* `? IS NULL OR …` *placeholders throughout — `rank` is only a meaningful* `ORDER BY` *when an FTS5* `MATCH` *clause is actually present, and a fixed query can't conditionally drop a* `JOIN`*.* `type:` *reuses the same* `LIKE`*-against-the-stored-body approach P6-7's cross-references introduced (matching a callout's own* `> [!TYPE` *marker prefix, wildcard-escaped), rather than a second search mechanism.*
+
+*Recent searches persist through the same channel* `openTabs`*/*`expandedFolders` *already do —* `WorkspaceState`*'s* `recentSearches` *field, saved at the same checkpoints (workspace switch, app close), loaded on open. A search is recorded only when a result is actually opened, not on every keystroke — "recent searches" means queries that found something, not typing fragments.*
+
+**Exit check for M6:** all seven P6 tasks done. **M6 reached (2026-08-19)**: proof/theorem and algorithm blocks, collapsible sections, templates, equation snippets, the outline panel, cross-references, and scoped search all ship. Writing maths, proofs and structured notes is faster in this app than in any general note app — the milestone's own claim — across every dimension the phase set out to cover.
 
 ---
 

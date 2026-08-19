@@ -12,6 +12,7 @@ const reset = () =>
     folderError: null,
     tagFilter: null,
     recentWorkspaces: [],
+    recentSearches: [],
     repoMode: null,
     git: { prompted: false, autoCommit: false, idleMinutes: 10, skipHooks: false, autoPush: true },
     gitPendingPaths: [],
@@ -120,6 +121,31 @@ describe('useWorkspaceStore', () => {
   it('sets the recent workspaces list', () => {
     useWorkspaceStore.getState().setRecentWorkspaces(['/ws/a', '/ws/b'])
     expect(useWorkspaceStore.getState().recentWorkspaces).toEqual(['/ws/a', '/ws/b'])
+  })
+
+  it('addRecentSearch prepends, dedupes and caps the recent-searches list', () => {
+    for (let i = 0; i < 9; i++) {
+      useWorkspaceStore.getState().addRecentSearch(`query ${i}`)
+    }
+    useWorkspaceStore.getState().addRecentSearch('query 5')
+
+    const searches = useWorkspaceStore.getState().recentSearches
+    expect(searches[0]).toBe('query 5')
+    expect(searches).toHaveLength(8)
+    expect(searches.filter((q) => q === 'query 5')).toHaveLength(1)
+  })
+
+  it('addRecentSearch ignores a blank query', () => {
+    useWorkspaceStore.getState().addRecentSearch('   ')
+    expect(useWorkspaceStore.getState().recentSearches).toEqual([])
+  })
+
+  // Unlike the recent-workspaces list, recent searches are per-workspace
+  // state loaded from that workspace's own session file.
+  it('resetForNewWorkspace clears the recent searches list', () => {
+    useWorkspaceStore.getState().addRecentSearch('theorem 3.2')
+    useWorkspaceStore.getState().resetForNewWorkspace()
+    expect(useWorkspaceStore.getState().recentSearches).toEqual([])
   })
 
   // The recent-workspaces list is global, not per-workspace UI state — it

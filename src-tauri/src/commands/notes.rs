@@ -478,21 +478,42 @@ pub async fn delete_note(path: String, db: State<'_, DbPool>) -> Result<(), Stri
 
 #[tauri::command]
 pub async fn search_notes(
+    workspace: String,
     query: String,
+    folder: Option<String>,
+    tag: Option<String>,
+    block_type: Option<String>,
     db: State<'_, DbPool>,
 ) -> Result<Vec<SearchResult>, String> {
     let trimmed = query.trim();
-    if trimmed.is_empty() {
+    let fts_query = if trimmed.is_empty() {
+        None
+    } else {
+        Some(
+            trimmed
+                .split_whitespace()
+                .map(|w| format!("\"{}\"*", w.replace('"', "")))
+                .collect::<Vec<_>>()
+                .join(" "),
+        )
+    };
+
+    // A bare `folder:` or `tag:` with no free text is a real, useful search
+    // ("everything in this folder") — only truly empty input short-circuits.
+    if fts_query.is_none() && folder.is_none() && tag.is_none() && block_type.is_none() {
         return Ok(vec![]);
     }
-    let fts_query = trimmed
-        .split_whitespace()
-        .map(|w| format!("\"{}\"*", w.replace('"', "")))
-        .collect::<Vec<_>>()
-        .join(" ");
-    db::notes::search_notes(&db, &fts_query)
-        .await
-        .map_err(|e| e.to_string())
+
+    db::notes::search_notes(
+        &db,
+        &workspace,
+        fts_query.as_deref(),
+        folder.as_deref(),
+        tag.as_deref(),
+        block_type.as_deref(),
+    )
+    .await
+    .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -1176,7 +1197,7 @@ mod save_tests {
         .await
         .unwrap();
 
-        let hits = db::notes::search_notes(&pool, "\"shortest\"*")
+        let hits = db::notes::search_notes(&pool, "/ws", Some("\"shortest\"*"), None, None, None)
             .await
             .unwrap();
         assert_eq!(hits.len(), 1);

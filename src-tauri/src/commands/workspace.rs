@@ -123,6 +123,7 @@ mod tests {
             open_tabs: vec!["/ws/note.md".into()],
             active_tab: Some("/ws/note.md".into()),
             expanded_folders: vec!["/ws/Course1".into()],
+            recent_searches: vec!["theorem 3.2".into(), "tag:graphs".into()],
             ..Default::default()
         };
         save_workspace_to_dir(&path, &original).await.unwrap();
@@ -130,6 +131,7 @@ mod tests {
         assert_eq!(loaded.open_tabs, original.open_tabs);
         assert_eq!(loaded.active_tab, original.active_tab);
         assert_eq!(loaded.expanded_folders, original.expanded_folders);
+        assert_eq!(loaded.recent_searches, original.recent_searches);
     }
 
     #[tokio::test]

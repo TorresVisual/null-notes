@@ -4,7 +4,7 @@ Feature checklist. **The [roadmap](docs/ROADMAP.md) holds the reasoning and the 
 
 Effort: **S** ≈ hours · **M** ≈ a day or two · **L** ≈ several days.
 
-**Now (revised 2026-08-17):** ~~finish ruled fractions~~ → ~~freeze the PDF pipeline~~ → ~~triage the three open bugs~~ → ~~P4-3 (closes M4)~~ → ~~the dogfood slice~~ → ~~P7-2 (closes M7)~~ → ~~P5-1~~ → ~~P5-2 → P5-3 → P5-4 → P5-5 (closes M5)~~ → **P6 → P9**. **Phase numbers are identity, not order.**
+**Now (revised 2026-08-19):** ~~finish ruled fractions~~ → ~~freeze the PDF pipeline~~ → ~~triage the three open bugs~~ → ~~P4-3 (closes M4)~~ → ~~the dogfood slice~~ → ~~P7-2 (closes M7)~~ → ~~P5-1~~ → ~~P5-2 → P5-3 → P5-4 → P5-5 (closes M5)~~ → ~~P6-1 → P6-2 → P6-3 → P6-4 → P6-6 → P6-7 → P6-5 (closes M6)~~ → **P9**. **Phase numbers are identity, not order.**
 
 > The plan was to re-derive P5/P6/P9 priorities from a couple of weeks of real dogfood use first. That's dropped (see ROADMAP.md §1, 2026-08-17) — the maintainer's mode right now is implementing and verifying features, not daily use, so the wait doesn't resolve on its own. Back to the pre-dogfood priority order.
 
@@ -44,7 +44,7 @@ Effort: **S** ≈ hours · **M** ≈ a day or two · **L** ≈ several days.
 | P3 Headline features | M3 — the CS superpowers land | ✅ |
 | P4 PDF→Markdown & exercise sheets | M4 — a sheet becomes a workable note | ✅ |
 | P5 Versioned workspaces (Git) | M5 — my notes commit themselves | ✅ |
-| P6 STEM authoring | M6 — fastest place to write maths | |
+| P6 STEM authoring | M6 — fastest place to write maths | ✅ |
 | P7 IDE integration | M7 — notes and code are one workflow | ✅ |
 | P8 Embedded terminal | M8 — `claude` runs against the open note | ✅ |
 | P9 Study & revision | M9 — the app helps me *revise*, not just capture | |
@@ -215,13 +215,13 @@ Two modes, different defaults — everything here follows from this:
 
 ---
 
-## ▸ P6 — STEM authoring (M6)
+## ▸ P6 — STEM authoring (M6) ✅
 
 > ⚠️ Every new node needs `addStorage().markdown.serialize/parse`. Without one it serialises as escaped plain text — silent data loss.
 
 > **Finding, 2026-08-13, still worth knowing before diving in: a stream of editor work has no roadmap representation at all.** `BlockHandle`, `Divider`, `TextAlignment`, `Highlight`, `Kbd`, `HTMLBlock`, `HTMLInline`, `SpanStyle`, `Superscript`/`Subscript` and `NoteImage` all exist in `src/editor/extensions/` and correspond to no phase or task here. The Notion half of the app — which [ROADMAP.md](docs/ROADMAP.md) §1 now names as a pillar — is being built off-book, which suggests "STEM authoring" is only part of the real frame ("Notion parity" is the other part). **No longer a blocking rescope** (the step-5 wait it was tied to is superseded, ROADMAP.md §1 2026-08-17) — just a caveat to keep in mind while working through the boxes below, which are genuinely missing either way.
 >
-> Still genuinely unbuilt: search refinement (P6-5), outline panel (P6-6), cross-references (P6-7).
+> **M6 reached (2026-08-19) — all seven tasks done.**
 
 ### P6-1 Proof blocks + collapsible sections — **M** ✅
 - [x] Theorem / Lemma / Corollary / Proof / Definition / Example blocks, optional numbering + title
@@ -275,10 +275,12 @@ Two modes, different defaults — everything here follows from this:
 >
 > Built as `CodeLink`'s structural cousin: `src/lib/crossRefs.ts` recognises the seven numbered `calloutType` keywords + a dotted number; `CrossRef.ts` decorates and resolves them batched-and-cached, exactly like P7-1. Resolution reuses the FTS index rather than a new one — `db::notes::marker_like_pattern`/`note_containing_marker` LIKE-match a callout's own serialized `> [!TYPE NUMBER]` marker against `notes_fts`'s stored body, escaping `%`/`_` so a number containing `_` can't act as a wildcard. Jumping to the exact block needed `Callout.tsx`'s node view to actually carry `data-callout-type`/`data-callout-number` on its DOM, which it never had — the schema's own `renderHTML` attribute mapping is bypassed once a node view takes over.
 
-### P6-5 Search refinement — **S**
-- [ ] Filter results by folder and by tag, without leaving the keyboard
-- [ ] Recent-searches list, persisted per workspace
-- [ ] `type:` (block type, once P6-1/P6-2 exist) and `task:open`/`task:done` (once P9-1's `note_tasks` table exists) — same filter mechanism, bounded key list, not a query language
+### P6-5 Search refinement — **S** ✅ *(closes M6)*
+- [x] Filter results by folder and by tag, without leaving the keyboard
+- [x] Recent-searches list, persisted per workspace
+- [x] `type:` (block type, once P6-1/P6-2 exist) — `task:` left out: P9-1's `note_tasks` table doesn't exist yet, per the roadmap's own "optional extension, not a blocker"
+
+> `src/lib/searchQuery.ts` parses the fixed `folder:`/`tag:`/`type:` key list (no quoting, deliberately not a query language); filters compose freely with each other and with free text. Fixing this properly meant scoping `search_notes` to a workspace for the first time — it previously searched across every workspace this app's shared `index.db` has ever indexed, a real gap a `folder:`/`tag:` filter would otherwise have inherited. Recent searches persist through `WorkspaceState.recentSearches`, the same save/load checkpoints as `openTabs`/`expandedFolders`; a query is recorded only when a result is actually opened.
 
 ---
 

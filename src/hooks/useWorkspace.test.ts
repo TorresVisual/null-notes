@@ -23,6 +23,7 @@ const emptySession: WorkspaceState = {
   openTabs: [],
   activeTab: null,
   expandedFolders: [],
+  recentSearches: [],
   git: { prompted: false, autoCommit: false, idleMinutes: 10, skipHooks: false, autoPush: true },
 }
 

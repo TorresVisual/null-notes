@@ -30,9 +30,9 @@ export function useWorkspace() {
   const { checkForUpdates } = useGitAutoPull()
 
   const saveSession = useCallback(async () => {
-    const { path, openTabs, activeTab, expandedFolders, git } = useWorkspaceStore.getState()
+    const { path, openTabs, activeTab, expandedFolders, recentSearches, git } = useWorkspaceStore.getState()
     if (!path) return
-    await api.workspace.save(path, { openTabs, activeTab, expandedFolders, git })
+    await api.workspace.save(path, { openTabs, activeTab, expandedFolders, recentSearches, git })
   }, [])
 
   // Read the folder before touching any state: a recent workspace can be gone
@@ -40,7 +40,8 @@ export function useWorkspace() {
   const openWorkspaceAt = useCallback(
     async (selected: string, opts: { remember?: boolean } = {}) => {
       const { remember = true } = opts
-      const { setFolderError, setRecentWorkspaces, setGit, setRepoMode } = useWorkspaceStore.getState()
+      const { setFolderError, setRecentWorkspaces, setRecentSearches, setGit, setRepoMode } =
+        useWorkspaceStore.getState()
       let tree, session
       try {
         ;[tree, session] = await Promise.all([
@@ -60,6 +61,7 @@ export function useWorkspace() {
       setNotes(tree.notes)
       setFolders(tree.folders)
       setExpandedFolders(session.expandedFolders)
+      setRecentSearches(session.recentSearches)
       setGit(session.git)
       for (const tab of session.openTabs) {
         openTab(tab)
