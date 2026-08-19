@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  check:
+    # windows-latest, not ubuntu: this is a Windows-primary desktop app —
+    # portable-pty's ConPTY backend and the Windows-path handling scattered
+    # through the storage layer only get meaningfully exercised here.
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # tauri-build's build script expects frontendDist to exist even for a
+      # debug-profile build that never embeds it (it only reads devUrl at
+      # runtime) — a fresh checkout has no dist/ at all since it's gitignored.
+      - run: npm run build
+
+      - run: npm run typecheck
+      - run: npm test
+
+      - name: cargo fmt --check
+        working-directory: src-tauri
+        run: cargo fmt --check
+
+      - name: cargo clippy
+        working-directory: src-tauri
+        run: cargo clippy -- -D warnings
+
+      - name: cargo test
+        working-directory: src-tauri
+        run: cargo test

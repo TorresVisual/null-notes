@@ -61,8 +61,7 @@ Use `tokio` for all async. Long-running operations (OCR, PDF render) run in `tok
 - Avoid unnecessary `.clone()` — pass references where possible
 - Derive `Debug` on all structs
 - Keep Tauri commands thin: parse input, delegate to a domain module, return result
-- Run `cargo clippy -- -D warnings` before committing — no clippy warnings allowed
-- Run `cargo fmt --check` before committing — no unformatted diffs allowed (`cargo fmt` to apply)
+- No clippy warnings, no unformatted diffs — `.github/workflows/ci.yml` enforces both on push. Run `cargo clippy -- -D warnings` / `cargo fmt --check` locally for fast feedback when you want it; not required before every commit
 
 ---
 
