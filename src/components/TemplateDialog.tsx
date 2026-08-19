@@ -120,6 +120,7 @@ export function TemplateDialog({ onClose }: TemplateDialogProps) {
                 <span className="settings-row-control">
                   <input
                     type="text"
+                    name={field}
                     className="settings-text settings-text-wide"
                     value={values[field] ?? ''}
                     onChange={(e) => setValues((v) => ({ ...v, [field]: e.target.value }))}
