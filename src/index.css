@@ -1317,6 +1317,38 @@ body {
 
 .backlink-item:hover { text-decoration: underline; }
 
+/* Outline panel (P6-6) — shares the same in-pane strip as .backlinks-panel
+   rather than a new persistent column; toggled globally (Ctrl Shift O). */
+.outline-panel {
+  margin-top: var(--space-xl);
+  padding-top: var(--space-md);
+  border-top: 1px solid var(--border);
+}
+
+.outline-panel-title {
+  color: var(--text-tertiary);
+  font-size: 12px;
+  margin: 0 0 6px;
+}
+
+.outline-empty { color: var(--text-tertiary); font-size: 12px; margin: 0; }
+.outline-list { list-style: none; margin: 0; padding: 0; }
+
+.outline-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 3px 0;
+  font-size: 13px;
+}
+
+.outline-item:hover { color: var(--text-primary); }
+.outline-item.active { color: var(--accent); font-weight: 500; }
+
 /* Ink toolbar and canvas (previously unstyled — default browser buttons) */
 .ink-canvas-wrap {
   border: 1px solid var(--border-strong);

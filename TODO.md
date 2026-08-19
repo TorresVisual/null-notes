@@ -256,13 +256,15 @@ Two modes, different defaults — everything here follows from this:
 
 > `SlashCommands` turned out to be unreachable here: `InlineMath`/`BlockMath` edit LaTeX in a plain `<input>`/`<textarea>` outside ProseMirror, and the `Suggestion` plugin only sees PM transactions. `src/lib/mathSnippets.ts` holds the twenty-entry table plus three pure functions (`activeSlashQuery`, `matchMathSnippets`, `applyMathSnippet`); `useMathSnippetMenu` wires them to a live input (caret tracking, keyboard nav), shared by both node views via one `MathSnippetMenu` dropdown.
 
-### P6-6 Outline / TOC panel — **S**
-- [ ] Current note's headings in the right rail, click to jump
-- [ ] Highlight the heading currently in view
-- [ ] Share the rail with the backlinks panel — no third permanent column
-- [ ] Toggle on the P2-2 shortcut layer
+### P6-6 Outline / TOC panel — **S** ✅
+- [x] Current note's headings in the right rail, click to jump
+- [x] Highlight the heading currently in view
+- [x] Share the rail with the backlinks panel — no third permanent column
+- [x] Toggle on the P2-2 shortcut layer
 
 > No backend work — heading data is already in the ProseMirror doc. Proposed with the P9 study features but moved here: it's **S** and serves any long note, so parking it behind three phases would waste it.
+>
+> The "rail" isn't literal — `BacklinksPanel` is an inline strip at the bottom of the note, not a persistent column — so `OutlinePanel` sits directly above it in the same flow rather than in a new column. Shown only via **Toggle Outline** (`Ctrl Shift O`), lifted to `Layout` state like `toggle-terminal`/`graph-view`. Headings come from a `MutationObserver` on `.editor-pane`'s own rendered DOM; the active heading tracks `getBoundingClientRect()` against `.editor-scroll` on every scroll event.
 
 ### P6-7 Cross-references — **S** *(added 2026-08-18, from a review pass)*
 - [ ] Recognise `Theorem 3.2` (block-type keyword + its own number) in prose, resolved against P6-1's numbered blocks

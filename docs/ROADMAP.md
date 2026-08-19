@@ -1,6 +1,8 @@
 # null-notes — Product & Technical Roadmap
 
-**Last updated:** 2026-08-19 (**P6-4 done — equation snippets.** `/gradient` and nineteen others, in one editable table (`src/lib/mathSnippets.ts`). The "maths context" the task named turned out to be a plain `<input>`/`<textarea>` living outside ProseMirror — `SlashCommands`' `Suggestion` plugin structurally cannot see typing there, so the "/" trigger was reimplemented for that one context via a shared `useMathSnippetMenu` hook, not reused. Four of P6's seven tasks done; P6-5 through P6-7 remain.)
+**Last updated:** 2026-08-19 (**P6-6 done — the outline panel.** Headings collected live off ProseMirror's own rendered DOM via a `MutationObserver`, no lifted editor instance and no backend work, per the task's own note. The "share the rail with `BacklinksPanel`" instruction turned out to describe a rail that doesn't exist yet — `BacklinksPanel` is an inline strip, not a persistent column — so `OutlinePanel` sits directly above it in the same flow instead, shown only via **Toggle Outline** (`Ctrl Shift O`). Five of P6's seven tasks done; P6-5 and P6-7 remain.)
+
+*Same day, earlier: **P6-4 done — equation snippets.** `/gradient` and nineteen others, in one editable table (`src/lib/mathSnippets.ts`). The "maths context" the task named turned out to be a plain `<input>`/`<textarea>` living outside ProseMirror — `SlashCommands`' `Suggestion` plugin structurally cannot see typing there, so the "/" trigger was reimplemented for that one context via a shared `useMathSnippetMenu` hook, not reused. Four of P6's seven tasks done; P6-5 through P6-7 remain.*
 
 *Same day, earlier: **P6-3 done — templates.** `templates/` joins the standard scan-exclusion list, "New from Template" (sidebar + `Ctrl Shift T`) prompts for a note title plus each `{{name}}` a template uses, and `create_note_from_template` writes the filled body verbatim rather than synthesizing a heading. The P4-3 exercise-sheet layout ships as the one required starter template, seeded opt-in — same posture as P7-3's project-notes scaffold — never automatically and never overwriting an edited template. Three of P6's seven tasks done; P6-4 through P6-7 remain.*
 
@@ -673,7 +675,7 @@ Cheap phase with a high hit rate: the callout node, the slash-command menu, and 
 
 *Covered by* `mathSnippets.test.ts` *(the three pure functions) and one RTL test in* `BlockMath.test.tsx` *driving the real textarea end-to-end: type* `/gradient`*, press Enter, assert the draft became* `\nabla f(x)`*, then Ctrl+Enter to commit and assert the node's LaTeX. Existing* `InlineMath`*/*`BlockMath` *round-trip and commit/cancel tests were re-run unchanged — none of the wiring touches serialization, and none of the existing tests type a* `/` *that could regress into a snippet match.*
 
-### P6-6 — Outline / table-of-contents panel — **S**
+### P6-6 — Outline / table-of-contents panel — **S** ✅
 
 Long lecture notes are hard to move around in, and P6 is the phase that makes notes longer and more structured.
 
@@ -683,6 +685,10 @@ Long lecture notes are hard to move around in, and P6 is the phase that makes no
 - **DoD:** A long note's headings are listed and clickable; the list tracks the current scroll position; toggling the panel is on the P2-2 shortcut layer.
 
 *Placement note: this was proposed alongside the P9 study features, but it is an **S**-effort navigation aid that serves any long note — parking it behind three phases would waste it. Moved here deliberately.*
+
+*Done.* **The "rail" turned out not to be a literal rail either** *— same finding P6-4 made about "maths context": `BacklinksPanel` isn't a persistent right column today, it's a collapsible strip inline at the bottom of the note. "Share the rail rather than adding a third permanent column" is honored in spirit rather than letter:* `OutlinePanel` *sits directly above* `BacklinksPanel`*, in the same in-pane flow, and no new persistent screen column exists. It's rendered only when* **Toggle Outline** *(View menu,* `Ctrl Shift O`*) turns it on — lifted to* `Layout` *state exactly like* `toggle-terminal`*/*`graph-view`*, per the DoD's explicit "toggling is on the P2-2 shortcut layer" (`BacklinksPanel`'s own chevron is a local collapse, not that).*
+
+*True to "no backend work": headings are read straight off ProseMirror's own rendered DOM — a* `MutationObserver` *on* `.editor-pane` *re-collects* `h1`*–*`h6` *elements on any content change, no lifted editor instance, no new node attributes. The current-scroll highlight walks the same headings' *`getBoundingClientRect()`* against* `.editor-scroll`*'s on every scroll event (the same ref* `useScrollRestoration` *already exposes to* `Layout`*, reused rather than duplicated). Only shown in WYSIWYG view — raw mode has no rendered headings to walk. Covered by four RTL tests:* `OutlinePanel.test.tsx` *drives heading collection, the empty state, click-to-scroll (asserts* `scrollIntoView`*), and the active-heading highlight via mocked* `getBoundingClientRect` *on a manually dispatched scroll event.*
 
 ### P6-7 — Cross-references — **S**
 

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { listen } from '@tauri-apps/api/event'
 import { Sidebar } from './Sidebar'
@@ -8,6 +8,7 @@ import { RawEditor } from '../editor/RawEditor'
 import { SearchModal } from './SearchModal'
 import { QuickSwitcher } from './QuickSwitcher'
 import { BacklinksPanel } from './BacklinksPanel'
+import { OutlinePanel } from './OutlinePanel'
 import { WorkspacePicker } from './WorkspacePicker'
 import { SettingsPanel } from './SettingsPanel'
 import { ShortcutsOverlay } from './ShortcutsOverlay'
@@ -70,6 +71,8 @@ export function Layout() {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [shortcutsOpen, setShortcutsOpen] = useState(false)
   const [templateDialogOpen, setTemplateDialogOpen] = useState(false)
+  const [outlineOpen, setOutlineOpen] = useState(false)
+  const editorPaneRef = useRef<HTMLDivElement>(null)
   const [graphOpen, setGraphOpen] = useState(false)
   const [terminalMounted, setTerminalMounted] = useState(false)
   const [terminalOpen, setTerminalOpen] = useState(false)
@@ -175,6 +178,9 @@ export function Layout() {
           setTerminalMounted(true)
           setTerminalOpen((o) => !o)
           break
+        case 'toggle-outline':
+          if (activeTab) setOutlineOpen((o) => !o)
+          break
       }
     },
     [
@@ -263,6 +269,7 @@ export function Layout() {
         )}
         <div className="editor-scroll" ref={scrollRef}>
           <div
+            ref={editorPaneRef}
             className="editor-pane"
             style={{ '--editor-max-width': `${settings.editorMaxWidthPx}px` } as CSSProperties}
           >
@@ -294,6 +301,9 @@ export function Layout() {
               <p className="empty-state">
                 Select a note, press Ctrl P to jump to one, or press ? for shortcuts
               </p>
+            )}
+            {!isLoading && activeTab && viewMode === 'wysiwyg' && outlineOpen && (
+              <OutlinePanel containerRef={editorPaneRef} scrollRef={scrollRef} />
             )}
             {!isLoading && activeTab && currentNote && (
               <BacklinksPanel notePath={activeTab} noteTitle={currentNote.title} />

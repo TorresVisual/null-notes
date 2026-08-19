@@ -124,6 +124,13 @@ fn build_menu(handle: &tauri::AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
                 true,
                 Some("CmdOrCtrl+`"),
             )?,
+            &MenuItem::with_id(
+                handle,
+                "toggle-outline",
+                "Toggle Outline",
+                true,
+                Some("CmdOrCtrl+Shift+O"),
+            )?,
             &PredefinedMenuItem::separator(handle)?,
             &MenuItem::with_id(
                 handle,
