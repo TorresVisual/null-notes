@@ -61,7 +61,8 @@ Use `tokio` for all async. Long-running operations (OCR, PDF render) run in `tok
 - Avoid unnecessary `.clone()` — pass references where possible
 - Derive `Debug` on all structs
 - Keep Tauri commands thin: parse input, delegate to a domain module, return result
-- No clippy warnings, no unformatted diffs — `.github/workflows/ci.yml` enforces both on push. Run `cargo clippy -- -D warnings` / `cargo fmt --check` locally for fast feedback when you want it; not required before every commit
+- No clippy warnings — `.github/workflows/ci.yml` enforces this on push (`cargo clippy -- -D warnings`). Not required to run locally before every commit, but do it for fast feedback when you want it
+- Formatting is auto-fixed, not just checked — CI runs `cargo fmt` on push and pushes a `style: cargo fmt` commit back if anything changed. Never hand-fix formatting churn; let CI do it
 
 ---
 
