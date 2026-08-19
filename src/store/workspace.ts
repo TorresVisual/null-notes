@@ -30,7 +30,7 @@ interface WorkspaceStore {
   setPath: (path: string) => void
   openTab: (notePath: string) => void
   closeTab: (notePath: string) => void
-  setActiveTab: (notePath: string) => void
+  setActiveTab: (notePath: string | null) => void
   toggleFolder: (folderPath: string) => void
   setExpandedFolders: (paths: string[]) => void
   setSelectedFolder: (path: string | null) => void

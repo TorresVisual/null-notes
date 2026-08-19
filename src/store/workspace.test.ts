@@ -49,6 +49,14 @@ describe('useWorkspaceStore', () => {
     expect(useWorkspaceStore.getState().activeTab).toBeNull()
   })
 
+  it('setActiveTab accepts null to clear the active tab without closing any open tab', () => {
+    useWorkspaceStore.getState().openTab('/ws/a.md')
+    useWorkspaceStore.getState().openTab('/ws/b.md')
+    useWorkspaceStore.getState().setActiveTab(null)
+    expect(useWorkspaceStore.getState().activeTab).toBeNull()
+    expect(useWorkspaceStore.getState().openTabs).toEqual(['/ws/a.md', '/ws/b.md'])
+  })
+
   it('setPath defaults selectedFolder to the new path', () => {
     useWorkspaceStore.getState().setPath('/ws')
     expect(useWorkspaceStore.getState().selectedFolder).toBe('/ws')
