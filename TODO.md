@@ -4,7 +4,7 @@ Feature checklist. **The [roadmap](docs/ROADMAP.md) holds the reasoning and the 
 
 Effort: **S** ≈ hours · **M** ≈ a day or two · **L** ≈ several days.
 
-**Now (revised 2026-08-19):** ~~finish ruled fractions~~ → ~~freeze the PDF pipeline~~ → ~~triage the three open bugs~~ → ~~P4-3 (closes M4)~~ → ~~the dogfood slice~~ → ~~P7-2 (closes M7)~~ → ~~P5-1~~ → ~~P5-2 → P5-3 → P5-4 → P5-5 (closes M5)~~ → ~~P6-1 → P6-2 → P6-3 → P6-4 → P6-6 → P6-7 → P6-5 (closes M6)~~ → **P9**. **Phase numbers are identity, not order.**
+**Now (revised 2026-08-19):** ~~finish ruled fractions~~ → ~~freeze the PDF pipeline~~ → ~~triage the three open bugs~~ → ~~P4-3 (closes M4)~~ → ~~the dogfood slice~~ → ~~P7-2 (closes M7)~~ → ~~P5-1~~ → ~~P5-2 → P5-3 → P5-4 → P5-5 (closes M5)~~ → ~~P6-1 → P6-2 → P6-3 → P6-4 → P6-6 → P6-7 → P6-5 (closes M6)~~ → ~~P9-1~~ → **P9-2 → P9-3 → P9-4 (closes M9)**. **Phase numbers are identity, not order.**
 
 > The plan was to re-derive P5/P6/P9 priorities from a couple of weeks of real dogfood use first. That's dropped (see ROADMAP.md §1, 2026-08-17) — the maintainer's mode right now is implementing and verifying features, not daily use, so the wait doesn't resolve on its own. Back to the pre-dogfood priority order.
 
@@ -354,12 +354,12 @@ The only phase not from the brief. Everything before it is *capture*; this is *r
 
 > ⚠️ Study state is **data, not index.** Deleting `index.db` must lose nothing, so nothing here may keep its only copy in SQLite. Source of truth in the `.md`, derived table rebuilt by `reindex_note` — same shape as `note_tags`. **Test for every task: delete `index.db`, reopen, is anything gone?**
 
-### P9-1 Workspace-wide task view — **S/M** — *start here*
-- [ ] Extract `- [ ]` / `- [x]` into a `note_tasks` table (path, text, done, position), mirroring `note_tags`
-- [ ] Build it in the existing `reindex_note` path — inherits the P0-3 debounce and P0-5 watcher for free
-- [ ] View of open tasks grouped by note/folder; click jumps to the task
-- [ ] Ticking from the view writes through the normal save path
-- [ ] Delete `index.db`, reopen → identical list
+### P9-1 Workspace-wide task view — **S/M** ✅
+- [x] Extract `- [ ]` / `- [x]` into a `note_tasks` table (path, text, done, position), mirroring `note_tags`
+- [x] Build it in the existing `reindex_note` path — inherits the P0-3 debounce and P0-5 watcher for free
+- [x] View of open tasks grouped by note/folder; click jumps to the task
+- [x] Ticking from the view writes through the normal save path
+- [x] Delete `index.db`, reopen → identical list (rebuildable the same way `note_tags`/`note_links` already are — lazily, on next reindex, not eagerly on scan)
 
 ### P9-2 Formula sheet generation — **M**
 - [ ] Collect all block math across a scope (folder / tag / workspace)

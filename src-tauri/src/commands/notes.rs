@@ -1,5 +1,7 @@
 use crate::db::{self, DbPool};
-use crate::models::{GraphLink, GraphTag, NoteMetadata, SearchResult, WorkspaceTree};
+use crate::models::{
+    ExtractedTask, GraphLink, GraphTag, NoteMetadata, OpenTask, SearchResult, WorkspaceTree,
+};
 use regex::Regex;
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
@@ -98,6 +100,37 @@ pub fn extract_links(content: &str) -> Vec<String> {
         }
     }
     links
+}
+
+// Line-based rather than `strip_code`-then-regex like `extract_tags`: removing
+// fenced blocks from the string would shift line numbers, and `position` (the
+// line index) is the key `toggle_task` uses to find the line back later. A
+// running "inside a fence" flag gets the same "don't extract from an example
+// block" behavior without ever renumbering a line.
+pub fn extract_tasks(content: &str) -> Vec<ExtractedTask> {
+    let re = match Regex::new(r"^\s*-\s\[([ xX])\]\s+(.+)$") {
+        Ok(re) => re,
+        Err(_) => return Vec::new(),
+    };
+    let mut in_fence = false;
+    let mut tasks = Vec::new();
+    for (i, line) in content.lines().enumerate() {
+        if line.trim_start().starts_with("```") {
+            in_fence = !in_fence;
+            continue;
+        }
+        if in_fence {
+            continue;
+        }
+        if let Some(caps) = re.captures(line) {
+            tasks.push(ExtractedTask {
+                text: caps[2].trim().to_string(),
+                done: caps[1].eq_ignore_ascii_case("x"),
+                position: i as i64,
+            });
+        }
+    }
+    tasks
 }
 
 #[tauri::command]
@@ -281,6 +314,7 @@ async fn index_note_at(
     db::notes::index_note_content(db, path, &title, content).await?;
     db::notes::set_tags(db, path, &extract_tags(content)).await?;
     db::notes::set_links(db, path, &extract_links(content)).await?;
+    db::notes::set_tasks(db, path, &extract_tasks(content)).await?;
     Ok(())
 }
 
@@ -354,6 +388,46 @@ fn rewrite_title(content: &str, new_title: &str) -> String {
     rewritten
 }
 
+// Flips the checkbox on the line at `position` (the same 0-indexed line
+// number `extract_tasks` assigned it), matching `rewrite_title`'s
+// split-rejoin-preserve-trailing-newline shape. `None` means the line no
+// longer looks like a task — the note changed on disk since the view last
+// listed it — and the caller surfaces that as a normal error rather than
+// silently mangling an unrelated line.
+fn toggle_task_line(content: &str, position: i64) -> Option<String> {
+    let re = Regex::new(r"^(\s*-\s\[)([ xX])(\]\s.*)$").ok()?;
+    let mut lines: Vec<String> = content.lines().map(str::to_string).collect();
+    let idx = usize::try_from(position).ok()?;
+    let line = lines.get(idx)?;
+    let caps = re.captures(line)?;
+    let flipped = if caps[2].eq_ignore_ascii_case("x") {
+        " "
+    } else {
+        "x"
+    };
+    lines[idx] = format!("{}{}{}", &caps[1], flipped, &caps[3]);
+
+    let mut rewritten = lines.join("\n");
+    if content.ends_with('\n') {
+        rewritten.push('\n');
+    }
+    Some(rewritten)
+}
+
+async fn toggle_task_at(
+    path: &str,
+    position: i64,
+    workspace: &str,
+    db: &DbPool,
+) -> anyhow::Result<()> {
+    let content = tokio::fs::read_to_string(path).await?;
+    let new_content = toggle_task_line(&content, position)
+        .ok_or_else(|| anyhow::anyhow!("no task at line {position} in {path}"))?;
+    write_atomic(Path::new(path), &new_content).await?;
+    index_note_at(path, workspace, &new_content, db).await?;
+    Ok(())
+}
+
 // Wiki-links resolve by title case-insensitively (`backlinks_for`), and
 // `extract_links` trims whitespace inside the brackets, so the rewrite must
 // tolerate both rather than only matching an exact `[[Old]]`.
@@ -421,6 +495,7 @@ async fn forget_note(path: &str, db: &DbPool) -> anyhow::Result<()> {
     db::notes::remove_from_fts(db, path).await?;
     db::notes::set_tags(db, path, &[]).await?;
     db::notes::set_links(db, path, &[]).await?;
+    db::notes::set_tasks(db, path, &[]).await?;
     Ok(())
 }
 
@@ -472,6 +547,10 @@ pub async fn delete_note(path: String, db: State<'_, DbPool>) -> Result<(), Stri
         .map_err(|e| e.to_string())?;
 
     db::notes::set_links(&db, &path, &[])
+        .await
+        .map_err(|e| e.to_string())?;
+
+    db::notes::set_tasks(&db, &path, &[])
         .await
         .map_err(|e| e.to_string())
 }
@@ -530,6 +609,28 @@ pub async fn notes_with_tag(
     db: State<'_, DbPool>,
 ) -> Result<Vec<NoteMetadata>, String> {
     db::notes::notes_with_tag(&db, &workspace, &tag)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn list_open_tasks(
+    workspace: String,
+    db: State<'_, DbPool>,
+) -> Result<Vec<OpenTask>, String> {
+    db::notes::open_tasks(&db, &workspace)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn toggle_task(
+    path: String,
+    position: i64,
+    workspace: String,
+    db: State<'_, DbPool>,
+) -> Result<(), String> {
+    toggle_task_at(&path, position, &workspace, &db)
         .await
         .map_err(|e| e.to_string())
 }
@@ -1025,6 +1126,67 @@ mod tests {
     #[test]
     fn test_extract_links_empty_content() {
         assert!(extract_links("").is_empty());
+    }
+
+    #[test]
+    fn test_extract_tasks_finds_open_and_done_items_with_line_positions() {
+        let tasks = extract_tasks("# Notes\n\n- [ ] finish exercise 3\n- [x] read chapter 2\n");
+        assert_eq!(tasks.len(), 2);
+        assert_eq!(tasks[0].text, "finish exercise 3");
+        assert!(!tasks[0].done);
+        assert_eq!(tasks[0].position, 2);
+        assert_eq!(tasks[1].text, "read chapter 2");
+        assert!(tasks[1].done);
+        assert_eq!(tasks[1].position, 3);
+    }
+
+    #[test]
+    fn test_extract_tasks_ignores_fenced_code_without_shifting_positions() {
+        let content = "- [ ] real task\n```\n- [ ] example in docs\n```\n- [ ] another real task";
+        let tasks = extract_tasks(content);
+        assert_eq!(tasks.len(), 2);
+        assert_eq!(tasks[0].text, "real task");
+        assert_eq!(tasks[0].position, 0);
+        assert_eq!(tasks[1].text, "another real task");
+        assert_eq!(tasks[1].position, 4);
+    }
+
+    #[test]
+    fn test_extract_tasks_ignores_plain_bullets() {
+        assert!(extract_tasks("- just a bullet\n- [not a checkbox] either").is_empty());
+    }
+
+    #[test]
+    fn test_extract_tasks_empty_content() {
+        assert!(extract_tasks("").is_empty());
+    }
+
+    #[test]
+    fn test_toggle_task_line_checks_an_open_task() {
+        let result = toggle_task_line("- [ ] buy milk\n- [ ] other", 0).unwrap();
+        assert_eq!(result, "- [x] buy milk\n- [ ] other");
+    }
+
+    #[test]
+    fn test_toggle_task_line_unchecks_a_done_task() {
+        let result = toggle_task_line("- [x] buy milk", 0).unwrap();
+        assert_eq!(result, "- [ ] buy milk");
+    }
+
+    #[test]
+    fn test_toggle_task_line_preserves_trailing_newline() {
+        let result = toggle_task_line("- [ ] buy milk\n", 0).unwrap();
+        assert_eq!(result, "- [x] buy milk\n");
+    }
+
+    #[test]
+    fn test_toggle_task_line_none_when_position_is_out_of_range() {
+        assert!(toggle_task_line("- [ ] buy milk", 5).is_none());
+    }
+
+    #[test]
+    fn test_toggle_task_line_none_when_line_is_no_longer_a_task() {
+        assert!(toggle_task_line("just prose now", 0).is_none());
     }
 
     #[tokio::test]

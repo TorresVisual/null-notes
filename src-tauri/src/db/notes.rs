@@ -1,4 +1,4 @@
-use crate::models::{NoteMetadata, SearchResult};
+use crate::models::{ExtractedTask, NoteMetadata, OpenTask, SearchResult};
 use anyhow::Result;
 use sqlx::SqlitePool;
 
@@ -94,6 +94,10 @@ pub async fn remove_notes_under(pool: &SqlitePool, prefix: &str) -> Result<()> {
         .bind(&like_pattern)
         .execute(pool)
         .await?;
+    sqlx::query("DELETE FROM note_tasks WHERE note_path LIKE ? ESCAPE '\\'")
+        .bind(&like_pattern)
+        .execute(pool)
+        .await?;
     Ok(())
 }
 
@@ -114,6 +118,11 @@ pub async fn update_path(pool: &SqlitePool, old_path: &str, new_path: &str) -> R
         .execute(pool)
         .await?;
     sqlx::query("UPDATE note_links SET source_path = ? WHERE source_path = ?")
+        .bind(new_path)
+        .bind(old_path)
+        .execute(pool)
+        .await?;
+    sqlx::query("UPDATE note_tasks SET note_path = ? WHERE note_path = ?")
         .bind(new_path)
         .bind(old_path)
         .execute(pool)
@@ -218,6 +227,37 @@ pub async fn set_links(pool: &SqlitePool, source_path: &str, targets: &[String])
             .await?;
     }
     Ok(())
+}
+
+pub async fn set_tasks(pool: &SqlitePool, note_path: &str, tasks: &[ExtractedTask]) -> Result<()> {
+    sqlx::query("DELETE FROM note_tasks WHERE note_path = ?")
+        .bind(note_path)
+        .execute(pool)
+        .await?;
+    for task in tasks {
+        sqlx::query("INSERT INTO note_tasks (note_path, text, done, position) VALUES (?, ?, ?, ?)")
+            .bind(note_path)
+            .bind(&task.text)
+            .bind(task.done)
+            .bind(task.position)
+            .execute(pool)
+            .await?;
+    }
+    Ok(())
+}
+
+pub async fn open_tasks(pool: &SqlitePool, workspace: &str) -> Result<Vec<OpenTask>> {
+    let rows = sqlx::query_as::<_, OpenTask>(
+        "SELECT nt.note_path, n.title as note_title, nt.text, nt.position
+         FROM note_tasks nt
+         JOIN notes n ON n.path = nt.note_path
+         WHERE n.workspace = ? AND nt.done = 0
+         ORDER BY n.title COLLATE NOCASE, nt.position",
+    )
+    .bind(workspace)
+    .fetch_all(pool)
+    .await?;
+    Ok(rows)
 }
 
 pub async fn list_tags(pool: &SqlitePool, workspace: &str) -> Result<Vec<String>> {
@@ -840,6 +880,125 @@ mod tests {
         let links = all_links(&pool, "/ws").await.unwrap();
 
         assert_eq!(links, vec![("/ws/a.md".to_string(), "X".to_string())]);
+    }
+
+    fn task(text: &str, done: bool, position: i64) -> ExtractedTask {
+        ExtractedTask {
+            text: text.to_string(),
+            done,
+            position,
+        }
+    }
+
+    #[tokio::test]
+    async fn test_set_tasks_replaces_existing_tasks_for_a_note() {
+        let pool = make_pool().await;
+        index_note(&pool, &note("a", "A", "/ws/a.md", "/ws"))
+            .await
+            .unwrap();
+        set_tasks(
+            &pool,
+            "/ws/a.md",
+            &[task("first", false, 0), task("second", true, 2)],
+        )
+        .await
+        .unwrap();
+        set_tasks(&pool, "/ws/a.md", &[task("only", false, 0)])
+            .await
+            .unwrap();
+
+        let open = open_tasks(&pool, "/ws").await.unwrap();
+        assert_eq!(open.len(), 1);
+        assert_eq!(open[0].text, "only");
+    }
+
+    #[tokio::test]
+    async fn test_open_tasks_excludes_done_tasks_and_other_workspaces() {
+        let pool = make_pool().await;
+        index_note(&pool, &note("a", "A", "/ws/a.md", "/ws"))
+            .await
+            .unwrap();
+        index_note(&pool, &note("c", "C", "/other/c.md", "/other"))
+            .await
+            .unwrap();
+        set_tasks(
+            &pool,
+            "/ws/a.md",
+            &[task("open one", false, 0), task("done one", true, 1)],
+        )
+        .await
+        .unwrap();
+        set_tasks(&pool, "/other/c.md", &[task("other workspace", false, 0)])
+            .await
+            .unwrap();
+
+        let open = open_tasks(&pool, "/ws").await.unwrap();
+        assert_eq!(open.len(), 1);
+        assert_eq!(open[0].text, "open one");
+        assert_eq!(open[0].note_path, "/ws/a.md");
+        assert_eq!(open[0].note_title, "A");
+    }
+
+    #[tokio::test]
+    async fn test_open_tasks_orders_by_note_title_then_position() {
+        let pool = make_pool().await;
+        index_note(&pool, &note("b", "Beta", "/ws/b.md", "/ws"))
+            .await
+            .unwrap();
+        index_note(&pool, &note("a", "Alpha", "/ws/a.md", "/ws"))
+            .await
+            .unwrap();
+        set_tasks(&pool, "/ws/b.md", &[task("beta task", false, 0)])
+            .await
+            .unwrap();
+        set_tasks(
+            &pool,
+            "/ws/a.md",
+            &[
+                task("alpha second", false, 1),
+                task("alpha first", false, 0),
+            ],
+        )
+        .await
+        .unwrap();
+
+        let open = open_tasks(&pool, "/ws").await.unwrap();
+        let texts: Vec<&str> = open.iter().map(|t| t.text.as_str()).collect();
+        assert_eq!(texts, vec!["alpha first", "alpha second", "beta task"]);
+    }
+
+    #[tokio::test]
+    async fn test_update_path_also_rewrites_tasks() {
+        let pool = make_pool().await;
+        index_note(&pool, &note("a", "A", "/ws/old.md", "/ws"))
+            .await
+            .unwrap();
+        set_tasks(&pool, "/ws/old.md", &[task("todo", false, 0)])
+            .await
+            .unwrap();
+
+        update_path(&pool, "/ws/old.md", "/ws/Folder/old.md")
+            .await
+            .unwrap();
+
+        let open = open_tasks(&pool, "/ws").await.unwrap();
+        assert_eq!(open[0].note_path, "/ws/Folder/old.md");
+    }
+
+    #[tokio::test]
+    async fn test_remove_notes_under_also_deletes_tasks() {
+        let pool = make_pool().await;
+        index_note(&pool, &note("a", "A", "/ws/Course1/a.md", "/ws"))
+            .await
+            .unwrap();
+        set_tasks(&pool, "/ws/Course1/a.md", &[task("todo", false, 0)])
+            .await
+            .unwrap();
+
+        remove_notes_under(&pool, "/ws/Course1/").await.unwrap();
+
+        let open = open_tasks(&pool, "/ws").await.unwrap();
+        assert!(open.is_empty());
     }
 
     #[tokio::test]

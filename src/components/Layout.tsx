@@ -14,6 +14,7 @@ import { SettingsPanel } from './SettingsPanel'
 import { ShortcutsOverlay } from './ShortcutsOverlay'
 import { TemplateDialog } from './TemplateDialog'
 import { GraphView } from './GraphView'
+import { TaskView } from './TaskView'
 import { TerminalPane } from './TerminalPane'
 import { useWorkspaceStore } from '../store/workspace'
 import { useNotesStore } from '../store/notes'
@@ -74,6 +75,7 @@ export function Layout() {
   const [outlineOpen, setOutlineOpen] = useState(false)
   const editorPaneRef = useRef<HTMLDivElement>(null)
   const [graphOpen, setGraphOpen] = useState(false)
+  const [taskViewOpen, setTaskViewOpen] = useState(false)
   const [terminalMounted, setTerminalMounted] = useState(false)
   const [terminalOpen, setTerminalOpen] = useState(false)
   const settings = useSettingsStore((s) => s.settings)
@@ -173,6 +175,9 @@ export function Layout() {
         case 'graph-view':
           if (workspacePath) setGraphOpen(true)
           break
+        case 'task-view':
+          if (workspacePath) setTaskViewOpen(true)
+          break
         case 'toggle-terminal':
           if (!workspacePath) break
           setTerminalMounted(true)
@@ -246,6 +251,7 @@ export function Layout() {
       {shortcutsOpen && <ShortcutsOverlay onClose={() => setShortcutsOpen(false)} />}
       {templateDialogOpen && <TemplateDialog onClose={() => setTemplateDialogOpen(false)} />}
       {graphOpen && <GraphView onClose={() => setGraphOpen(false)} />}
+      {taskViewOpen && <TaskView onClose={() => setTaskViewOpen(false)} />}
       <Sidebar
         onSearchOpen={() => setSearchOpen(true)}
         onSettingsOpen={() => setSettingsOpen(true)}

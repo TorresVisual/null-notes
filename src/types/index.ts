@@ -98,3 +98,10 @@ export interface CrossRefTarget {
   calloutType: string
   number: string
 }
+
+export interface OpenTask {
+  notePath: string
+  noteTitle: string
+  text: string
+  position: number
+}

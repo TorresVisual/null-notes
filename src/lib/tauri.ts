@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core'
-import type { NoteMetadata, WorkspaceState, WorkspaceTree, SearchResult, AppSettings, GraphLink, GraphTag, RepoMode, CommitOutcome, PushOutcome, PullOutcome, RepoInitOutcome, TemplateMetadata, CrossRefTarget } from '../types'
+import type { NoteMetadata, WorkspaceState, WorkspaceTree, SearchResult, AppSettings, GraphLink, GraphTag, RepoMode, CommitOutcome, PushOutcome, PullOutcome, RepoInitOutcome, TemplateMetadata, CrossRefTarget, OpenTask } from '../types'
 import type { PdfPage, PdfMarkdownImport } from '../pdf/types'
 
 export const api = {
@@ -57,6 +57,10 @@ export const api = {
       invoke<GraphTag[]>('graph_tags', { workspace }),
     resolveCrossRefs: (workspace: string, targets: CrossRefTarget[]) =>
       invoke<(string | null)[]>('resolve_cross_refs', { workspace, targets }),
+    listOpenTasks: (workspace: string) =>
+      invoke<OpenTask[]>('list_open_tasks', { workspace }),
+    toggleTask: (path: string, position: number, workspace: string) =>
+      invoke<void>('toggle_task', { path, position, workspace }),
   },
   templates: {
     list: (workspace: string) =>

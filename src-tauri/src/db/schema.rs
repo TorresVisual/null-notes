@@ -55,5 +55,20 @@ pub async fn run_migrations(pool: &SqlitePool) -> Result<()> {
         .execute(pool)
         .await?;
 
+    sqlx::query(
+        "CREATE TABLE IF NOT EXISTS note_tasks (
+            note_path TEXT    NOT NULL,
+            text      TEXT    NOT NULL,
+            done      INTEGER NOT NULL,
+            position  INTEGER NOT NULL
+        )",
+    )
+    .execute(pool)
+    .await?;
+
+    sqlx::query("CREATE INDEX IF NOT EXISTS note_tasks_path ON note_tasks(note_path)")
+        .execute(pool)
+        .await?;
+
     Ok(())
 }

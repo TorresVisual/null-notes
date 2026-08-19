@@ -138,6 +138,34 @@ pub struct GraphTag {
     pub tag: String,
 }
 
+/// A `- [ ]` / `- [x]` checkbox line extracted from a note's raw markdown
+/// (P9-1), mirroring how `extract_tags` feeds `note_tags`. `position` is the
+/// 0-indexed line number within the note's content — also the key
+/// `toggle_task` uses to flip the line back, which is simpler than tracking a
+/// stable per-task identity and is correct because a toggle rewrites the file
+/// (and reindexes) immediately, so the position is never stale by the time
+/// it's used again.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExtractedTask {
+    pub text: String,
+    pub done: bool,
+    pub position: i64,
+}
+
+/// One open task joined with the note it lives in, for the workspace-wide
+/// task view (P9-1). Only open (`done = 0`) tasks are ever selected into
+/// this — a done task has nothing to show in a view whose whole point is
+/// "what's left."
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+#[serde(rename_all = "camelCase")]
+pub struct OpenTask {
+    pub note_path: String,
+    pub note_title: String,
+    pub text: String,
+    pub position: i64,
+}
+
 /// How an imported PDF becomes a note: page images to write alongside, or the
 /// text layer converted to editable Markdown.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]

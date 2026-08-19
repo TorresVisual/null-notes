@@ -1882,6 +1882,66 @@ body {
 }
 .graph-node:hover text { fill: var(--text-primary); }
 
+/* Workspace-wide task view (P9-1) — shares the settings-panel shell, sized
+   like the graph view since both are scrollable workspace-wide lists. */
+.task-view {
+  background: var(--bg-raised);
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  width: min(560px, calc(100vw - 40px));
+  max-height: min(700px, calc(100vh - 40px));
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6);
+  padding: var(--space-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.task-view-list {
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+.task-view-group ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.task-view-note-title {
+  display: block;
+  background: none;
+  border: none;
+  color: var(--text-tertiary);
+  font-size: 12px;
+  cursor: pointer;
+  padding: 0 0 4px;
+}
+
+.task-view-note-title:hover { color: var(--text-secondary); }
+
+.task-view-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: 3px 0;
+}
+
+.task-view-item-text {
+  flex: 1;
+  text-align: left;
+  background: none;
+  border: none;
+  color: var(--text-primary);
+  cursor: pointer;
+  font-size: 13px;
+  padding: 0;
+}
+
+.task-view-item-text:hover { text-decoration: underline; }
+
 /* Export to PDF (File > Export to PDF, or the OS print dialog directly)
    leans on the WebView's own print pipeline rather than a custom renderer —
    math, Mermaid, ink and code all print exactly as they're already shown on
