@@ -382,16 +382,16 @@ The only phase not from the brief. Everything before it is *capture*; this is *r
 
 > This is the named trigger for the **frontmatter** decision deferred in the roadmap. If Option A wins, frontmatter may never be needed at all.
 
-### P9-4 Workspace dashboard — **M** *(added 2026-08-18, from a review pass; capstone — sequence last in P9)*
-- [ ] **Continue** — last few open notes, from `.workspace.json`'s existing session state
-- [ ] **Recent** — recently edited notes, from existing mtime
-- [ ] **Tasks** — open count, from P9-1's `note_tasks`
-- [ ] **Study** — cards due today, from P9-3's `review_cards`
-- [ ] **Git** — up-to-date / unpushed / diverged, from P5's existing status calls
-- [ ] No new derived state — every section reads data another task already produces
-- [ ] Clicking an item opens it exactly like its source view would
+### P9-4 Workspace dashboard — **M** ✅ *(added 2026-08-18, from a review pass; capstone — sequence last in P9)*
+- [x] **Continue** — last few open notes, from `.workspace.json`'s existing session state
+- [x] **Recent** — recently edited notes, from existing mtime
+- [x] **Tasks** — open count, from P9-1's `note_tasks`
+- [x] **Study** — shipped as a disabled placeholder; P9-3 hasn't landed yet, so there's no `review_cards` data to show
+- [x] **Git** — up-to-date / unpushed / diverged, from P5's existing status calls
+- [x] No new derived state — every section reads data another task already produces
+- [x] Clicking an item opens it exactly like its source view would
 
-> **Dependency:** P9-1, P9-3, P5-2/P5-3/P5-4 — it has nothing to show without them.
+> **Dependency:** P9-1, P9-3, P5-2/P5-3/P5-4 — it has nothing to show without them. *Built ahead of P9-3 with Study stubbed out; see the roadmap's "Done, ahead of P9-3" note.*
 
 ---
 

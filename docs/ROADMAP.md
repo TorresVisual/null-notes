@@ -881,7 +881,7 @@ Then, once decided:
 - **Dependency:** the fork above; P6-1 for theorem-block cards; **this is the concrete trigger for the frontmatter decision** deferred in §5 — if Option A wins, frontmatter may never be needed at all.
 - **DoD:** Cards are authored inside normal notes and remain readable as plain Markdown in any other editor; a review session schedules correctly across restarts; deleting `index.db` and reopening loses no scheduling state; moving or renaming a note does not orphan its cards.
 
-### P9-4 — Workspace dashboard — **M**
+### P9-4 — Workspace dashboard — **M** ✅
 
 A single home screen instead of always opening to the last note — a capstone that pulls together threads P5 and P9 already built rather than adding new state of its own.
 
@@ -892,6 +892,8 @@ A single home screen instead of always opening to the last note — a capstone t
 - **Git** — up-to-date / N unpushed / diverged, from P5's existing status calls.
 - **Dependency:** P9-1, P9-3, P5-2/P5-3/P5-4. Sequence it last in P9 — it has nothing to show until the others exist.
 - **DoD:** Opening a workspace with no tab restored (or an explicit "Home" command) shows all five sections, each read from existing data with no new derived state introduced for this task; clicking any item opens it exactly like its source view would.
+
+*Done, ahead of P9-3.* Home reuses `Layout.tsx`'s existing `!activeTab` main-pane branch rather than a new overlay — `HomeView` renders in the same slot the old "select a note" empty-state text used to occupy, and a new `home` menu command (`Ctrl+H`) just calls `setActiveTab(null)`: no new view-state flag, and open tabs are never closed by it. Continue/Recent/Tasks/Git all read state or APIs another phase already computes (`openTabs`, `useNotesStore`'s `updatedAt`, `listOpenTasks`, and the P5 Git store fields `gitDiverged`/`gitPendingPaths`) — zero new derived state or backend commands, exactly as the DoD requires. P9-3 hasn't shipped yet, so **Study ships as a static disabled placeholder** ("Spaced repetition isn't set up yet") rather than blocking this task on it; wiring real due-card data into that section is P9-3's job when it lands. Design: `docs/specs/workspace-dashboard-design.md`.
 
 **Exit check for M9:** a real course folder yields a usable formula sheet, its open tasks are visible in one place, and a revision session runs off the semester's own notes without any content having been re-entered by hand.
 
