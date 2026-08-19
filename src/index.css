@@ -1942,6 +1942,51 @@ body {
 
 .task-view-item-text:hover { text-decoration: underline; }
 
+/* Formula sheet generation prompt (P9-2) — a single scope input, not a full
+   list view like task-view above, so it gets a narrower shell of its own. */
+.formula-sheet-prompt {
+  background: var(--bg-raised);
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  width: min(440px, calc(100vw - 40px));
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6);
+  padding: var(--space-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.formula-sheet-prompt-hint {
+  color: var(--text-tertiary);
+  font-size: 12px;
+  margin: 0;
+}
+
+.formula-sheet-prompt-input {
+  width: 100%;
+  padding: 10px 12px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-size: 14px;
+  outline: none;
+}
+
+.formula-sheet-prompt-input:focus { border-color: var(--border-strong); }
+
+.formula-sheet-prompt-error {
+  color: var(--danger);
+  font-size: 12px;
+  margin: 0;
+}
+
+.formula-sheet-prompt-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-sm);
+}
+
 /* Export to PDF (File > Export to PDF, or the OS print dialog directly)
    leans on the WebView's own print pipeline rather than a custom renderer —
    math, Mermaid, ink and code all print exactly as they're already shown on

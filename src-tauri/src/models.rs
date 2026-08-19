@@ -138,6 +138,16 @@ pub struct GraphTag {
     pub tag: String,
 }
 
+/// A block-math formula extracted from a note's raw markdown (P9-2), used
+/// only to assemble a generated formula sheet — never persisted, unlike
+/// `ExtractedTask`. `heading` is the nearest ATX heading above the formula in
+/// its source note, `None` if it appears before any heading.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ExtractedFormula {
+    pub latex: String,
+    pub heading: Option<String>,
+}
+
 /// A `- [ ]` / `- [x]` checkbox line extracted from a note's raw markdown
 /// (P9-1), mirroring how `extract_tags` feeds `note_tags`. `position` is the
 /// 0-indexed line number within the note's content — also the key

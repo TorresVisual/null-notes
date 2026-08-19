@@ -15,6 +15,7 @@ import { ShortcutsOverlay } from './ShortcutsOverlay'
 import { TemplateDialog } from './TemplateDialog'
 import { GraphView } from './GraphView'
 import { TaskView } from './TaskView'
+import { FormulaSheetPrompt } from './FormulaSheetPrompt'
 import { TerminalPane } from './TerminalPane'
 import { useWorkspaceStore } from '../store/workspace'
 import { useNotesStore } from '../store/notes'
@@ -76,6 +77,7 @@ export function Layout() {
   const editorPaneRef = useRef<HTMLDivElement>(null)
   const [graphOpen, setGraphOpen] = useState(false)
   const [taskViewOpen, setTaskViewOpen] = useState(false)
+  const [formulaSheetOpen, setFormulaSheetOpen] = useState(false)
   const [terminalMounted, setTerminalMounted] = useState(false)
   const [terminalOpen, setTerminalOpen] = useState(false)
   const settings = useSettingsStore((s) => s.settings)
@@ -178,6 +180,9 @@ export function Layout() {
         case 'task-view':
           if (workspacePath) setTaskViewOpen(true)
           break
+        case 'generate-formula-sheet':
+          if (workspacePath) setFormulaSheetOpen(true)
+          break
         case 'toggle-terminal':
           if (!workspacePath) break
           setTerminalMounted(true)
@@ -252,6 +257,7 @@ export function Layout() {
       {templateDialogOpen && <TemplateDialog onClose={() => setTemplateDialogOpen(false)} />}
       {graphOpen && <GraphView onClose={() => setGraphOpen(false)} />}
       {taskViewOpen && <TaskView onClose={() => setTaskViewOpen(false)} />}
+      {formulaSheetOpen && <FormulaSheetPrompt onClose={() => setFormulaSheetOpen(false)} />}
       <Sidebar
         onSearchOpen={() => setSearchOpen(true)}
         onSettingsOpen={() => setSettingsOpen(true)}

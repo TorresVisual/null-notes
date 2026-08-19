@@ -61,6 +61,8 @@ export const api = {
       invoke<OpenTask[]>('list_open_tasks', { workspace }),
     toggleTask: (path: string, position: number, workspace: string) =>
       invoke<void>('toggle_task', { path, position, workspace }),
+    generateFormulaSheet: (workspace: string, folder: string | null, tag: string | null) =>
+      invoke<NoteMetadata>('generate_formula_sheet', { workspace, folder, tag }),
   },
   templates: {
     list: (workspace: string) =>

@@ -199,6 +199,39 @@ pub async fn search_notes(
     Ok(rows)
 }
 
+/// The note set a P9-2 formula sheet is generated from: the same folder/tag
+/// scoping as `search_notes`, minus the FTS match and the 20-result cap
+/// (a sheet has to include *every* formula in scope, not a search page of
+/// them) and ordered by path rather than recency, so a regenerated sheet
+/// lists formulas in the same source order every time.
+pub async fn notes_in_scope(
+    pool: &SqlitePool,
+    workspace: &str,
+    folder: Option<&str>,
+    tag: Option<&str>,
+) -> Result<Vec<NoteMetadata>> {
+    let mut sql = String::from("SELECT n.id, n.title, n.path, n.workspace, n.updated_at FROM notes n");
+    if tag.is_some() {
+        sql.push_str(" JOIN note_tags nt ON nt.note_path = n.path AND nt.tag = ? COLLATE NOCASE");
+    }
+    sql.push_str(" WHERE n.workspace = ?");
+    if folder.is_some() {
+        sql.push_str(" AND n.path LIKE ? ESCAPE '\\'");
+    }
+    sql.push_str(" ORDER BY n.path");
+
+    let mut q = sqlx::query_as::<_, NoteMetadata>(&sql);
+    if let Some(tag) = tag {
+        q = q.bind(tag.to_string());
+    }
+    q = q.bind(workspace.to_string());
+    if let Some(folder) = folder {
+        q = q.bind(format!("%{}%", escape_like(folder)));
+    }
+    let rows = q.fetch_all(pool).await?;
+    Ok(rows)
+}
+
 pub async fn set_tags(pool: &SqlitePool, note_path: &str, tags: &[String]) -> Result<()> {
     sqlx::query("DELETE FROM note_tags WHERE note_path = ?")
         .bind(note_path)
@@ -553,6 +586,53 @@ mod tests {
         .unwrap();
 
         assert!(hits.is_empty(), "routing text only appears outside CS101");
+    }
+
+    #[tokio::test]
+    async fn test_notes_in_scope_whole_workspace_returns_all_notes_in_path_order() {
+        let pool = make_pool().await;
+        seed_search_fixture(&pool).await;
+
+        let notes = notes_in_scope(&pool, "/ws", None, None).await.unwrap();
+
+        let paths: Vec<&str> = notes.iter().map(|n| n.path.as_str()).collect();
+        assert_eq!(paths, vec!["/ws/CS101/a.md", "/ws/CS102/b.md"]);
+    }
+
+    #[tokio::test]
+    async fn test_notes_in_scope_filters_by_folder() {
+        let pool = make_pool().await;
+        seed_search_fixture(&pool).await;
+
+        let notes = notes_in_scope(&pool, "/ws", Some("CS102"), None)
+            .await
+            .unwrap();
+
+        assert_eq!(notes.len(), 1);
+        assert_eq!(notes[0].path, "/ws/CS102/b.md");
+    }
+
+    #[tokio::test]
+    async fn test_notes_in_scope_filters_by_tag() {
+        let pool = make_pool().await;
+        seed_search_fixture(&pool).await;
+
+        let notes = notes_in_scope(&pool, "/ws", None, Some("graphs"))
+            .await
+            .unwrap();
+
+        assert_eq!(notes.len(), 1);
+        assert_eq!(notes[0].path, "/ws/CS101/a.md");
+    }
+
+    #[tokio::test]
+    async fn test_notes_in_scope_is_scoped_to_the_given_workspace() {
+        let pool = make_pool().await;
+        seed_search_fixture(&pool).await;
+
+        let notes = notes_in_scope(&pool, "/ws", None, None).await.unwrap();
+
+        assert!(notes.iter().all(|n| n.workspace == "/ws"));
     }
 
     #[tokio::test]

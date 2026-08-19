@@ -1,6 +1,7 @@
 use crate::db::{self, DbPool};
 use crate::models::{
-    ExtractedTask, GraphLink, GraphTag, NoteMetadata, OpenTask, SearchResult, WorkspaceTree,
+    ExtractedFormula, ExtractedTask, GraphLink, GraphTag, NoteMetadata, OpenTask, SearchResult,
+    WorkspaceTree,
 };
 use regex::Regex;
 use std::collections::HashSet;
@@ -131,6 +132,92 @@ pub fn extract_tasks(content: &str) -> Vec<ExtractedTask> {
         }
     }
     tasks
+}
+
+// Recognises the same two shapes `BlockMath.tsx`'s markdown-it rule reads: a
+// one-liner `$$latex$$`, or a `$`/`$$` fence closed by the same marker across
+// multiple lines. Line-based like `extract_tasks`, for the same reason —
+// fenced code demonstrating math syntax must be skipped, not harvested — plus
+// a running "nearest heading above" so each formula can be captioned with the
+// section it came from (`None` before the note's first heading).
+pub fn extract_formulas(content: &str) -> Vec<ExtractedFormula> {
+    // `#{2,6}`, not `{1,6}`: a level-1 heading is conventionally the note's
+    // own title, which the formula sheet already renders as the `##` group
+    // for the whole note — tracking it as a formula's `heading` would just
+    // repeat the note title as a redundant sub-caption for anything that
+    // appears before the first real section heading.
+    let heading_re = match Regex::new(r"^#{2,6}\s+(.+?)\s*$") {
+        Ok(re) => re,
+        Err(_) => return Vec::new(),
+    };
+
+    let lines: Vec<&str> = content.lines().collect();
+    let mut in_fence = false;
+    let mut current_heading: Option<String> = None;
+    let mut formulas = Vec::new();
+    let mut i = 0;
+
+    while i < lines.len() {
+        let trimmed = lines[i].trim();
+
+        if trimmed.starts_with("```") {
+            in_fence = !in_fence;
+            i += 1;
+            continue;
+        }
+        if in_fence {
+            i += 1;
+            continue;
+        }
+
+        if let Some(caps) = heading_re.captures(trimmed) {
+            current_heading = Some(caps[1].to_string());
+            i += 1;
+            continue;
+        }
+
+        // One-liner: opened and closed by `$$` on the same line, with real
+        // content between — `$$` alone falls through to the fence case below.
+        if let Some(inner) = trimmed
+            .strip_prefix("$$")
+            .and_then(|rest| rest.strip_suffix("$$"))
+        {
+            let latex = inner.trim();
+            if trimmed.len() > 4 && !latex.is_empty() {
+                formulas.push(ExtractedFormula {
+                    latex: latex.to_string(),
+                    heading: current_heading.clone(),
+                });
+                i += 1;
+                continue;
+            }
+        }
+
+        // A fence closes on the marker it opened with: guessing which half of
+        // a mismatched pair was meant would swallow the rest of the note.
+        if trimmed == "$" || trimmed == "$$" {
+            let marker = trimmed;
+            let mut j = i + 1;
+            while j < lines.len() && lines[j].trim() != marker {
+                j += 1;
+            }
+            if j < lines.len() {
+                let latex = lines[i + 1..j].join("\n").trim().to_string();
+                if !latex.is_empty() {
+                    formulas.push(ExtractedFormula {
+                        latex,
+                        heading: current_heading.clone(),
+                    });
+                }
+                i = j + 1;
+                continue;
+            }
+        }
+
+        i += 1;
+    }
+
+    formulas
 }
 
 #[tauri::command]
@@ -910,6 +997,102 @@ pub async fn create_note_from_template(
     Ok(meta)
 }
 
+fn formula_sheet_title(folder: Option<&str>, tag: Option<&str>) -> String {
+    match (folder, tag) {
+        (None, None) => "Formula Sheet".to_string(),
+        (Some(f), None) => format!("Formula Sheet - {f}"),
+        (None, Some(t)) => format!("Formula Sheet - {t}"),
+        (Some(f), Some(t)) => format!("Formula Sheet - {f} - {t}"),
+    }
+}
+
+/// Groups consecutively by (note, heading) — the input is already in scope
+/// order, so a run of entries sharing a note or heading is always contiguous
+/// — and emits a `## Note Title` / `### Heading` pair only when either
+/// changes, rather than once per formula.
+fn render_formula_sheet(title: &str, entries: &[(String, Option<String>, String)]) -> String {
+    let mut out = format!("# {title}\n");
+    let mut last_note: Option<String> = None;
+    let mut last_heading: Option<Option<String>> = None;
+
+    for (note_title, heading, latex) in entries {
+        if last_note.as_deref() != Some(note_title.as_str()) {
+            out.push_str(&format!("\n## {note_title}\n"));
+            last_note = Some(note_title.clone());
+            last_heading = None;
+        }
+        if last_heading.as_ref() != Some(heading) {
+            if let Some(h) = heading {
+                out.push_str(&format!("\n### {h}\n"));
+            }
+            last_heading = Some(heading.clone());
+        }
+        out.push_str(&format!("\n$\n{latex}\n$\n"));
+    }
+    out
+}
+
+/// P9-2: every block-math formula across a scope, deduplicated and written
+/// to a new plain note. Scope resolution and per-note extraction are already
+/// tested in isolation (`db::notes::notes_in_scope`, `extract_formulas`) —
+/// this is the part that's new: reading each scoped note's *current* file
+/// content (not whatever's indexed, which can lag a still-open buffer),
+/// deduping scope-wide by trimmed latex (first occurrence wins, so the sheet
+/// stays stable across regenerations as long as the source notes don't
+/// change), and handing the result to the same collision-refusing write path
+/// every other generated note goes through.
+async fn generate_formula_sheet_at(
+    workspace: &str,
+    folder: Option<&str>,
+    tag: Option<&str>,
+    db: &DbPool,
+) -> anyhow::Result<NoteMetadata> {
+    let scoped = db::notes::notes_in_scope(db, workspace, folder, tag).await?;
+
+    let mut seen = HashSet::new();
+    let mut entries = Vec::new();
+    for note in &scoped {
+        // Same posture as `reindex_from_disk`: an indexed path whose file is
+        // gone (deleted outside the app, or an index that's drifted) is a
+        // note with nothing left to contribute, not a reason to fail the
+        // whole sheet.
+        let Ok(content) = tokio::fs::read_to_string(&note.path).await else {
+            continue;
+        };
+        for formula in extract_formulas(&content) {
+            if seen.insert(formula.latex.clone()) {
+                entries.push((note.title.clone(), formula.heading, formula.latex));
+            }
+        }
+    }
+
+    let title = formula_sheet_title(folder, tag);
+    let body = render_formula_sheet(&title, &entries);
+    let path = create_note_file_with_content(workspace, &title, &body).await?;
+
+    let meta = NoteMetadata {
+        id: Uuid::new_v4().to_string(),
+        title,
+        path: path.to_string_lossy().into_owned(),
+        workspace: workspace.to_string(),
+        updated_at: now_ms(),
+    };
+    index_note_at(&meta.path, &meta.workspace, &body, db).await?;
+    Ok(meta)
+}
+
+#[tauri::command]
+pub async fn generate_formula_sheet(
+    workspace: String,
+    folder: Option<String>,
+    tag: Option<String>,
+    db: State<'_, DbPool>,
+) -> Result<NoteMetadata, String> {
+    generate_formula_sheet_at(&workspace, folder.as_deref(), tag.as_deref(), &db)
+        .await
+        .map_err(|e| e.to_string())
+}
+
 async fn create_folder_at(parent: &str, name: &str) -> anyhow::Result<String> {
     let path = std::path::Path::new(parent).join(name);
     tokio::fs::create_dir(&path).await?;
@@ -1159,6 +1342,73 @@ mod tests {
     #[test]
     fn test_extract_tasks_empty_content() {
         assert!(extract_tasks("").is_empty());
+    }
+
+    #[test]
+    fn test_extract_formulas_reads_a_one_liner() {
+        let formulas = extract_formulas("intro\n\n$$e^{i\\pi} + 1 = 0$$\n\nmore text");
+        assert_eq!(formulas.len(), 1);
+        assert_eq!(formulas[0].latex, "e^{i\\pi} + 1 = 0");
+        assert_eq!(formulas[0].heading, None);
+    }
+
+    #[test]
+    fn test_extract_formulas_reads_a_multiline_dollar_fence() {
+        let formulas = extract_formulas("$\nE = mc^2\n$\n");
+        assert_eq!(formulas.len(), 1);
+        assert_eq!(formulas[0].latex, "E = mc^2");
+    }
+
+    #[test]
+    fn test_extract_formulas_reads_a_multiline_double_dollar_fence() {
+        let formulas = extract_formulas("$$\n\\det(A - \\lambda I) = 0\n$$\n");
+        assert_eq!(formulas.len(), 1);
+        assert_eq!(formulas[0].latex, "\\det(A - \\lambda I) = 0");
+    }
+
+    #[test]
+    fn test_extract_formulas_captures_the_nearest_heading_above() {
+        let content = "# Lecture 3\n## Eigenvalues\n$$Av = \\lambda v$$\n## Determinants\n$$\\det(A)$$";
+        let formulas = extract_formulas(content);
+        assert_eq!(formulas.len(), 2);
+        assert_eq!(formulas[0].heading.as_deref(), Some("Eigenvalues"));
+        assert_eq!(formulas[1].heading.as_deref(), Some("Determinants"));
+    }
+
+    #[test]
+    fn test_extract_formulas_before_any_heading_has_no_heading() {
+        let formulas = extract_formulas("$$E = mc^2$$\n# Later Heading\n");
+        assert_eq!(formulas.len(), 1);
+        assert_eq!(formulas[0].heading, None);
+    }
+
+    #[test]
+    fn test_extract_formulas_does_not_treat_the_note_title_as_a_heading() {
+        let formulas = extract_formulas("# Networks\n$$E = mc^2$$\n");
+        assert_eq!(formulas.len(), 1);
+        assert_eq!(formulas[0].heading, None);
+    }
+
+    #[test]
+    fn test_extract_formulas_skips_fenced_code_blocks() {
+        let content = "$$real formula$$\n```\n$$not a formula$$\n```\n$$another real one$$";
+        let formulas = extract_formulas(content);
+        assert_eq!(formulas.len(), 2);
+        assert_eq!(formulas[0].latex, "real formula");
+        assert_eq!(formulas[1].latex, "another real one");
+    }
+
+    #[test]
+    fn test_extract_formulas_preserves_source_order() {
+        let content = "$$first$$\n$$second$$\n$$third$$";
+        let formulas = extract_formulas(content);
+        let latexes: Vec<&str> = formulas.iter().map(|f| f.latex.as_str()).collect();
+        assert_eq!(latexes, vec!["first", "second", "third"]);
+    }
+
+    #[test]
+    fn test_extract_formulas_empty_content() {
+        assert!(extract_formulas("").is_empty());
     }
 
     #[test]
@@ -1495,6 +1745,136 @@ mod save_tests {
             std::fs::read_to_string(&other).unwrap(),
             "# Other\nSee [[Something Else]].\n"
         );
+    }
+
+    async fn seed_formula_fixture(tmp: &std::path::Path, ws: &str, pool: &DbPool) {
+        let a = tmp.join("CS101").join("a.md");
+        let b = tmp.join("CS102").join("b.md");
+        std::fs::create_dir_all(a.parent().unwrap()).unwrap();
+        std::fs::create_dir_all(b.parent().unwrap()).unwrap();
+
+        let a_content = "# Analysis\n## Eigenvalues\n$$Av = \\lambda v$$\n\n$$Av = \\lambda v$$\n";
+        let b_content = "# Networks\n$$Av = \\lambda v$$\n$$E=mc^2$$\n";
+        std::fs::write(&a, a_content).unwrap();
+        std::fs::write(&b, b_content).unwrap();
+
+        index_note_at(&a.to_string_lossy(), ws, a_content, pool)
+            .await
+            .unwrap();
+        index_note_at(&b.to_string_lossy(), ws, b_content, pool)
+            .await
+            .unwrap();
+        db::notes::set_tags(pool, &a.to_string_lossy(), &["calc2".to_string()])
+            .await
+            .unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_generate_formula_sheet_at_dedupes_and_groups_by_note_and_heading() {
+        let tmp = tempdir().unwrap();
+        let ws = tmp.path().to_string_lossy().into_owned();
+        let pool = DbPool::connect("sqlite::memory:").await.unwrap();
+        run_migrations(&pool).await.unwrap();
+        seed_formula_fixture(tmp.path(), &ws, &pool).await;
+
+        let meta = generate_formula_sheet_at(&ws, None, None, &pool)
+            .await
+            .unwrap();
+
+        assert_eq!(meta.title, "Formula Sheet");
+        let body = std::fs::read_to_string(&meta.path).unwrap();
+        assert_eq!(
+            body,
+            "# Formula Sheet\n\n## Analysis\n\n### Eigenvalues\n\n$\nAv = \\lambda v\n$\n\n## Networks\n\n$\nE=mc^2\n$\n"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_generate_formula_sheet_at_filters_by_folder() {
+        let tmp = tempdir().unwrap();
+        let ws = tmp.path().to_string_lossy().into_owned();
+        let pool = DbPool::connect("sqlite::memory:").await.unwrap();
+        run_migrations(&pool).await.unwrap();
+        seed_formula_fixture(tmp.path(), &ws, &pool).await;
+
+        let meta = generate_formula_sheet_at(&ws, Some("CS102"), None, &pool)
+            .await
+            .unwrap();
+
+        assert_eq!(meta.title, "Formula Sheet - CS102");
+        let body = std::fs::read_to_string(&meta.path).unwrap();
+        assert_eq!(
+            body,
+            "# Formula Sheet - CS102\n\n## Networks\n\n$\nAv = \\lambda v\n$\n\n$\nE=mc^2\n$\n"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_generate_formula_sheet_at_filters_by_tag() {
+        let tmp = tempdir().unwrap();
+        let ws = tmp.path().to_string_lossy().into_owned();
+        let pool = DbPool::connect("sqlite::memory:").await.unwrap();
+        run_migrations(&pool).await.unwrap();
+        seed_formula_fixture(tmp.path(), &ws, &pool).await;
+
+        let meta = generate_formula_sheet_at(&ws, None, Some("calc2"), &pool)
+            .await
+            .unwrap();
+
+        assert_eq!(meta.title, "Formula Sheet - calc2");
+        let body = std::fs::read_to_string(&meta.path).unwrap();
+        assert_eq!(
+            body,
+            "# Formula Sheet - calc2\n\n## Analysis\n\n### Eigenvalues\n\n$\nAv = \\lambda v\n$\n"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_generate_formula_sheet_at_refuses_to_overwrite_an_existing_file() {
+        let tmp = tempdir().unwrap();
+        let ws = tmp.path().to_string_lossy().into_owned();
+        let pool = DbPool::connect("sqlite::memory:").await.unwrap();
+        run_migrations(&pool).await.unwrap();
+        seed_formula_fixture(tmp.path(), &ws, &pool).await;
+        let existing = tmp.path().join("Formula Sheet.md");
+        std::fs::write(&existing, "pre-existing content").unwrap();
+
+        let result = generate_formula_sheet_at(&ws, None, None, &pool).await;
+
+        assert!(result.is_err());
+        assert_eq!(
+            std::fs::read_to_string(&existing).unwrap(),
+            "pre-existing content"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_generate_formula_sheet_at_skips_a_note_whose_file_no_longer_exists_on_disk() {
+        let tmp = tempdir().unwrap();
+        let ws = tmp.path().to_string_lossy().into_owned();
+        let pool = DbPool::connect("sqlite::memory:").await.unwrap();
+        run_migrations(&pool).await.unwrap();
+        seed_formula_fixture(tmp.path(), &ws, &pool).await;
+
+        // A stale index row: indexed, but the file is since gone — the shape
+        // index.db can end up in when a note is deleted outside the app
+        // (matches `reindex_from_disk`'s own read-failure handling, which
+        // also treats a missing file as "gone," not an error).
+        let gone = tmp.path().join("CS103").join("gone.md");
+        std::fs::create_dir_all(gone.parent().unwrap()).unwrap();
+        std::fs::write(&gone, "# Gone\n$$stale$$\n").unwrap();
+        index_note_at(&gone.to_string_lossy(), &ws, "# Gone\n$$stale$$\n", &pool)
+            .await
+            .unwrap();
+        std::fs::remove_file(&gone).unwrap();
+
+        let meta = generate_formula_sheet_at(&ws, None, None, &pool)
+            .await
+            .unwrap();
+
+        let body = std::fs::read_to_string(&meta.path).unwrap();
+        assert!(!body.contains("stale"));
+        assert!(body.contains("Av = \\lambda v"));
     }
 }
 
