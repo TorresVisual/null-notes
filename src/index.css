@@ -483,6 +483,55 @@ body {
   color: var(--danger);
 }
 
+/* Equation snippets (P6-4) — the "/" trigger reimplemented for LaTeX-source
+   editing, since InlineMath's <input> and BlockMath's <textarea> are plain
+   form controls outside ProseMirror and the editor-wide .slash-menu can
+   never see typing inside either one. */
+.math-snippet-anchor {
+  position: relative;
+}
+
+.math-snippet-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 60;
+  background: var(--bg-raised);
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  min-width: 220px;
+  max-height: 260px;
+  overflow-y: auto;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+  padding: var(--space-xs);
+}
+
+.math-snippet-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  width: 100%;
+  padding: 6px 8px;
+  background: none;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  text-align: left;
+  color: var(--text-primary);
+}
+
+.math-snippet-item.selected,
+.math-snippet-item:hover { background: var(--bg-hover); }
+
+.math-snippet-trigger {
+  font-family: 'Cascadia Code', 'Fira Code', monospace;
+  font-size: 12px;
+  color: var(--accent);
+}
+
+.math-snippet-desc { font-size: 11px; color: var(--text-tertiary); }
+
 /* Ink block placeholder */
 .ink-block-wrapper {
   border: 1px dashed var(--border-strong);

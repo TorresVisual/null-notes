@@ -3,6 +3,8 @@ import { ReactNodeViewRenderer, NodeViewWrapper } from '@tiptap/react'
 import type { ReactNodeViewProps } from '@tiptap/react'
 import { useEffect, useRef, useState } from 'react'
 import katex from 'katex'
+import { useMathSnippetMenu } from '../../hooks/useMathSnippetMenu'
+import { MathSnippetMenu } from './MathSnippetMenu'
 
 interface BlockMathAttrs {
   latex: string
@@ -29,7 +31,9 @@ function BlockMathView({ node, editor, getPos, updateAttributes, deleteNode, sel
   const { latex } = node.attrs as unknown as BlockMathAttrs
   const [editing, setEditing] = useState(() => editor.isEditable && latex === '')
   const [draft, setDraft] = useState(latex)
+  const [cursor, setCursor] = useState(0)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const snippetMenu = useMathSnippetMenu(draft, cursor, setDraft, textareaRef)
 
   useEffect(() => {
     if (editing) textareaRef.current?.focus()
@@ -85,25 +89,38 @@ function BlockMathView({ node, editor, getPos, updateAttributes, deleteNode, sel
       )}
       {editing && (
         <div className="block-math-editor" contentEditable={false} onMouseDown={(e) => e.stopPropagation()}>
-          <textarea
-            ref={textareaRef}
-            className="block-math-editor-input"
-            value={draft}
-            spellCheck={false}
-            placeholder="e^{i\pi} + 1 = 0  (Mod-Enter to apply, Escape to cancel)"
-            onChange={(e) => setDraft(e.target.value)}
-            onBlur={() => commit(false)}
-            onKeyDown={(e) => {
-              e.stopPropagation()
-              if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-                e.preventDefault()
-                commit(true)
-              } else if (e.key === 'Escape') {
-                e.preventDefault()
-                cancel()
-              }
-            }}
-          />
+          <div className="math-snippet-anchor">
+            <textarea
+              ref={textareaRef}
+              className="block-math-editor-input"
+              value={draft}
+              spellCheck={false}
+              placeholder="e^{i\pi} + 1 = 0  (Mod-Enter to apply, Escape to cancel, / for a snippet)"
+              onChange={(e) => {
+                setDraft(e.target.value)
+                setCursor(e.target.selectionStart ?? e.target.value.length)
+              }}
+              onClick={(e) => setCursor(e.currentTarget.selectionStart ?? 0)}
+              onKeyUp={(e) => setCursor(e.currentTarget.selectionStart ?? 0)}
+              onBlur={() => commit(false)}
+              onKeyDown={(e) => {
+                e.stopPropagation()
+                if (snippetMenu.handleKeyDown(e)) return
+                if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                  e.preventDefault()
+                  commit(true)
+                } else if (e.key === 'Escape') {
+                  e.preventDefault()
+                  cancel()
+                }
+              }}
+            />
+            <MathSnippetMenu
+              matches={snippetMenu.matches}
+              selected={snippetMenu.selected}
+              onSelect={snippetMenu.select}
+            />
+          </div>
           <div className="block-math-editor-preview" dangerouslySetInnerHTML={{ __html: preview.html }} />
           {preview.error && <div className="block-math-editor-error">{preview.error}</div>}
         </div>

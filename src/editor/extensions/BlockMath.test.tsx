@@ -96,6 +96,25 @@ describe('block math editing', () => {
     await waitFor(() => expect(mathNodes(editor!)).toHaveLength(0))
   })
 
+  // P6-4: the "/" trigger reimplemented for LaTeX-source editing, since the
+  // textarea is a plain form control outside ProseMirror and the editor-wide
+  // slash-command plugin can never see typing inside it.
+  it('inserts an equation snippet on Enter after a "/" query', async () => {
+    const { container } = mount('<p></p>')
+    editor!.commands.insertContent({ type: 'blockMath', attrs: { latex: '' } })
+    const textarea = await waitFor(() => {
+      const el = getTextarea(container)
+      if (!el) throw new Error('editor not open yet')
+      return el
+    })
+    const user = userEvent.setup()
+    await user.type(textarea, '/gradient{Enter}')
+    await waitFor(() => expect(getTextarea(container)!.value).toBe('\\nabla f(x)'))
+
+    await user.type(textarea, '{Control>}{Enter}{/Control}')
+    await waitFor(() => expect(mathNodes(editor!)).toEqual([{ latex: '\\nabla f(x)' }]))
+  })
+
   it('opens directly into edit mode for a freshly inserted empty node, and Escape deletes it', async () => {
     const { container } = mount('<p></p>')
     editor!.commands.insertContent({ type: 'blockMath', attrs: { latex: '' } })
