@@ -1,0 +1,662 @@
+<title>null-notes Roadmap</title>
+<style>
+  :root {
+    --bg: #f4f6f8;
+    --surface: #ffffff;
+    --surface-2: #eef1f4;
+    --border: #dde3ea;
+    --border-strong: #c6cfd9;
+    --text: #1a212b;
+    --text-muted: #5b6b7c;
+    --text-faint: #8998a8;
+    --accent: #0e828f;
+    --accent-soft: #e2f2f3;
+    --done: #2f8f5b;
+    --done-soft: #e5f4ec;
+    --next: #b5791a;
+    --next-soft: #faf0dd;
+    --gated: #6b6f9a;
+    --gated-soft: #ecedf7;
+    --code-bg: #eef1f4;
+    --shadow: 0 1px 2px rgba(20, 30, 45, 0.06), 0 8px 24px rgba(20, 30, 45, 0.05);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #10141b;
+      --surface: #171d27;
+      --surface-2: #1c232f;
+      --border: #262f3d;
+      --border-strong: #333e4f;
+      --text: #e6ebf0;
+      --text-muted: #8b98a9;
+      --text-faint: #5e6b7c;
+      --accent: #5fd0dd;
+      --accent-soft: #17313a;
+      --done: #57c98b;
+      --done-soft: #17301f;
+      --next: #e0a94a;
+      --next-soft: #332714;
+      --gated: #9ba3d8;
+      --gated-soft: #1e2035;
+      --code-bg: #1c232f;
+      --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 12px 32px rgba(0, 0, 0, 0.35);
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --bg: #10141b;
+    --surface: #171d27;
+    --surface-2: #1c232f;
+    --border: #262f3d;
+    --border-strong: #333e4f;
+    --text: #e6ebf0;
+    --text-muted: #8b98a9;
+    --text-faint: #5e6b7c;
+    --accent: #5fd0dd;
+    --accent-soft: #17313a;
+    --done: #57c98b;
+    --done-soft: #17301f;
+    --next: #e0a94a;
+    --next-soft: #332714;
+    --gated: #9ba3d8;
+    --gated-soft: #1e2035;
+    --code-bg: #1c232f;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 12px 32px rgba(0, 0, 0, 0.35);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: ui-sans-serif, -apple-system, "Segoe UI", system-ui, Roboto, sans-serif;
+    font-size: 16px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .mono {
+    font-family: ui-monospace, "Cascadia Code", "Fira Code", "SF Mono", Consolas, monospace;
+  }
+
+  a { color: var(--accent); }
+
+  .page {
+    display: grid;
+    grid-template-columns: 220px minmax(0, 720px);
+    gap: 56px;
+    justify-content: center;
+    max-width: 1080px;
+    margin: 0 auto;
+    padding: 56px 24px 96px;
+  }
+
+  @media (max-width: 880px) {
+    .page { grid-template-columns: minmax(0, 1fr); }
+    .rail { display: none; }
+  }
+
+  /* ---------- Rail nav ---------- */
+  .rail {
+    position: sticky;
+    top: 56px;
+    align-self: start;
+    height: fit-content;
+    max-height: calc(100vh - 96px);
+    overflow-y: auto;
+  }
+  .rail-label {
+    font-family: ui-monospace, "Cascadia Code", "Fira Code", "SF Mono", Consolas, monospace;
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+    margin-bottom: 12px;
+  }
+  .rail-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+  .rail-list a {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    padding: 5px 8px;
+    border-radius: 6px;
+    text-decoration: none;
+    color: var(--text-muted);
+    font-size: 13px;
+  }
+  .rail-list a:hover { background: var(--surface-2); color: var(--text); }
+  .rail-code {
+    font-family: ui-monospace, "Cascadia Code", "Fira Code", "SF Mono", Consolas, monospace;
+    font-size: 11px;
+    color: var(--text-faint);
+    width: 26px;
+    flex-shrink: 0;
+  }
+  .rail-dot {
+    width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0;
+    background: var(--border-strong);
+  }
+  .rail-dot.done { background: var(--done); }
+  .rail-dot.next { background: var(--next); }
+  .rail-dot.gated { background: var(--gated); }
+
+  /* ---------- Header ---------- */
+  header { margin-bottom: 48px; }
+  .eyebrow {
+    font-family: ui-monospace, "Cascadia Code", "Fira Code", "SF Mono", Consolas, monospace;
+    font-size: 12px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0 0 14px;
+  }
+  h1 {
+    font-family: ui-monospace, "Cascadia Code", "Fira Code", "SF Mono", Consolas, monospace;
+    font-size: clamp(32px, 5vw, 44px);
+    line-height: 1.08;
+    letter-spacing: -0.01em;
+    margin: 0 0 16px;
+    text-wrap: balance;
+  }
+  .tagline {
+    font-size: 18px;
+    color: var(--text-muted);
+    max-width: 56ch;
+    margin: 0 0 24px;
+    text-wrap: balance;
+  }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip {
+    font-family: ui-monospace, "Cascadia Code", "Fira Code", "SF Mono", Consolas, monospace;
+    font-size: 12px;
+    padding: 5px 10px;
+    border: 1px solid var(--border-strong);
+    border-radius: 6px;
+    color: var(--text-muted);
+    background: var(--surface);
+  }
+
+  /* ---------- Sections ---------- */
+  section { margin-bottom: 52px; scroll-margin-top: 32px; }
+  h2 {
+    font-family: ui-monospace, "Cascadia Code", "Fira Code", "SF Mono", Consolas, monospace;
+    font-size: 22px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 0 0 6px;
+  }
+  h2 .code {
+    font-size: 13px;
+    color: var(--accent);
+    background: var(--accent-soft);
+    padding: 3px 8px;
+    border-radius: 5px;
+  }
+  .section-sub {
+    color: var(--text-muted);
+    margin: 0 0 24px;
+    max-width: 62ch;
+  }
+  h3 {
+    font-size: 16px;
+    font-weight: 650;
+    margin: 28px 0 10px;
+  }
+  p { margin: 0 0 14px; max-width: 68ch; }
+  ul, ol { margin: 0 0 14px; padding-left: 22px; max-width: 66ch; }
+  li { margin-bottom: 6px; }
+  code {
+    font-family: ui-monospace, "Cascadia Code", "Fira Code", "SF Mono", Consolas, monospace;
+    font-size: 0.88em;
+    background: var(--code-bg);
+    padding: 1px 5px;
+    border-radius: 4px;
+  }
+
+  /* ---------- Principle cards ---------- */
+  .principles {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+  @media (max-width: 560px) { .principles { grid-template-columns: 1fr; } }
+  .principle {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px 18px;
+  }
+  .principle .num {
+    font-family: ui-monospace, "Cascadia Code", "Fira Code", "SF Mono", Consolas, monospace;
+    font-size: 11px;
+    color: var(--accent);
+    display: block;
+    margin-bottom: 6px;
+  }
+  .principle p { margin: 0; font-size: 14px; color: var(--text-muted); }
+  .principle strong { color: var(--text); }
+
+  /* ---------- Status table ---------- */
+  .status-table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); box-shadow: var(--shadow); }
+  table { width: 100%; border-collapse: collapse; min-width: 560px; }
+  th, td { text-align: left; padding: 12px 16px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  th {
+    font-family: ui-monospace, "Cascadia Code", "Fira Code", "SF Mono", Consolas, monospace;
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+    font-weight: 600;
+  }
+  td.phase-code {
+    font-family: ui-monospace, "Cascadia Code", "Fira Code", "SF Mono", Consolas, monospace;
+    color: var(--text-muted);
+    white-space: nowrap;
+  }
+  td.milestone { color: var(--text-muted); font-size: 14px; }
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-family: ui-monospace, "Cascadia Code", "Fira Code", "SF Mono", Consolas, monospace;
+    font-size: 11px;
+    letter-spacing: 0.03em;
+    padding: 3px 9px;
+    border-radius: 100px;
+    white-space: nowrap;
+  }
+  .pill.done { background: var(--done-soft); color: var(--done); }
+  .pill.next { background: var(--next-soft); color: var(--next); }
+  .pill.gated { background: var(--gated-soft); color: var(--gated); }
+  .pill::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+
+  /* ---------- Feature list ---------- */
+  .feat-group { margin-bottom: 22px; }
+  .feat-group h4 {
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-faint);
+    margin: 0 0 10px;
+    font-weight: 600;
+  }
+  .feat-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 9px; }
+  .feat-list li {
+    display: flex;
+    gap: 10px;
+    align-items: baseline;
+    font-size: 14.5px;
+  }
+  .feat-list li::before {
+    content: "";
+    width: 5px; height: 5px; border-radius: 50%;
+    background: var(--done);
+    flex-shrink: 0;
+    margin-top: 8px;
+  }
+  .feat-list.open li::before { background: var(--next); }
+  .feat-list b { color: var(--text); }
+  .feat-list span.desc { color: var(--text-muted); }
+
+  /* ---------- Callout ---------- */
+  .callout {
+    border-left: 3px solid var(--accent);
+    background: var(--accent-soft);
+    border-radius: 0 8px 8px 0;
+    padding: 14px 18px;
+    margin: 0 0 20px;
+    font-size: 14.5px;
+    color: var(--text);
+  }
+  .callout p:last-child { margin-bottom: 0; }
+
+  /* ---------- Not building ---------- */
+  .cut-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+    gap: 10px;
+  }
+  .cut-card {
+    border: 1px dashed var(--border-strong);
+    border-radius: 10px;
+    padding: 12px 14px;
+    font-size: 13.5px;
+  }
+  .cut-card b { display: block; margin-bottom: 4px; color: var(--text); font-size: 14px; }
+  .cut-card span { color: var(--text-faint); }
+
+  /* ---------- Planning ---------- */
+  .plan-item {
+    border: 1px solid var(--border);
+    background: var(--surface);
+    border-radius: 10px;
+    padding: 16px 18px;
+    margin-bottom: 12px;
+  }
+  .plan-item h4 { margin: 0 0 6px; font-size: 15px; display: flex; align-items: center; gap: 8px; }
+  .plan-item .tag {
+    font-family: ui-monospace, "Cascadia Code", "Fira Code", "SF Mono", Consolas, monospace;
+    font-size: 10.5px;
+    color: var(--accent);
+    background: var(--accent-soft);
+    padding: 2px 7px;
+    border-radius: 4px;
+  }
+  .plan-item p { margin: 0; font-size: 14px; color: var(--text-muted); }
+
+  footer {
+    margin-top: 64px;
+    padding-top: 24px;
+    border-top: 1px solid var(--border);
+    font-size: 13px;
+    color: var(--text-faint);
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .rail-list a { transition: background 0.12s ease, color 0.12s ease; }
+  }
+</style>
+
+<div class="page">
+  <nav class="rail" aria-label="Phase navigation">
+    <div class="rail-label">Jump to phase</div>
+    <ul class="rail-list">
+      <li><a href="#foundation"><span class="rail-code">—</span> Foundation</a></li>
+      <li><a href="#p0"><span class="rail-code">P0</span><span class="rail-dot done"></span> Daily driver</a></li>
+      <li><a href="#p1p2"><span class="rail-code">P1–2</span><span class="rail-dot done"></span> Ergonomics</a></li>
+      <li><a href="#p3"><span class="rail-code">P3</span><span class="rail-dot done"></span> Power tools</a></li>
+      <li><a href="#p4"><span class="rail-code">P4</span><span class="rail-dot done"></span> PDF pipeline</a></li>
+      <li><a href="#p5"><span class="rail-code">P5</span><span class="rail-dot done"></span> Git automation</a></li>
+      <li><a href="#p6"><span class="rail-code">P6</span><span class="rail-dot done"></span> STEM authoring</a></li>
+      <li><a href="#p7p8"><span class="rail-code">P7–8</span><span class="rail-dot done"></span> IDE + terminal</a></li>
+      <li><a href="#p9"><span class="rail-code">P9</span><span class="rail-dot next"></span> Study &amp; revision</a></li>
+      <li><a href="#gated"><span class="rail-code">P10</span><span class="rail-dot gated"></span> Gated</a></li>
+      <li><a href="#cut"><span class="rail-code">—</span> Not building</a></li>
+      <li><a href="#planning"><span class="rail-code">—</span> Planning notes</a></li>
+    </ul>
+  </nav>
+
+  <main>
+    <header>
+      <p class="eyebrow">Product &amp; feature map — 2026-08-19</p>
+      <h1>null-notes</h1>
+      <p class="tagline">A Markdown-first, WYSIWYG desktop note app for a CS student who writes math and code daily, sketches diagrams by hand, and never wants their notes locked into a proprietary format. Notion's editor, on Obsidian's storage model.</p>
+      <div class="chips">
+        <span class="chip">Tauri 2</span>
+        <span class="chip">Rust</span>
+        <span class="chip">React 19 + TS</span>
+        <span class="chip">TipTap 3</span>
+        <span class="chip">SQLite FTS</span>
+        <span class="chip">Windows-primary</span>
+        <span class="chip">Single user, offline-first</span>
+        <span class="chip">CI + e2e on push</span>
+      </div>
+    </header>
+
+    <section id="principles">
+      <h2>Non-negotiable principles</h2>
+      <p class="section-sub">Established early, still governing every decision below. Any future feature has to fit inside these, not around them.</p>
+      <div class="principles">
+        <div class="principle">
+          <span class="num">01</span>
+          <p><strong>Plain <code>.md</code> is the source of truth.</strong> SQLite is a rebuildable index — deleting it loses nothing.</p>
+        </div>
+        <div class="principle">
+          <span class="num">02</span>
+          <p><strong>Offline-first, local-first.</strong> No cloud dependency to open a note, ever.</p>
+        </div>
+        <div class="principle">
+          <span class="num">03</span>
+          <p><strong>The file on disk is always safe.</strong> No edit path may silently lose or corrupt a note.</p>
+        </div>
+        <div class="principle">
+          <span class="num">04</span>
+          <p><strong>Small, sharp feature set.</strong> Three similar things is not a pattern; no scaffolded half-features.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="foundation">
+      <h2><span class="code">—</span> Foundation</h2>
+      <p class="section-sub">Built before the phase roadmap existed and never revisited because it hasn't needed to be — the editor and ink subsystems are the mature heart of the app.</p>
+      <div class="feat-group">
+        <ul class="feat-list">
+          <li><b>WYSIWYG Markdown editor</b> <span class="desc">— live-preview, plain <code>.md</code> as the only file format, full GitHub-flavored Markdown.</span></li>
+          <li><b>Maths, diagrams, code</b> <span class="desc">— KaTeX (inline + block), Mermaid diagrams, syntax-highlighted code blocks, callouts, tables, task lists.</span></li>
+          <li><b>Wiki-links &amp; backlinks</b> <span class="desc">— <code>[[links]]</code> with a backlinks panel, plus <code>#tags</code> and a tag browser.</span></li>
+          <li><b>Full-text search</b> <span class="desc">— SQLite FTS over every note, <code>Ctrl+K</code>, scoped per workspace.</span></li>
+          <li><b>Inline handwriting</b> <span class="desc">— vector ink blocks with pen/eraser/shapes, pressure sensitivity, palm rejection.</span></li>
+          <li><b>Folder tree</b> <span class="desc">— create/rename/delete with cascade, drag-to-move.</span></li>
+          <li><b>Session persistence</b> <span class="desc">— open tabs and expanded folders remembered per workspace.</span></li>
+          <li><b>"Terminal Precision" design system</b> <span class="desc">— the app's own visual identity and icon set.</span></li>
+          <li><b>End-to-end test harness</b> <span class="desc">— WebdriverIO + tauri-driver against the real compiled app, screenshot-verified, run in CI on every push alongside <code>fmt</code>/<code>clippy</code>/unit tests.</span></li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="p0">
+      <h2><span class="code">P0</span> Trustworthy daily driver <span class="pill done">shipped</span></h2>
+      <p class="section-sub">Milestone: <em>I trust it with my real notes.</em> Every later feature that touches a note write is bound by the rules this phase established.</p>
+      <div class="feat-group">
+        <ul class="feat-list">
+          <li><b>Debounced autosave</b> <span class="desc">— typing never triggers a per-keystroke write; a visible <code>clean / dirty / saving / error</code> indicator tracks state.</span></li>
+          <li><b>Crash-safe writes</b> <span class="desc">— temp file → fsync → rename, so a killed process never leaves a half-written note.</span></li>
+          <li><b>Save/index split</b> <span class="desc">— the file write is the fast path; search/tag/link reindexing runs on a slower debounce.</span></li>
+          <li><b>External-change watcher</b> <span class="desc">— a file edited elsewhere (another editor, <code>git pull</code>, Syncthing) refreshes the tree and index automatically; a dirty buffer gets a conflict prompt instead of being overwritten.</span></li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="p1p2">
+      <h2><span class="code">P1–P2</span> Everyday use &amp; ergonomics <span class="pill done">shipped</span></h2>
+      <p class="section-sub">Milestones: <em>I don't reach for another app</em> and <em>it's a pleasure to use for hours.</em></p>
+      <div class="feat-group">
+        <ul class="feat-list">
+          <li><b>Click-to-create links</b> <span class="desc">— an unresolved <code>[[wiki-link]]</code> creates and opens the note.</span></li>
+          <li><b>Quick switcher</b> <span class="desc">— <code>Ctrl+P</code> fuzzy-jumps to any note; recent workspaces replace the folder dialog on reopen.</span></li>
+          <li><b>Link-preserving rename</b> <span class="desc">— renaming a note rewrites every inbound <code>[[link]]</code> across the workspace.</span></li>
+          <li><b>Settings panel</b> <span class="desc">— autosave delay, editor width, spellcheck + language, editor/terminal commands.</span></li>
+          <li><b>Native menu + shortcuts</b> <span class="desc">— File/Edit/View menu, a discoverable shortcut overlay (<code>?</code>).</span></li>
+          <li><b>Editor niceties</b> <span class="desc">— paste/drop images into a note, cursor &amp; scroll position remembered per tab, list editing that doesn't tear apart on Backspace.</span></li>
+          <li><b>Onboarding</b> <span class="desc">— a fresh workspace always has an obvious next action.</span></li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="p3">
+      <h2><span class="code">P3</span> Headline features &amp; power tools <span class="pill done">shipped</span></h2>
+      <p class="section-sub">Milestone: <em>the CS-specific superpowers that justify a custom app are real.</em></p>
+      <div class="feat-group">
+        <ul class="feat-list">
+          <li><b>PDF import as reference</b> <span class="desc">— pages render alongside the note for manual transcription; no OCR, no external binaries.</span></li>
+          <li><b>Export to PDF</b> <span class="desc">— via the WebView's own print pipeline, with a dedicated print stylesheet.</span></li>
+          <li><b>Connections graph</b> <span class="desc">— <code>Ctrl+G</code>, a force-directed view of notes linked by <code>[[links]]</code> and shared tags.</span></li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="p4">
+      <h2><span class="code">P4</span> PDF → Markdown pipeline <span class="pill done">shipped, frozen</span></h2>
+      <p class="section-sub">The brief's flagship feature. Milestone: <em>drop an exercise sheet in and start writing solutions into it as real text.</em></p>
+      <div class="callout">
+        <p><strong>No OCR.</strong> A typeset PDF carries its own embedded text layer — <code>pdfium-render</code> hands over exact glyph geometry and font metrics for free. Structure reconstruction became deterministic geometry, not machine learning.</p>
+      </div>
+      <div class="feat-group">
+        <ul class="feat-list">
+          <li><b>Structure from geometry</b> <span class="desc">— headings, paragraphs, lists, and monospace code blocks reconstructed from font size, baseline, and gap analysis.</span></li>
+          <li><b>Real LaTeX, not images</b> <span class="desc">— maths regions are rebuilt as editable <code>$…$</code> / <code>$$…$$</code> by classifying which maths font each glyph came from (variable, relation, blackboard bold…).</span></li>
+          <li><b>2D layout reconstruction</b> <span class="desc">— matrices, piecewise (<code>\cases</code>) functions, stacked and ruled fractions, operator limits, and tables all rebuild correctly, closed as a complete set.</span></li>
+          <li><b>Scanned-PDF fallback</b> <span class="desc">— a near-empty text layer is detected up front and routed to Pages mode instead of producing a garbage note.</span></li>
+          <li><b>Exercise splitting</b> <span class="desc">— "Split Into Tasks" turns a sheet into <code>Task N / Solution</code> pairs, each solution carrying its own handwriting canvas; "add next task" appends the next one.</span></li>
+        </ul>
+      </div>
+      <p style="color: var(--text-faint); font-size: 13.5px;">Frozen against a 10-document regression corpus — a new bug earns work only if it's whole-document or recurs across two documents. Verified real-world, not synthetic: every fix traces to an actual coursework PDF.</p>
+    </section>
+
+    <section id="p5">
+      <h2><span class="code">P5</span> Versioned workspaces / Git automation <span class="pill done">shipped</span></h2>
+      <p class="section-sub">Milestone: <em>my notes commit themselves, in both kinds of repo.</em> The next tier of P0's data safety — a commit is a recoverable backup.</p>
+      <div class="callout">
+        <p>Two modes with different defaults: a <strong>notes-only</strong> workspace pushes automatically; a workspace living <strong>inside a code repo</strong> (e.g. <code>notes/</code> in a coursework project) commits but <em>never</em> auto-pushes, and every Git command is pathspec-scoped so it can't touch your other work.</p>
+      </div>
+      <div class="feat-group">
+        <ul class="feat-list">
+          <li><b>Repo detection</b> <span class="desc">— classifies notes-only vs. code-repo on open; opt-in, never commits without an explicit yes.</span></li>
+          <li><b>Batched auto-commit</b> <span class="desc">— one commit per idle window, never per-save; backs off quietly on a mid-rebase/merge/detached-HEAD repo rather than ever repairing it.</span></li>
+          <li><b>Push policy</b> <span class="desc">— notes-only pushes after commit (configurable); a code-repo workspace cannot push through any UI path, enforced twice over.</span></li>
+          <li><b>Fast-forward-only pull</b> <span class="desc">— fetches on open; a clean fast-forward is silent, a diverged history stops and shows the ahead/behind counts instead of guessing.</span></li>
+          <li><b>One-click repo creation</b> <span class="desc">— <code>git init</code> plus the documented <code>.gitignore</code>, with an optional private GitHub remote via <code>gh</code>.</span></li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="p6">
+      <h2><span class="code">P6</span> STEM authoring <span class="pill done">shipped</span></h2>
+      <p class="section-sub">Milestone: <em>writing maths, proofs and algorithms is faster here than anywhere else.</em> All seven tasks done — nearly everything reuses the existing <code>Callout</code> node rather than inventing new block types.</p>
+      <div class="feat-group">
+        <ul class="feat-list">
+          <li><b>Proof &amp; theorem blocks</b> <span class="desc">— Theorem / Lemma / Corollary / Proof / Definition / Example, numbered, reachable from <code>/</code>; a Proof block appends a CSS-only <code>∎</code>.</span></li>
+          <li><b>Collapsible sections</b> <span class="desc">— presentation-only by design: toggling never dirties the buffer or triggers a P5 auto-commit for a view-state click.</span></li>
+          <li><b>Algorithm blocks</b> <span class="desc">— Complexity / Pseudocode / Implementation / References slots, the same Callout machinery as proof blocks.</span></li>
+          <li><b>Templates</b> <span class="desc">— a <code>templates/</code> folder with placeholder substitution (<code>{{date}}</code>, <code>{{title}}</code>, any <code>{{name}}</code>); the P4-3 exercise-sheet layout ships as the first one.</span></li>
+          <li><b>Equation snippets</b> <span class="desc">— <code>/gradient</code> → <code>\nabla f(x)</code>, a live dropdown inside the maths edit box itself.</span></li>
+          <li><b>Outline panel</b> <span class="desc">— <code>Ctrl Shift O</code>, current note's headings with scroll-tracked highlighting.</span></li>
+          <li><b>Cross-references</b> <span class="desc">— writing <code>Theorem 3.2</code> in prose resolves to the numbered block it names and jumps there on click.</span></li>
+          <li><b>Search refinement</b> <span class="desc">— <code>folder:</code> / <code>tag:</code> / <code>type:</code> filters compose with free text; recent searches persist per workspace.</span></li>
+        </ul>
+      </div>
+      <p style="color: var(--text-faint); font-size: 13.5px;">A stream of other editor nodes (block handles, dividers, alignment, highlight, HTML embed, sub/superscript, note images) shipped alongside this phase with no roadmap task behind them — see Planning notes.</p>
+    </section>
+
+    <section id="p7p8">
+      <h2><span class="code">P7–P8</span> IDE integration &amp; embedded terminal <span class="pill done">shipped</span></h2>
+      <p class="section-sub">Milestones: <em>notes and code are one workflow</em> and <em><code>claude</code> runs against the open note without leaving the app.</em></p>
+      <div class="feat-group">
+        <h4>P7 — IDE integration</h4>
+        <ul class="feat-list">
+          <li><b>Code deep links</b> <span class="desc">— <code>src/main.cpp:58</code> in note text is clickable, opening the configured editor at that line.</span></li>
+          <li><b>"Open in IDE" on code blocks</b> <span class="desc">— a block whose first line names its own source path gets a one-click launch.</span></li>
+          <li><b>Project awareness</b> <span class="desc">— open a code repo directly as a workspace (dependency folders excluded from the scan); optional <code>notes/</code> scaffold on request only.</span></li>
+        </ul>
+      </div>
+      <div class="feat-group">
+        <h4>P8 — Embedded terminal</h4>
+        <ul class="feat-list">
+          <li><b>PTY-backed pane</b> <span class="desc">— <code>Ctrl+\`</code>, rooted at the workspace, survives being hidden.</span></li>
+          <li><b>Active-note awareness</b> <span class="desc">— the open note's path is an env var and a one-key insert, so <code>claude</code> (or any CLI) can act on exactly what you're looking at.</span></li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="status">
+      <h2>Roadmap at a glance</h2>
+      <p class="section-sub">Phase numbers are identity, not build order — several later-numbered phases shipped before earlier ones once priorities shifted.</p>
+      <div class="status-table-wrap">
+        <table>
+          <thead>
+            <tr><th>Phase</th><th>Milestone</th><th>Status</th></tr>
+          </thead>
+          <tbody>
+            <tr><td class="phase-code">P0</td><td class="milestone">Trustworthy daily driver</td><td><span class="pill done">done</span></td></tr>
+            <tr><td class="phase-code">P1</td><td class="milestone">Everyday-use completeness</td><td><span class="pill done">done</span></td></tr>
+            <tr><td class="phase-code">P2</td><td class="milestone">Feel &amp; ergonomics</td><td><span class="pill done">done</span></td></tr>
+            <tr><td class="phase-code">P3</td><td class="milestone">Headline features &amp; power tools</td><td><span class="pill done">done</span></td></tr>
+            <tr><td class="phase-code">P4</td><td class="milestone">PDF → Markdown &amp; exercise sheets</td><td><span class="pill done">done</span></td></tr>
+            <tr><td class="phase-code">P5</td><td class="milestone">Versioned workspaces (Git automation)</td><td><span class="pill done">done</span></td></tr>
+            <tr><td class="phase-code">P6</td><td class="milestone">STEM authoring</td><td><span class="pill done">done</span></td></tr>
+            <tr><td class="phase-code">P7</td><td class="milestone">IDE integration</td><td><span class="pill done">done</span></td></tr>
+            <tr><td class="phase-code">P8</td><td class="milestone">Embedded terminal</td><td><span class="pill done">done</span></td></tr>
+            <tr><td class="phase-code">P9</td><td class="milestone">Study &amp; revision</td><td><span class="pill next">in progress</span></td></tr>
+            <tr><td class="phase-code">P10</td><td class="milestone">Gated stretch (in-app AI, code execution)</td><td><span class="pill gated">gated</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="p9">
+      <h2><span class="code">P9</span> Study &amp; revision <span class="pill next">in progress</span></h2>
+      <p class="section-sub">Milestone: <em>the app helps me revise, not just capture.</em> The one phase not derived from the original brief — everything before it is <em>capture</em>, this is <em>retrieval</em>. Two of four tasks shipped; this is the live edge of the roadmap.</p>
+
+      <div class="feat-group">
+        <h4>Shipped</h4>
+        <ul class="feat-list">
+          <li><b>Workspace-wide task view</b> <span class="desc">— <code>Ctrl Shift K</code>, every <code>- [ ]</code>/<code>- [x]</code> across the workspace in one place, grouped by note; ticking writes straight through the normal save path.</span></li>
+          <li><b>Formula sheet generation</b> <span class="desc">— <code>File &gt; Generate Formula Sheet…</code> collects a folder/tag/workspace scope's block maths into one deduplicated, editable, printable generated note.</span></li>
+        </ul>
+      </div>
+
+      <div class="feat-group">
+        <h4>Open — next up</h4>
+        <ul class="feat-list open">
+          <li><b>Spaced repetition</b> <span class="desc">— cloze deletion + <code>Question :: Answer</code> cards, SM-2 scheduling, a due-today review session. Storage decision still open before any code — see Planning notes. Theorem/proof blocks from P6 become cards essentially for free once it lands.</span></li>
+          <li><b>Workspace dashboard</b> <span class="desc">— Continue / Recent / Tasks / Study / Git sections on open, each reading data another task already produces. Design spec written; sequenced last since it has nothing to show without the task view, spaced repetition, and P5's Git status calls in place.</span></li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="gated">
+      <h2><span class="code">P10</span> Gated stretch <span class="pill gated">explicitly deferred</span></h2>
+      <p class="section-sub">Not to influence P0–P9 design. Revisit only if the gate condition is actually met.</p>
+      <ul class="feat-list open">
+        <li><b>In-app AI assistant</b> <span class="desc">— gated on the embedded terminal (P8) proving insufficient first; may never be needed at all.</span></li>
+        <li><b>In-editor code execution</b> <span class="desc">— gated on a dedicated security design pass before any code is written.</span></li>
+      </ul>
+    </section>
+
+    <section id="cut">
+      <h2>Deliberately not building</h2>
+      <p class="section-sub">Considered and rejected with reasoning on record — worth checking before proposing a "new" feature that's actually one of these.</p>
+      <div class="cut-grid">
+        <div class="cut-card"><b>OCR → LaTeX pipeline</b><span>Superseded by P4's text-layer approach entirely.</span></div>
+        <div class="cut-card"><b>Handwriting search</b><span>Ink is for working through a proof, not archival retrieval.</span></div>
+        <div class="cut-card"><b>Version history / snapshots</b><span>Git (P5) already does this.</span></div>
+        <div class="cut-card"><b>Query blocks / Dataview-lite</b><span>No natural end to a query language; P6-5 + P9-1 cover the real 90%.</span></div>
+        <div class="cut-card"><b>Lecture audio + timestamps</b><span>A different product surface than plain-text portability.</span></div>
+        <div class="cut-card"><b>Citations / BibTeX</b><span>A thesis need, not a coursework one.</span></div>
+        <div class="cut-card"><b>Presentation mode</b><span>PDF export already covers sharing.</span></div>
+        <div class="cut-card"><b>Graphviz / TikZ export</b><span>Mermaid + PDF export cover the real need.</span></div>
+        <div class="cut-card"><b>Cloud sync, mobile, collab</b><span>Different product. P5 automates your own Git instead.</span></div>
+        <div class="cut-card"><b>Resolving merge conflicts</b><span>App commits and fast-forwards only — never merges or rebases.</span></div>
+        <div class="cut-card"><b>Stable note ID scheme</b><span><code>path</code> is the working key; revisit only if something concrete needs it.</span></div>
+        <div class="cut-card"><b>Installers / auto-update</b><span>Personal tool; revisit only if the audience changes.</span></div>
+      </div>
+    </section>
+
+    <section id="planning">
+      <h2>Notes for planning further features</h2>
+      <p class="section-sub">Where the open threads actually are, if you're deciding what to scope next.</p>
+
+      <div class="plan-item">
+        <h4><span class="tag">decision</span> Spaced-repetition storage</h4>
+        <p>The one blocking decision left on the board — not refactorable later, since it determines what happens to every card when a note is renamed. Inline HTML comment beside each card is the leading option (<code>&lt;!-- sr due=… ease=… interval=… --&gt;</code>): survives renames/moves/Git with no key tracking, and merges as readable text under P5's auto-commit/push, unlike a JSON sidecar. Decide before writing any P9-3 code.</p>
+      </div>
+      <div class="plan-item">
+        <h4><span class="tag">overdue</span> Split-pane editing</h4>
+        <p>Deferred with "reconsider at P4" back when P4 was still open — P4, P6, and most of P9 are now behind it and it hasn't been revisited. Worth an explicit decision (build it, or formally re-defer) rather than leaving it drifting.</p>
+      </div>
+      <div class="plan-item">
+        <h4><span class="tag">gap</span> Off-book editor nodes</h4>
+        <p>Several TipTap nodes (block handles, dividers, alignment, highlight, HTML embed, sub/superscript, note images) shipped with no roadmap task behind them — a real "Notion parity" thread running alongside P6/P9 that isn't currently named or tracked anywhere.</p>
+      </div>
+      <div class="plan-item">
+        <h4><span class="tag">sequencing</span> Workspace dashboard is the last P9 task on purpose</h4>
+        <p>It has nothing of its own to show — every section reads state another task already produces (tasks, cards, Git status). Spaced repetition (P9-3) needs to land first, or the Study section has nothing to display.</p>
+      </div>
+      <div class="plan-item">
+        <h4><span class="tag">infra</span> e2e coverage now exists — use it</h4>
+        <p>WebdriverIO + tauri-driver drives the real compiled app with screenshot verification, and CI runs it on every push. Two real, otherwise-invisible bugs (an outline-panel freeze, a stale-index crash in formula generation) were caught this way rather than by unit tests. Any new user-facing feature should get a spec here going forward.</p>
+      </div>
+      <div class="plan-item">
+        <h4><span class="tag">frozen</span> PDF pipeline re-entry bar</h4>
+        <p>P4 is closed. It reopens only when real coursework produces a document that fails the "faster than transcribing by hand" bar — not from hunting for edge cases.</p>
+      </div>
+    </section>
+
+    <footer>
+      Generated from <code>docs/ROADMAP.md</code> and <code>TODO.md</code>, last refreshed 2026-08-19 after M6 (STEM authoring) and P9-1/P9-2 (task view, formula sheets) shipped.
+    </footer>
+  </main>
+</div>
