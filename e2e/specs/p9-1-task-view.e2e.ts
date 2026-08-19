@@ -172,19 +172,37 @@ describe('P9-1: workspace-wide task view', () => {
       const dump = await browser.execute(() => document.querySelector('.task-view')?.textContent ?? '<no .task-view>')
       throw new Error(`${(e as Error).message} — task view content: ${dump}`)
     }
-
-    await browser.execute(() => {
-      const groups = Array.from(document.querySelectorAll('.task-view-group'))
-      const group = groups.find((g) => g.querySelector('.task-view-note-title')?.textContent === 'P9-1 Tasks B')
-      const btn = group?.querySelector('.task-view-item-text')
-      if (!(btn instanceof HTMLElement)) throw new Error('task text button not found')
-      btn.click()
-    })
+    // The list can still churn briefly right as it first appears (a trailing
+    // reindex replacing the fetched task set) — give it a beat before the
+    // first click attempt, on top of the retry loop below.
+    await browser.pause(500)
 
     try {
+      // Idempotent and retried, not a single click: a re-render between the
+      // group-list appearing (the waitUntil above) and this click landing —
+      // e.g. the reindex debounce still catching up and replacing the task
+      // list's DOM nodes — can silently lose a one-shot click. The success
+      // condition is both halves of what openNote() does (openTab *and*
+      // onClose), checked together — on a mocha retry the tab can already be
+      // active from a prior attempt while the view (just reopened fresh by
+      // openTaskView() above) is still open, so checking the tab alone would
+      // report success without ever having closed this attempt's view.
       await browser.waitUntil(
-        async () => browser.execute(() => document.querySelector('.tab.active button')?.textContent === 'P9-1 Tasks B'),
-        { timeout: 5000, timeoutMsg: 'clicking the task never opened P9-1 Tasks B' },
+        async () => {
+          const state = await browser.execute(() => ({
+            tabActive: document.querySelector('.tab.active button')?.textContent === 'P9-1 Tasks B',
+            viewClosed: !document.querySelector('.task-view'),
+          }))
+          if (state.tabActive && state.viewClosed) return true
+          await browser.execute(() => {
+            const groups = Array.from(document.querySelectorAll('.task-view-group'))
+            const group = groups.find((g) => g.querySelector('.task-view-note-title')?.textContent === 'P9-1 Tasks B')
+            const btn = group?.querySelector('.task-view-item-text')
+            if (btn instanceof HTMLElement) btn.click()
+          })
+          return false
+        },
+        { timeout: 15000, interval: 500, timeoutMsg: 'clicking the task never opened P9-1 Tasks B and closed the view' },
       )
     } catch (e) {
       const dump = await browser.execute(() => ({
