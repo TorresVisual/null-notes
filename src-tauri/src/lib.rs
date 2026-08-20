@@ -148,6 +148,13 @@ fn build_menu(handle: &tauri::AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
                 true,
                 Some("CmdOrCtrl+Shift+K"),
             )?,
+            &MenuItem::with_id(
+                handle,
+                "review",
+                "Review",
+                true,
+                Some("CmdOrCtrl+Shift+R"),
+            )?,
             &PredefinedMenuItem::separator(handle)?,
             &MenuItem::with_id(
                 handle,
@@ -212,6 +219,8 @@ pub fn run() {
             commands::notes::notes_with_tag,
             commands::notes::list_open_tasks,
             commands::notes::toggle_task,
+            commands::notes::grade_card,
+            commands::notes::list_due_cards,
             commands::notes::backlinks_for,
             commands::notes::graph_links,
             commands::notes::graph_tags,
