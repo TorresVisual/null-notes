@@ -1147,6 +1147,16 @@ code {
   color: var(--text-primary);
 }
 
+/* The one differentiation pitch a first-time reader sees, per P9.5-7 —
+   slightly more prominent than .workspace-picker-subtitle below it, which
+   stays the plain mechanical instruction. */
+.workspace-picker-tagline {
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--text-secondary);
+  margin-bottom: var(--space-sm);
+}
+
 .workspace-picker-subtitle {
   font-size: 13px;
   color: var(--text-tertiary);
