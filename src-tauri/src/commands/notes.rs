@@ -1,8 +1,9 @@
 use crate::db::{self, DbPool};
 use crate::models::{
-    CardKind, ExtractedCard, ExtractedFormula, ExtractedTask, GraphLink, GraphTag, NoteMetadata,
-    OpenTask, SearchResult, WorkspaceTree,
+    CardKind, DueCard, ExtractedCard, ExtractedFormula, ExtractedTask, GraphLink, GraphTag,
+    NoteMetadata, OpenTask, SearchResult, WorkspaceTree,
 };
+use crate::sm2;
 use regex::Regex;
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
@@ -604,6 +605,70 @@ async fn toggle_task_at(
     Ok(())
 }
 
+// Mirrors `toggle_task_line`'s shape exactly: pure, no I/O, `None` when the
+// line no longer looks like a card (the note changed on disk since the
+// review queue was built) — surfaced as an error by the caller, never
+// silently mangling an unrelated line.
+pub fn grade_card_line(
+    content: &str,
+    position: i64,
+    grade: sm2::Grade,
+    today: chrono::NaiveDate,
+) -> Option<String> {
+    let mut lines: Vec<String> = content.lines().map(str::to_string).collect();
+    let idx = usize::try_from(position).ok()?;
+    let trimmed = lines.get(idx)?.trim().to_string();
+    classify_card_line(&trimmed)?;
+
+    let current = lines
+        .get(idx + 1)
+        .and_then(|l| parse_sr_comment(l))
+        .map(|(_, ease, interval, reps)| sm2::CardState {
+            ease,
+            interval,
+            reps,
+        })
+        .unwrap_or_default();
+
+    let next = sm2::next_state(current, grade, today);
+    let comment = format!(
+        "<!-- sr due={} ease={:.2} interval={} reps={} -->",
+        next.due, next.ease, next.interval, next.reps
+    );
+
+    let has_comment_line = lines
+        .get(idx + 1)
+        .map(|l| parse_sr_comment(l).is_some())
+        .unwrap_or(false);
+    if has_comment_line {
+        lines[idx + 1] = comment;
+    } else {
+        lines.insert(idx + 1, comment);
+    }
+
+    let mut rewritten = lines.join("\n");
+    if content.ends_with('\n') {
+        rewritten.push('\n');
+    }
+    Some(rewritten)
+}
+
+async fn grade_card_at(
+    path: &str,
+    position: i64,
+    grade: sm2::Grade,
+    workspace: &str,
+    db: &DbPool,
+) -> anyhow::Result<()> {
+    let content = tokio::fs::read_to_string(path).await?;
+    let today = chrono::Utc::now().date_naive();
+    let new_content = grade_card_line(&content, position, grade, today)
+        .ok_or_else(|| anyhow::anyhow!("no card at line {position} in {path}"))?;
+    write_atomic(Path::new(path), &new_content).await?;
+    index_note_at(path, workspace, &new_content, db).await?;
+    Ok(())
+}
+
 // Wiki-links resolve by title case-insensitively (`backlinks_for`), and
 // `extract_links` trims whitespace inside the brackets, so the rewrite must
 // tolerate both rather than only matching an exact `[[Old]]`.
@@ -812,6 +877,26 @@ pub async fn toggle_task(
     db: State<'_, DbPool>,
 ) -> Result<(), String> {
     toggle_task_at(&path, position, &workspace, &db)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn grade_card(
+    path: String,
+    position: i64,
+    grade: sm2::Grade,
+    workspace: String,
+    db: State<'_, DbPool>,
+) -> Result<(), String> {
+    grade_card_at(&path, position, grade, &workspace, &db)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn list_due_cards(workspace: String, db: State<'_, DbPool>) -> Result<Vec<DueCard>, String> {
+    db::notes::due_cards(&db, &workspace, &sm2::today())
         .await
         .map_err(|e| e.to_string())
 }
@@ -1605,6 +1690,49 @@ mod tests {
     #[test]
     fn test_toggle_task_line_none_when_line_is_no_longer_a_task() {
         assert!(toggle_task_line("just prose now", 0).is_none());
+    }
+
+    fn grade_today() -> chrono::NaiveDate {
+        chrono::NaiveDate::from_ymd_opt(2026, 8, 20).unwrap()
+    }
+
+    #[test]
+    fn test_grade_card_line_inserts_a_new_schedule_comment() {
+        let result = grade_card_line("Q :: A\n", 0, sm2::Grade::Good, grade_today()).unwrap();
+        assert_eq!(
+            result,
+            "Q :: A\n<!-- sr due=2026-08-21 ease=2.50 interval=1 reps=1 -->\n"
+        );
+    }
+
+    #[test]
+    fn test_grade_card_line_replaces_an_existing_schedule_comment() {
+        let content = "Q :: A\n<!-- sr due=2026-08-20 ease=2.50 interval=6 reps=2 -->\n";
+        let result = grade_card_line(content, 0, sm2::Grade::Good, grade_today()).unwrap();
+        assert_eq!(
+            result,
+            "Q :: A\n<!-- sr due=2026-09-04 ease=2.50 interval=15 reps=3 -->\n"
+        );
+    }
+
+    #[test]
+    fn test_grade_card_line_again_resets_progress() {
+        let content = "Q :: A\n<!-- sr due=2026-08-20 ease=2.50 interval=6 reps=2 -->\n";
+        let result = grade_card_line(content, 0, sm2::Grade::Again, grade_today()).unwrap();
+        assert!(result.contains("interval=1 reps=0"));
+    }
+
+    #[test]
+    fn test_grade_card_line_none_when_position_is_no_longer_a_card() {
+        assert!(grade_card_line("just prose now\n", 0, sm2::Grade::Good, grade_today()).is_none());
+    }
+
+    #[test]
+    fn test_grade_card_line_preserves_a_second_card_below() {
+        let content = "Q1 :: A1\nQ2 :: A2\n";
+        let result = grade_card_line(content, 0, sm2::Grade::Good, grade_today()).unwrap();
+        assert!(result.contains("Q2 :: A2"));
+        assert!(result.contains("Q1 :: A1\n<!-- sr"));
     }
 
     #[tokio::test]
