@@ -1,4 +1,5 @@
-use crate::models::{ExtractedTask, NoteMetadata, OpenTask, SearchResult};
+use crate::models::{CardKind, DueCard, ExtractedCard, ExtractedTask, NoteMetadata, OpenTask, SearchResult};
+use crate::sm2;
 use anyhow::Result;
 use sqlx::SqlitePool;
 
@@ -98,6 +99,10 @@ pub async fn remove_notes_under(pool: &SqlitePool, prefix: &str) -> Result<()> {
         .bind(&like_pattern)
         .execute(pool)
         .await?;
+    sqlx::query("DELETE FROM review_cards WHERE note_path LIKE ? ESCAPE '\\'")
+        .bind(&like_pattern)
+        .execute(pool)
+        .await?;
     Ok(())
 }
 
@@ -123,6 +128,11 @@ pub async fn update_path(pool: &SqlitePool, old_path: &str, new_path: &str) -> R
         .execute(pool)
         .await?;
     sqlx::query("UPDATE note_tasks SET note_path = ? WHERE note_path = ?")
+        .bind(new_path)
+        .bind(old_path)
+        .execute(pool)
+        .await?;
+    sqlx::query("UPDATE review_cards SET note_path = ? WHERE note_path = ?")
         .bind(new_path)
         .bind(old_path)
         .execute(pool)
@@ -288,6 +298,54 @@ pub async fn open_tasks(pool: &SqlitePool, workspace: &str) -> Result<Vec<OpenTa
          ORDER BY n.title COLLATE NOCASE, nt.position",
     )
     .bind(workspace)
+    .fetch_all(pool)
+    .await?;
+    Ok(rows)
+}
+
+pub async fn set_cards(pool: &SqlitePool, note_path: &str, cards: &[ExtractedCard]) -> Result<()> {
+    sqlx::query("DELETE FROM review_cards WHERE note_path = ?")
+        .bind(note_path)
+        .execute(pool)
+        .await?;
+    for card in cards {
+        let kind = match card.kind {
+            CardKind::Qa => "qa",
+            CardKind::Cloze => "cloze",
+        };
+        let due = card.due.clone().unwrap_or_else(sm2::today);
+        let ease = card.ease.unwrap_or(2.5);
+        let interval = card.interval.unwrap_or(0);
+        let reps = card.reps.unwrap_or(0);
+        sqlx::query(
+            "INSERT INTO review_cards (note_path, kind, front, back, position, due, ease, interval, reps)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        )
+        .bind(note_path)
+        .bind(kind)
+        .bind(&card.front)
+        .bind(&card.back)
+        .bind(card.position)
+        .bind(due)
+        .bind(ease)
+        .bind(interval)
+        .bind(reps)
+        .execute(pool)
+        .await?;
+    }
+    Ok(())
+}
+
+pub async fn due_cards(pool: &SqlitePool, workspace: &str, today: &str) -> Result<Vec<DueCard>> {
+    let rows = sqlx::query_as::<_, DueCard>(
+        "SELECT rc.note_path, n.title as note_title, rc.kind, rc.front, rc.back, rc.position
+         FROM review_cards rc
+         JOIN notes n ON n.path = rc.note_path
+         WHERE n.workspace = ? AND rc.due <= ?
+         ORDER BY rc.due, n.title COLLATE NOCASE, rc.position",
+    )
+    .bind(workspace)
+    .bind(today)
     .fetch_all(pool)
     .await?;
     Ok(rows)
@@ -1079,6 +1137,103 @@ mod tests {
 
         let open = open_tasks(&pool, "/ws").await.unwrap();
         assert!(open.is_empty());
+    }
+
+    fn card(kind: CardKind, front: &str, back: &str, position: i64) -> ExtractedCard {
+        ExtractedCard {
+            kind,
+            front: front.into(),
+            back: back.into(),
+            position,
+            due: None,
+            ease: None,
+            interval: None,
+            reps: None,
+        }
+    }
+
+    #[tokio::test]
+    async fn test_set_cards_replaces_existing_cards_for_a_note() {
+        let pool = make_pool().await;
+        index_note(&pool, &note("a", "A", "/ws/a.md", "/ws")).await.unwrap();
+        set_cards(
+            &pool,
+            "/ws/a.md",
+            &[card(CardKind::Qa, "Q1", "A1", 0), card(CardKind::Qa, "Q2", "A2", 2)],
+        )
+        .await
+        .unwrap();
+        set_cards(&pool, "/ws/a.md", &[card(CardKind::Qa, "only", "one", 0)])
+            .await
+            .unwrap();
+
+        let due = due_cards(&pool, "/ws", "9999-12-31").await.unwrap();
+        assert_eq!(due.len(), 1);
+        assert_eq!(due[0].front, "only");
+    }
+
+    #[tokio::test]
+    async fn test_new_card_with_no_schedule_defaults_to_due_today() {
+        let pool = make_pool().await;
+        index_note(&pool, &note("a", "A", "/ws/a.md", "/ws")).await.unwrap();
+        set_cards(&pool, "/ws/a.md", &[card(CardKind::Cloze, "front", "back", 0)])
+            .await
+            .unwrap();
+
+        let due = due_cards(&pool, "/ws", "2026-08-20").await.unwrap();
+        assert_eq!(due.len(), 1);
+        assert_eq!(due[0].kind, "cloze");
+    }
+
+    #[tokio::test]
+    async fn test_due_cards_excludes_not_yet_due_and_other_workspaces() {
+        let pool = make_pool().await;
+        index_note(&pool, &note("a", "A", "/ws/a.md", "/ws")).await.unwrap();
+        index_note(&pool, &note("c", "C", "/other/c.md", "/other")).await.unwrap();
+        let mut future = card(CardKind::Qa, "not due yet", "back", 0);
+        future.due = Some("2099-01-01".to_string());
+        future.ease = Some(2.5);
+        future.interval = Some(400);
+        future.reps = Some(5);
+        set_cards(&pool, "/ws/a.md", &[future]).await.unwrap();
+        set_cards(
+            &pool,
+            "/other/c.md",
+            &[card(CardKind::Qa, "other workspace", "back", 0)],
+        )
+        .await
+        .unwrap();
+
+        let due = due_cards(&pool, "/ws", "2026-08-20").await.unwrap();
+        assert!(due.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_update_path_also_rewrites_cards() {
+        let pool = make_pool().await;
+        index_note(&pool, &note("a", "A", "/ws/old.md", "/ws")).await.unwrap();
+        set_cards(&pool, "/ws/old.md", &[card(CardKind::Qa, "Q", "A", 0)])
+            .await
+            .unwrap();
+
+        update_path(&pool, "/ws/old.md", "/ws/Folder/old.md").await.unwrap();
+
+        let due = due_cards(&pool, "/ws", "9999-12-31").await.unwrap();
+        assert_eq!(due[0].note_path, "/ws/Folder/old.md");
+    }
+
+    #[tokio::test]
+    async fn test_remove_notes_under_also_deletes_cards() {
+        let pool = make_pool().await;
+        index_note(&pool, &note("a", "A", "/ws/Folder/a.md", "/ws")).await.unwrap();
+        set_cards(&pool, "/ws/Folder/a.md", &[card(CardKind::Qa, "Q", "A", 0)])
+            .await
+            .unwrap();
+
+        remove_notes_under(&pool, "/ws/Folder/").await.unwrap();
+
+        let due = due_cards(&pool, "/ws", "9999-12-31").await.unwrap();
+        assert!(due.is_empty());
     }
 
     #[tokio::test]
