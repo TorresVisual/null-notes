@@ -1,7 +1,7 @@
 use crate::db::{self, DbPool};
 use crate::models::{
-    ExtractedFormula, ExtractedTask, GraphLink, GraphTag, NoteMetadata, OpenTask, SearchResult,
-    WorkspaceTree,
+    CardKind, ExtractedCard, ExtractedFormula, ExtractedTask, GraphLink, GraphTag, NoteMetadata,
+    OpenTask, SearchResult, WorkspaceTree,
 };
 use regex::Regex;
 use std::collections::HashSet;
@@ -218,6 +218,94 @@ pub fn extract_formulas(content: &str) -> Vec<ExtractedFormula> {
     }
 
     formulas
+}
+
+// A schedule comment is never itself a card, even though it starts a fresh
+// line right after one — checked first so the loop below never has to
+// special-case it.
+fn parse_sr_comment(line: &str) -> Option<(String, f64, i64, i64)> {
+    let re = match Regex::new(
+        r"^<!--\s+sr\s+due=(\S+)\s+ease=(\S+)\s+interval=(\S+)\s+reps=(\S+)\s+-->$",
+    ) {
+        Ok(re) => re,
+        Err(_) => return None,
+    };
+    let caps = re.captures(line.trim())?;
+    let due = caps[1].to_string();
+    let ease = caps[2].parse::<f64>().ok()?;
+    let interval = caps[3].parse::<i64>().ok()?;
+    let reps = caps[4].parse::<i64>().ok()?;
+    Some((due, ease, interval, reps))
+}
+
+// Q::A checked first; a line matching both forms (rare — a "::" pair inside
+// a {{cloze}} span) reads as Q::A, which is the more explicit authoring
+// intent. One card per line, matching every other extractor in this file:
+// all {{}} spans on a cloze line reveal together as a single card, not
+// Anki-style per-span sub-cards.
+fn classify_card_line(trimmed: &str) -> Option<(CardKind, String, String)> {
+    if trimmed.is_empty() || trimmed.starts_with("<!--") {
+        return None;
+    }
+    let qa_re = Regex::new(r"^(.+?)\s::\s(.+)$").ok()?;
+    if let Some(caps) = qa_re.captures(trimmed) {
+        return Some((
+            CardKind::Qa,
+            caps[1].trim().to_string(),
+            caps[2].trim().to_string(),
+        ));
+    }
+    let cloze_re = Regex::new(r"\{\{([^{}]+)\}\}").ok()?;
+    if cloze_re.is_match(trimmed) {
+        let front = cloze_re.replace_all(trimmed, "[...]").to_string();
+        let back = cloze_re.replace_all(trimmed, "$1").to_string();
+        return Some((CardKind::Cloze, front, back));
+    }
+    None
+}
+
+// Line-based like `extract_tasks`/`extract_formulas`, for the same reason:
+// `position` (the line index) is the identity `grade_card` uses to find a
+// card's schedule-comment line back, so fenced code must be skipped without
+// ever renumbering a line.
+pub fn extract_cards(content: &str) -> Vec<ExtractedCard> {
+    let lines: Vec<&str> = content.lines().collect();
+    let mut in_fence = false;
+    let mut cards = Vec::new();
+
+    for (i, line) in lines.iter().enumerate() {
+        let trimmed = line.trim();
+        if trimmed.starts_with("```") {
+            in_fence = !in_fence;
+            continue;
+        }
+        if in_fence {
+            continue;
+        }
+
+        let (kind, front, back) = match classify_card_line(trimmed) {
+            Some(c) => c,
+            None => continue,
+        };
+
+        let (due, ease, interval, reps) = match lines.get(i + 1).and_then(|l| parse_sr_comment(l)) {
+            Some((due, ease, interval, reps)) => (Some(due), Some(ease), Some(interval), Some(reps)),
+            None => (None, None, None, None),
+        };
+
+        cards.push(ExtractedCard {
+            kind,
+            front,
+            back,
+            position: i as i64,
+            due,
+            ease,
+            interval,
+            reps,
+        });
+    }
+
+    cards
 }
 
 #[tauri::command]
@@ -1342,6 +1430,80 @@ mod tests {
     #[test]
     fn test_extract_tasks_empty_content() {
         assert!(extract_tasks("").is_empty());
+    }
+
+    #[test]
+    fn test_extract_cards_finds_a_qa_card() {
+        let cards = extract_cards("# Notes\n\nWhat is Big-O of binary search? :: O(log n)\n");
+        assert_eq!(cards.len(), 1);
+        assert_eq!(cards[0].kind, CardKind::Qa);
+        assert_eq!(cards[0].front, "What is Big-O of binary search?");
+        assert_eq!(cards[0].back, "O(log n)");
+        assert_eq!(cards[0].position, 2);
+        assert_eq!(cards[0].due, None);
+    }
+
+    #[test]
+    fn test_extract_cards_finds_a_cloze_card() {
+        let cards =
+            extract_cards("A binary search tree keeps {{all left descendants smaller}} than the node.\n");
+        assert_eq!(cards.len(), 1);
+        assert_eq!(cards[0].kind, CardKind::Cloze);
+        assert_eq!(
+            cards[0].front,
+            "A binary search tree keeps [...] than the node."
+        );
+        assert_eq!(
+            cards[0].back,
+            "A binary search tree keeps all left descendants smaller than the node."
+        );
+    }
+
+    #[test]
+    fn test_extract_cards_reads_an_adjacent_schedule_comment() {
+        let content = "Q :: A\n<!-- sr due=2026-08-21 ease=2.30 interval=6 reps=2 -->\n";
+        let cards = extract_cards(content);
+        assert_eq!(cards.len(), 1);
+        assert_eq!(cards[0].due, Some("2026-08-21".to_string()));
+        assert_eq!(cards[0].ease, Some(2.30));
+        assert_eq!(cards[0].interval, Some(6));
+        assert_eq!(cards[0].reps, Some(2));
+    }
+
+    #[test]
+    fn test_extract_cards_new_card_has_no_schedule() {
+        let cards = extract_cards("Q :: A\nSome unrelated next line.\n");
+        assert_eq!(cards[0].due, None);
+        assert_eq!(cards[0].ease, None);
+    }
+
+    #[test]
+    fn test_extract_cards_ignores_fenced_code() {
+        let content = "```\nWhat :: is this\n```\n";
+        assert!(extract_cards(content).is_empty());
+    }
+
+    #[test]
+    fn test_extract_cards_ignores_the_schedule_comment_line_itself() {
+        // A schedule comment can never be mistaken for a new card even
+        // though it starts a fresh line right after one.
+        let content = "Q :: A\n<!-- sr due=2026-08-21 ease=2.50 interval=1 reps=1 -->\n";
+        let cards = extract_cards(content);
+        assert_eq!(cards.len(), 1);
+    }
+
+    #[test]
+    fn test_extract_cards_handles_multiple_cards_in_one_note() {
+        let content = "Q1 :: A1\nQ2 :: A2\n";
+        let cards = extract_cards(content);
+        assert_eq!(cards.len(), 2);
+        assert_eq!(cards[0].position, 0);
+        assert_eq!(cards[1].position, 1);
+    }
+
+    #[test]
+    fn test_extract_cards_empty_content() {
+        assert!(extract_cards("").is_empty());
     }
 
     #[test]

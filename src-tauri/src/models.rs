@@ -176,6 +176,46 @@ pub struct OpenTask {
     pub position: i64,
 }
 
+/// Which of the two card-authoring forms a line matched (P9-3): a
+/// `front :: back` line, or a line containing one or more `{{cloze}}` spans.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CardKind {
+    Qa,
+    Cloze,
+}
+
+/// A review card extracted from a note's raw markdown (P9-3), mirroring how
+/// `extract_tasks` feeds `note_tasks`: `position` is the 0-indexed line
+/// number of the card itself, the same identity `grade_card` uses to find
+/// its schedule-comment line back. `due`/`ease`/`interval`/`reps` come from
+/// the `<!-- sr ... -->` comment on the line immediately below, if present —
+/// `None` across all four means the card has never been reviewed and is
+/// implicitly due today with SM-2 defaults.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ExtractedCard {
+    pub kind: CardKind,
+    pub front: String,
+    pub back: String,
+    pub position: i64,
+    pub due: Option<String>,
+    pub ease: Option<f64>,
+    pub interval: Option<i64>,
+    pub reps: Option<i64>,
+}
+
+/// One due (or new) review card joined with the note it lives in, for the
+/// review session (P9-3). Mirrors `OpenTask`'s shape exactly.
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+#[serde(rename_all = "camelCase")]
+pub struct DueCard {
+    pub note_path: String,
+    pub note_title: String,
+    pub kind: String,
+    pub front: String,
+    pub back: String,
+    pub position: i64,
+}
+
 /// How an imported PDF becomes a note: page images to write alongside, or the
 /// text layer converted to editable Markdown.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
