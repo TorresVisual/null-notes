@@ -15,6 +15,7 @@ import { ShortcutsOverlay } from './ShortcutsOverlay'
 import { TemplateDialog } from './TemplateDialog'
 import { GraphView } from './GraphView'
 import { TaskView } from './TaskView'
+import { ReviewSession } from './ReviewSession'
 import { HomeView } from './HomeView'
 import { FormulaSheetPrompt } from './FormulaSheetPrompt'
 import { TerminalPane } from './TerminalPane'
@@ -79,6 +80,7 @@ export function Layout() {
   const editorPaneRef = useRef<HTMLDivElement>(null)
   const [graphOpen, setGraphOpen] = useState(false)
   const [taskViewOpen, setTaskViewOpen] = useState(false)
+  const [reviewOpen, setReviewOpen] = useState(false)
   const [formulaSheetOpen, setFormulaSheetOpen] = useState(false)
   const [terminalMounted, setTerminalMounted] = useState(false)
   const [terminalOpen, setTerminalOpen] = useState(false)
@@ -185,6 +187,9 @@ export function Layout() {
         case 'task-view':
           if (workspacePath) setTaskViewOpen(true)
           break
+        case 'review':
+          if (workspacePath) setReviewOpen(true)
+          break
         case 'generate-formula-sheet':
           if (workspacePath) setFormulaSheetOpen(true)
           break
@@ -263,6 +268,7 @@ export function Layout() {
       {templateDialogOpen && <TemplateDialog onClose={() => setTemplateDialogOpen(false)} />}
       {graphOpen && <GraphView onClose={() => setGraphOpen(false)} />}
       {taskViewOpen && <TaskView onClose={() => setTaskViewOpen(false)} />}
+      {reviewOpen && <ReviewSession onClose={() => setReviewOpen(false)} />}
       {formulaSheetOpen && <FormulaSheetPrompt onClose={() => setFormulaSheetOpen(false)} />}
       <Sidebar
         onSearchOpen={() => setSearchOpen(true)}
@@ -325,7 +331,10 @@ export function Layout() {
               </p>
             )}
             {!activeTab && workspacePath && notes.length > 0 && (
-              <HomeView onOpenTaskView={() => setTaskViewOpen(true)} />
+              <HomeView
+                onOpenTaskView={() => setTaskViewOpen(true)}
+                onOpenReview={() => setReviewOpen(true)}
+              />
             )}
             {!isLoading && activeTab && viewMode === 'wysiwyg' && outlineOpen && (
               <OutlinePanel content={content} containerRef={editorPaneRef} scrollRef={scrollRef} />

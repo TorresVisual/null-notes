@@ -16,6 +16,7 @@ const SHORTCUTS: Array<{ keys: string; label: string }> = [
   { keys: 'Ctrl `', label: 'Toggle terminal' },
   { keys: 'Ctrl Shift O', label: 'Toggle outline' },
   { keys: 'Ctrl Shift K', label: 'Tasks' },
+  { keys: 'Ctrl Shift R', label: 'Review' },
   { keys: 'Ctrl ,', label: 'Settings' },
   { keys: '?', label: 'Show this list' },
 ]
