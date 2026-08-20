@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core'
-import type { NoteMetadata, WorkspaceState, WorkspaceTree, SearchResult, AppSettings, GraphLink, GraphTag, RepoMode, CommitOutcome, PushOutcome, PullOutcome, RepoInitOutcome, TemplateMetadata, CrossRefTarget, OpenTask } from '../types'
+import type { NoteMetadata, WorkspaceState, WorkspaceTree, SearchResult, AppSettings, GraphLink, GraphTag, RepoMode, CommitOutcome, PushOutcome, PullOutcome, RepoInitOutcome, TemplateMetadata, CrossRefTarget, OpenTask, DueCard, Grade } from '../types'
 import type { PdfPage, PdfMarkdownImport } from '../pdf/types'
 
 export const api = {
@@ -63,6 +63,10 @@ export const api = {
       invoke<void>('toggle_task', { path, position, workspace }),
     generateFormulaSheet: (workspace: string, folder: string | null, tag: string | null) =>
       invoke<NoteMetadata>('generate_formula_sheet', { workspace, folder, tag }),
+    listDueCards: (workspace: string) =>
+      invoke<DueCard[]>('list_due_cards', { workspace }),
+    gradeCard: (path: string, position: number, grade: Grade, workspace: string) =>
+      invoke<void>('grade_card', { path, position, grade, workspace }),
   },
   templates: {
     list: (workspace: string) =>

@@ -105,3 +105,14 @@ export interface OpenTask {
   text: string
   position: number
 }
+
+export type Grade = 'again' | 'hard' | 'good' | 'easy'
+
+export interface DueCard {
+  notePath: string
+  noteTitle: string
+  kind: string
+  front: string
+  back: string
+  position: number
+}
