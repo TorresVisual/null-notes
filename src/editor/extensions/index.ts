@@ -35,6 +35,7 @@ import { Kbd } from './Kbd'
 import { SpanStyle } from './SpanStyle'
 import { HTMLInline } from './HTMLInline'
 import { HTMLBlock } from './HTMLBlock'
+import { SrState } from './SrState'
 import { DivBlock } from './DivBlock'
 import { Details } from './Details'
 import { TextAlignment } from './TextAlignment'
@@ -174,5 +175,6 @@ export const coreExtensions = [
   DivBlock,
   HTMLBlock,
   HTMLInline,
+  SrState,
   TextAlignment,
 ]
