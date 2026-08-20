@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useWorkspaceStore } from '../store/workspace'
 import { useNotesStore } from '../store/notes'
 import { api } from '../lib/tauri'
-import type { OpenTask } from '../types'
+import type { OpenTask, DueCard } from '../types'
 
 const SECTION_CAP = 5
 
@@ -12,9 +12,10 @@ function tabLabel(path: string): string {
 
 interface HomeViewProps {
   onOpenTaskView: () => void
+  onOpenReview: () => void
 }
 
-export function HomeView({ onOpenTaskView }: HomeViewProps) {
+export function HomeView({ onOpenTaskView, onOpenReview }: HomeViewProps) {
   const openTabs = useWorkspaceStore((s) => s.openTabs)
   const setActiveTab = useWorkspaceStore((s) => s.setActiveTab)
   const openTab = useWorkspaceStore((s) => s.openTab)
@@ -38,6 +39,13 @@ export function HomeView({ onOpenTaskView }: HomeViewProps) {
   }, [workspacePath])
 
   const taskItems = tasks.slice(0, SECTION_CAP)
+
+  const [dueCards, setDueCards] = useState<DueCard[]>([])
+
+  useEffect(() => {
+    if (!workspacePath) return
+    api.notes.listDueCards(workspacePath).then(setDueCards)
+  }, [workspacePath])
 
   const repoMode = useWorkspaceStore((s) => s.repoMode)
   const gitDiverged = useWorkspaceStore((s) => s.gitDiverged)
@@ -107,9 +115,18 @@ export function HomeView({ onOpenTaskView }: HomeViewProps) {
           </>
         )}
       </section>
-      <section className="home-section home-section-disabled">
+      <section className="home-section">
         <h2>Study</h2>
-        <p className="home-empty">Spaced repetition isn't set up yet.</p>
+        {dueCards.length === 0 ? (
+          <p className="home-empty">Nothing due.</p>
+        ) : (
+          <>
+            <p className="home-count">{dueCards.length} due</p>
+            <button className="home-view-all" onClick={onOpenReview}>
+              Start review
+            </button>
+          </>
+        )}
       </section>
       {gitStatus && (
         <section className="home-section">
