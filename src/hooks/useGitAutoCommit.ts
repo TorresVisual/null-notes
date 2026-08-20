@@ -8,13 +8,23 @@ import { api } from '../lib/tauri'
  * close-requested handler), so a session shorter than the idle window still
  * gets committed once before the app closes.
  */
+// How long "Committed" stays visible before fading back to idle — long
+// enough to register as a deliberate confirmation, short enough that it
+// still reads as transient rather than a permanent status label.
+const COMMITTED_DISPLAY_MS = 4000
+
 export function useGitAutoCommit() {
   const idleTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const revertTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const flushGitCommit = useCallback(async () => {
     if (idleTimer.current) {
       clearTimeout(idleTimer.current)
       idleTimer.current = null
+    }
+    if (revertTimer.current) {
+      clearTimeout(revertTimer.current)
+      revertTimer.current = null
     }
     const { path, repoMode, git, gitPendingPaths, clearGitPendingPaths, setGitCommitStatus } =
       useWorkspaceStore.getState()
@@ -27,6 +37,16 @@ export function useGitAutoCommit() {
       if (outcome.kind === 'committed') {
         clearGitPendingPaths()
         setGitCommitStatus('committed')
+        // "Committed" would otherwise sit in the tab bar indefinitely until
+        // the next commit cycle — revert to idle so it reads as a
+        // confirmation rather than a permanent label. Guarded by a status
+        // check so a commit that starts again in the meantime (which already
+        // moves status off 'committed') isn't clobbered by this firing late.
+        revertTimer.current = setTimeout(() => {
+          if (useWorkspaceStore.getState().gitCommitStatus === 'committed') {
+            setGitCommitStatus('idle')
+          }
+        }, COMMITTED_DISPLAY_MS)
         // The only call site for pushNotes in the app — this is what makes
         // "never for a code repo" true on the frontend side too, on top of
         // the Rust-level guard in checked_push.

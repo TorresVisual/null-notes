@@ -9,11 +9,17 @@ interface TaskViewProps {
   onClose: () => void
 }
 
+// How long a just-ticked task stays visible (checked + struck through)
+// before it's dropped from the list — long enough to register as a
+// confirmation, short enough it still reads as "leaving," not stuck.
+const TASK_CHECK_FADE_MS = 320
+
 export function TaskView({ onClose }: TaskViewProps) {
   const workspacePath = useWorkspaceStore((s) => s.path)
   const openTab = useWorkspaceStore((s) => s.openTab)
   const [tasks, setTasks] = useState<OpenTask[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [checkingKeys, setCheckingKeys] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     if (!workspacePath) return
@@ -39,10 +45,19 @@ export function TaskView({ onClose }: TaskViewProps) {
   // other external change.
   function toggle(task: OpenTask) {
     if (!workspacePath) return
+    const key = `${task.notePath}#${task.position}`
+    setCheckingKeys((prev) => new Set(prev).add(key))
     void api.notes.toggleTask(task.notePath, task.position, workspacePath).then(() => {
-      setTasks((prev) =>
-        prev.filter((t) => !(t.notePath === task.notePath && t.position === task.position)),
-      )
+      setTimeout(() => {
+        setTasks((prev) =>
+          prev.filter((t) => !(t.notePath === task.notePath && t.position === task.position)),
+        )
+        setCheckingKeys((prev) => {
+          const next = new Set(prev)
+          next.delete(key)
+          return next
+        })
+      }, TASK_CHECK_FADE_MS)
     })
   }
 
@@ -67,19 +82,22 @@ export function TaskView({ onClose }: TaskViewProps) {
                   {group.noteTitle}
                 </button>
                 <ul>
-                  {group.tasks.map((task) => (
-                    <li key={task.position} className="task-view-item">
-                      <input
-                        type="checkbox"
-                        checked={false}
-                        onChange={() => toggle(task)}
-                        aria-label={`Mark "${task.text}" done`}
-                      />
-                      <button className="task-view-item-text" onClick={() => openNote(group.notePath)}>
-                        {task.text}
-                      </button>
-                    </li>
-                  ))}
+                  {group.tasks.map((task) => {
+                    const checked = checkingKeys.has(`${task.notePath}#${task.position}`)
+                    return (
+                      <li key={task.position} className={`task-view-item${checked ? ' checked' : ''}`}>
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => toggle(task)}
+                          aria-label={`Mark "${task.text}" done`}
+                        />
+                        <button className="task-view-item-text" onClick={() => openNote(group.notePath)}>
+                          {task.text}
+                        </button>
+                      </li>
+                    )
+                  })}
                 </ul>
               </div>
             ))}

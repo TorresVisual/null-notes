@@ -68,6 +68,11 @@ interface WorkspaceStore {
   setGitCommitStatus: (status: GitCommitStatus) => void
   gitDiverged: { ahead: number; behind: number } | null
   setGitDiverged: (d: { ahead: number; behind: number } | null) => void
+  // Ephemeral, UI-only: the tab that should show a brief "just created"
+  // highlight. Never persisted — TabBar clears it itself once the CSS
+  // animation finishes (see .tab-flash's onAnimationEnd).
+  flashTabPath: string | null
+  setFlashTabPath: (path: string | null) => void
 }
 
 export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
@@ -86,6 +91,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   gitPendingPaths: [],
   gitCommitStatus: 'idle',
   gitDiverged: null,
+  flashTabPath: null,
 
   setPath: (path) => set({ path, selectedFolder: path }),
 
@@ -160,6 +166,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   clearGitPendingPaths: () => set({ gitPendingPaths: [] }),
   setGitCommitStatus: (status) => set({ gitCommitStatus: status }),
   setGitDiverged: (d) => set({ gitDiverged: d }),
+  setFlashTabPath: (path) => set({ flashTabPath: path }),
 
   resetForNewWorkspace: () =>
     set({
@@ -176,5 +183,6 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
       gitPendingPaths: [],
       gitCommitStatus: 'idle',
       gitDiverged: null,
+      flashTabPath: null,
     }),
 }))

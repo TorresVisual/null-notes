@@ -65,6 +65,14 @@
   --focus-ring: 0 0 0 2px var(--bg-base), 0 0 0 4px var(--accent);
   --disabled-opacity: 0.4;
   --loading-opacity: 0.6;
+
+  /* Motion — one duration for state-change feedback (hover/press/toggle
+     color swaps), one for a surface entering (menus/modals), one easing
+     curve used everywhere. Matches the value `.details-chevron` already
+     used before this pass rather than inventing a new number. */
+  --duration-fast: 120ms;
+  --duration-base: 180ms;
+  --ease-standard: ease;
 }
 
 html {
@@ -81,6 +89,41 @@ body {
 }
 
 #root { height: 100%; display: flex; flex-direction: column; }
+
+/* One base transition for every interactive element's own state-change
+   feedback (hover/press/toggle background, border and text-color swaps) —
+   applied broadly here rather than repeated on 50+ individual selectors, so
+   "does this button transition smoothly" has one answer everywhere instead
+   of depending on which selector happens to declare it. */
+button, [role="button"], .tree-row, .tab, .search-result, .slash-menu-item,
+.math-snippet-item, .block-handle-menu-item, .tag-item, .tag-pill,
+.wiki-link, .code-link, .cross-ref, input, select {
+  transition:
+    background-color var(--duration-fast) var(--ease-standard),
+    border-color var(--duration-fast) var(--ease-standard),
+    color var(--duration-fast) var(--ease-standard),
+    outline-color var(--duration-fast) var(--ease-standard);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition-duration: 0.001ms !important; animation-duration: 0.001ms !important; }
+}
+
+/* Entrance animation for anything that mounts as a floating surface (a menu,
+   popover, or modal) — a small fade + settle, once, on mount. No exit
+   animation: that would need coordinating with React's unmount timing for
+   very little payoff on a surface that's usually dismissed by clicking
+   straight through to whatever it was covering. */
+@keyframes surface-in {
+  from { opacity: 0; transform: translateY(-2px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.context-menu, .slash-menu, .math-editor, .math-snippet-menu, .block-handle-menu,
+.search-modal, .settings-panel, .import-mode-dialog, .graph-view, .task-view,
+.review-session, .formula-sheet-prompt {
+  animation: surface-in var(--duration-base) var(--ease-standard);
+}
 
 /* Thin dark scrollbar for WebKit / WebView2 */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
@@ -163,6 +206,15 @@ body {
 
 .tab.active button:first-child { color: var(--text-primary); }
 .tab:hover { background: var(--bg-hover); }
+
+/* A newly-created note's tab gets one brief accent pulse so "a note was just
+   created" reads as a confirmed action, not a tab that silently appeared —
+   cleared by TabBar's own onAnimationEnd once it finishes, not a timer. */
+@keyframes tab-flash {
+  from { background: var(--accent-bg-hover); }
+  to { background: transparent; }
+}
+.tab-flash { animation: tab-flash 900ms var(--ease-standard); }
 
 /* Editor scroll container — full width so the scrollbar sits at the window edge */
 .editor-scroll {
@@ -344,7 +396,7 @@ body {
 
 .details-chevron {
   flex-shrink: 0;
-  transition: transform 180ms ease;
+  transition: transform var(--duration-base) var(--ease-standard);
 }
 .details-wrapper.open .details-chevron { transform: rotate(90deg); }
 
@@ -1241,6 +1293,12 @@ body {
   flex-shrink: 0;
 }
 
+/* Same rotate-in-place technique as .details-chevron — one persistent icon,
+   not a swap between two different Lucide components, so the rotation has
+   something to interpolate. */
+.tree-toggle-icon { transition: transform var(--duration-fast) var(--ease-standard); }
+.tree-toggle-icon.open { transform: rotate(90deg); }
+
 .tree-label {
   flex: 1;
   overflow: hidden;
@@ -2003,7 +2061,13 @@ body {
   align-items: center;
   gap: var(--space-sm);
   padding: 3px 0;
+  transition: opacity var(--duration-base) var(--ease-standard);
 }
+
+/* Brief checked-and-struck-through state before the row leaves the list
+   (see TASK_CHECK_FADE_MS in TaskView.tsx) — confirms the tick registered
+   instead of the row just vanishing the instant the write resolves. */
+.task-view-item.checked { opacity: 0.55; text-decoration: line-through; }
 
 .task-view-item-text {
   flex: 1;

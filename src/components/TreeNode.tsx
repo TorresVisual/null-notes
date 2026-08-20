@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ChevronRight, ChevronDown, Pencil, Trash2 } from 'lucide-react'
+import { ChevronRight, Pencil, Trash2 } from 'lucide-react'
 import { useWorkspaceStore } from '../store/workspace'
 import { useNotesStore } from '../store/notes'
 import { api } from '../lib/tauri'
@@ -120,7 +120,7 @@ export function TreeNode({ entry, depth }: TreeNodeProps) {
         onDrop={(e) => void handleDrop(e)}
       >
         <span className="tree-toggle">
-          {isExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+          <ChevronRight size={12} className={`tree-toggle-icon${isExpanded ? ' open' : ''}`} />
         </span>
         <span className="tree-label">{entry.name}</span>
       </div>

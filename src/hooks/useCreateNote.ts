@@ -14,6 +14,7 @@ export function useCreateNote() {
   const selectedFolder = useWorkspaceStore((s) => s.selectedFolder)
   const openTab = useWorkspaceStore((s) => s.openTab)
   const setFolderError = useWorkspaceStore((s) => s.setFolderError)
+  const setFlashTabPath = useWorkspaceStore((s) => s.setFlashTabPath)
   const inFlight = useRef(false)
 
   return useCallback(
@@ -24,6 +25,7 @@ export function useCreateNote() {
         const meta = await api.notes.create(workspacePath, selectedFolder ?? workspacePath, title)
         addNote(meta)
         openTab(meta.path)
+        setFlashTabPath(meta.path)
         setFolderError(null)
         return meta
       } catch (e) {
@@ -33,6 +35,6 @@ export function useCreateNote() {
         inFlight.current = false
       }
     },
-    [workspacePath, selectedFolder, addNote, openTab, setFolderError],
+    [workspacePath, selectedFolder, addNote, openTab, setFolderError, setFlashTabPath],
   )
 }

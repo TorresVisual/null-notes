@@ -24,19 +24,24 @@ export function TabBar({
   onDismissSaveError,
   gitCommitStatus,
 }: TabBarProps) {
-  const { openTabs, activeTab, setActiveTab, closeTab } = useWorkspaceStore()
+  const { openTabs, activeTab, setActiveTab, closeTab, flashTabPath, setFlashTabPath } =
+    useWorkspaceStore()
   if (openTabs.length === 0) return null
   return (
     <div className="tab-bar" role="tablist">
       {openTabs.map((path) => {
         const name = path.split(/[\\/]/).pop()?.replace('.md', '') ?? path
         const isActive = path === activeTab
+        const isFlashing = path === flashTabPath
         return (
           <div
             key={path}
             role="tab"
             aria-selected={isActive}
-            className={`tab${isActive ? ' active' : ''}`}
+            className={`tab${isActive ? ' active' : ''}${isFlashing ? ' tab-flash' : ''}`}
+            onAnimationEnd={() => {
+              if (isFlashing) setFlashTabPath(null)
+            }}
           >
             <button onClick={() => setActiveTab(path)}>{name}</button>
             <button className="tab-close" onClick={() => closeTab(path)} aria-label={`Close ${name}`}>

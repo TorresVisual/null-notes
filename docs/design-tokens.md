@@ -140,3 +140,31 @@ Eight states, each with a token or a documented convention:
 ```
 
 **Known gap, deliberately not fixed here:** `.tree-row` is a plain `<li>` with an `onClick` handler (`TreeNode.tsx`) — it has no `tabIndex` and no keydown handler, so `:focus-visible` is defined in CSS but currently unreachable by keyboard. Making tree rows genuinely keyboard-operable is an interaction/accessibility fix, not a token-definition one; it's flagged here for P9.5-3/P9.5-4 rather than silently left looking more accessible than it is.
+
+---
+
+## Motion (P9.5-4)
+
+One easing curve, two durations. `--ease-standard: ease` — a plain curve on purpose, not a custom cubic-bezier; `--duration-fast: 120ms` for a state-change swap (hover/press/toggle), `--duration-base: 180ms` for a surface entering (menu/modal) or a larger movement (chevron rotate) — the value `.details-chevron` already used before this pass, kept rather than replaced. Every transition/animation in the app derives from these two numbers and this one curve; `prefers-reduced-motion: reduce` collapses both to near-zero globally.
+
+One sentence per audited interaction, per the DoD:
+
+- **Opening/closing panels** — every modal/popover/menu (`.context-menu`, `.slash-menu`, `.math-editor`, `.math-snippet-menu`, `.block-handle-menu`, `.search-modal`, `.settings-panel`, `.import-mode-dialog`, `.graph-view`, `.task-view`, `.review-session`, `.formula-sheet-prompt`) plays one `surface-in` fade-and-settle on mount; there's no exit animation, since coordinating that with React's unmount timing costs more than it returns on a surface that's usually dismissed by clicking through to whatever it covered.
+- **Tab transitions** — hover/active color swaps now transition at `--duration-fast` via the shared base rule instead of snapping instantly.
+- **Menus** — covered by the same `surface-in` entrance as panels; item hover/selected states transition at `--duration-fast`.
+- **Dialogs** — same `surface-in` entrance; button hover/press/focus states transition at `--duration-fast`.
+- **Drag/drop** — `.tree-row.drag-over`'s background/outline now fades in at `--duration-fast` instead of appearing instantly.
+- **Tree expansion** — the folder tree's chevron now rotates a single persistent icon (`.tree-toggle-icon.open`) at `--duration-fast`, matching `.details-chevron`'s existing technique, instead of hard-swapping between two different Lucide icon components.
+- **Selection** — row/item selected-state color changes (tree rows, search results, slash-menu items, tags) transition at `--duration-fast` via the same shared rule.
+- **Editor focus** — left as native caret/selection rendering; ProseMirror's own focus handling isn't a CSS transition candidate and wasn't touched.
+- **Search** — the input and its container get the standard focus/entrance treatment; result-list re-filtering as you type is deliberately left instant, since animating a list that's re-rendering on every keystroke would read as lag, not polish.
+- **Saving** — `.save-status`'s icon changes by swapping Lucide components (Check/AlertTriangle/RotateCw), which can't cross-fade without a decorator; left as an instant icon swap since the status text alongside it already carries the change.
+- **Indexing** — has no user-facing state to animate: reindexing is intentionally invisible per the save-path architecture (`CLAUDE.md`'s "`save_note` does no database work... keeping DB work off the keystroke path is the point"), so there's nothing silent to fix here.
+- **Git operations** — the concrete fix: `useGitAutoCommit.ts`'s `'committed'` status used to sit in the tab bar indefinitely with no way back to idle; it now auto-reverts after `COMMITTED_DISPLAY_MS` (4s), guarded against a commit that starts again in the meantime, so "committed" reads as a confirmation instead of a permanent label.
+- **PDF generation** — import progress (`.import-progress`) is a text label that updates as pages resolve; left as-is, since a progress *percentage* changing shouldn't debounce behind an animation.
+- **Workspace switching** — the workspace picker's own entrance isn't a floating surface (it's the main pane's content), so it isn't part of the `surface-in` set; no silent gap was found here to fix.
+
+Two more concrete "currently silent" fixes named directly in the task brief:
+
+- **A task being ticked** — `TaskView.tsx`'s checkbox used to remove the row from the list the instant the write resolved, with no confirmation. It now optimistically shows checked + struck-through (`.task-view-item.checked`) for `TASK_CHECK_FADE_MS` (320ms) before the row leaves the list.
+- **A note being created** — a newly created note's tab used to just appear with no acknowledgement. It now gets one `tab-flash` accent pulse (900ms), cleared via `onAnimationEnd` rather than a timer so it can never outlive its own animation. ("Copied" doesn't apply — there is no whole-note copy feature, only block duplication inside the editor, which already gives correct positional feedback via node selection; animating the newly-duplicated block itself would need a ProseMirror decoration plugin, a larger change than this pass's scope, so it's left for a follow-up rather than folded in here.)
