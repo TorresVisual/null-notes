@@ -29,7 +29,12 @@ export function BacklinksPanel({ notePath, noteTitle }: BacklinksPanelProps) {
       </button>
       {!collapsed && (
         backlinks.length === 0 ? (
-          <p className="backlinks-empty">No notes link here yet.</p>
+          <p className="backlinks-empty">
+            No notes link here yet.
+            <span className="empty-state-detail">
+              Write <code>[[{noteTitle}]]</code> in another note to connect it to this one.
+            </span>
+          </p>
         ) : (
           <ul className="backlinks-list">
             {backlinks.map((note) => (

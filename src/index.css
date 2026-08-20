@@ -276,10 +276,30 @@ button, [role="button"], .tree-row, .tab, .search-result, .slash-menu-item,
 
 .terminal-pane-kill:hover { color: var(--danger); }
 
-.terminal-pane-body {
+.terminal-pane-body-wrap {
+  position: relative;
   flex: 1;
+  overflow: hidden;
+}
+
+.terminal-pane-body {
+  height: 100%;
   padding: 4px 8px;
   overflow: hidden;
+}
+
+/* Shown until the shell process actually spawns (`useTerminal`'s `isReady`)
+   — otherwise the pane is a blank canvas with no feedback for however long
+   terminal_open takes. */
+.terminal-pane-starting {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-tertiary);
+  font: var(--text-empty-state);
+  pointer-events: none;
 }
 
 .note-editor { outline: none; min-height: 100%; }
@@ -321,6 +341,27 @@ button, [role="button"], .tree-row, .tab, .search-result, .slash-menu-item,
   text-align: center;
   margin-top: 20vh;
   font: var(--text-empty-state);
+}
+
+/* Second line under an empty-state message — "what to do next," per P9.5-5.
+   Shared by every empty-state class (.empty-state, .search-empty,
+   .backlinks-empty, .home-empty) rather than each defining its own. */
+.empty-state-detail {
+  display: block;
+  margin-top: 4px;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+/* Generic inline code styling for UI chrome outside note content — e.g. the
+   empty-state hints above. .note-editor code (below) keeps its own em-based
+   rule since note content needs to scale with the surrounding heading. */
+code {
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+  background: var(--bg-hover);
+  padding: 1px 4px;
+  border-radius: 3px;
 }
 
 /* Sidebar extras */

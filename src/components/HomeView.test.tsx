@@ -41,7 +41,7 @@ describe('HomeView', () => {
     useWorkspaceStore.getState().openTab('/ws/a.md')
     useWorkspaceStore.getState().openTab('/ws/b.md')
 
-    const { getByText } = render(<HomeView onOpenTaskView={() => {}} onOpenReview={() => {}} />)
+    const { getByText } = render(<HomeView onOpenTaskView={() => {}} onOpenReview={() => {}} onOpenSettings={() => {}} />)
 
     const items = [getByText('a'), getByText('b')]
     expect(items[0]).toBeInTheDocument()
@@ -53,7 +53,7 @@ describe('HomeView', () => {
   })
 
   it('shows an empty hint under Continue when no tabs are open', () => {
-    const { getByText } = render(<HomeView onOpenTaskView={() => {}} onOpenReview={() => {}} />)
+    const { getByText } = render(<HomeView onOpenTaskView={() => {}} onOpenReview={() => {}} onOpenSettings={() => {}} />)
     expect(getByText('No open notes.')).toBeInTheDocument()
   })
 
@@ -67,7 +67,7 @@ describe('HomeView', () => {
       tags: [],
     })
 
-    const { getByText, getAllByRole } = render(<HomeView onOpenTaskView={() => {}} onOpenReview={() => {}} />)
+    const { getByText, getAllByRole } = render(<HomeView onOpenTaskView={() => {}} onOpenReview={() => {}} onOpenSettings={() => {}} />)
     const recentSection = getByText('Recent').closest('section')!
     const buttons = getAllByRole('button', { name: /Older|Newer/ })
     expect(buttons).toHaveLength(2)
@@ -86,7 +86,7 @@ describe('HomeView', () => {
       { notePath: '/ws/b.md', noteTitle: 'B', text: 'Review notes', position: 3 },
     ])
 
-    const { findByText, getByText } = render(<HomeView onOpenTaskView={() => {}} onOpenReview={() => {}} />)
+    const { findByText, getByText } = render(<HomeView onOpenTaskView={() => {}} onOpenReview={() => {}} onOpenSettings={() => {}} />)
 
     expect(await findByText('2 open')).toBeInTheDocument()
     expect(getByText('Finish proof')).toBeInTheDocument()
@@ -97,7 +97,7 @@ describe('HomeView', () => {
 
   it('shows an empty hint under Tasks when there are none', async () => {
     listOpenTasks.mockResolvedValue([])
-    const { findByText } = render(<HomeView onOpenTaskView={() => {}} onOpenReview={() => {}} />)
+    const { findByText } = render(<HomeView onOpenTaskView={() => {}} onOpenReview={() => {}} onOpenSettings={() => {}} />)
     expect(await findByText('No open tasks.')).toBeInTheDocument()
   })
 
@@ -107,7 +107,7 @@ describe('HomeView', () => {
     ])
     const onOpenTaskView = vi.fn()
     const { findByText, getByText } = render(
-      <HomeView onOpenTaskView={onOpenTaskView} onOpenReview={() => {}} />,
+      <HomeView onOpenTaskView={onOpenTaskView} onOpenReview={() => {}} onOpenSettings={() => {}} />,
     )
 
     await findByText('Finish proof')
@@ -120,7 +120,7 @@ describe('HomeView', () => {
       { notePath: '/ws/a.md', noteTitle: 'A', kind: 'qa', front: 'Q', back: 'A', position: 0 },
     ])
     const onOpenReview = vi.fn()
-    render(<HomeView onOpenTaskView={vi.fn()} onOpenReview={onOpenReview} />)
+    render(<HomeView onOpenTaskView={vi.fn()} onOpenReview={onOpenReview} onOpenSettings={() => {}} />)
     await waitFor(() => expect(screen.getByText('1 due')).toBeInTheDocument())
     fireEvent.click(screen.getByText('Start review'))
     expect(onOpenReview).toHaveBeenCalled()
@@ -128,19 +128,25 @@ describe('HomeView', () => {
 
   it('shows "Nothing due." when the queue is empty', async () => {
     listDueCards.mockResolvedValue([])
-    render(<HomeView onOpenTaskView={vi.fn()} onOpenReview={vi.fn()} />)
+    render(<HomeView onOpenTaskView={vi.fn()} onOpenReview={vi.fn()} onOpenSettings={() => {}} />)
     await waitFor(() => expect(screen.getByText('Nothing due.')).toBeInTheDocument())
   })
 
-  it('hides the Git section when the workspace is not a Git repo', () => {
+  it('shows a not-a-repo empty state with a Settings CTA when the workspace is not a Git repo', async () => {
     useWorkspaceStore.setState({ repoMode: null })
-    const { queryByText } = render(<HomeView onOpenTaskView={() => {}} onOpenReview={() => {}} />)
-    expect(queryByText('Git')).not.toBeInTheDocument()
+    const onOpenSettings = vi.fn()
+    const { getByText } = render(
+      <HomeView onOpenTaskView={() => {}} onOpenReview={() => {}} onOpenSettings={onOpenSettings} />,
+    )
+    expect(getByText('Git')).toBeInTheDocument()
+    expect(getByText('Not a Git repository.')).toBeInTheDocument()
+    await userEvent.click(getByText('Open Settings'))
+    expect(onOpenSettings).toHaveBeenCalledOnce()
   })
 
   it('shows "Up to date" when there is no divergence and nothing pending', () => {
     useWorkspaceStore.setState({ repoMode: 'notesOnly', gitDiverged: null, gitPendingPaths: [] })
-    const { getByText } = render(<HomeView onOpenTaskView={() => {}} onOpenReview={() => {}} />)
+    const { getByText } = render(<HomeView onOpenTaskView={() => {}} onOpenReview={() => {}} onOpenSettings={() => {}} />)
     expect(getByText('Up to date')).toBeInTheDocument()
   })
 
@@ -150,7 +156,7 @@ describe('HomeView', () => {
       gitDiverged: null,
       gitPendingPaths: ['/ws/a.md', '/ws/b.md'],
     })
-    const { getByText } = render(<HomeView onOpenTaskView={() => {}} onOpenReview={() => {}} />)
+    const { getByText } = render(<HomeView onOpenTaskView={() => {}} onOpenReview={() => {}} onOpenSettings={() => {}} />)
     expect(getByText('2 unpushed')).toBeInTheDocument()
   })
 
@@ -160,7 +166,7 @@ describe('HomeView', () => {
       gitDiverged: { ahead: 1, behind: 3 },
       gitPendingPaths: ['/ws/a.md'],
     })
-    const { getByText } = render(<HomeView onOpenTaskView={() => {}} onOpenReview={() => {}} />)
+    const { getByText } = render(<HomeView onOpenTaskView={() => {}} onOpenReview={() => {}} onOpenSettings={() => {}} />)
     expect(getByText('1 ahead, 3 behind')).toBeInTheDocument()
   })
 })

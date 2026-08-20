@@ -13,9 +13,10 @@ function tabLabel(path: string): string {
 interface HomeViewProps {
   onOpenTaskView: () => void
   onOpenReview: () => void
+  onOpenSettings: () => void
 }
 
-export function HomeView({ onOpenTaskView, onOpenReview }: HomeViewProps) {
+export function HomeView({ onOpenTaskView, onOpenReview, onOpenSettings }: HomeViewProps) {
   const openTabs = useWorkspaceStore((s) => s.openTabs)
   const setActiveTab = useWorkspaceStore((s) => s.setActiveTab)
   const openTab = useWorkspaceStore((s) => s.openTab)
@@ -128,12 +129,24 @@ export function HomeView({ onOpenTaskView, onOpenReview }: HomeViewProps) {
           </>
         )}
       </section>
-      {gitStatus && (
-        <section className="home-section">
-          <h2>Git</h2>
+      <section className="home-section">
+        <h2>Git</h2>
+        {gitStatus ? (
           <p className="home-status">{gitStatus}</p>
-        </section>
-      )}
+        ) : (
+          <>
+            <p className="home-empty">
+              Not a Git repository.
+              <span className="empty-state-detail">
+                Turn this workspace into one for version history and backups.
+              </span>
+            </p>
+            <button className="home-view-all" onClick={onOpenSettings}>
+              Open Settings
+            </button>
+          </>
+        )}
+      </section>
     </div>
   )
 }

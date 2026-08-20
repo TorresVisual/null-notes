@@ -115,7 +115,13 @@ export function SearchModal({ onClose }: SearchModalProps) {
           </ul>
         )}
         {query.trim() !== '' && results.length === 0 && (
-          <p className="search-empty">No results for &ldquo;{query}&rdquo;</p>
+          <p className="search-empty">
+            No results for &ldquo;{query}&rdquo;
+            <span className="empty-state-detail">
+              Searches every note's title and body — try a shorter or different term, or narrow
+              with <code>folder:</code>/<code>tag:</code>.
+            </span>
+          </p>
         )}
       </div>
     </div>

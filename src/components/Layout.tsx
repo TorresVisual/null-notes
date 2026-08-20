@@ -334,6 +334,7 @@ export function Layout() {
               <HomeView
                 onOpenTaskView={() => setTaskViewOpen(true)}
                 onOpenReview={() => setReviewOpen(true)}
+                onOpenSettings={() => setSettingsOpen(true)}
               />
             )}
             {!isLoading && activeTab && viewMode === 'wysiwyg' && outlineOpen && (

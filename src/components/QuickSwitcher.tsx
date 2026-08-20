@@ -98,7 +98,10 @@ export function QuickSwitcher({ onClose }: QuickSwitcherProps) {
           </ul>
         )}
         {query.trim() !== '' && results.length === 0 && (
-          <p className="search-empty">No notes match &ldquo;{query}&rdquo;</p>
+          <p className="search-empty">
+            No notes match &ldquo;{query}&rdquo;
+            <span className="empty-state-detail">Matches note titles — try part of the title instead.</span>
+          </p>
         )}
       </div>
     </div>

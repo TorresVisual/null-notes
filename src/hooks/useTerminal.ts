@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { RefObject } from 'react'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
@@ -28,6 +28,9 @@ export function useTerminal(
   // open" on the backend. Every write path (typed input and insertText)
   // chains onto this instead of firing the moment the component mounts.
   const readyRef = useRef<Promise<void>>(Promise.resolve())
+  // Surfaces the same gap as an "starting shell…" state instead of a blank
+  // pane with no feedback at all.
+  const [isReady, setIsReady] = useState(false)
 
   useEffect(() => {
     const container = containerRef.current
@@ -42,6 +45,7 @@ export function useTerminal(
 
     const ready = api.terminal.open(workspace, notePath, shell).then(() => {
       void api.terminal.resize(term.cols, term.rows)
+      setIsReady(true)
     })
     readyRef.current = ready
 
@@ -78,5 +82,5 @@ export function useTerminal(
     await api.terminal.close()
   }
 
-  return { insertText, kill }
+  return { insertText, kill, isReady }
 }

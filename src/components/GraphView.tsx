@@ -107,7 +107,13 @@ export function GraphView({ onClose }: GraphViewProps) {
         {isLoading ? (
           <p className="status">Loading…</p>
         ) : nodes.length === 0 ? (
-          <p className="empty-state">No notes yet.</p>
+          <p className="empty-state">
+            No notes yet.
+            <span className="empty-state-detail">
+              This graphs [[wiki-links]] and shared #tags between notes — create a couple of notes
+              and link or tag them to see connections here.
+            </span>
+          </p>
         ) : (
           <svg className="graph-svg" viewBox={viewBox} role="img" aria-label="Note connections graph">
             {edges.map((e) => (

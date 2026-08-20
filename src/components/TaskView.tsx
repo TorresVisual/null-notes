@@ -73,7 +73,12 @@ export function TaskView({ onClose }: TaskViewProps) {
         {isLoading ? (
           <p className="status">Loading…</p>
         ) : groups.length === 0 ? (
-          <p className="empty-state">No open tasks in this workspace.</p>
+          <p className="empty-state">
+            No open tasks in this workspace.
+            <span className="empty-state-detail">
+              Write <code>- [ ] task text</code> in any note to track it here.
+            </span>
+          </p>
         ) : (
           <div className="task-view-list">
             {groups.map((group) => (

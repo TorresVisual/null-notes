@@ -16,7 +16,7 @@ interface TerminalPaneProps {
 // unmount as a side effect of the toggle.
 export function TerminalPane({ workspace, notePath, shell, hidden, onClose }: TerminalPaneProps) {
   const containerRef = useRef<HTMLDivElement>(null)
-  const { insertText, kill } = useTerminal(containerRef, workspace, notePath, shell)
+  const { insertText, kill, isReady } = useTerminal(containerRef, workspace, notePath, shell)
 
   const noteLabel = notePath ? notePath.split(/[\\/]/).pop() : null
 
@@ -43,7 +43,10 @@ export function TerminalPane({ workspace, notePath, shell, hidden, onClose }: Te
           <X size={14} />
         </button>
       </div>
-      <div className="terminal-pane-body" ref={containerRef} />
+      <div className="terminal-pane-body-wrap">
+        {!isReady && <p className="terminal-pane-starting">Starting shell…</p>}
+        <div className="terminal-pane-body" ref={containerRef} />
+      </div>
     </div>
   )
 }
