@@ -1,6 +1,12 @@
 # null-notes — Product & Technical Roadmap
 
-**Last updated:** 2026-08-19 (**P9-2 done — formula sheet generation.** `File > Generate Formula Sheet…` opens a single scope prompt reusing P6-5's `folder:`/`tag:` query syntax (`parseSearchQuery`) rather than a dedicated picker — blank means the whole workspace. `db::notes::notes_in_scope` resolves the matching notes (`search_notes`'s folder/tag SQL minus the FTS match and the 20-result cap, ordered by path for a stable source order), and a new `extract_formulas` scanner reads each note's *current* file content directly from disk — line-based like `extract_tasks`, recognising the same one-liner `$$latex$$` and multi-line `$`/`$$` fence shapes `BlockMath.tsx`'s own markdown-it rule reads, and tracking the nearest `##`+ heading above each formula (a level-1 heading is excluded — it's the note's own title, which the sheet already renders as the `##` group, so counting it too would just repeat the title as a redundant sub-caption). Formulas are deduplicated scope-wide by trimmed latex, first occurrence wins, then grouped consecutively by (note, heading) into `## Note Title` / `### Heading` sections with `$\n<latex>\n$` blocks — the exact form `BlockMath` serializes, so the sheet round-trips through the editor identically to a hand-written one. The generated note goes through the same collision-refusing write path every other generated note uses (`create_note_file_with_content`) — regenerating over an existing sheet fails loudly rather than overwriting, same posture as "no live-updating magic file." One real bug surfaced by e2e testing against the shared fixture workspace: `generate_formula_sheet_at` initially propagated a file-read error for any indexed note whose `.md` was since deleted outside the app, failing the whole sheet over one stale index row — fixed to skip an unreadable note (same posture as `reindex_from_disk`'s own missing-file handling) rather than erroring. Covered by 14 new Rust tests (extraction, scope resolution, dedup/grouping, the stale-index case) and an e2e spec (`p9-2-formula-sheet.e2e.ts`) driving the real compiled app end to end, screenshotted.)
+**Last updated:** 2026-08-20 (**P9-3 done — spaced repetition, closing M9.** Cards are authored inline in ordinary notes: a `front :: back` line, or a line with one or more `{{cloze}}` spans, one card per line like every other line-based extractor in this codebase. Schedule state (`due`/`ease`/`interval`/`reps`) is a plain `<!-- sr ... -->` comment written onto the line directly below a card, per the storage decision the roadmap had already resolved (Option A) — never scaffolded until a card is actually reviewed once. `review_cards` is a purely derived table, rebuilt every `reindex_note` from `extract_cards` exactly like `note_tags`/`note_tasks`, wired into the same five rename/remove/forget call sites. Scheduling is SM-2 with four-button grading (Again/Hard/Good/Easy), a pure `sm2::next_state` function taking `today` as an explicit argument rather than reading the clock itself, which made it trivial to test exhaustively. Verified and fixed one real, load-bearing risk *before* writing any storage code: a raw HTML comment is silently dropped by the WYSIWYG editor's own markdown round-trip (`tiptap-markdown` renders to an HTML string, then ProseMirror's `DOMParser` walks Element/Text nodes only, skipping Comment nodes) — confirmed with a throwaway test against the real `coreExtensions`, then fixed with a new `SrState` node using `Callout.tsx`'s own `parse.updateDOM` trick to rewrite the comment into a real element before ProseMirror ever sees it. `ReviewSession` (`Ctrl Shift R`, or Home's now-live Study section) fetches the due queue once, but **re-fetches after every grade rather than caching it** — a real bug found by e2e testing against the compiled app: grading a card inserts a line, which shifts the position of any later due card in the *same* note, so a cached queue's stale position silently failed to grade the next card. Covered by 30 new Rust tests, 18 new frontend tests, and `p9-3-spaced-repetition.e2e.ts` driving the real compiled app end to end. **M9 reached** — P9-1, P9-2, P9-3 and P9-4 are all done.)
+
+*Previously, same day (superseded above): **Phase 9.5 — Productization / Polish added.** A second review pass (`notes/Roadmap-Update2.md`) proposed brand identity, a design-system/UI-hierarchy audit, interaction polish, empty states, error states, product onboarding, an editor-polish re-pass, a micro-interactions pass, and a consistency audit. Five of those nine ideas were first challenged as public-distribution work a single-user tool doesn't need (see §4's struck-through rows) — the maintainer overruled that the same day: wanting the app to feel finished regardless of audience size is a legitimate preference §3 already names ("enjoyment and learning are legitimate terms in the prioritization formula"), not a call this roadmap gets to make on the maintainer's behalf. All nine ideas are now real tasks under the new **Phase 9.5** (P9.5-1…P9.5-8, sequenced after P9 since it polishes surfaces P9 still has to build). The three items briefly parked in §8's polish backlog earlier the same day — empty states, error copy, the consistency audit — moved into P9.5-5/P9.5-6/P9.5-3 instead, so they're tracked once, not twice.)
+
+*Previously, same day (superseded above): **A second review pass (`notes/Roadmap-Update2.md`) proposed a "P9.5 — Productization / Polish" phase — brand identity, a formal design-system/UI-hierarchy audit, interaction polish, empty states, error states, product onboarding, a general editor-polish re-pass, a micro-interactions pass, and a consistency audit.** No new phase was opened for it. Five of the nine ideas are challenged rather than scheduled, for the same reason three ideas were challenged in the first review pass (§4): a brand-identity exercise, a from-scratch design-system audit, and a marketing-style onboarding pass all assume a public-distribution posture that §1 explicitly rules out right now ("not aimed at public distribution yet," branding and onboarding deliberately pushed down the list) — and P1-5's identity cleanup plus P2's already-shipped "Terminal Precision" tokens (M2 reached: "it's a pleasure to use for hours; nothing fights me") cover the same ground a second time with no reported problem driving the redo. The micro-interactions pass and a general editor-polish re-pass are the same shape as ink polish already deferred indefinitely (§4) — no concrete friction named, just more polish for its own sake. What survived: a handful of missing per-surface empty states (search results, backlinks, tasks, Git, graph, terminal) and sharper save-failure copy join §8's polish backlog, and the consistency audit — go through the app, record every visual inconsistency in a table, fix systematically — is recorded there too, unphased, for whenever a polish pass is actually being done rather than as a standing milestone. See §4 for the five challenged rows and their individual reasoning. **Superseded within the hour** — see the current top entry.)
+
+*Previously, 2026-08-19: **P9-2 done — formula sheet generation.** `File > Generate Formula Sheet…` opens a single scope prompt reusing P6-5's `folder:`/`tag:` query syntax (`parseSearchQuery`) rather than a dedicated picker — blank means the whole workspace. `db::notes::notes_in_scope` resolves the matching notes (`search_notes`'s folder/tag SQL minus the FTS match and the 20-result cap, ordered by path for a stable source order), and a new `extract_formulas` scanner reads each note's *current* file content directly from disk — line-based like `extract_tasks`, recognising the same one-liner `$$latex$$` and multi-line `$`/`$$` fence shapes `BlockMath.tsx`'s own markdown-it rule reads, and tracking the nearest `##`+ heading above each formula (a level-1 heading is excluded — it's the note's own title, which the sheet already renders as the `##` group, so counting it too would just repeat the title as a redundant sub-caption). Formulas are deduplicated scope-wide by trimmed latex, first occurrence wins, then grouped consecutively by (note, heading) into `## Note Title` / `### Heading` sections with `$\n<latex>\n$` blocks — the exact form `BlockMath` serializes, so the sheet round-trips through the editor identically to a hand-written one. The generated note goes through the same collision-refusing write path every other generated note uses (`create_note_file_with_content`) — regenerating over an existing sheet fails loudly rather than overwriting, same posture as "no live-updating magic file." One real bug surfaced by e2e testing against the shared fixture workspace: `generate_formula_sheet_at` initially propagated a file-read error for any indexed note whose `.md` was since deleted outside the app, failing the whole sheet over one stale index row — fixed to skip an unreadable note (same posture as `reindex_from_disk`'s own missing-file handling) rather than erroring. Covered by 14 new Rust tests (extraction, scope resolution, dedup/grouping, the stale-index case) and an e2e spec (`p9-2-formula-sheet.e2e.ts`) driving the real compiled app end to end, screenshotted.)
 
 *Previously, same day: **P9-1 done — workspace-wide task view, opening P9.** `- [ ]`/`- [x]` lines extract into a `note_tasks` table (`note_path, text, done, position`), a direct mirror of `note_tags` down to how `rename_path_prefix`/`remove_notes_under`/`update_path` carry it and how `forget_note`/`delete_note` clear it — built into the existing `reindex_note` path per the task's own instruction, so it inherits the P0-3 debounce and P0-5 watcher for free. `position` is the 0-indexed line number, which doubles as the key `toggle_task` uses to flip the checkbox back — simpler than inventing a stable per-task identity, and safe because a toggle rewrites the file and reindexes immediately. Ticking a task from the new `Tasks` view (`Ctrl Shift K`) writes straight to disk via the same atomic-write path every other mutation uses; no new conflict logic was needed because the existing P0-5 watcher already treats that write like any external change — reloading a clean open buffer or conflict-prompting a dirty one. `extract_tasks` tracks fenced-code-block state line-by-line (not `extract_tags`'s strip-then-regex) since removing the fences first would shift the very line numbers `position` depends on.)
 
@@ -178,12 +184,15 @@ Given "personal daily driver," priority = `(daily-use value) × (risk of data lo
 | **P6** | STEM authoring | **M6:** writing maths/algorithms is faster here than anywhere else | ✅ | Compounds on every note; cheap, since the infra exists |
 | **P7** | IDE integration | **M7:** notes and code are one workflow, not two | ✅ | The brief's second pillar — "integrate, don't replace" |
 | **P8** | Embedded terminal | **M8:** `claude` runs against the open note without leaving the app | ✅ | Small effort; delivers the brief's AI ask without AI code |
-| **P9** | Study & revision | **M9:** the app helps me *revise*, not just capture |  | The only phase not derived from the brief — see below |
+| **P9** | Study & revision | **M9:** the app helps me *revise*, not just capture | ✅ | The only phase not derived from the brief — see below |
+| **P9.5** | Productization / polish | **M9.5:** the app looks and feels considered, not just working |  | Explicit maintainer preference — craft is a legitimate prioritization term (below), not gated on audience size |
 | **P10** | Gated stretch | **M10:** in-app AI + code execution | gated | Explicitly deferred; do not let it pull focus |
 
 Priority within the new phases follows the same formula (**daily value × friction ÷ effort**), which is why P6 (many small wins on infra that already exists) outranks P7 (a whole new integration surface) despite P7 being the more distinctive feature.
 
 **Why P9 exists (2026-07-29).** Every other phase traces to `notes/Plan.md`. P9 does not, and was added because reviewing the brief exposed a gap in the brief itself: **it is a capture roadmap.** Everything — editing, ink, PDF import, links, graph — helps get material *into* the app. Nothing helps a student get it back *out* at exam time, which is when a study tool either earns its keep or doesn't. It sits at P9 rather than earlier because capture has to be excellent before revision has anything worth revising.
+
+**Why P9.5 exists (2026-08-20).** A second review pass proposed a productization/polish batch that was first challenged as work a single-user tool doesn't need (§4). The maintainer said otherwise: wanting the app to feel finished is a real preference regardless of who else ever sees it, which the "enjoyment and learning are legitimate terms" line above already covers — this table just hadn't given that preference its own row yet. It sits after P9 because it polishes surfaces P9 still has to build first.
 
 ---
 
@@ -827,9 +836,9 @@ The brief's actual AI ask is *"a terminal in which I can do* `claude` *and work 
 
 ---
 
-## Phase 9 — Study & Revision (P9)
+## Phase 9 — Study & Revision (P9) ✅
 
-**Milestone M9:** *At exam time the app is where I revise, not just where my notes happen to live.*
+**Milestone M9 reached (2026-08-20):** *At exam time the app is where I revise, not just where my notes happen to live.*
 
 The one phase not derived from `notes/Plan.md`. Everything before it is capture; this is retrieval. Ordered cheapest-first, because P9-1 is small enough to ship in a sitting and P9-3 needs a decision made before any code.
 
@@ -858,7 +867,7 @@ Many exams allow one A4 formula sheet. Building it by hand is hours of copy-past
 
 *Done: scope is a single input reusing P6-5's `folder:`/`tag:` syntax, blank for the whole workspace — no dedicated picker UI.* `notes_in_scope` *(*`db/notes.rs`*) mirrors* `search_notes`*'s folder/tag SQL minus the FTS match and result cap, ordered by path for a stable source order.* `extract_formulas` *(*`commands/notes.rs`*) is line-based like* `extract_tasks`*, reading each scoped note's current file content directly off disk (not the FTS index, which can lag an open buffer) and recognising the same math forms* `BlockMath.tsx` *itself reads — a level-1 heading is deliberately excluded from "nearest heading," since it's the note's own title and the sheet already renders that as the* `##` *group. Formulas dedupe scope-wide by trimmed latex, grouped consecutively into* `## Note` */* `### Heading` *sections. Generation reuses the existing collision-refusing note-creation path, so regenerating over an existing sheet fails loudly rather than overwriting. e2e testing against the shared fixture workspace surfaced a real gap — a stale* `notes` *row whose file had since been deleted failed the whole generation — fixed by skipping an unreadable note rather than propagating the read error, the same posture* `reindex_from_disk` *already takes. Covered by 14 new Rust tests and* `p9-2-formula-sheet.e2e.ts`*.*
 
-### P9-3 — Spaced repetition: **decision fork first** — **decision, then L**
+### P9-3 — Spaced repetition: **decision fork first** — **decision, then L** ✅
 
 The highest-value study feature and the one with a real architectural catch, so **do not start coding until the storage question is settled.** Review scheduling is data that cannot be rebuilt from the notes, so `index.db` is not an option (principle #1). Three candidates:
 
@@ -881,6 +890,12 @@ Then, once decided:
 - **Dependency:** the fork above; P6-1 for theorem-block cards; **this is the concrete trigger for the frontmatter decision** deferred in §5 — if Option A wins, frontmatter may never be needed at all.
 - **DoD:** Cards are authored inside normal notes and remain readable as plain Markdown in any other editor; a review session schedules correctly across restarts; deleting `index.db` and reopening loses no scheduling state; moving or renaming a note does not orphan its cards.
 
+*Done, per the recommendation above (Option A, unchallenged).* Cards are two plain-text forms, one per line like every other extractor here: `front :: back`, and a line carrying one or more `{{cloze}}` spans (all spans on a line reveal together as one card — no per-span sub-cards). A card's schedule lives on the line directly below it, `<!-- sr due=... ease=... interval=... reps=... -->`, written for the first time only on that card's first review — a card with no comment yet is implicitly new and due today. `extract_cards` (`commands/notes.rs`) is line-based and fence-skipping like `extract_tasks`/`extract_formulas`, and `review_cards` is a purely derived table wired into the same five call sites `note_tasks` already uses.
+
+Before writing any of that, the design phase verified a real risk rather than assuming Option A's comment would just work: mounting a note containing an HTML comment in the real `coreExtensions` and reading back `getMarkdown()` showed the comment **silently vanishes** — `tiptap-markdown` renders markdown to an HTML string and ProseMirror's `DOMParser` then walks Element and Text nodes only, dropping Comment nodes with no error. Left alone, opening and saving a note in this app's own editor would have quietly erased its entire review history. Fixed with a new `SrState` node reusing `Callout.tsx`'s own `parse.updateDOM` hook to rewrite the comment into a real (invisible) element before ProseMirror's parser ever sees it — confirmed with a throwaway round-trip test, since made permanent in `srState.test.ts`.
+
+Scheduling is a pure `sm2::next_state(state, grade, today)` function (SM-2, four-button Again/Hard/Good/Easy grading, `today` passed in rather than read from the clock) — no I/O, cheap to test exhaustively. `ReviewSession` (`Ctrl Shift R`, or Home's Study section) fetches the due queue once but **re-fetches it after every grade** rather than caching it locally, per `TaskView`'s usual shortcut — a real bug e2e testing caught: grading a card inserts a comment line, which shifts the line position of any *later* due card in the same note, so a cached queue's stale position silently failed `grade_card`'s own is-this-still-a-card check and the session never advanced past it. Theorem/Proof-block auto-cards (mentioned above as the argument for sequencing P6 first) were deliberately left out — a user can already hand-author a `Question :: Answer` card from a theorem in seconds once card syntax exists, and auto-pairing adds real matching logic with no line in this task's own DoD.
+
 ### P9-4 — Workspace dashboard — **M** ✅
 
 A single home screen instead of always opening to the last note — a capstone that pulls together threads P5 and P9 already built rather than adding new state of its own.
@@ -893,9 +908,73 @@ A single home screen instead of always opening to the last note — a capstone t
 - **Dependency:** P9-1, P9-3, P5-2/P5-3/P5-4. Sequence it last in P9 — it has nothing to show until the others exist.
 - **DoD:** Opening a workspace with no tab restored (or an explicit "Home" command) shows all five sections, each read from existing data with no new derived state introduced for this task; clicking any item opens it exactly like its source view would.
 
-*Done, ahead of P9-3.* Home reuses `Layout.tsx`'s existing `!activeTab` main-pane branch rather than a new overlay — `HomeView` renders in the same slot the old "select a note" empty-state text used to occupy, and a new `home` menu command (`Ctrl+H`) just calls `setActiveTab(null)`: no new view-state flag, and open tabs are never closed by it. Continue/Recent/Tasks/Git all read state or APIs another phase already computes (`openTabs`, `useNotesStore`'s `updatedAt`, `listOpenTasks`, and the P5 Git store fields `gitDiverged`/`gitPendingPaths`) — zero new derived state or backend commands, exactly as the DoD requires. P9-3 hasn't shipped yet, so **Study ships as a static disabled placeholder** ("Spaced repetition isn't set up yet") rather than blocking this task on it; wiring real due-card data into that section is P9-3's job when it lands. Design: `docs/specs/workspace-dashboard-design.md`.
+*Done, ahead of P9-3.* Home reuses `Layout.tsx`'s existing `!activeTab` main-pane branch rather than a new overlay — `HomeView` renders in the same slot the old "select a note" empty-state text used to occupy, and a new `home` menu command (`Ctrl+H`) just calls `setActiveTab(null)`: no new view-state flag, and open tabs are never closed by it. Continue/Recent/Tasks/Git all read state or APIs another phase already computes (`openTabs`, `useNotesStore`'s `updatedAt`, `listOpenTasks`, and the P5 Git store fields `gitDiverged`/`gitPendingPaths`) — zero new derived state or backend commands, exactly as the DoD requires. P9-3 hadn't shipped yet at the time, so **Study shipped as a static disabled placeholder** ("Spaced repetition isn't set up yet"). Design: `docs/specs/workspace-dashboard-design.md`.
 
-**Exit check for M9:** a real course folder yields a usable formula sheet, its open tasks are visible in one place, and a revision session runs off the semester's own notes without any content having been re-entered by hand.
+*Study section wired live, P9-3 (same day it shipped).* The placeholder is gone: `HomeView` now fetches `list_due_cards` the same way it already fetches open tasks, showing a due count and a **Start review** button that opens `ReviewSession` — still zero new derived state, since `review_cards` is P9-3's own table, not something this task added.
+
+**Exit check for M9 — reached.** A real course folder yields a usable formula sheet (P9-2); its open tasks are visible in one place (P9-1); a revision session runs off the semester's own notes without any content having been re-entered by hand (P9-3, cards authored inline in existing notes); and Home surfaces all of it (P9-4).
+
+---
+
+## Phase 9.5 — Productization / Polish (P9.5)
+
+**Milestone M9.5:** *The app looks and feels like a finished, considered product — not just a working one — even though it still has an audience of one.*
+
+Added 2026-08-20 from a second review pass (`notes/Roadmap-Update2.md`). The pass initially read as public-distribution work — branding, "why should I care" onboarding — that §1 deprioritizes for a personal tool, and five of its nine ideas were challenged rather than scheduled on that basis (§4, struck through below). The maintainer overruled that the same day: wanting a polished, considered product regardless of audience size is exactly what §3's "enjoyment and learning are legitimate terms in the prioritization formula" already licenses — this roadmap doesn't get to substitute its own judgment about what's worth wanting. **Sequenced after P9, not before it:** P9.5 polishes existing surfaces, including P9's own dashboard and task/review views, so polishing them before they exist would be redoing the work.
+
+### P9.5-1 — Brand identity — S
+
+- A real app icon (the one piece P1-5 left undone — window/taskbar/installer icon, not just the name), plus a short written identity note: what "Terminal Precision" communicates, how "terminal" and "academic notebook" aesthetics relate, and where each shows up.
+- **Dependency:** none.
+- **DoD:** the built app shows a custom icon everywhere Tauri currently shows its default one; a short identity note exists in `docs/` covering color, iconography language, and the terminal/notebook relationship, and at least one concrete design decision cites it.
+
+### P9.5-2 — Design-system completeness pass — M
+
+- Extend "Terminal Precision" (already shipped, P2) into a documented, complete token set: a named typography scale (display/heading/body/metadata/code/math), a spacing scale, a surface catalogue (background/sidebar/editor/popover/modal/command-palette/context-menu/hover), and an interactive-state catalogue (default/hover/active/focused/disabled/loading/error/selected).
+- **Dependency:** none — extends existing tokens rather than replacing them.
+- **DoD:** a design-tokens reference exists (doc or a single source file) naming every category above with concrete values; spot-checking three arbitrary interactive elements (a button, an input, a tree row) finds all eight states defined, not just default/hover.
+
+### P9.5-3 — UI hierarchy & consistency audit — M
+
+- Walk every major screen and judge it against "can I immediately tell what's important," not "does this feature work" — establish primary/secondary/tertiary hierarchy per screen.
+- Combine with a formal consistency pass: record every inconsistency (button heights, icon styles, menu/dialog padding, tooltip delay, input focus treatment, panel borders, empty-state typography, shortcut notation, and how panel-open/tab-switch/dialog/drag-drop interactions feel against each other) in a table, then fix systematically.
+- **Dependency:** P9.5-2 (needs the token set to fix against).
+- **DoD:** each major screen has a one-line documented hierarchy (primary/secondary/tertiary); the consistency table's rows are each either fixed or explicitly deferred with a reason, not left silently unresolved.
+
+### P9.5-4 — Interaction & micro-interaction polish — M
+
+- Audit and align feedback across: opening/closing panels, tab transitions, menus, dialogs, drag/drop, tree expansion, selection, editor focus, search, saving, indexing, Git operations, PDF generation, workspace switching.
+- Add restrained feedback where currently silent — a Git commit completing, a task being ticked, a note being created or copied — without gratuitous animation.
+- **Dependency:** P9.5-2 (state catalogue defines what "consistent" means here).
+- **DoD:** the interactions listed above are reviewed against a single documented feel (timing/easing), not left as a mix of nice/browser-default/custom/differently-custom; each gets at most one sentence in the design-tokens doc.
+
+### P9.5-5 — Empty states — S
+
+- Design a state for every major surface currently showing nothing or a bare message: search results, backlinks, open tasks, no Git repository detected, connections graph, terminal session. (Workspace/no-notes empty states already exist from P2-4.)
+- Each communicates what the surface is and what to do next, not just "nothing here."
+- **Dependency:** none.
+- **DoD:** all six listed surfaces show a designed empty state; none is a bare "Nothing here" string.
+
+### P9.5-6 — Error state polish — S
+
+- Extend every user-facing error (save failure, Git push/pull failure, PDF import failure, conversion failure) to the same shape: what happened, confirmation that the underlying data is still safe (per `CLAUDE.md`'s "the file on disk is always safe" principle), and a concrete next action.
+- P0-2's save-failure retry chip already has the mechanics; this is a copy and consistency pass over it and the others.
+- **Dependency:** none.
+- **DoD:** every error surface above follows the "what happened / what's still safe / what to do" shape; a save failure names the file and states the edit is preserved, not just "Save failed."
+
+### P9.5-7 — Product onboarding pass — S/M
+
+- Beyond P2-4's functional first-run (pick/create a workspace, create your first note, a `Ctrl+K`/`Ctrl+P` hint): the first 30 seconds should communicate what this is, why it's different from a plain Markdown editor or Notion, how Markdown fits, and what to do first.
+- **Dependency:** P2-4 (extends it, doesn't replace it).
+- **DoD:** a first-run experience states the app's differentiation in addition to the mechanical next action — verified by reading it cold, as if seeing the app for the first time.
+
+### P9.5-8 — Editor feel re-pass — M
+
+- Revisit cursor behaviour, selection, keyboard navigation, spacing, caret and selection appearance, and focus behaviour now that P6 has added many new node types (theorem/proof/algorithm blocks, equation snippets) since P2-3's original pass.
+- **Dependency:** P6 (the node types this re-pass is checking against).
+- **DoD:** each item above is checked against every P6 node type, not just the paragraph/heading/list types P2-3 covered; any regression found gets its own fix, not folded silently into this task.
+
+**Exit check for M9.5:** the app has its own icon and a written identity; the design-token set is complete and interactive elements demonstrably use it; a hierarchy and consistency pass has been done and recorded; the six named empty states and the error-copy pattern are live; a first-time look at the app communicates what it is; and the editor feel holds up across every P6 block type.
 
 ---
 
@@ -942,6 +1021,11 @@ Per the mandate to remove work that doesn't earn its keep:
 | **Per-note "document map" (block-reference graph)** | **Challenged — not scheduled** | Redundant with two things that already cover the same underlying data: P3-3's connections graph (global, notes+tags+links) and P6-7's cross-references (in-note, click-through). A third, note-scoped visualization is a presentation choice, not a missing capability — revisit only if P6-7 in practice turns out to need a picture, not just a jump-to-block. |
 | **Source-aware PDF notes** (click a converted exercise's "Source: Sheet.pdf, Page 4" back to the original PDF page) | **Challenged — blocked by the P4 freeze** | Genuinely useful, and distinct in kind from 2D-layout reconstruction (P4-2e's freeze target) — but recording page provenance still means touching the conversion path in `pdf/extract.rs`/`layout.rs`, and the freeze's re-entry condition is "real coursework use produces a document that fails the by-hand bar," not "a good idea arrives." No such document has. If the freeze ever lifts, this is a reasonable first thing to build — not a reason to lift it early. |
 | **Unified command palette** (`Ctrl+Shift+P`, "Create theorem" / "Insert equation" / …) | **Challenged — not scheduled** | Every action it would list already has a path: the P2-2 native menu, the shortcut sheet, and P6's own `/` slash commands. A fuzzy-searchable palette earns its keep once the action count makes menu-hunting slow — revisit after P6 ships and the slash-command list has actually grown, not speculatively now. |
+| ~~**Brand identity pass**~~ | ~~Challenged — not scheduled~~ → **Reversed 2026-08-20, scheduled as P9.5-1** | Originally challenged as public-distribution work with no audience yet. The maintainer overruled that the same day — wanting this regardless of audience size is a legitimate preference (§3: "enjoyment and learning are legitimate terms in the prioritization formula"), not something this roadmap gets to veto. See Phase 9.5. |
+| ~~**Formal design-system / UI-hierarchy audit**~~ | ~~Challenged — not scheduled~~ → **Reversed 2026-08-20, scheduled as P9.5-2/P9.5-3** | Same reversal. See Phase 9.5. |
+| ~~**Product onboarding**~~ | ~~Challenged — not scheduled~~ → **Reversed 2026-08-20, scheduled as P9.5-7** | Same reversal. See Phase 9.5. |
+| ~~**Micro-interactions pass**~~ | ~~Challenged — not scheduled~~ → **Reversed 2026-08-20, scheduled as P9.5-4** | Same reversal. See Phase 9.5. |
+| ~~**General editor-polish re-pass**~~ | ~~Challenged — not scheduled~~ → **Reversed 2026-08-20, scheduled as P9.5-8** | Same reversal. See Phase 9.5. |
 
 ---
 
@@ -1032,7 +1116,7 @@ The following are **intentionally not on this roadmap**. Adding any of them is a
 
 ## 8. Polish backlog
 
-Small, low-effort quality-of-life items collected from a 2026-08-18 review pass (`notes/Roadmap-Update.md`). None are phased — none gate anything, and folding them into a phase would make that phase's milestone about the wrong thing. Pull one out into a real task (with its own DoD) when it's actually being built; until then this is just the list, so a good suggestion doesn't evaporate between reviews.
+Small, low-effort quality-of-life items collected from two review passes — 2026-08-18 (`notes/Roadmap-Update.md`) and 2026-08-20 (`notes/Roadmap-Update2.md`). None are phased — none gate anything, and folding them into a phase would make that phase's milestone about the wrong thing. Pull one out into a real task (with its own DoD) when it's actually being built; until then this is just the list, so a good suggestion doesn't evaporate between reviews.
 
 **Editor**
 
@@ -1050,5 +1134,7 @@ Small, low-effort quality-of-life items collected from a 2026-08-18 review pass 
 **Backlinks**
 
 - Context snippets in the backlinks panel — the surrounding line or block, not just the linking note's title.
+
+**Moved to Phase 9.5 (2026-08-20):** empty states (P9.5-5), save-failure and other error copy (P9.5-6), and the consistency audit (P9.5-3) were briefly listed here, then scheduled as real tasks once the maintainer chose to build the whole productization/polish pass rather than leave it unphased. See Phase 9.5.
 
 **Deliberately left off this list:** multi-cursor editing. TipTap/ProseMirror's selection model has no clean multi-cursor primitive — it would be a real subsystem, not a backlog item, and belongs in its own phase if it ever turns out to matter.

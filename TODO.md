@@ -4,7 +4,7 @@ Feature checklist. **The [roadmap](docs/ROADMAP.md) holds the reasoning and the 
 
 Effort: **S** ≈ hours · **M** ≈ a day or two · **L** ≈ several days.
 
-**Now (revised 2026-08-19):** ~~finish ruled fractions~~ → ~~freeze the PDF pipeline~~ → ~~triage the three open bugs~~ → ~~P4-3 (closes M4)~~ → ~~the dogfood slice~~ → ~~P7-2 (closes M7)~~ → ~~P5-1~~ → ~~P5-2 → P5-3 → P5-4 → P5-5 (closes M5)~~ → ~~P6-1 → P6-2 → P6-3 → P6-4 → P6-6 → P6-7 → P6-5 (closes M6)~~ → ~~P9-1~~ → ~~P9-2~~ → **P9-3 → P9-4 (closes M9)**. **Phase numbers are identity, not order.**
+**Now (revised 2026-08-20):** ~~finish ruled fractions~~ → ~~freeze the PDF pipeline~~ → ~~triage the three open bugs~~ → ~~P4-3 (closes M4)~~ → ~~the dogfood slice~~ → ~~P7-2 (closes M7)~~ → ~~P5-1~~ → ~~P5-2 → P5-3 → P5-4 → P5-5 (closes M5)~~ → ~~P6-1 → P6-2 → P6-3 → P6-4 → P6-6 → P6-7 → P6-5 (closes M6)~~ → ~~P9-1~~ → ~~P9-2~~ → ~~P9-3 → P9-4 (closes M9)~~. **M9 reached — on to Phase 9.5.** **Phase numbers are identity, not order.**
 
 > The plan was to re-derive P5/P6/P9 priorities from a couple of weeks of real dogfood use first. That's dropped (see ROADMAP.md §1, 2026-08-17) — the maintainer's mode right now is implementing and verifying features, not daily use, so the wait doesn't resolve on its own. Back to the pre-dogfood priority order.
 
@@ -20,7 +20,7 @@ Effort: **S** ≈ hours · **M** ≈ a day or two · **L** ≈ several days.
 
 > **The PDF pipeline is frozen** as of 2026-08-13. The corpus is the regression suite; a new bug earns work only if it is whole-document or recurs across ≥2 corpus documents; 2D-layout reconstruction is closed. See P4-2e.
 
-**Two decisions owed:** split-pane editing (during P4); spaced-repetition storage (before any P9-3 code). *(The third — `<details open>`, collapse state in the file or presentation-only — was decided 2026-08-18: presentation-only. See P6-1.)*
+**One decision owed:** split-pane editing (during P4). *(Spaced-repetition storage was decided 2026-07-29 — Option A, inline `<!-- sr ... -->` comments — and shipped 2026-08-20. See P9-3. The `<details open>` decision — collapse state in the file or presentation-only — was decided 2026-08-18: presentation-only. See P6-1.)*
 
 ---
 
@@ -368,30 +368,30 @@ The only phase not from the brief. Everything before it is *capture*; this is *r
 - [x] Optional caption: source note + heading
 - [x] Generate on demand — **no live-updating magic file** that rewrites itself behind your back
 
-### P9-3 Spaced repetition — **decision, then L**
-- [ ] **Decide storage before writing any code** — not refactorable later; it determines what happens to every existing card when a note is renamed
-  - **A — inline HTML comment beside each card** *(recommended)*: `<!-- sr due=… ease=… interval=… -->`. Survives renames/moves/Git with no key tracking — which matters because note `id` is non-stable and `path` is the real key. Cost: reviews write note files and churn Git history.
+### P9-3 Spaced repetition — **decision, then L** ✅
+- [x] **Decide storage before writing any code** — not refactorable later; it determines what happens to every existing card when a note is renamed
+  - **A — inline HTML comment beside each card** *(recommended, and the one shipped)*: `<!-- sr due=… ease=… interval=… reps=… -->`. Survives renames/moves/Git with no key tracking — which matters because note `id` is non-stable and `path` is the real key. Cost: reviews write note files and churn Git history.
   - **B — `.review.json` sidecar**: notes stay pristine, but cards need stable keys — reintroduces the identity problem the app has avoided by never needing one. Editing a card or moving its note can silently orphan its schedule.
   - **C — frontmatter**: rejected on inspection. Cards are per-*card*, not per-note, so it's all of B's identity problem with none of A's locality.
-- [ ] Card syntax: cloze deletion + `Question :: Answer`
-- [ ] **P6-1 theorem/proof blocks become cards for free** — the real reason P6 precedes P9
-- [ ] SM-2 scheduling + review session UI
-- [ ] Derived `review_cards` table for "what's due", rebuildable from the notes
-- [ ] Cards stay readable as plain Markdown in any other editor
-- [ ] Renaming/moving a note does not orphan its cards
+- [x] Card syntax: cloze deletion + `Question :: Answer`
+- [ ] ~~P6-1 theorem/proof blocks become cards for free~~ — deliberately deferred; not in this task's DoD, and a theorem can already be hand-turned into a `Question :: Answer` card in seconds
+- [x] SM-2 scheduling + review session UI
+- [x] Derived `review_cards` table for "what's due", rebuildable from the notes
+- [x] Cards stay readable as plain Markdown in any other editor
+- [x] Renaming/moving a note does not orphan its cards
 
-> This is the named trigger for the **frontmatter** decision deferred in the roadmap. If Option A wins, frontmatter may never be needed at all.
+> This was the named trigger for the **frontmatter** decision deferred in the roadmap. Option A won, so frontmatter was never needed.
 
 ### P9-4 Workspace dashboard — **M** ✅ *(added 2026-08-18, from a review pass; capstone — sequence last in P9)*
 - [x] **Continue** — last few open notes, from `.workspace.json`'s existing session state
 - [x] **Recent** — recently edited notes, from existing mtime
 - [x] **Tasks** — open count, from P9-1's `note_tasks`
-- [x] **Study** — shipped as a disabled placeholder; P9-3 hasn't landed yet, so there's no `review_cards` data to show
+- [x] **Study** — shipped as a disabled placeholder initially, wired live to `review_cards` the same day P9-3 shipped
 - [x] **Git** — up-to-date / unpushed / diverged, from P5's existing status calls
 - [x] No new derived state — every section reads data another task already produces
 - [x] Clicking an item opens it exactly like its source view would
 
-> **Dependency:** P9-1, P9-3, P5-2/P5-3/P5-4 — it has nothing to show without them. *Built ahead of P9-3 with Study stubbed out; see the roadmap's "Done, ahead of P9-3" note.*
+> **Dependency:** P9-1, P9-3, P5-2/P5-3/P5-4. *Built ahead of P9-3 with Study stubbed out; see the roadmap's "Done, ahead of P9-3" note — Study was wired live once P9-3 landed.*
 
 ---
 
