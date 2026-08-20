@@ -38,7 +38,7 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
       <div className="settings-panel" onMouseDown={(e) => e.stopPropagation()}>
         <div className="settings-panel-header">
           <h2>Settings</h2>
-          <button className="settings-panel-close" onClick={onClose} aria-label="Close settings">
+          <button className="settings-panel-close" onClick={onClose} aria-label="Close settings" title="Close settings">
             <X size={16} />
           </button>
         </div>

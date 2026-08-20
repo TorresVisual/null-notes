@@ -53,7 +53,7 @@ export function ReviewSession({ onClose }: ReviewSessionProps) {
       <div className="review-session" onMouseDown={(e) => e.stopPropagation()}>
         <div className="settings-panel-header">
           <h2>Review{queue.length > 0 ? ` (${queue.length} due)` : ''}</h2>
-          <button className="settings-panel-close" onClick={onClose} aria-label="Close review">
+          <button className="settings-panel-close" onClick={onClose} aria-label="Close review" title="Close review">
             <X size={16} />
           </button>
         </div>

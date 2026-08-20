@@ -64,8 +64,8 @@ export function FormulaSheetPrompt({ onClose }: FormulaSheetPromptProps) {
         />
         {error && <p className="formula-sheet-prompt-error">{error}</p>}
         <div className="formula-sheet-prompt-actions">
-          <button onClick={onClose}>Cancel</button>
-          <button onClick={() => void generate()} disabled={isGenerating}>
+          <button className="dialog-action" onClick={onClose}>Cancel</button>
+          <button className="dialog-action" onClick={() => void generate()} disabled={isGenerating}>
             {isGenerating ? 'Generating…' : 'Generate'}
           </button>
         </div>

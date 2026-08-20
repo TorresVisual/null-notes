@@ -72,7 +72,7 @@ export function TemplateDialog({ onClose }: TemplateDialogProps) {
       <div className="settings-panel" onMouseDown={(e) => e.stopPropagation()}>
         <div className="settings-panel-header">
           <h2>{selected ? selected.meta.name : 'New from Template'}</h2>
-          <button className="settings-panel-close" onClick={onClose} aria-label="Close">
+          <button className="settings-panel-close" onClick={onClose} aria-label="Close" title="Close">
             <X size={16} />
           </button>
         </div>
@@ -134,7 +134,7 @@ export function TemplateDialog({ onClose }: TemplateDialogProps) {
               <button className="import-mode-cancel" onClick={() => setSelected(null)}>
                 Back
               </button>
-              <button onClick={() => void handleCreate()}>Create</button>
+              <button className="dialog-action" onClick={() => void handleCreate()}>Create</button>
             </div>
           </>
         )}

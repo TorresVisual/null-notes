@@ -51,6 +51,7 @@
   --text-body: 400 15px/1.6 var(--font-sans);
   --text-metadata: 600 11px/1.4 var(--font-sans);
   --text-code: 400 13px/1.5 var(--font-mono);
+  --text-empty-state: 400 13px/1.5 var(--font-sans);
 
   /* Elevation — the three distinct shadow depths in use across popovers,
      modals and the context menu, named so a new surface picks one instead
@@ -58,6 +59,7 @@
   --shadow-popover: 0 12px 40px rgba(0, 0, 0, 0.5);
   --shadow-modal: 0 24px 64px rgba(0, 0, 0, 0.6);
   --shadow-context-menu: 0 12px 32px rgba(0, 0, 0, 0.5);
+  --shadow-compact: 0 4px 16px rgba(0, 0, 0, 0.4);
 
   /* Interactive states */
   --focus-ring: 0 0 0 2px var(--bg-base), 0 0 0 4px var(--accent);
@@ -266,7 +268,7 @@ body {
   color: var(--text-tertiary);
   text-align: center;
   margin-top: 20vh;
-  font-size: 14px;
+  font: var(--text-empty-state);
 }
 
 /* Sidebar extras */
@@ -913,13 +915,17 @@ body {
   color: var(--text-tertiary) !important;
 }
 
+/* Deliberately more muted and smaller than .shortcuts-row kbd: this is a
+   peripheral hint next to the "Search" label, not the point of the row the
+   way a shortcuts-overlay entry is — padding matches so the two don't drift
+   for no reason, but size/color stay distinct on purpose. */
 .search-open-btn kbd {
   font-size: 10px;
   color: var(--text-disabled);
   background: var(--bg-base);
   border: 1px solid var(--border-strong);
   border-radius: 3px;
-  padding: 1px 4px;
+  padding: 2px 6px;
   font-family: inherit;
 }
 
@@ -1008,7 +1014,7 @@ body {
 
 .search-empty {
   padding: 16px 18px;
-  font-size: 13px;
+  font: var(--text-empty-state);
   color: var(--text-tertiary);
 }
 
@@ -1194,6 +1200,7 @@ body {
 }
 
 .context-menu button:hover { background: var(--bg-hover); }
+.context-menu button.danger { color: var(--danger); }
 
 .tree-row.drag-over { background: var(--accent-bg); outline: 1px dashed var(--accent); }
 
@@ -1292,8 +1299,7 @@ body {
 .sidebar-onboarding {
   padding: var(--space-md) var(--space-sm);
   color: var(--text-tertiary);
-  font-size: 12px;
-  line-height: 1.5;
+  font: var(--text-empty-state);
 }
 
 .sidebar-onboarding strong { color: var(--text-secondary); font-weight: 600; }
@@ -1353,7 +1359,7 @@ body {
 }
 
 .backlinks-toggle:hover { color: var(--text-secondary); }
-.backlinks-empty { color: var(--text-tertiary); font-size: 12px; margin: 6px 0 0; }
+.backlinks-empty { color: var(--text-tertiary); font: var(--text-empty-state); margin: 6px 0 0; }
 .backlinks-list { list-style: none; margin: 6px 0 0; padding: 0; }
 
 .backlink-item {
@@ -1384,7 +1390,7 @@ body {
   margin: 0 0 6px;
 }
 
-.outline-empty { color: var(--text-tertiary); font-size: 12px; margin: 0; }
+.outline-empty { color: var(--text-tertiary); font: var(--text-empty-state); margin: 0; }
 .outline-list { list-style: none; margin: 0; padding: 0; }
 
 .outline-item {
@@ -1777,6 +1783,7 @@ body {
   background: var(--bg-raised);
   border: 1px solid var(--border-strong);
   border-radius: 8px;
+  box-shadow: var(--shadow-modal);
   padding: var(--space-lg);
   width: min(460px, 90vw);
   display: flex;
@@ -1848,12 +1855,29 @@ body {
   cursor: pointer;
 }
 
+.import-mode-cancel:hover { color: var(--text-primary); border-color: var(--text-tertiary); }
+
+/* Generic dialog action button (Cancel/Generate/Create-style) — same shape as
+   .import-mode-cancel, reusable wherever a dialog needs a plain bordered
+   action button rather than that one's own flex-alignment specifics. */
+.dialog-action {
+  padding: 5px 12px;
+  background: none;
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.dialog-action:hover { color: var(--text-primary); border-color: var(--text-tertiary); }
+.dialog-action:disabled { opacity: var(--disabled-opacity); cursor: not-allowed; }
+
 /* New from Template (P6-3) — reuses .settings-panel for chrome and
    .import-mode-option for the template list; these two are its own. */
 .template-empty-hint {
   color: var(--text-tertiary);
-  font-size: 12px;
-  line-height: 1.5;
+  font: var(--text-empty-state);
 }
 
 .template-list {
@@ -2118,7 +2142,7 @@ body {
 
 .home-empty, .home-status {
   color: var(--text-tertiary);
-  font-size: 13px;
+  font: var(--text-empty-state);
   margin: 0;
 }
 
@@ -2272,8 +2296,8 @@ body {
   background: var(--bg-raised);
   border: 1px solid var(--border-strong);
   border-radius: 6px;
-  padding: 4px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  padding: var(--space-xs);
+  box-shadow: var(--shadow-compact);
 }
 
 .block-handle-menu-item {

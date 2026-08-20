@@ -63,6 +63,7 @@ export function BlockHandle({ editor }: BlockHandleProps) {
         type="button"
         className="block-handle-grip"
         aria-label="Block actions"
+        title="Block actions"
         onClick={openMenu}
       >
         <GripVertical size={14} />

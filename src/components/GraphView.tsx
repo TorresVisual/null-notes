@@ -100,7 +100,7 @@ export function GraphView({ onClose }: GraphViewProps) {
       <div className="graph-view" onMouseDown={(e) => e.stopPropagation()}>
         <div className="settings-panel-header">
           <h2>Connections</h2>
-          <button className="settings-panel-close" onClick={onClose} aria-label="Close connections graph">
+          <button className="settings-panel-close" onClick={onClose} aria-label="Close connections graph" title="Close connections graph">
             <X size={16} />
           </button>
         </div>

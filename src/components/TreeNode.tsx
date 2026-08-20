@@ -64,6 +64,7 @@ export function TreeNode({ entry, depth }: TreeNodeProps) {
           className="tree-rename"
           onClick={(e) => void handleRename(e)}
           aria-label={`Rename ${entry.name}`}
+          title={`Rename ${entry.name}`}
         >
           <Pencil size={12} />
         </button>
@@ -71,6 +72,7 @@ export function TreeNode({ entry, depth }: TreeNodeProps) {
           className="tree-delete"
           onClick={(e) => void handleDelete(e)}
           aria-label={`Delete ${entry.name}`}
+          title={`Delete ${entry.name}`}
         >
           <Trash2 size={12} />
         </button>

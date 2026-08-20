@@ -61,7 +61,7 @@ export function FolderContextMenu() {
         <button onClick={() => void handleRename()}>
           <Pencil size={14} /> Rename
         </button>
-        <button onClick={() => void handleDelete()}>
+        <button className="danger" onClick={() => void handleDelete()}>
           <Trash2 size={14} /> Delete
         </button>
       </div>

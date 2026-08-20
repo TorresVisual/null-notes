@@ -51,7 +51,7 @@ export function TaskView({ onClose }: TaskViewProps) {
       <div className="task-view" onMouseDown={(e) => e.stopPropagation()}>
         <div className="settings-panel-header">
           <h2>Tasks</h2>
-          <button className="settings-panel-close" onClick={onClose} aria-label="Close tasks">
+          <button className="settings-panel-close" onClick={onClose} aria-label="Close tasks" title="Close tasks">
             <X size={16} />
           </button>
         </div>
