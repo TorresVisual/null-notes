@@ -95,6 +95,14 @@ function InlineMathView({ node, editor, getPos, updateAttributes, deleteNode, se
       <span
         className="inline-math-render"
         onClick={open}
+        tabIndex={editor.isEditable ? 0 : undefined}
+        role="button"
+        aria-label="Edit equation"
+        onKeyDown={(e) => {
+          if (e.key !== 'Enter' && e.key !== ' ') return
+          e.preventDefault()
+          open()
+        }}
         dangerouslySetInnerHTML={{ __html: display.html }}
       />
       {editing && (

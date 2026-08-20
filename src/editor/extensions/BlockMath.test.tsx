@@ -115,6 +115,16 @@ describe('block math editing', () => {
     await waitFor(() => expect(mathNodes(editor!)).toEqual([{ latex: '\\nabla f(x)' }]))
   })
 
+  it('opens the editor via keyboard (Enter) on the rendered formula, not just a click', async () => {
+    const user = userEvent.setup()
+    const { container } = mount('$\n\ne^{i\\pi} + 1 = 0\n\n$')
+    await waitFor(() => expect(getRender(container)).toBeInTheDocument())
+    getRender(container).focus()
+    await user.keyboard('{Enter}')
+    await waitFor(() => expect(getTextarea(container)).toBeInTheDocument())
+    expect(getTextarea(container)!.value).toBe('e^{i\\pi} + 1 = 0')
+  })
+
   it('opens directly into edit mode for a freshly inserted empty node, and Escape deletes it', async () => {
     const { container } = mount('<p></p>')
     editor!.commands.insertContent({ type: 'blockMath', attrs: { latex: '' } })

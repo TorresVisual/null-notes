@@ -85,7 +85,19 @@ function BlockMathView({ node, editor, getPos, updateAttributes, deleteNode, sel
       spellCheck={false}
     >
       {!editing && (
-        <div className="block-math-render" onClick={open} dangerouslySetInnerHTML={{ __html: display.html }} />
+        <div
+          className="block-math-render"
+          onClick={open}
+          tabIndex={editor.isEditable ? 0 : undefined}
+          role="button"
+          aria-label="Edit equation"
+          onKeyDown={(e) => {
+            if (e.key !== 'Enter' && e.key !== ' ') return
+            e.preventDefault()
+            open()
+          }}
+          dangerouslySetInnerHTML={{ __html: display.html }}
+        />
       )}
       {editing && (
         <div className="block-math-editor" contentEditable={false} onMouseDown={(e) => e.stopPropagation()}>

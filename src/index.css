@@ -499,6 +499,10 @@ code {
 
 .block-math-render { cursor: pointer; border-radius: 4px; display: inline-block; padding: 2px 6px; }
 .block-math-render:hover { background: var(--accent-bg); }
+.block-math-render:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+/* A NodeSelection over the whole block (arrow-keyed onto it, or Ctrl+A) —
+   matches .inline-math.selected, which already had this and this didn't. */
+.block-math.selected .block-math-render { background: var(--accent-bg-hover); }
 
 .block-math-editor {
   display: flex;
@@ -556,6 +560,7 @@ code {
 
 .inline-math-render { cursor: pointer; border-radius: 3px; padding: 0 1px; }
 .inline-math-render:hover { background: var(--accent-bg); }
+.inline-math-render:focus-visible { outline: none; box-shadow: var(--focus-ring); }
 .inline-math.selected .inline-math-render,
 .inline-math.editing .inline-math-render { background: var(--accent-bg-hover); }
 
