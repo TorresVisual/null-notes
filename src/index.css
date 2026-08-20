@@ -1607,6 +1607,19 @@ body {
   cursor: default;
 }
 
+/* Review card highlighting (P9-3) — decoration only, the underlying text is
+   unstyled outside the editor. Q::A gets a light underline like a code link;
+   cloze spans get a subtle fill so hidden text is easy to spot while
+   authoring without being illegible. */
+.sr-card-qa {
+  border-bottom: 1px dashed color-mix(in srgb, var(--accent) 50%, transparent);
+}
+
+.sr-cloze {
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  border-radius: 3px;
+}
+
 /* Briefly marks the block a cross-reference jumped to. */
 .callout.cross-ref-target {
   outline: 2px solid var(--accent);
