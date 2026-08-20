@@ -1955,6 +1955,74 @@ body {
 
 .task-view-item-text:hover { text-decoration: underline; }
 
+/* Review session (P9-3) — shares the settings-panel/task-view shell. */
+.review-session {
+  background: var(--bg-raised);
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  width: min(480px, calc(100vw - 40px));
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6);
+  padding: var(--space-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+.review-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  padding: var(--space-lg) 0;
+}
+
+.review-card-note {
+  color: var(--text-tertiary);
+  font-size: 12px;
+  margin: 0;
+}
+
+.review-card-front, .review-card-back {
+  color: var(--text-primary);
+  font-size: 15px;
+  margin: 0;
+}
+
+.review-card-back {
+  padding-top: var(--space-md);
+  border-top: 1px solid var(--border-strong);
+}
+
+.review-card-reveal {
+  align-self: flex-start;
+  background: none;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  color: var(--text-primary);
+  cursor: pointer;
+  padding: 6px 14px;
+  font-size: 13px;
+}
+
+.review-card-reveal:hover { border-color: var(--accent); }
+
+.review-card-grades {
+  display: flex;
+  gap: var(--space-sm);
+}
+
+.review-card-grade {
+  flex: 1;
+  background: none;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  color: var(--text-primary);
+  cursor: pointer;
+  padding: 6px 0;
+  font-size: 13px;
+}
+
+.review-card-grade:hover { border-color: var(--accent); color: var(--accent); }
+
 /* Workspace dashboard (P9-4) — an inline main-pane view, not a modal
    overlay, since it replaces the empty-state slot rather than sitting
    on top of a note. */
