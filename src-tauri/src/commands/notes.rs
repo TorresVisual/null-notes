@@ -490,6 +490,7 @@ async fn index_note_at(
     db::notes::set_tags(db, path, &extract_tags(content)).await?;
     db::notes::set_links(db, path, &extract_links(content)).await?;
     db::notes::set_tasks(db, path, &extract_tasks(content)).await?;
+    db::notes::set_cards(db, path, &extract_cards(content)).await?;
     Ok(())
 }
 
@@ -671,6 +672,7 @@ async fn forget_note(path: &str, db: &DbPool) -> anyhow::Result<()> {
     db::notes::set_tags(db, path, &[]).await?;
     db::notes::set_links(db, path, &[]).await?;
     db::notes::set_tasks(db, path, &[]).await?;
+    db::notes::set_cards(db, path, &[]).await?;
     Ok(())
 }
 
@@ -726,6 +728,10 @@ pub async fn delete_note(path: String, db: State<'_, DbPool>) -> Result<(), Stri
         .map_err(|e| e.to_string())?;
 
     db::notes::set_tasks(&db, &path, &[])
+        .await
+        .map_err(|e| e.to_string())?;
+
+    db::notes::set_cards(&db, &path, &[])
         .await
         .map_err(|e| e.to_string())
 }
@@ -1786,6 +1792,32 @@ mod save_tests {
             .await
             .unwrap();
         assert_eq!(backlinks.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_index_note_at_populates_review_cards() {
+        let pool = DbPool::connect("sqlite::memory:").await.unwrap();
+        run_migrations(&pool).await.unwrap();
+        index_note_at("/ws/a.md", "/ws", "Q :: A\n", &pool)
+            .await
+            .unwrap();
+
+        let due = db::notes::due_cards(&pool, "/ws", "9999-12-31").await.unwrap();
+        assert_eq!(due.len(), 1);
+        assert_eq!(due[0].front, "Q");
+    }
+
+    #[tokio::test]
+    async fn test_forget_note_clears_its_cards() {
+        let pool = DbPool::connect("sqlite::memory:").await.unwrap();
+        run_migrations(&pool).await.unwrap();
+        index_note_at("/ws/a.md", "/ws", "Q :: A\n", &pool)
+            .await
+            .unwrap();
+        forget_note("/ws/a.md", &pool).await.unwrap();
+
+        let due = db::notes::due_cards(&pool, "/ws", "9999-12-31").await.unwrap();
+        assert!(due.is_empty());
     }
 
     #[test]
