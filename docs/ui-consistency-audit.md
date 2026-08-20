@@ -115,3 +115,25 @@ Covered above under menu/dialog radius; no additional findings beyond the shadow
 - `.search-open-btn kbd` padding aligned to `.shortcuts-row kbd`'s `2px 6px`
 
 Verified with `npm run typecheck` (clean), `npm test -- --run` (528/528 passing), and a dev-server screenshot of the workspace picker showing no visual regression.
+
+---
+
+## P9.5-6 — Error state polish (2026-08-20)
+
+The four error surfaces named in that task were rewritten to the "what happened / what's still safe / what to do" shape:
+
+| Surface | Before | After |
+|---|---|---|
+| Save failure | "Save failed" + raw `String(e)` (e.g. `"disk full"`) in a tooltip, Retry/Dismiss icon buttons | Detail names the file (`Couldn't save Algorithms.md`); tooltip adds "Your edit is still here — nothing was lost. Click Retry to try again." Retry/Dismiss unchanged. |
+| Git commit failure | Badge said only "Commit failed" — the actual error never reached the UI, only `console.error` | Tooltip: "Your saved changes are safe on disk — only the Git commit failed. It will retry automatically on your next edit." plus the real error in parens. |
+| Git commit skipped / hook failed | Badge said only "Commit skipped" — `outcome.reason`/`outcome.output` were discarded entirely | Same badge text, tooltip now carries the actual reason or pre-commit hook output, plus the same disk-safety/auto-retry statement. |
+| Git push failure | Nothing visible at all — `console.error` only, status stayed wherever the successful commit had already left it | New `pushFailed` status: badge says "Push failed," tooltip: "Your commit is safe in the local repository — only the push to the remote failed. Push manually from your Git tool, or it will go out with the next commit." |
+| PDF import / conversion failure (one code path, not two — see below) | Bare `e.message`/`String(e)`, no filename, no safety statement | Names the file, states the source PDF was only ever read, and that a partially-created note (if any) should be deleted before retrying. |
+
+Two things checked and found not to be what the task assumed:
+- **"Conversion failure" isn't a distinct surface from "PDF import failure."** `ImportButton.tsx`'s `runImport` has exactly one try/catch spanning pick, text-layer detection, conversion, note creation, image writes, save and reindex — any failure from any of those steps renders through the same `.import-error` line. There's nothing to give a second treatment to.
+- **A push failure needed a new status value**, not just better copy — reusing the existing `error` status would have mislabeled a successful-commit-but-failed-push as "Commit failed," which is actively wrong, not just terse. Added `'pushFailed'` to `GitCommitStatus` and a matching `gitCommitDetail` field to carry the reason without cramming it into the badge's own short label.
+
+**Deliberately out of scope** (not named in the P9.5-6 task, and each is its own smaller fix rather than one four-item pass): `.settings-error`, `.formula-sheet-prompt-error`, `.sidebar-error`, `.math-editor-error`/`.block-math-editor-error`, and `.mermaid-error` (which shows no message at all on a render failure — just the raw diagram source) all still show a bare, unprefixed error string with no safety statement. Recorded here so a future pass has the list rather than re-discovering it.
+
+Verified with `npm run typecheck` (clean) and `npm test -- --run` (531/531 passing, three new tests covering the push-failure/hook-failed/thrown-error detail-carrying behavior in `useGitAutoCommit.test.ts`).

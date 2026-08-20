@@ -792,7 +792,7 @@ code {
   white-space: nowrap;
   flex-shrink: 0;
 }
-.git-commit-status.error { color: var(--danger); }
+.git-commit-status.error, .git-commit-status.pushFailed { color: var(--danger); }
 
 /* External-change conflict prompt — never resolves itself */
 .conflict-bar, .git-prompt {

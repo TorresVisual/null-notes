@@ -113,7 +113,18 @@ export function ImportButton() {
       addNote({ ...note, title: picked.title })
       openTab(note.path)
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
+      // Names the file, states what's provably true regardless of which step
+      // failed (the source PDF is only ever read, never written to), and
+      // says what to do — rather than a bare thrown-value string with no
+      // context. A note file may already exist on disk if a later step
+      // (image write, save) failed after api.notes.create succeeded; this
+      // doesn't roll that back, so the guidance covers it rather than
+      // silently implying nothing happened at all.
+      const detail = e instanceof Error ? e.message : String(e)
+      setError(
+        `Couldn't import "${picked.title}": ${detail}. Your PDF file wasn't changed — if a ` +
+          'note was partly created, delete it and try again.',
+      )
     }
   }
 

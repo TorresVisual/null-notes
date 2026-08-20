@@ -3,6 +3,7 @@ import { listen } from '@tauri-apps/api/event'
 import { api } from '../lib/tauri'
 import { useWorkspaceStore } from '../store/workspace'
 import { useSettingsStore } from '../store/settings'
+import { folderName } from '../lib/pathPrefix'
 
 export type SaveState = 'clean' | 'dirty' | 'saving' | 'error'
 
@@ -105,7 +106,12 @@ export function useNote(path: string | null) {
       // Keep the buffer dirty — a failed write must never look like a saved one.
       if (!pendingWrite.current) pendingWrite.current = job
       setSaveState('error')
-      setSaveError(String(e))
+      // Names the file rather than showing the raw thrown value — the full
+      // "what's still safe / what to do" reassurance lives in SaveStatus's
+      // tooltip, since this compact tab-bar chip has no room for two
+      // sentences of visible text.
+      setSaveError(`Couldn't save ${folderName(job.path)}`)
+      console.error('save failed', e)
     }
   }, [scheduleIndex])
 

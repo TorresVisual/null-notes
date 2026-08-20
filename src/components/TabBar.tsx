@@ -13,6 +13,7 @@ interface TabBarProps {
   onRetrySave: () => void
   onDismissSaveError: () => void
   gitCommitStatus: GitStatus
+  gitCommitDetail: string | null
 }
 
 export function TabBar({
@@ -23,6 +24,7 @@ export function TabBar({
   onRetrySave,
   onDismissSaveError,
   gitCommitStatus,
+  gitCommitDetail,
 }: TabBarProps) {
   const { openTabs, activeTab, setActiveTab, closeTab, flashTabPath, setFlashTabPath } =
     useWorkspaceStore()
@@ -58,7 +60,7 @@ export function TabBar({
             onRetry={onRetrySave}
             onDismiss={onDismissSaveError}
           />
-          <GitCommitStatus status={gitCommitStatus} />
+          <GitCommitStatus status={gitCommitStatus} detail={gitCommitDetail} />
           <button
             className={`view-toggle${viewMode === 'raw' ? ' active' : ''}`}
             onClick={onToggleView}

@@ -72,7 +72,7 @@ describe('useGitAutoCommit', () => {
     expect(git.autoCommit).toHaveBeenCalledWith('/ws', ['/ws/a.md'], false)
   })
 
-  it('a non-committed outcome leaves the batch pending for the next trigger', async () => {
+  it('a non-committed outcome leaves the batch pending for the next trigger, carrying the reason as detail', async () => {
     git.autoCommit.mockResolvedValue({ kind: 'skipped', reason: 'a rebase is in progress' })
     renderHook(() => useGitAutoCommit())
 
@@ -81,6 +81,30 @@ describe('useGitAutoCommit', () => {
 
     expect(useWorkspaceStore.getState().gitPendingPaths).toEqual(['/ws/a.md'])
     expect(useWorkspaceStore.getState().gitCommitStatus).toBe('skipped')
+    expect(useWorkspaceStore.getState().gitCommitDetail).toBe('a rebase is in progress')
+  })
+
+  it('a failed pre-commit hook carries its output as detail, distinct from a plain skip', async () => {
+    git.autoCommit.mockResolvedValue({ kind: 'hookFailed', output: 'lint failed on Notes.md' })
+    renderHook(() => useGitAutoCommit())
+
+    useWorkspaceStore.getState().addGitPendingPath('/ws/a.md')
+    await act(() => vi.advanceTimersByTimeAsync(10 * 60_000))
+
+    expect(useWorkspaceStore.getState().gitPendingPaths).toEqual(['/ws/a.md'])
+    expect(useWorkspaceStore.getState().gitCommitStatus).toBe('skipped')
+    expect(useWorkspaceStore.getState().gitCommitDetail).toBe('lint failed on Notes.md')
+  })
+
+  it('a thrown commit error sets status and carries the error as detail', async () => {
+    git.autoCommit.mockRejectedValue(new Error('index.lock exists'))
+    renderHook(() => useGitAutoCommit())
+
+    useWorkspaceStore.getState().addGitPendingPath('/ws/a.md')
+    await act(() => vi.advanceTimersByTimeAsync(10 * 60_000))
+
+    expect(useWorkspaceStore.getState().gitCommitStatus).toBe('error')
+    expect(useWorkspaceStore.getState().gitCommitDetail).toContain('index.lock exists')
   })
 
   it('pushes after a successful commit when notes-only and autoPush is on', async () => {
@@ -95,6 +119,24 @@ describe('useGitAutoCommit', () => {
     await act(() => vi.advanceTimersByTimeAsync(10 * 60_000))
 
     expect(git.pushNotes).toHaveBeenCalledWith('/ws', 'notesOnly')
+  })
+
+  it('a failed push sets its own status and detail, leaving the successful commit alone', async () => {
+    git.autoCommit.mockResolvedValue({ kind: 'committed' })
+    git.pushNotes.mockRejectedValue(new Error('remote rejected'))
+    useWorkspaceStore.setState({
+      git: { prompted: true, autoCommit: true, idleMinutes: 10, skipHooks: false, autoPush: true },
+    })
+    renderHook(() => useGitAutoCommit())
+
+    useWorkspaceStore.getState().addGitPendingPath('/ws/a.md')
+    await act(() => vi.advanceTimersByTimeAsync(10 * 60_000))
+
+    expect(useWorkspaceStore.getState().gitCommitStatus).toBe('pushFailed')
+    expect(useWorkspaceStore.getState().gitCommitDetail).toContain('remote rejected')
+    // The commit itself already succeeded — pending paths were already
+    // cleared before the push was attempted.
+    expect(useWorkspaceStore.getState().gitPendingPaths).toEqual([])
   })
 
   it('never pushes a code-repo workspace, even with autoPush on', async () => {

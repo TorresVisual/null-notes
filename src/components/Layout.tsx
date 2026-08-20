@@ -64,6 +64,7 @@ export function Layout() {
   const repoMode = useWorkspaceStore((s) => s.repoMode)
   const gitPrompted = useWorkspaceStore((s) => s.git.prompted)
   const gitCommitStatus = useWorkspaceStore((s) => s.gitCommitStatus)
+  const gitCommitDetail = useWorkspaceStore((s) => s.gitCommitDetail)
   const gitDiverged = useWorkspaceStore((s) => s.gitDiverged)
   useExternalChanges()
   const createNote = useCreateNote()
@@ -284,6 +285,7 @@ export function Layout() {
           onRetrySave={() => void retrySave()}
           onDismissSaveError={dismissError}
           gitCommitStatus={gitCommitStatus}
+          gitCommitDetail={gitCommitDetail}
         />
         {conflict && <ConflictBar onKeepMine={keepMine} onReloadTheirs={reloadTheirs} />}
         {gitDiverged && (

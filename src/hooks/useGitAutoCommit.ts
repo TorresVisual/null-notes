@@ -26,12 +26,20 @@ export function useGitAutoCommit() {
       clearTimeout(revertTimer.current)
       revertTimer.current = null
     }
-    const { path, repoMode, git, gitPendingPaths, clearGitPendingPaths, setGitCommitStatus } =
-      useWorkspaceStore.getState()
+    const {
+      path,
+      repoMode,
+      git,
+      gitPendingPaths,
+      clearGitPendingPaths,
+      setGitCommitStatus,
+      setGitCommitDetail,
+    } = useWorkspaceStore.getState()
     if (!path || !git.autoCommit || gitPendingPaths.length === 0) return
 
     const paths = gitPendingPaths
     setGitCommitStatus('committing')
+    setGitCommitDetail(null)
     try {
       const outcome = await api.git.autoCommit(path, paths, git.skipHooks)
       if (outcome.kind === 'committed') {
@@ -54,19 +62,31 @@ export function useGitAutoCommit() {
           try {
             await api.git.pushNotes(path, repoMode)
           } catch (e) {
-            console.error('push after auto-commit failed', e)
+            // The commit itself already succeeded and is safe in the local
+            // repo — only the push failed, so this is its own status rather
+            // than reusing 'error' (which would misleadingly say the commit
+            // failed) or staying silent (the previous behavior — a failed
+            // push had no visible effect at all beyond a console.error).
+            setGitCommitStatus('pushFailed')
+            setGitCommitDetail(String(e))
           }
         }
       } else if (outcome.kind === 'nothingToCommit') {
         clearGitPendingPaths()
         setGitCommitStatus('idle')
-      } else {
-        // Skipped or hookFailed: report quietly, leave the batch pending so
-        // the next trigger retries rather than losing it.
+      } else if (outcome.kind === 'hookFailed') {
+        // Leave the batch pending so the next trigger retries rather than
+        // losing it — the pre-commit hook's own output is the detail.
         setGitCommitStatus('skipped')
+        setGitCommitDetail(outcome.output)
+      } else {
+        // outcome.kind === 'skipped': also leaves the batch pending.
+        setGitCommitStatus('skipped')
+        setGitCommitDetail(outcome.reason)
       }
     } catch (e) {
       setGitCommitStatus('error')
+      setGitCommitDetail(String(e))
       console.error('auto-commit failed', e)
     }
   }, [])

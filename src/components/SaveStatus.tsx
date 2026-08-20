@@ -29,7 +29,10 @@ export function SaveStatus({ state, error, onRetry, onDismiss }: SaveStatusProps
       {state === 'error' && (
         <>
           {error && (
-            <span className="save-status-detail" title={error}>
+            <span
+              className="save-status-detail"
+              title={`${error}. Your edit is still here — nothing was lost. Click Retry to try again.`}
+            >
               {error}
             </span>
           )}

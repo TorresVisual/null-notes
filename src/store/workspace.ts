@@ -66,6 +66,11 @@ interface WorkspaceStore {
   clearGitPendingPaths: () => void
   gitCommitStatus: GitCommitStatus
   setGitCommitStatus: (status: GitCommitStatus) => void
+  // The specific reason behind a 'skipped'/'error'/'pushFailed' status —
+  // surfaced as a tooltip by GitCommitStatus rather than folded into the
+  // badge's own short label, which stays a fixed, glanceable phrase.
+  gitCommitDetail: string | null
+  setGitCommitDetail: (detail: string | null) => void
   gitDiverged: { ahead: number; behind: number } | null
   setGitDiverged: (d: { ahead: number; behind: number } | null) => void
   // Ephemeral, UI-only: the tab that should show a brief "just created"
@@ -90,6 +95,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   git: DEFAULT_GIT_CONFIG,
   gitPendingPaths: [],
   gitCommitStatus: 'idle',
+  gitCommitDetail: null,
   gitDiverged: null,
   flashTabPath: null,
 
@@ -165,6 +171,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   },
   clearGitPendingPaths: () => set({ gitPendingPaths: [] }),
   setGitCommitStatus: (status) => set({ gitCommitStatus: status }),
+  setGitCommitDetail: (detail) => set({ gitCommitDetail: detail }),
   setGitDiverged: (d) => set({ gitDiverged: d }),
   setFlashTabPath: (path) => set({ flashTabPath: path }),
 
@@ -182,6 +189,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
       git: DEFAULT_GIT_CONFIG,
       gitPendingPaths: [],
       gitCommitStatus: 'idle',
+      gitCommitDetail: null,
       gitDiverged: null,
       flashTabPath: null,
     }),

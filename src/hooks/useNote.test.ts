@@ -126,7 +126,7 @@ describe('useNote', () => {
     })
 
     expect(result.current.saveState).toBe('error')
-    expect(result.current.saveError).toContain('disk full')
+    expect(result.current.saveError).toBe("Couldn't save note.md")
 
     await act(async () => {
       await result.current.retrySave()
