@@ -32,15 +32,20 @@ export function ReviewSession({ onClose }: ReviewSessionProps) {
 
   const current = queue[0]
 
-  // Grades the front card, then drops it from the local queue on success —
-  // mirrors `TaskView.toggle`'s "drop it from local state, don't refetch"
-  // shape, since the backend write already happened.
+  // Grades the front card, then re-fetches the whole due queue — unlike
+  // `TaskView.toggle`'s "drop it from local state" shortcut, a card's
+  // position is a line number, and grading writes a schedule-comment line
+  // into the note. If another due card sits later in the same note, that
+  // insertion shifts its own position too, so the locally cached queue can
+  // no longer be trusted after any grade — only a fresh read reflects it.
   function grade(g: Grade) {
     if (!workspacePath || !current) return
-    void api.notes.gradeCard(current.notePath, current.position, g, workspacePath).then(() => {
-      setQueue((prev) => prev.slice(1))
-      setRevealed(false)
-    })
+    void api.notes.gradeCard(current.notePath, current.position, g, workspacePath).then(() =>
+      api.notes.listDueCards(workspacePath).then((cards) => {
+        setQueue(cards)
+        setRevealed(false)
+      }),
+    )
   }
 
   return (

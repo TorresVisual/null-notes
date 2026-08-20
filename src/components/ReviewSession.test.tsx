@@ -44,7 +44,19 @@ describe('ReviewSession', () => {
     expect(screen.getByText('Easy')).toBeInTheDocument()
   })
 
-  it('grades the card and advances to the next one', async () => {
+  it('grades the card, re-fetches the queue, and advances to the next card', async () => {
+    // Grading can shift a later card's line position within the same note
+    // (a schedule comment is inserted), so the session re-fetches the whole
+    // due queue after each grade rather than trusting the cached list. The
+    // mock tracks graded state itself (rather than queuing fixed return
+    // values by call order) so it stays correct regardless of exactly how
+    // many times an effect re-fires a fetch.
+    let graded = false
+    vi.mocked(api.notes.listDueCards).mockImplementation(async () => (graded ? [cards[1]!] : cards))
+    vi.mocked(api.notes.gradeCard).mockImplementation(async () => {
+      graded = true
+    })
+
     render(<ReviewSession onClose={vi.fn()} />)
     await waitFor(() => screen.getByText('Q1'))
     fireEvent.click(screen.getByText('Reveal answer'))
