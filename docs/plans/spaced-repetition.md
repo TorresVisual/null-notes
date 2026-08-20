@@ -2254,7 +2254,14 @@ async function gradeCurrentCard(label: string): Promise<void> {
 
 describe('P9-3: spaced repetition', () => {
   it('reviews a Q::A and a cloze card, writing schedule state back to disk', async () => {
-    const notePath = await createNote('P9-3 Review')
+    // A unique title per attempt (not a fixed "P9-3 Review") — generated
+    // fresh inside the test body so a mocha retry gets a genuinely new
+    // title too, not just a new file at the same path. A retry reusing the
+    // same path can hit an already-open tab from the failed attempt whose
+    // in-memory buffer was never cleared by `rmSync` (a disk-level delete),
+    // so a retry's typing lands appended after the first attempt's text
+    // instead of into a clean note.
+    const notePath = await createNote(`P9-3 Review ${Date.now()}`)
     await focusEditorEnd()
     await browser.keys(['Enter'])
     await browser.keys('What is Big-O of binary search? :: O(log n)')
@@ -2280,7 +2287,9 @@ describe('P9-3: spaced repetition', () => {
     await screenshot('p9-3-review-front')
 
     await gradeCurrentCard('Good')
-    await browser.waitUntil(async () => (await reviewFrontText())?.includes('descendants') ?? false, {
+    // The cloze card's front deliberately hides the {{...}} span behind
+    // "[...]" — "descendants" only appears once revealed.
+    await browser.waitUntil(async () => (await reviewFrontText())?.includes('[...]') ?? false, {
       timeout: 5000,
       timeoutMsg: 'review session never advanced to the cloze card',
     })
