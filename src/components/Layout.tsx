@@ -80,7 +80,7 @@ export function Layout() {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [shortcutsOpen, setShortcutsOpen] = useState(false)
   const [templateDialogOpen, setTemplateDialogOpen] = useState(false)
-  const [outlineOpen, setOutlineOpen] = useState(false)
+  const [outlineOpen, setOutlineOpen] = useState(true)
   const editorPaneRef = useRef<HTMLDivElement>(null)
   const [graphOpen, setGraphOpen] = useState(false)
   const [taskViewOpen, setTaskViewOpen] = useState(false)
@@ -353,7 +353,7 @@ export function Layout() {
             </div>
           </div>
           {!isLoading && activeTab && viewMode === 'wysiwyg' && outlineOpen && (
-            <OutlinePanel content={content} containerRef={editorPaneRef} scrollRef={scrollRef} />
+            <OutlinePanel content={content} containerRef={editorPaneRef} />
           )}
         </div>
         {terminalMounted && workspacePath && (

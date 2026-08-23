@@ -280,9 +280,16 @@ button, [role="button"], .tree-row, .tab, .search-result, .slash-menu-item,
 .tab-flash { animation: tab-flash 900ms var(--ease-standard); }
 
 /* Editor scroll container — full width so the scrollbar sits at the window edge */
-/* Row for the scrolling note plus the outline rail beside it — .editor-scroll
-   keeps its own independent scroll regardless of the rail's presence. */
+/* .editor-scroll fills the whole row; the outline rail is an absolutely
+   positioned overlay on top of it (see .outline-panel below), not a flex
+   sibling beside it. A sibling column necessarily lands past .editor-scroll's
+   own right edge — which is exactly where its scrollbar draws, so a sibling
+   can only ever end up to the scrollbar's right, gap or no gap. An overlay
+   sits inside that same box instead, positioned to clear the scrollbar's own
+   width, which is what actually puts it between the note and the scrollbar —
+   the same relationship Notion's own page-level ToC has to its scrollbar. */
 .editor-body {
+  position: relative;
   flex: 1;
   display: flex;
   min-height: 0;
@@ -1631,16 +1638,75 @@ code {
 
 .backlink-item:hover { text-decoration: underline; }
 
-/* Outline panel (P6-6) — a persistent right-side rail, sibling to
-   .editor-scroll inside .editor-body, so it stays visible while the note
-   itself scrolls rather than sitting below all its content. Toggled
-   globally (Ctrl Shift O). */
+/* Outline panel (P6-6) — a persistent right-side rail, overlaid on top of
+   .editor-scroll (not a flex sibling — see .editor-body's own comment for
+   why) so it stays visible while the note itself scrolls, and reads as
+   sitting *before* the scrollbar rather than past it. Toggled globally
+   (Ctrl Shift O).
+   Notion-style two-state design: idle, it's a set of unlabeled tick marks
+   (one per heading, width by level) — present but unobtrusive. Hovering the
+   rail expands a floating card with the real heading list, overlaid on top
+   of the note rather than reflowing it, so opening it never shifts the
+   text you're reading. */
 .outline-panel {
-  flex-shrink: 0;
+  position: absolute;
+  top: 0;
+  right: 20px;
+  height: 100%;
+  width: 32px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 0 var(--space-sm);
+  /* The panel's own box is full-height so the tick stack can center inside
+     it, but most of that height is empty margin above/below the ticks —
+     dead space that must not steal clicks/scroll from the note underneath.
+     Only the parts a person can actually see (ticks, flyout) opt back in. */
+  pointer-events: none;
+}
+
+.outline-ticks {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 7px;
+  pointer-events: auto;
+}
+
+.outline-tick {
+  height: 3px;
+  border-radius: 1.5px;
+  background: var(--text-secondary);
+  opacity: 0.7;
+  transition: background-color 0.15s ease, opacity 0.15s ease;
+}
+
+.outline-tick.active { background: var(--accent); opacity: 1; }
+.outline-tick-empty { width: 12px; opacity: 0.35; }
+
+.outline-panel:hover .outline-tick { opacity: 0.95; }
+
+.outline-flyout {
+  position: absolute;
+  top: 50%;
+  right: var(--space-sm);
+  transform: translateY(-50%);
   width: 220px;
+  max-height: min(60vh, 480px);
   overflow-y: auto;
-  padding: var(--space-lg) var(--space-md);
-  border-left: 1px solid var(--border);
+  padding: var(--space-md);
+  background: var(--bg-raised);
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  box-shadow: var(--shadow-modal);
+  z-index: 20;
+  pointer-events: auto;
+  animation: outline-flyout-in 0.12s ease;
+}
+
+@keyframes outline-flyout-in {
+  from { opacity: 0; transform: translateY(-50%) translateX(4px); }
+  to { opacity: 1; transform: translateY(-50%) translateX(0); }
 }
 
 .outline-panel-title {

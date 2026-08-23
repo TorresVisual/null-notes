@@ -12,6 +12,8 @@
 * [x] The auto git doesnt handle its own .gitignore — `checked_init_notes_repo` now commits the `.gitignore` it writes; auto-commit also merges the required lines into a pre-existing repo's `.gitignore` (Notes-only/Notes-monorepo only)
 * [x] Git actions constantly open terminals in the built app — every `git`/`gh` spawn now sets `CREATE_NO_WINDOW` on Windows
 
+* [ ] Better custom modals design
+
 ## Features
 
 * [ ]  Use the built git feature to sync workspaces to other machines
