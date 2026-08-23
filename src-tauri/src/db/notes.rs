@@ -1194,7 +1194,7 @@ mod tests {
         .await
         .unwrap();
 
-        let due = due_cards(&pool, "/ws", "2026-08-20").await.unwrap();
+        let due = due_cards(&pool, "/ws", &sm2::today()).await.unwrap();
         assert_eq!(due.len(), 1);
         assert_eq!(due[0].kind, "cloze");
     }

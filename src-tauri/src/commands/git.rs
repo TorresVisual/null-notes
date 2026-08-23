@@ -664,6 +664,31 @@ mod tests {
     use super::*;
     use tempfile::tempdir;
 
+    // These tests, and the production code they exercise, both shell out to
+    // plain `git commit` — which refuses to commit without a resolvable
+    // identity anywhere in the config chain. A developer machine normally has
+    // that set globally, masking the dependency; CI runners don't, so every
+    // repo this suite creates needs its own local identity rather than
+    // relying on one being ambient. `git init`/`git clone` each produce a
+    // fresh `.git/config`, so this has to run after every one of them, not
+    // just once.
+    fn configure_test_identity(dir: &Path) {
+        for (key, value) in [
+            ("user.name", "Test User"),
+            ("user.email", "test@example.com"),
+        ] {
+            let status = no_window_command("git")
+                .arg("-C")
+                .arg(dir)
+                .arg("config")
+                .arg(key)
+                .arg(value)
+                .status()
+                .unwrap();
+            assert!(status.success());
+        }
+    }
+
     fn git_init(dir: &Path) {
         let status = no_window_command("git")
             .arg("-C")
@@ -673,6 +698,19 @@ mod tests {
             .status()
             .unwrap();
         assert!(status.success());
+        configure_test_identity(dir);
+    }
+
+    fn git_clone(remote: &Path, dest: &Path) {
+        let status = no_window_command("git")
+            .arg("clone")
+            .arg("-q")
+            .arg(remote)
+            .arg(dest)
+            .status()
+            .unwrap();
+        assert!(status.success());
+        configure_test_identity(dest);
     }
 
     #[test]
@@ -785,14 +823,15 @@ mod tests {
 
     fn commit_file(dir: &Path, name: &str, content: &str) {
         std::fs::write(dir.join(name), content).unwrap();
-        no_window_command("git")
+        let add_status = no_window_command("git")
             .arg("-C")
             .arg(dir)
             .arg("add")
             .arg(name)
             .status()
             .unwrap();
-        no_window_command("git")
+        assert!(add_status.success());
+        let commit_status = no_window_command("git")
             .arg("-C")
             .arg(dir)
             .arg("commit")
@@ -800,6 +839,7 @@ mod tests {
             .arg(format!("add {name}"))
             .status()
             .unwrap();
+        assert!(commit_status.success());
     }
 
     #[test]
@@ -1149,13 +1189,7 @@ mod tests {
             .unwrap();
 
         let clone = tempdir().unwrap();
-        no_window_command("git")
-            .arg("clone")
-            .arg("-q")
-            .arg(remote.path())
-            .arg(clone.path())
-            .status()
-            .unwrap();
+        git_clone(remote.path(), clone.path());
         commit_file(clone.path(), "note.md", "# Note\n");
         no_window_command("git")
             .arg("-C")
@@ -1236,13 +1270,7 @@ mod tests {
     fn a_non_fast_forward_push_is_rejected_not_forced() {
         let (remote, clone_a) = bare_remote_with_clone();
         let clone_b = tempdir().unwrap();
-        no_window_command("git")
-            .arg("clone")
-            .arg("-q")
-            .arg(remote.path())
-            .arg(clone_b.path())
-            .status()
-            .unwrap();
+        git_clone(remote.path(), clone_b.path());
 
         commit_file(clone_a.path(), "a.md", "from a\n");
         no_window_command("git")
@@ -1294,13 +1322,7 @@ mod tests {
     fn fast_forwards_when_purely_behind() {
         let (remote, clone_a) = bare_remote_with_clone();
         let clone_b = tempdir().unwrap();
-        no_window_command("git")
-            .arg("clone")
-            .arg("-q")
-            .arg(remote.path())
-            .arg(clone_b.path())
-            .status()
-            .unwrap();
+        git_clone(remote.path(), clone_b.path());
 
         commit_file(clone_a.path(), "a.md", "from a\n");
         no_window_command("git")
@@ -1332,13 +1354,7 @@ mod tests {
     fn diverged_reports_counts_and_writes_no_conflict_marker() {
         let (remote, clone_a) = bare_remote_with_clone();
         let clone_b = tempdir().unwrap();
-        no_window_command("git")
-            .arg("clone")
-            .arg("-q")
-            .arg(remote.path())
-            .arg(clone_b.path())
-            .status()
-            .unwrap();
+        git_clone(remote.path(), clone_b.path());
 
         commit_file(clone_a.path(), "a.md", "from a\n");
         no_window_command("git")
@@ -1380,6 +1396,7 @@ mod tests {
     #[test]
     fn init_creates_a_repo_and_the_documented_gitignore() {
         let tmp = tempdir().unwrap();
+        git_init(tmp.path());
 
         let outcome = checked_init_notes_repo(&tmp.path().to_string_lossy(), false).unwrap();
 
@@ -1399,6 +1416,7 @@ mod tests {
     #[test]
     fn init_commits_the_gitignore_it_creates() {
         let tmp = tempdir().unwrap();
+        git_init(tmp.path());
 
         checked_init_notes_repo(&tmp.path().to_string_lossy(), false).unwrap();
 
@@ -1527,6 +1545,7 @@ mod tests {
     #[test]
     fn declining_the_github_remote_returns_the_exact_command_to_run_by_hand() {
         let tmp = tempdir().unwrap();
+        git_init(tmp.path());
 
         let outcome = checked_init_notes_repo(&tmp.path().to_string_lossy(), false).unwrap();
 
