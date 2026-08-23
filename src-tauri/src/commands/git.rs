@@ -1424,7 +1424,10 @@ mod tests {
             .arg(".gitignore")
             .output()
             .unwrap();
-        assert_eq!(String::from_utf8_lossy(&tracked.stdout).trim(), ".gitignore");
+        assert_eq!(
+            String::from_utf8_lossy(&tracked.stdout).trim(),
+            ".gitignore"
+        );
     }
 
     #[test]
@@ -1467,7 +1470,10 @@ mod tests {
             .arg(".gitignore")
             .output()
             .unwrap();
-        assert_eq!(String::from_utf8_lossy(&tracked.stdout).trim(), ".gitignore");
+        assert_eq!(
+            String::from_utf8_lossy(&tracked.stdout).trim(),
+            ".gitignore"
+        );
     }
 
     // A workspace whose .gitignore already exists (the user's own, or an
