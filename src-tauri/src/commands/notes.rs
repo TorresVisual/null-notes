@@ -290,7 +290,9 @@ pub fn extract_cards(content: &str) -> Vec<ExtractedCard> {
         };
 
         let (due, ease, interval, reps) = match lines.get(i + 1).and_then(|l| parse_sr_comment(l)) {
-            Some((due, ease, interval, reps)) => (Some(due), Some(ease), Some(interval), Some(reps)),
+            Some((due, ease, interval, reps)) => {
+                (Some(due), Some(ease), Some(interval), Some(reps))
+            }
             None => (None, None, None, None),
         };
 
@@ -895,7 +897,10 @@ pub async fn grade_card(
 }
 
 #[tauri::command]
-pub async fn list_due_cards(workspace: String, db: State<'_, DbPool>) -> Result<Vec<DueCard>, String> {
+pub async fn list_due_cards(
+    workspace: String,
+    db: State<'_, DbPool>,
+) -> Result<Vec<DueCard>, String> {
     db::notes::due_cards(&db, &workspace, &sm2::today())
         .await
         .map_err(|e| e.to_string())
@@ -1536,8 +1541,9 @@ mod tests {
 
     #[test]
     fn test_extract_cards_finds_a_cloze_card() {
-        let cards =
-            extract_cards("A binary search tree keeps {{all left descendants smaller}} than the node.\n");
+        let cards = extract_cards(
+            "A binary search tree keeps {{all left descendants smaller}} than the node.\n",
+        );
         assert_eq!(cards.len(), 1);
         assert_eq!(cards[0].kind, CardKind::Cloze);
         assert_eq!(
@@ -1621,7 +1627,8 @@ mod tests {
 
     #[test]
     fn test_extract_formulas_captures_the_nearest_heading_above() {
-        let content = "# Lecture 3\n## Eigenvalues\n$$Av = \\lambda v$$\n## Determinants\n$$\\det(A)$$";
+        let content =
+            "# Lecture 3\n## Eigenvalues\n$$Av = \\lambda v$$\n## Determinants\n$$\\det(A)$$";
         let formulas = extract_formulas(content);
         assert_eq!(formulas.len(), 2);
         assert_eq!(formulas[0].heading.as_deref(), Some("Eigenvalues"));
@@ -1930,7 +1937,9 @@ mod save_tests {
             .await
             .unwrap();
 
-        let due = db::notes::due_cards(&pool, "/ws", "9999-12-31").await.unwrap();
+        let due = db::notes::due_cards(&pool, "/ws", "9999-12-31")
+            .await
+            .unwrap();
         assert_eq!(due.len(), 1);
         assert_eq!(due[0].front, "Q");
     }
@@ -1944,7 +1953,9 @@ mod save_tests {
             .unwrap();
         forget_note("/ws/a.md", &pool).await.unwrap();
 
-        let due = db::notes::due_cards(&pool, "/ws", "9999-12-31").await.unwrap();
+        let due = db::notes::due_cards(&pool, "/ws", "9999-12-31")
+            .await
+            .unwrap();
         assert!(due.is_empty());
     }
 
