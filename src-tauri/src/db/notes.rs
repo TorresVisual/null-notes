@@ -1,4 +1,6 @@
-use crate::models::{CardKind, DueCard, ExtractedCard, ExtractedTask, NoteMetadata, OpenTask, SearchResult};
+use crate::models::{
+    CardKind, DueCard, ExtractedCard, ExtractedTask, NoteMetadata, OpenTask, SearchResult,
+};
 use crate::sm2;
 use anyhow::Result;
 use sqlx::SqlitePool;
@@ -220,7 +222,8 @@ pub async fn notes_in_scope(
     folder: Option<&str>,
     tag: Option<&str>,
 ) -> Result<Vec<NoteMetadata>> {
-    let mut sql = String::from("SELECT n.id, n.title, n.path, n.workspace, n.updated_at FROM notes n");
+    let mut sql =
+        String::from("SELECT n.id, n.title, n.path, n.workspace, n.updated_at FROM notes n");
     if tag.is_some() {
         sql.push_str(" JOIN note_tags nt ON nt.note_path = n.path AND nt.tag = ? COLLATE NOCASE");
     }
@@ -1155,11 +1158,16 @@ mod tests {
     #[tokio::test]
     async fn test_set_cards_replaces_existing_cards_for_a_note() {
         let pool = make_pool().await;
-        index_note(&pool, &note("a", "A", "/ws/a.md", "/ws")).await.unwrap();
+        index_note(&pool, &note("a", "A", "/ws/a.md", "/ws"))
+            .await
+            .unwrap();
         set_cards(
             &pool,
             "/ws/a.md",
-            &[card(CardKind::Qa, "Q1", "A1", 0), card(CardKind::Qa, "Q2", "A2", 2)],
+            &[
+                card(CardKind::Qa, "Q1", "A1", 0),
+                card(CardKind::Qa, "Q2", "A2", 2),
+            ],
         )
         .await
         .unwrap();
@@ -1175,10 +1183,16 @@ mod tests {
     #[tokio::test]
     async fn test_new_card_with_no_schedule_defaults_to_due_today() {
         let pool = make_pool().await;
-        index_note(&pool, &note("a", "A", "/ws/a.md", "/ws")).await.unwrap();
-        set_cards(&pool, "/ws/a.md", &[card(CardKind::Cloze, "front", "back", 0)])
+        index_note(&pool, &note("a", "A", "/ws/a.md", "/ws"))
             .await
             .unwrap();
+        set_cards(
+            &pool,
+            "/ws/a.md",
+            &[card(CardKind::Cloze, "front", "back", 0)],
+        )
+        .await
+        .unwrap();
 
         let due = due_cards(&pool, "/ws", "2026-08-20").await.unwrap();
         assert_eq!(due.len(), 1);
@@ -1188,8 +1202,12 @@ mod tests {
     #[tokio::test]
     async fn test_due_cards_excludes_not_yet_due_and_other_workspaces() {
         let pool = make_pool().await;
-        index_note(&pool, &note("a", "A", "/ws/a.md", "/ws")).await.unwrap();
-        index_note(&pool, &note("c", "C", "/other/c.md", "/other")).await.unwrap();
+        index_note(&pool, &note("a", "A", "/ws/a.md", "/ws"))
+            .await
+            .unwrap();
+        index_note(&pool, &note("c", "C", "/other/c.md", "/other"))
+            .await
+            .unwrap();
         let mut future = card(CardKind::Qa, "not due yet", "back", 0);
         future.due = Some("2099-01-01".to_string());
         future.ease = Some(2.5);
@@ -1211,12 +1229,16 @@ mod tests {
     #[tokio::test]
     async fn test_update_path_also_rewrites_cards() {
         let pool = make_pool().await;
-        index_note(&pool, &note("a", "A", "/ws/old.md", "/ws")).await.unwrap();
+        index_note(&pool, &note("a", "A", "/ws/old.md", "/ws"))
+            .await
+            .unwrap();
         set_cards(&pool, "/ws/old.md", &[card(CardKind::Qa, "Q", "A", 0)])
             .await
             .unwrap();
 
-        update_path(&pool, "/ws/old.md", "/ws/Folder/old.md").await.unwrap();
+        update_path(&pool, "/ws/old.md", "/ws/Folder/old.md")
+            .await
+            .unwrap();
 
         let due = due_cards(&pool, "/ws", "9999-12-31").await.unwrap();
         assert_eq!(due[0].note_path, "/ws/Folder/old.md");
@@ -1225,7 +1247,9 @@ mod tests {
     #[tokio::test]
     async fn test_remove_notes_under_also_deletes_cards() {
         let pool = make_pool().await;
-        index_note(&pool, &note("a", "A", "/ws/Folder/a.md", "/ws")).await.unwrap();
+        index_note(&pool, &note("a", "A", "/ws/Folder/a.md", "/ws"))
+            .await
+            .unwrap();
         set_cards(&pool, "/ws/Folder/a.md", &[card(CardKind::Qa, "Q", "A", 0)])
             .await
             .unwrap();
