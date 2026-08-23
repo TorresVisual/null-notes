@@ -305,7 +305,7 @@ export function Layout() {
         <div className="editor-scroll" ref={scrollRef}>
           <div
             ref={editorPaneRef}
-            className="editor-pane"
+            className={`editor-pane${!activeTab && !workspacePath ? ' editor-pane--center' : ''}`}
             style={{ '--editor-max-width': `${settings.editorMaxWidthPx}px` } as CSSProperties}
           >
             {isLoading && <p className="status">Loading…</p>}

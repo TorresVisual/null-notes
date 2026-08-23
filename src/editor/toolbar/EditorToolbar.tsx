@@ -75,7 +75,9 @@ export function EditorToolbar({ editor, notePath }: EditorToolbarProps) {
       ) : (
         <>
           {editor && <InsertGroup editor={editor} notePath={notePath} />}
+          {editor && <span className="toolbar-sep" aria-hidden />}
           {editor && <SheetGroup editor={editor} />}
+          {editor && <span className="toolbar-sep" aria-hidden />}
           {editor && (codeBlockState.active ? (
             <label className="code-language-control">
               <span>Language</span>

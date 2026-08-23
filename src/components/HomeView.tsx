@@ -129,7 +129,7 @@ export function HomeView({ onOpenTaskView, onOpenReview, onOpenSettings }: HomeV
           </>
         )}
       </section>
-      <section className="home-section">
+      <section className="home-section home-section--wide">
         <h2>Git</h2>
         {gitStatus ? (
           <p className="home-status">{gitStatus}</p>

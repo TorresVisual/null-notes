@@ -2,23 +2,53 @@ interface ShortcutsOverlayProps {
   onClose: () => void
 }
 
-const SHORTCUTS: Array<{ keys: string; label: string }> = [
-  { keys: 'Ctrl N', label: 'New note' },
-  { keys: 'Ctrl Shift N', label: 'New folder' },
-  { keys: 'Ctrl Shift T', label: 'New from template' },
-  { keys: 'Ctrl O', label: 'Open workspace' },
-  { keys: 'Ctrl K', label: 'Search notes' },
-  { keys: 'Ctrl P', label: 'Jump to a note by title' },
-  { keys: 'Ctrl H', label: 'Home' },
-  { keys: 'Ctrl E', label: 'Toggle source / preview' },
-  { keys: 'Ctrl Shift I', label: 'Insert ink block' },
-  { keys: 'Ctrl G', label: 'Connections graph' },
-  { keys: 'Ctrl `', label: 'Toggle terminal' },
-  { keys: 'Ctrl Shift O', label: 'Toggle outline' },
-  { keys: 'Ctrl Shift K', label: 'Tasks' },
-  { keys: 'Ctrl Shift R', label: 'Review' },
-  { keys: 'Ctrl ,', label: 'Settings' },
-  { keys: '?', label: 'Show this list' },
+interface ShortcutGroup {
+  label: string
+  shortcuts: Array<{ keys: string; label: string }>
+}
+
+const SHORTCUT_GROUPS: ShortcutGroup[] = [
+  {
+    label: 'Create',
+    shortcuts: [
+      { keys: 'Ctrl N', label: 'New note' },
+      { keys: 'Ctrl Shift N', label: 'New folder' },
+      { keys: 'Ctrl Shift T', label: 'New from template' },
+    ],
+  },
+  {
+    label: 'Navigate',
+    shortcuts: [
+      { keys: 'Ctrl O', label: 'Open workspace' },
+      { keys: 'Ctrl K', label: 'Search notes' },
+      { keys: 'Ctrl P', label: 'Jump to a note by title' },
+      { keys: 'Ctrl H', label: 'Home' },
+    ],
+  },
+  {
+    label: 'View',
+    shortcuts: [
+      { keys: 'Ctrl E', label: 'Toggle source / preview' },
+      { keys: 'Ctrl Shift I', label: 'Insert ink block' },
+      { keys: 'Ctrl G', label: 'Connections graph' },
+      { keys: 'Ctrl `', label: 'Toggle terminal' },
+      { keys: 'Ctrl Shift O', label: 'Toggle outline' },
+    ],
+  },
+  {
+    label: 'Study',
+    shortcuts: [
+      { keys: 'Ctrl Shift K', label: 'Tasks' },
+      { keys: 'Ctrl Shift R', label: 'Review' },
+    ],
+  },
+  {
+    label: 'Other',
+    shortcuts: [
+      { keys: 'Ctrl ,', label: 'Settings' },
+      { keys: '?', label: 'Show this list' },
+    ],
+  },
 ]
 
 export function ShortcutsOverlay({ onClose }: ShortcutsOverlayProps) {
@@ -28,14 +58,19 @@ export function ShortcutsOverlay({ onClose }: ShortcutsOverlayProps) {
         <div className="settings-panel-header">
           <h2>Keyboard Shortcuts</h2>
         </div>
-        <ul className="shortcuts-list">
-          {SHORTCUTS.map((s) => (
-            <li key={s.label} className="shortcuts-row">
-              <span>{s.label}</span>
-              <kbd>{s.keys}</kbd>
-            </li>
-          ))}
-        </ul>
+        {SHORTCUT_GROUPS.map((group) => (
+          <div className="settings-section" key={group.label}>
+            <p className="section-label">{group.label}</p>
+            <ul className="shortcuts-list">
+              {group.shortcuts.map((s) => (
+                <li key={s.label} className="shortcuts-row">
+                  <span>{s.label}</span>
+                  <kbd>{s.keys}</kbd>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
       </div>
     </div>
   )

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { FilePlus, FolderPlus, LayoutTemplate, PenLine, Search, Settings } from 'lucide-react'
+import { FilePlus, FolderOpen, FolderPlus, LayoutTemplate, PenLine, Search, Settings } from 'lucide-react'
 import { useNotesStore } from '../store/notes'
 import { useWorkspaceStore } from '../store/workspace'
 import { useWorkspace } from '../hooks/useWorkspace'
@@ -67,33 +67,38 @@ export function Sidebar({ onSearchOpen, onSettingsOpen, onTemplateOpen }: Sideba
   return (
     <aside className="sidebar">
       {workspaceName && <p className="workspace-name" title={workspacePath ?? ''}>{workspaceName}</p>}
-      <button onClick={() => void openWorkspace()}>Open Workspace</button>
+      <button className="sidebar-workspace-btn" onClick={() => void openWorkspace()}>
+        <FolderOpen size={14} /> Open Workspace
+      </button>
+      <p className="section-label">New</p>
       <div className="sidebar-new-actions">
         <button onClick={() => void handleCreateNote()} disabled={!workspacePath}>
-          <FilePlus size={14} /> New Note
+          <FilePlus size={14} /> Note
         </button>
         <button onClick={() => void handleCreateFolder()} disabled={!workspacePath}>
-          <FolderPlus size={14} /> New Folder
+          <FolderPlus size={14} /> Folder
         </button>
         <button onClick={() => void handleCreateCanvasNote()} disabled={!workspacePath}>
-          <PenLine size={14} /> New Canvas
+          <PenLine size={14} /> Canvas
         </button>
         <button onClick={onTemplateOpen} disabled={!workspacePath}>
-          <LayoutTemplate size={14} /> New from Template
+          <LayoutTemplate size={14} /> Template
         </button>
       </div>
       <ImportButton />
-      <button className="search-open-btn" onClick={onSearchOpen}>
-        <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <Search size={13} /> Search
-        </span>
-        <kbd>Ctrl K</kbd>
-      </button>
-      <button className="search-open-btn" onClick={onSettingsOpen}>
-        <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <Settings size={13} /> Settings
-        </span>
-      </button>
+      <div className="sidebar-group">
+        <button className="search-open-btn" onClick={onSearchOpen}>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <Search size={13} /> Search
+          </span>
+          <kbd>Ctrl K</kbd>
+        </button>
+        <button className="search-open-btn" onClick={onSettingsOpen}>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <Settings size={13} /> Settings
+          </span>
+        </button>
+      </div>
       {folderError && <p className="sidebar-error">{folderError}</p>}
       <TagList />
       {tagFilter ? (
