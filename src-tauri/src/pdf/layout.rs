@@ -2745,8 +2745,10 @@ pub(super) fn matrix_bracket_row(row: &[CharBox]) -> Option<(Vec<BracketPair>, V
 
     let first_pos = bracket_positions[0];
     let brackets: Vec<BracketPair> = bracket_positions
-        .chunks_exact(2)
-        .map(|pair| (sorted[pair[0]], sorted[pair[1]]))
+        .as_chunks::<2>()
+        .0
+        .iter()
+        .map(|&[a, b]| (sorted[a], sorted[b]))
         .collect();
     let leading = sorted[..first_pos].to_vec();
     Some((brackets, leading))
