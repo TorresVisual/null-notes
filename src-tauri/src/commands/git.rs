@@ -1,6 +1,7 @@
-//! P5's Git automation: which of the two modes a workspace is in (P5-1),
-//! batched auto-commit (P5-2), push policy (P5-3), fast-forward-only
-//! auto-pull (P5-4), and repo creation (P5-5).
+//! P5's Git automation: which repo mode a workspace is in (P5-1, including
+//! the `NotesMonorepo` extension for a repo of nothing but sibling course
+//! workspaces), batched auto-commit (P5-2), push policy (P5-3),
+//! fast-forward-only auto-pull (P5-4), and repo creation (P5-5).
 //!
 //! Every mutating command here is pathspec-scoped to note paths and backs
 //! off quietly on an unsafe repo state — see `unsafe_repo_state` — rather
@@ -41,11 +42,83 @@ pub fn detect_repo_mode(workspace: &str) -> anyhow::Result<Option<RepoMode>> {
     let root_canon = std::fs::canonicalize(Path::new(&root))?;
     let workspace_canon = std::fs::canonicalize(Path::new(workspace))?;
 
-    Ok(Some(if root_canon == workspace_canon {
-        RepoMode::NotesOnly
+    if root_canon == workspace_canon {
+        return Ok(Some(RepoMode::NotesOnly));
+    }
+
+    Ok(Some(if is_notes_monorepo(&root_canon, &workspace_canon)? {
+        RepoMode::NotesMonorepo
     } else {
         RepoMode::CodeRepo
     }))
+}
+
+/// A directory counts as its own note workspace if it directly carries the
+/// marker `.workspace.json` P3-4 already gitignores — the same file
+/// `useGitConfig` persists into. Written lazily (first session-state save,
+/// not on the folder's very first open), so a course folder opened for the
+/// first time ever still reads as a plain `CodeRepo` this once; it detects
+/// as `NotesMonorepo` from its next open onward.
+fn is_workspace_folder(dir: &Path) -> bool {
+    dir.join(".workspace.json").is_file()
+}
+
+/// True if every entry in `dir`, other than `except` (the child we walked up
+/// from), is either itself a workspace folder or a dotfile/`README.md` —
+/// i.e. `dir` holds nothing but sibling note-workspaces and repo
+/// bookkeeping, never a stray file or an unmarked folder that could be
+/// someone else's source.
+fn only_holds_workspace_siblings(dir: &Path, except: &Path) -> anyhow::Result<bool> {
+    for entry in std::fs::read_dir(dir)? {
+        let entry = entry?;
+        let path = entry.path();
+        if path == except {
+            continue;
+        }
+        let name = entry.file_name();
+        let name = name.to_string_lossy();
+        if name.starts_with('.') || name == "README.md" {
+            continue;
+        }
+        if path.is_dir() && is_workspace_folder(&path) {
+            continue;
+        }
+        return Ok(false);
+    }
+    Ok(true)
+}
+
+/// Walks from `workspace` up to `root`: `workspace` itself must be a marked
+/// workspace folder, and every directory in between must hold nothing but
+/// sibling workspace folders (plus bookkeeping) alongside the path that
+/// leads to it — the whole repo is composed of independent note workspaces,
+/// never someone else's source living next to yours. Any single foreign
+/// entry at any level falls back to the conservative `CodeRepo` reading.
+fn is_notes_monorepo(root: &Path, workspace: &Path) -> anyhow::Result<bool> {
+    if !is_workspace_folder(workspace) {
+        return Ok(false);
+    }
+
+    let mut current = workspace.to_path_buf();
+    loop {
+        let parent = current
+            .parent()
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "{} is not under repo root {}",
+                    workspace.display(),
+                    root.display()
+                )
+            })?
+            .to_path_buf();
+        if !only_holds_workspace_siblings(&parent, &current)? {
+            return Ok(false);
+        }
+        if parent == root {
+            return Ok(true);
+        }
+        current = parent;
+    }
 }
 
 #[tauri::command]
@@ -251,20 +324,40 @@ fn has_remote(workspace: &str) -> anyhow::Result<bool> {
     Ok(!String::from_utf8_lossy(&output.stdout).trim().is_empty())
 }
 
-/// Never called for `RepoMode::CodeRepo` from the frontend, but the guard
+/// Never called for `RepoMode::CodeRepo` from the frontend unless the user
+/// has explicitly opted this specific workspace in (`allow_code_repo_push`,
+/// set only through a confirm dialog — see `SettingsPanel`), but the guard
 /// lives here too — structural, not only a UI-layer check (P5-3).
-pub fn checked_push(workspace: &str, mode: RepoMode) -> anyhow::Result<PushOutcome> {
-    if mode == RepoMode::CodeRepo {
-        anyhow::bail!("refusing to push a CodeRepo workspace — P5-3 forbids it unconditionally");
+/// `NotesMonorepo` is never blocked: `is_notes_monorepo` already confirmed
+/// the whole repo is nothing but sibling note workspaces, which is exactly
+/// `NotesOnly`'s own safety property, just at a different root.
+pub fn checked_push(
+    workspace: &str,
+    mode: RepoMode,
+    allow_code_repo_push: bool,
+) -> anyhow::Result<PushOutcome> {
+    if mode == RepoMode::CodeRepo && !allow_code_repo_push {
+        anyhow::bail!(
+            "refusing to push a CodeRepo workspace — set allow_code_repo_push to override"
+        );
     }
     if !has_remote(workspace)? {
         return Ok(PushOutcome::NoRemote);
     }
 
+    // `-u origin HEAD`, not a bare `push`: a repo `checked_init_notes_repo`
+    // just created has a remote but no upstream tracking branch yet (`gh
+    // repo create` adds the remote without pushing), so the first
+    // auto-commit's push would otherwise fail with "no upstream branch" —
+    // silently, since that's a plain rejection, not an auth error. Safe to
+    // pass unconditionally: a no-op once tracking already exists.
     let output = Command::new("git")
         .arg("-C")
         .arg(workspace)
         .arg("push")
+        .arg("-u")
+        .arg("origin")
+        .arg("HEAD")
         .output()?;
     if output.status.success() {
         return Ok(PushOutcome::Pushed);
@@ -281,8 +374,12 @@ pub fn checked_push(workspace: &str, mode: RepoMode) -> anyhow::Result<PushOutco
 }
 
 #[tauri::command]
-pub async fn push_notes(workspace: String, mode: RepoMode) -> Result<PushOutcome, String> {
-    tokio::task::spawn_blocking(move || checked_push(&workspace, mode))
+pub async fn push_notes(
+    workspace: String,
+    mode: RepoMode,
+    allow_code_repo_push: bool,
+) -> Result<PushOutcome, String> {
+    tokio::task::spawn_blocking(move || checked_push(&workspace, mode, allow_code_repo_push))
         .await
         .map_err(|e| e.to_string())?
         .map_err(|e| e.to_string())
@@ -380,6 +477,26 @@ pub enum RepoInitOutcome {
     InitializedLocalOnly { remote_add_command: String },
 }
 
+/// Slugifies a workspace folder name into a valid GitHub repo name
+/// component: GitHub only accepts letters, digits, `.`, `_` and `-` — a
+/// space, colon or parenthesis in the folder name (`Analysis 2 (2026)`)
+/// would otherwise make `gh repo create` reject the name outright. Any run
+/// of disallowed characters collapses to a single `-`.
+fn slugify(name: &str) -> String {
+    let mut out = String::with_capacity(name.len());
+    let mut last_was_dash = false;
+    for c in name.chars() {
+        if c.is_ascii_alphanumeric() || c == '.' || c == '_' || c == '-' {
+            out.push(c);
+            last_was_dash = c == '-';
+        } else if !last_was_dash {
+            out.push('-');
+            last_was_dash = true;
+        }
+    }
+    out.trim_matches('-').to_string()
+}
+
 fn has_gh() -> bool {
     let probe = if cfg!(windows) { "where" } else { "which" };
     Command::new(probe)
@@ -408,11 +525,23 @@ pub fn checked_init_notes_repo(
     }
 
     if create_github_remote && has_gh() {
+        // Named explicitly rather than left to gh's own default (the source
+        // folder's bare basename) — "null-notes-<folder>" makes a repo
+        // created by this app identifiable as one at a glance in the GitHub
+        // repo list, without relying on gh to guess a name from a folder
+        // that might not even be unique across courses.
+        let folder_name = Path::new(workspace)
+            .file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_else(|| "workspace".to_string());
+        let repo_name = format!("null-notes-{}", slugify(&folder_name));
+
         // Private by default: lecture notes must not become public by
         // accident.
         let status = Command::new("gh")
             .arg("repo")
             .arg("create")
+            .arg(&repo_name)
             .arg("--source")
             .arg(workspace)
             .arg("--private")
@@ -488,9 +617,9 @@ mod tests {
         assert_eq!(mode, Some(RepoMode::CodeRepo));
     }
 
-    // A workspace two levels under the repo root is still a code repo, not
-    // some third mode — depth past the root doesn't change which of the two
-    // it is.
+    // A workspace two levels under the repo root with no `.workspace.json`
+    // anywhere in the chain is still a plain code repo — depth past the root
+    // doesn't by itself earn the NotesMonorepo reading.
     #[test]
     fn depth_below_the_repo_root_stays_code_repo() {
         let tmp = tempdir().unwrap();
@@ -499,6 +628,68 @@ mod tests {
         std::fs::create_dir_all(&nested).unwrap();
 
         let mode = detect_repo_mode(&nested.to_string_lossy()).unwrap();
+
+        assert_eq!(mode, Some(RepoMode::CodeRepo));
+    }
+
+    fn mark_as_workspace(dir: &Path) {
+        std::fs::write(dir.join(".workspace.json"), "{}").unwrap();
+    }
+
+    // The user's own motivating shape: a "Courses" repo root holding nothing
+    // but sibling course workspaces (DSA, Analysis_2), each independently
+    // opened and each carrying its own `.workspace.json`.
+    #[test]
+    fn a_repo_of_nothing_but_sibling_course_workspaces_is_a_notes_monorepo() {
+        let tmp = tempdir().unwrap();
+        git_init(tmp.path());
+        mark_as_workspace(tmp.path());
+        let dsa = tmp.path().join("DSA");
+        std::fs::create_dir(&dsa).unwrap();
+        mark_as_workspace(&dsa);
+        let analysis = tmp.path().join("Analysis_2");
+        std::fs::create_dir(&analysis).unwrap();
+        mark_as_workspace(&analysis);
+
+        let mode = detect_repo_mode(&dsa.to_string_lossy()).unwrap();
+
+        assert_eq!(mode, Some(RepoMode::NotesMonorepo));
+    }
+
+    // One stray foreign entry at the repo root — a real source folder sitting
+    // next to the course workspaces — must fall back to the conservative
+    // CodeRepo reading, not a false-positive NotesMonorepo.
+    #[test]
+    fn a_foreign_sibling_at_the_repo_root_disqualifies_the_monorepo_reading() {
+        let tmp = tempdir().unwrap();
+        git_init(tmp.path());
+        let dsa = tmp.path().join("DSA");
+        std::fs::create_dir(&dsa).unwrap();
+        mark_as_workspace(&dsa);
+        std::fs::create_dir(tmp.path().join("src")).unwrap();
+        std::fs::write(tmp.path().join("src").join("main.rs"), "fn main() {}").unwrap();
+
+        let mode = detect_repo_mode(&dsa.to_string_lossy()).unwrap();
+
+        assert_eq!(mode, Some(RepoMode::CodeRepo));
+    }
+
+    // A folder opened for the very first time ever has no `.workspace.json`
+    // yet (it's written lazily, on first session-state save) — even with
+    // perfectly clean siblings, it must read as CodeRepo this once rather
+    // than guessing monorepo from folder shape alone.
+    #[test]
+    fn a_workspace_not_yet_marked_itself_stays_code_repo_even_with_clean_siblings() {
+        let tmp = tempdir().unwrap();
+        git_init(tmp.path());
+        let dsa = tmp.path().join("DSA");
+        std::fs::create_dir(&dsa).unwrap();
+        // DSA itself is deliberately left unmarked.
+        let analysis = tmp.path().join("Analysis_2");
+        std::fs::create_dir(&analysis).unwrap();
+        mark_as_workspace(&analysis);
+
+        let mode = detect_repo_mode(&dsa.to_string_lossy()).unwrap();
 
         assert_eq!(mode, Some(RepoMode::CodeRepo));
     }
@@ -890,7 +1081,47 @@ mod tests {
         let (_remote, clone) = bare_remote_with_clone();
         commit_file(clone.path(), "note2.md", "# Note 2\n");
 
-        let outcome = checked_push(&clone.path().to_string_lossy(), RepoMode::NotesOnly).unwrap();
+        let outcome =
+            checked_push(&clone.path().to_string_lossy(), RepoMode::NotesOnly, false).unwrap();
+
+        assert_eq!(outcome, PushOutcome::Pushed);
+    }
+
+    // The real-world first-push sequence: `checked_init_notes_repo` runs
+    // `git init` and `gh repo create --remote origin` (no `--push`), so by
+    // the time the first auto-commit fires there's a remote but no upstream
+    // tracking branch yet — a bare `git push` fails here with "no upstream
+    // branch", which is exactly the silent failure this test guards against.
+    #[test]
+    fn pushes_and_sets_upstream_on_a_repo_with_no_tracking_branch_yet() {
+        let remote = tempdir().unwrap();
+        Command::new("git")
+            .arg("init")
+            .arg("--bare")
+            .arg("-q")
+            .arg(remote.path())
+            .status()
+            .unwrap();
+
+        let workspace = tempdir().unwrap();
+        git_init(workspace.path());
+        commit_file(workspace.path(), "note.md", "# Note\n");
+        Command::new("git")
+            .arg("-C")
+            .arg(workspace.path())
+            .arg("remote")
+            .arg("add")
+            .arg("origin")
+            .arg(remote.path())
+            .status()
+            .unwrap();
+
+        let outcome = checked_push(
+            &workspace.path().to_string_lossy(),
+            RepoMode::NotesOnly,
+            false,
+        )
+        .unwrap();
 
         assert_eq!(outcome, PushOutcome::Pushed);
     }
@@ -901,7 +1132,8 @@ mod tests {
         git_init(tmp.path());
         commit_file(tmp.path(), "note.md", "# Note\n");
 
-        let outcome = checked_push(&tmp.path().to_string_lossy(), RepoMode::NotesOnly).unwrap();
+        let outcome =
+            checked_push(&tmp.path().to_string_lossy(), RepoMode::NotesOnly, false).unwrap();
 
         assert_eq!(outcome, PushOutcome::NoRemote);
     }
@@ -930,18 +1162,38 @@ mod tests {
             .unwrap();
 
         commit_file(clone_b.path(), "b.md", "from b\n");
-        let outcome = checked_push(&clone_b.path().to_string_lossy(), RepoMode::NotesOnly).unwrap();
+        let outcome = checked_push(
+            &clone_b.path().to_string_lossy(),
+            RepoMode::NotesOnly,
+            false,
+        )
+        .unwrap();
 
         assert!(matches!(outcome, PushOutcome::Rejected { .. }));
     }
 
     #[test]
-    fn a_code_repo_workspace_is_refused_unconditionally() {
+    fn a_code_repo_workspace_is_refused_by_default() {
         let (_remote, clone) = bare_remote_with_clone();
 
-        let result = checked_push(&clone.path().to_string_lossy(), RepoMode::CodeRepo);
+        let result = checked_push(&clone.path().to_string_lossy(), RepoMode::CodeRepo, false);
 
         assert!(result.is_err());
+    }
+
+    // The explicit escape hatch: a user who has looked at this specific
+    // shared repo and decided it's fine can opt in per-workspace — but only
+    // through this flag, set only via a confirm dialog on the frontend
+    // (SettingsPanel), never a default.
+    #[test]
+    fn a_code_repo_workspace_pushes_when_explicitly_allowed() {
+        let (_remote, clone) = bare_remote_with_clone();
+        commit_file(clone.path(), "note2.md", "# Note 2\n");
+
+        let outcome =
+            checked_push(&clone.path().to_string_lossy(), RepoMode::CodeRepo, true).unwrap();
+
+        assert_eq!(outcome, PushOutcome::Pushed);
     }
 
     #[test]
@@ -1069,5 +1321,23 @@ mod tests {
             }
             other => panic!("expected InitializedLocalOnly, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn slugify_passes_through_an_already_valid_name() {
+        assert_eq!(slugify("DSA"), "DSA");
+        assert_eq!(slugify("Analysis_2"), "Analysis_2");
+    }
+
+    #[test]
+    fn slugify_collapses_disallowed_characters_to_a_single_dash() {
+        assert_eq!(slugify("Analysis 2 (2026)"), "Analysis-2-2026");
+        assert_eq!(slugify("Intro to CS: Fall"), "Intro-to-CS-Fall");
+    }
+
+    #[test]
+    fn slugify_trims_leading_and_trailing_dashes() {
+        assert_eq!(slugify("  DSA  "), "DSA");
+        assert_eq!(slugify("(DSA)"), "DSA");
     }
 }

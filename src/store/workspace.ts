@@ -12,6 +12,7 @@ const DEFAULT_GIT_CONFIG: GitWorkspaceConfig = {
   idleMinutes: 10,
   skipHooks: false,
   autoPush: true,
+  allowCodeRepoPush: false,
 }
 
 interface FolderContextMenuState {

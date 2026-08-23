@@ -67,12 +67,16 @@
   --loading-opacity: 0.6;
 
   /* Motion — one duration for state-change feedback (hover/press/toggle
-     color swaps), one for a surface entering (menus/modals), one easing
-     curve used everywhere. Matches the value `.details-chevron` already
-     used before this pass rather than inventing a new number. */
+     color swaps), one for a surface entering (menus/modals). Two curves:
+     `--ease-standard` (a real accelerate-decelerate, not linear `ease`) for
+     color/position changes, `--ease-spring` (a slight overshoot) reserved
+     for things that should feel like they have physical weight — a button
+     press, a surface popping in, a selection indicator landing — never for
+     plain color transitions, where an overshoot reads as a glitch. */
   --duration-fast: 120ms;
   --duration-base: 180ms;
-  --ease-standard: ease;
+  --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 html {
@@ -102,7 +106,28 @@ button, [role="button"], .tree-row, .tab, .search-result, .slash-menu-item,
     background-color var(--duration-fast) var(--ease-standard),
     border-color var(--duration-fast) var(--ease-standard),
     color var(--duration-fast) var(--ease-standard),
-    outline-color var(--duration-fast) var(--ease-standard);
+    outline-color var(--duration-fast) var(--ease-standard),
+    box-shadow var(--duration-fast) var(--ease-standard),
+    transform var(--duration-fast) var(--ease-spring);
+}
+
+/* Press feedback — a discrete, button-shaped control visibly compresses on
+   click. Deliberately NOT applied to .tree-row/.tab/.search-result/list
+   items above: scaling a full-width row looks like a glitch, not a press;
+   this is reserved for compact, self-contained controls. */
+.toolbar-button:active, .ink-tool:active, .ink-pen:active,
+.sidebar-new-actions button:active, .workspace-picker-browse:active,
+.dialog-action:active, .context-menu button:active, .settings-reset:active,
+.import-mode-option:active, .sidebar-workspace-btn:active {
+  transform: scale(0.96);
+}
+
+/* Hover lift — the same compact-control set rises slightly rather than just
+   swapping color, giving buttons real physical presence instead of reading
+   as flat colored rectangles. */
+.toolbar-button:hover, .ink-tool:hover, .ink-pen:hover,
+.sidebar-new-actions button:hover:not(:disabled) {
+  transform: translateY(-1px);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -115,14 +140,14 @@ button, [role="button"], .tree-row, .tab, .search-result, .slash-menu-item,
    very little payoff on a surface that's usually dismissed by clicking
    straight through to whatever it was covering. */
 @keyframes surface-in {
-  from { opacity: 0; transform: translateY(-2px) scale(0.98); }
+  from { opacity: 0; transform: translateY(-4px) scale(0.94); }
   to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
 .context-menu, .slash-menu, .math-editor, .math-snippet-menu, .block-handle-menu,
 .search-modal, .settings-panel, .import-mode-dialog, .graph-view, .task-view,
 .review-session, .formula-sheet-prompt {
-  animation: surface-in var(--duration-base) var(--ease-standard);
+  animation: surface-in var(--duration-base) var(--ease-spring);
 }
 
 /* Thin dark scrollbar for WebKit / WebView2 */
@@ -138,8 +163,8 @@ button, [role="button"], .tree-row, .tab, .search-result, .slash-menu-item,
 }
 
 .sidebar {
-  width: 220px;
-  min-width: 180px;
+  width: 240px;
+  min-width: 200px;
   background: var(--bg-raised);
   border-right: 1px solid var(--border);
   display: flex;
@@ -149,25 +174,54 @@ button, [role="button"], .tree-row, .tab, .search-result, .slash-menu-item,
   overflow-y: auto;
 }
 
+/* Ghost by default — a filled box on every nav row read as a stack of form
+   fields rather than a navigation panel. Background only appears on
+   interaction; grouping and the New-actions toolbar (below) carry hierarchy
+   instead of a uniform border everywhere. */
 .sidebar button {
   width: 100%;
-  padding: 6px 10px;
-  background: var(--bg-hover);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  background: transparent;
   color: var(--text-primary);
-  border: 1px solid var(--border-strong);
-  border-radius: 4px;
+  border: 1px solid transparent;
+  border-radius: 6px;
   cursor: pointer;
   text-align: left;
   font-size: 13px;
 }
 
-.sidebar button:hover { background: var(--border-strong); }
+.sidebar button:hover { background: var(--bg-hover); }
 .sidebar button:active { background: var(--bg-sunken); }
 .sidebar button:focus-visible { outline: none; box-shadow: var(--focus-ring); }
 .sidebar button:disabled { opacity: var(--disabled-opacity); cursor: not-allowed; }
 .sidebar button.is-loading { opacity: var(--loading-opacity); pointer-events: none; }
 .sidebar button.is-error { border-color: var(--danger); color: var(--danger); }
 .sidebar button.is-selected { background: var(--accent-bg); color: var(--accent); }
+
+/* The one persistent entry point for switching workspaces — set apart from
+   the plain nav rows below it with real weight (border, bolder label)
+   rather than looking identical to Search/Settings. */
+.sidebar-workspace-btn {
+  font-weight: 600;
+  border-color: var(--border-strong) !important;
+  margin-bottom: 2px;
+}
+
+.sidebar-workspace-btn:hover { background: var(--bg-hover); border-color: var(--text-tertiary) !important; transform: translateY(-1px); }
+
+/* Separates navigation (Search/Settings) from the workspace-content actions
+   above it — a divider encodes the grouping instead of relying on gap alone. */
+.sidebar-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding-top: var(--space-sm);
+  margin-top: 2px;
+  border-top: 1px solid var(--border);
+}
 
 .sidebar > .folder-tree { flex: 1; overflow-y: auto; }
 
@@ -204,8 +258,17 @@ button, [role="button"], .tree-row, .tab, .search-result, .slash-menu-item,
   white-space: nowrap;
 }
 
+/* The active tab previously differed from every other tab only by text
+   color — easy to miss at a glance. A background matching the editor
+   content below it (so the tab reads as "attached" to that content) plus
+   an accent underline gives it real, unambiguous visual weight. */
+.tab.active {
+  background: var(--bg-base);
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+
 .tab.active button:first-child { color: var(--text-primary); }
-.tab:hover { background: var(--bg-hover); }
+.tab:hover:not(.active) { background: var(--bg-hover); }
 
 /* A newly-created note's tab gets one brief accent pulse so "a note was just
    created" reads as a confirmed action, not a tab that silently appeared —
@@ -229,6 +292,17 @@ button, [role="button"], .tree-row, .tab, .search-result, .slash-menu-item,
   margin: 0 auto;
   padding: 32px 48px;
   min-height: 100%;
+}
+
+/* Applied only for the pre-workspace picker, whose content is a fixed-size
+   composition rather than flowing text — vertically centering it in the
+   viewport reads as intentional instead of the content floating in
+   whatever empty space happens to be below the fold. Not used for
+   HomeView/empty-note-list, which can be taller than the viewport. */
+.editor-pane--center {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
 }
 
 /* Terminal pane — docked at the bottom of the main column, not a modal
@@ -1140,11 +1214,16 @@ code {
 
 /* Workspace picker (shown until a workspace is open) */
 .workspace-picker {
-  max-width: 420px;
-  margin: 18vh auto 0;
+  max-width: 440px;
+  margin: 0 auto;
   display: flex;
   flex-direction: column;
   gap: var(--space-sm);
+}
+
+.workspace-picker-mark {
+  display: block;
+  margin-bottom: var(--space-sm);
 }
 
 .workspace-picker-title {
@@ -1225,8 +1304,26 @@ code {
   align-items: center;
   justify-content: center;
   gap: var(--space-sm);
-  margin-top: var(--space-sm);
+  margin-top: var(--space-md);
+  width: 100%;
+  padding: 10px 16px;
+  background: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  color: var(--accent-contrast);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
 }
+
+.workspace-picker-browse:hover {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(126, 231, 135, 0.35);
+}
+.workspace-picker-browse:active { background: var(--accent); transform: translateY(0) scale(0.97); }
+.workspace-picker-browse:focus-visible { outline: none; box-shadow: var(--focus-ring); }
 
 /* Slash command menu */
 .slash-menu {
@@ -1320,6 +1417,7 @@ code {
 }
 
 .tree-row {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 4px;
@@ -1334,6 +1432,26 @@ code {
 .tree-row:active { background: var(--bg-sunken); }
 .tree-row:focus-visible { outline: none; box-shadow: var(--focus-ring); }
 .tree-row.active { background: var(--accent-bg); color: var(--text-primary); }
+
+/* The open note's row gets a pill landing in the gutter, not just a
+   background tint — the same "which channel am I in" signal Discord's
+   sidebar gives, scaled to this app's own accent and geometry. */
+.tree-row.active::before {
+  content: '';
+  position: absolute;
+  left: -6px;
+  top: 5px;
+  bottom: 5px;
+  width: 3px;
+  border-radius: 2px;
+  background: var(--accent);
+  animation: pill-in var(--duration-base) var(--ease-spring);
+}
+
+@keyframes pill-in {
+  from { transform: scaleY(0); opacity: 0; }
+  to { transform: scaleY(1); opacity: 1; }
+}
 .tree-row.selected { background: var(--bg-hover); }
 .tree-row.is-disabled { opacity: var(--disabled-opacity); pointer-events: none; }
 .tree-row.is-loading { opacity: var(--loading-opacity); pointer-events: none; }
@@ -1387,17 +1505,31 @@ code {
 .sidebar .tree-delete:hover { color: var(--danger); }
 .sidebar .tree-rename:hover { color: var(--accent); }
 
+.section-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+  margin: 2px 2px 0;
+}
+
 .sidebar-new-actions {
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: 6px;
 }
 
 .sidebar-new-actions button {
-  flex: 1;
-  display: flex;
-  align-items: center;
   justify-content: center;
   gap: 5px;
+  background: var(--bg-sunken);
+  border-color: var(--border) !important;
+}
+
+.sidebar-new-actions button:hover:not(:disabled) {
+  background: var(--bg-hover);
+  border-color: var(--border-strong) !important;
 }
 
 .sidebar-error {
@@ -1644,6 +1776,42 @@ code {
   gap: var(--space-lg);
 }
 
+/* Settings only — sized like a real window scaled down, not the compact
+   list the shared shell gives Shortcuts/Template. The body scrolls
+   independently of the header/footer so the Git section (only shown once a
+   workspace is open) never gets clipped off the bottom of a short window. */
+.settings-panel--lg {
+  width: min(1040px, calc(100vw - 60px));
+  max-height: min(760px, calc(100vh - 60px));
+}
+
+.settings-overlay {
+  align-items: center;
+  padding-top: 0;
+}
+
+/* `scrollbar-gutter: stable` alone isn't enough here: WebView2 (the real
+   render target — Chromium in a browser tab doesn't reproduce this) can
+   render Windows' overlay-mode scrollbar directly on top of content even
+   with a reserved gutter, since an overlay scrollbar by definition doesn't
+   participate in layout. The explicit padding-right is what actually
+   guarantees dead space under the thumb regardless of scrollbar mode;
+   scrollbar-gutter is kept as a no-cost improvement where it does apply. */
+.settings-panel-body {
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+  padding-right: 14px;
+}
+
+.settings-panel-footer {
+  padding-top: var(--space-md);
+  border-top: 1px solid var(--border);
+}
+
 .settings-panel-header {
   display: flex;
   align-items: center;
@@ -1666,6 +1834,21 @@ code {
 }
 
 .settings-panel-close:hover { color: var(--text-primary); }
+
+/* Groups related settings (Editor / Writing / Tools / Git) so a panel that
+   can carry up to nine rows reads as sections, not one flat undifferentiated
+   list. Tighter gap within a section than .settings-panel's own gap between
+   sections is what signals "these are related" — the divider reinforces it. */
+.settings-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.settings-section + .settings-section {
+  padding-top: var(--space-md);
+  border-top: 1px solid var(--border);
+}
 
 .settings-row {
   display: flex;
@@ -1713,16 +1896,51 @@ code {
 .settings-row-control input.is-error { border-color: var(--danger); }
 .settings-row-control input.is-selected { border-color: var(--accent); background: var(--accent-bg); }
 
-/* The rule above is written for the number inputs; a checkbox inherits it as
-   a 72px-wide dark box with no visible tick. */
+/* `accent-color` alone only recolors a native checkbox's *checked* fill —
+   the unchecked box still renders as the OS/browser default (a stark white
+   square on Windows WebView2), which clashes hard against a near-black
+   theme. `appearance: none` plus a hand-built checked-state mark is the
+   only way to theme both states. */
 .settings-row-control input[type='checkbox'] {
+  appearance: none;
   width: 16px;
   height: 16px;
+  margin: 0;
   padding: 0;
-  background: none;
-  border: none;
-  accent-color: var(--accent);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-sunken);
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
   cursor: pointer;
+}
+
+.settings-row-control input[type='checkbox']:hover { border-color: var(--text-tertiary); }
+
+.settings-row-control input[type='checkbox']:checked {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.settings-row-control input[type='checkbox']:checked::after {
+  content: '';
+  width: 4px;
+  height: 8px;
+  border: solid var(--accent-contrast);
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg) translate(-1px, -1px);
+  animation: checkmark-pop var(--duration-base) var(--ease-spring);
+}
+
+@keyframes checkmark-pop {
+  from { transform: scale(0) rotate(45deg) translate(-1px, -1px); opacity: 0; }
+  to { transform: scale(1) rotate(45deg) translate(-1px, -1px); opacity: 1; }
+}
+
+.settings-row-control input[type='checkbox']:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
 }
 
 /* Same inheritance trap as the checkbox above: 72px suits a three-digit number
@@ -2224,6 +2442,14 @@ code {
 }
 
 .home-section-disabled { opacity: 0.55; }
+
+/* Git is the fifth card in a two-column auto-fit grid — left as a regular
+   cell it's always the odd one out, orphaned alone with an empty gap beside
+   it regardless of viewport width. Spanning the full row is correct at any
+   column count auto-fit produces, where reordering the cards would not be. */
+.home-section--wide {
+  grid-column: 1 / -1;
+}
 
 .home-section h2 {
   margin: 0 0 var(--space-md);

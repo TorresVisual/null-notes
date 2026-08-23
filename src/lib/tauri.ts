@@ -100,8 +100,8 @@ export const api = {
       invoke<RepoMode | null>('detect_repo', { workspace }),
     autoCommit: (workspace: string, paths: string[], skipHooks: boolean) =>
       invoke<CommitOutcome>('auto_commit', { workspace, paths, skipHooks }),
-    pushNotes: (workspace: string, mode: RepoMode) =>
-      invoke<PushOutcome>('push_notes', { workspace, mode }),
+    pushNotes: (workspace: string, mode: RepoMode, allowCodeRepoPush: boolean) =>
+      invoke<PushOutcome>('push_notes', { workspace, mode, allowCodeRepoPush }),
     fetchAndCompare: (workspace: string) =>
       invoke<PullOutcome>('fetch_and_compare', { workspace }),
     initNotesRepo: (workspace: string, createGithubRemote: boolean) =>

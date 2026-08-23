@@ -19,6 +19,7 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
   const gitIdleMinutes = useWorkspaceStore((s) => s.git.idleMinutes)
   const gitSkipHooks = useWorkspaceStore((s) => s.git.skipHooks)
   const gitAutoPush = useWorkspaceStore((s) => s.git.autoPush)
+  const gitAllowCodeRepoPush = useWorkspaceStore((s) => s.git.allowCodeRepoPush)
   const { updateGit } = useGitConfig()
   const [error, setError] = useState<string | null>(null)
 
@@ -34,8 +35,8 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
   }
 
   return (
-    <div className="search-overlay" onMouseDown={onClose}>
-      <div className="settings-panel" onMouseDown={(e) => e.stopPropagation()}>
+    <div className="search-overlay settings-overlay" onMouseDown={onClose}>
+      <div className="settings-panel settings-panel--lg" onMouseDown={(e) => e.stopPropagation()}>
         <div className="settings-panel-header">
           <h2>Settings</h2>
           <button className="settings-panel-close" onClick={onClose} aria-label="Close settings" title="Close settings">
@@ -43,226 +44,298 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
           </button>
         </div>
 
-        <label className="settings-row">
-          <span>
-            Autosave delay
-            <small>How long to wait after you stop typing before writing to disk.</small>
-          </span>
-          <span className="settings-row-control">
-            <input
-              type="number"
-              min={100}
-              max={5000}
-              step={100}
-              value={settings.autosaveDebounceMs}
-              onChange={(e) => void update({ autosaveDebounceMs: Number(e.target.value) })}
-            />
-            <span className="settings-unit">ms</span>
-          </span>
-        </label>
-
-        <label className="settings-row">
-          <span>
-            Editor width
-            <small>Maximum width of the note column.</small>
-          </span>
-          <span className="settings-row-control">
-            <input
-              type="number"
-              min={480}
-              max={1600}
-              step={20}
-              value={settings.editorMaxWidthPx}
-              onChange={(e) => void update({ editorMaxWidthPx: Number(e.target.value) })}
-            />
-            <span className="settings-unit">px</span>
-          </span>
-        </label>
-
-        <label className="settings-row">
-          <span>
-            Spellcheck
-            <small>Underline misspelled words in prose. Code, maths, diagrams, tags and link targets are never checked.</small>
-          </span>
-          <span className="settings-row-control">
-            <input
-              type="checkbox"
-              checked={settings.spellcheck}
-              onChange={(e) => void update({ spellcheck: e.target.checked })}
-            />
-          </span>
-        </label>
-
-        <label className="settings-row">
-          <span>
-            Spellcheck language
-            <small>
-              A BCP-47 tag (<code>de</code>, <code>en</code>, <code>en-GB</code>). Whether squiggles appear at
-              all is the OS language pack's call, not this app's.
-            </small>
-          </span>
-          <span className="settings-row-control">
-            <input
-              type="text"
-              className="settings-text"
-              value={settings.spellcheckLanguage}
-              onChange={(e) => void update({ spellcheckLanguage: e.target.value.trim() })}
-            />
-          </span>
-        </label>
-
-        <label className="settings-row">
-          <span>
-            Editor command
-            <small>
-              Launched when you click a <code>src/main.rs:58</code> link. <code>{'{file}'}</code> and{' '}
-              <code>{'{line}'}</code> are filled in; run without a shell. Detected on first load.
-            </small>
-          </span>
-          <span className="settings-row-control">
-            <input
-              type="text"
-              className="settings-text settings-text-wide"
-              value={settings.editorCommand}
-              onChange={(e) => void update({ editorCommand: e.target.value })}
-            />
-          </span>
-        </label>
-
-        <label className="settings-row">
-          <span>
-            Terminal shell
-            <small>
-              Spawned by the terminal pane (<code>Ctrl `</code>), rooted at the workspace. Detected on
-              first load.
-            </small>
-          </span>
-          <span className="settings-row-control">
-            <input
-              type="text"
-              className="settings-text settings-text-wide"
-              value={settings.terminalShell}
-              onChange={(e) => void update({ terminalShell: e.target.value })}
-            />
-          </span>
-        </label>
-
-        {repoMode === null && workspacePath && (
-          <div className="settings-row">
-            <span>
-              This workspace isn&apos;t a Git repository yet
-              <small>
-                Turn it into one — private by default if you have the GitHub CLI installed, local-only
-                otherwise.
-              </small>
-            </span>
-            <button
-              onClick={() => {
-                void (async () => {
-                  const proceed = await confirm(`Initialize a Git repository in ${workspacePath}?`)
-                  if (!proceed) return
-                  const wantsRemote = await confirm(
-                    'Also create a private GitHub remote via `gh`? (Cancel = local-only)',
-                  )
-                  const outcome = await api.git.initNotesRepo(workspacePath, wantsRemote)
-                  if (outcome.kind === 'initializedLocalOnly') {
-                    await message(`Repo created locally. To add a remote later:\n${outcome.remoteAddCommand}`)
-                  }
-                  useWorkspaceStore.getState().setRepoMode('notesOnly')
-                })()
-              }}
-            >
-              Initialize Git repo
-            </button>
-          </div>
-        )}
-
-        {repoMode && (
-          <label className="settings-row">
-            <span>
-              Auto-commit this workspace
-              <small>
-                {repoMode === 'notesOnly'
-                  ? 'This workspace is its own Git repository.'
-                  : 'This workspace sits inside a larger code repository — auto-commit only ever touches note paths, and never auto-pushes here.'}{' '}
-                Machine-local, not synced with the notes.
-              </small>
-            </span>
-            <span className="settings-row-control">
-              <input
-                type="checkbox"
-                checked={gitAutoCommit}
-                onChange={(e) => void updateGit({ prompted: true, autoCommit: e.target.checked })}
-              />
-            </span>
-          </label>
-        )}
-
-        {repoMode && gitAutoCommit && (
-          <>
+        <div className="settings-panel-body">
+          <div className="settings-section">
+            <p className="section-label">Editor</p>
             <label className="settings-row">
               <span>
-                Auto-commit idle window
-                <small>Minutes of no note activity before a pending batch is committed.</small>
+                Autosave delay
+                <small>How long to wait after you stop typing before writing to disk.</small>
               </span>
               <span className="settings-row-control">
                 <input
                   type="number"
-                  min={1}
-                  max={120}
-                  value={gitIdleMinutes}
-                  onChange={(e) => void updateGit({ idleMinutes: Number(e.target.value) })}
+                  min={100}
+                  max={5000}
+                  step={100}
+                  value={settings.autosaveDebounceMs}
+                  onChange={(e) => void update({ autosaveDebounceMs: Number(e.target.value) })}
                 />
-                <span className="settings-unit">min</span>
+                <span className="settings-unit">ms</span>
               </span>
             </label>
 
             <label className="settings-row">
               <span>
-                Skip commit hooks
-                <small>
-                  Run without <code>pre-commit</code>/<code>commit-msg</code> hooks. Off by default — a
-                  failing hook aborts the auto-commit instead.
-                </small>
+                Editor width
+                <small>Maximum width of the note column.</small>
+              </span>
+              <span className="settings-row-control">
+                <input
+                  type="number"
+                  min={480}
+                  max={1600}
+                  step={20}
+                  value={settings.editorMaxWidthPx}
+                  onChange={(e) => void update({ editorMaxWidthPx: Number(e.target.value) })}
+                />
+                <span className="settings-unit">px</span>
+              </span>
+            </label>
+          </div>
+
+          <div className="settings-section">
+            <p className="section-label">Writing</p>
+            <label className="settings-row">
+              <span>
+                Spellcheck
+                <small>Underline misspelled words in prose. Code, maths, diagrams, tags and link targets are never checked.</small>
               </span>
               <span className="settings-row-control">
                 <input
                   type="checkbox"
-                  checked={gitSkipHooks}
-                  onChange={(e) => void updateGit({ skipHooks: e.target.checked })}
+                  checked={settings.spellcheck}
+                  onChange={(e) => void update({ spellcheck: e.target.checked })}
                 />
               </span>
             </label>
 
-            {repoMode === 'notesOnly' && (
-              <label className="settings-row">
-                <span>
-                  Push after commit
-                  <small>
-                    Only ever applies to a notes-only repo — a workspace inside a code repo never
-                    auto-pushes, at any setting.
-                  </small>
-                </span>
-                <span className="settings-row-control">
-                  <input
-                    type="checkbox"
-                    checked={gitAutoPush}
-                    onChange={(e) => void updateGit({ autoPush: e.target.checked })}
-                  />
-                </span>
-              </label>
-            )}
-          </>
-        )}
+            <label className="settings-row">
+              <span>
+                Spellcheck language
+                <small>
+                  A BCP-47 tag (<code>de</code>, <code>en</code>, <code>en-GB</code>). Whether squiggles appear at
+                  all is the OS language pack's call, not this app's.
+                </small>
+              </span>
+              <span className="settings-row-control">
+                <input
+                  type="text"
+                  className="settings-text"
+                  value={settings.spellcheckLanguage}
+                  onChange={(e) => void update({ spellcheckLanguage: e.target.value.trim() })}
+                />
+              </span>
+            </label>
+          </div>
 
-        {error && <p className="settings-error">{error}</p>}
+          <div className="settings-section">
+            <p className="section-label">Tools</p>
+            <label className="settings-row">
+              <span>
+                Editor command
+                <small>
+                  Launched when you click a <code>src/main.rs:58</code> link. <code>{'{file}'}</code> and{' '}
+                  <code>{'{line}'}</code> are filled in; run without a shell. Detected on first load.
+                </small>
+              </span>
+              <span className="settings-row-control">
+                <input
+                  type="text"
+                  className="settings-text settings-text-wide"
+                  value={settings.editorCommand}
+                  onChange={(e) => void update({ editorCommand: e.target.value })}
+                />
+              </span>
+            </label>
 
-        <button
-          className="settings-reset"
-          onClick={() => void update(DEFAULT_SETTINGS)}
-        >
-          Reset to defaults
-        </button>
+            <label className="settings-row">
+              <span>
+                Terminal shell
+                <small>
+                  Spawned by the terminal pane (<code>Ctrl `</code>), rooted at the workspace. Detected on
+                  first load.
+                </small>
+              </span>
+              <span className="settings-row-control">
+                <input
+                  type="text"
+                  className="settings-text settings-text-wide"
+                  value={settings.terminalShell}
+                  onChange={(e) => void update({ terminalShell: e.target.value })}
+                />
+              </span>
+            </label>
+          </div>
+
+          {(workspacePath && repoMode === null) || repoMode ? (
+            <div className="settings-section">
+              <p className="section-label">Git</p>
+              {repoMode === null && workspacePath && (
+                <div className="settings-row">
+                  <span>
+                    This workspace isn&apos;t a Git repository yet
+                    <small>
+                      Turn it into one — private by default if you have the GitHub CLI installed, local-only
+                      otherwise.
+                    </small>
+                  </span>
+                  <button
+                    className="dialog-action"
+                    onClick={() => {
+                      void (async () => {
+                        const proceed = await confirm(`Initialize a Git repository in ${workspacePath}?`)
+                        if (!proceed) return
+                        const wantsRemote = await confirm(
+                          'Also create a private GitHub remote via `gh`? (Cancel = local-only)',
+                        )
+                        const outcome = await api.git.initNotesRepo(workspacePath, wantsRemote)
+                        if (outcome.kind === 'initializedLocalOnly') {
+                          await message(`Repo created locally. To add a remote later:\n${outcome.remoteAddCommand}`)
+                        }
+                        useWorkspaceStore.getState().setRepoMode('notesOnly')
+                      })()
+                    }}
+                  >
+                    Initialize Git repo
+                  </button>
+                </div>
+              )}
+
+              {repoMode && (
+                <label className="settings-row">
+                  <span>
+                    Auto-commit this workspace
+                    <small>
+                      {repoMode === 'notesOnly'
+                        ? 'This workspace is its own Git repository.'
+                        : repoMode === 'notesMonorepo'
+                          ? 'This repository holds nothing but sibling note workspaces — auto-commit stays scoped to this one, and auto-push works here too.'
+                          : 'This workspace sits inside a larger code repository — auto-commit only ever touches note paths, and never auto-pushes here.'}{' '}
+                      Machine-local, not synced with the notes.
+                    </small>
+                  </span>
+                  <span className="settings-row-control">
+                    <input
+                      type="checkbox"
+                      checked={gitAutoCommit}
+                      onChange={(e) => void updateGit({ prompted: true, autoCommit: e.target.checked })}
+                    />
+                  </span>
+                </label>
+              )}
+
+              {repoMode && gitAutoCommit && (
+                <>
+                  <label className="settings-row">
+                    <span>
+                      Auto-commit idle window
+                      <small>Minutes of no note activity before a pending batch is committed.</small>
+                    </span>
+                    <span className="settings-row-control">
+                      <input
+                        type="number"
+                        min={1}
+                        max={120}
+                        value={gitIdleMinutes}
+                        onChange={(e) => void updateGit({ idleMinutes: Number(e.target.value) })}
+                      />
+                      <span className="settings-unit">min</span>
+                    </span>
+                  </label>
+
+                  <label className="settings-row">
+                    <span>
+                      Skip commit hooks
+                      <small>
+                        Run without <code>pre-commit</code>/<code>commit-msg</code> hooks. Off by default — a
+                        failing hook aborts the auto-commit instead.
+                      </small>
+                    </span>
+                    <span className="settings-row-control">
+                      <input
+                        type="checkbox"
+                        checked={gitSkipHooks}
+                        onChange={(e) => void updateGit({ skipHooks: e.target.checked })}
+                      />
+                    </span>
+                  </label>
+
+                  {(repoMode === 'notesOnly' || repoMode === 'notesMonorepo') && (
+                    <label className="settings-row">
+                      <span>
+                        Push after commit
+                        <small>
+                          {repoMode === 'notesMonorepo'
+                            ? 'This repo holds nothing but sibling note workspaces, so it gets the same push treatment as a notes-only repo.'
+                            : 'Only ever applies to a notes-only repo.'}{' '}
+                          A shared code repo never auto-pushes unless you explicitly allow it below.
+                        </small>
+                      </span>
+                      <span className="settings-row-control">
+                        <input
+                          type="checkbox"
+                          checked={gitAutoPush}
+                          onChange={(e) => void updateGit({ autoPush: e.target.checked })}
+                        />
+                      </span>
+                    </label>
+                  )}
+
+                  {repoMode === 'codeRepo' && (
+                    <>
+                      <label className="settings-row">
+                        <span>
+                          Allow pushing this workspace
+                          <small>
+                            This pushes directly into a shared repository other people may read the log
+                            of — off by default for exactly that reason. Only enable it if you&apos;re
+                            sure this repo is yours to push to.
+                          </small>
+                        </span>
+                        <span className="settings-row-control">
+                          <input
+                            type="checkbox"
+                            checked={gitAllowCodeRepoPush}
+                            onChange={(e) => {
+                              if (!e.target.checked) {
+                                void updateGit({ allowCodeRepoPush: false })
+                                return
+                              }
+                              void (async () => {
+                                const proceed = await confirm(
+                                  'This will push commits directly into a shared repository other people may read the log of. Allow auto-push for this workspace?',
+                                )
+                                if (proceed) await updateGit({ allowCodeRepoPush: true })
+                              })()
+                            }}
+                          />
+                        </span>
+                      </label>
+
+                      {gitAllowCodeRepoPush && (
+                        <label className="settings-row">
+                          <span>
+                            Push after commit
+                            <small>Now allowed for this workspace — push after each auto-commit.</small>
+                          </span>
+                          <span className="settings-row-control">
+                            <input
+                              type="checkbox"
+                              checked={gitAutoPush}
+                              onChange={(e) => void updateGit({ autoPush: e.target.checked })}
+                            />
+                          </span>
+                        </label>
+                      )}
+                    </>
+                  )}
+                </>
+              )}
+            </div>
+          ) : null}
+
+          {error && <p className="settings-error">{error}</p>}
+        </div>
+
+        <div className="settings-panel-footer">
+          <button
+            className="settings-reset"
+            onClick={() => void update(DEFAULT_SETTINGS)}
+          >
+            Reset to defaults
+          </button>
+        </div>
       </div>
     </div>
   )

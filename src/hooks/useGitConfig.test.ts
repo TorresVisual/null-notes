@@ -17,7 +17,7 @@ describe('useGitConfig', () => {
       openTabs: ['/ws/a.md'],
       activeTab: '/ws/a.md',
       expandedFolders: [],
-      git: { prompted: false, autoCommit: false, idleMinutes: 10, skipHooks: false, autoPush: true },
+      git: { prompted: false, autoCommit: false, idleMinutes: 10, skipHooks: false, autoPush: true, allowCodeRepoPush: false },
     })
     workspace.save.mockResolvedValue(undefined)
   })
@@ -36,14 +36,14 @@ describe('useGitConfig', () => {
       autoCommit: true,
       idleMinutes: 10,
       skipHooks: false,
-      autoPush: true,
+      autoPush: true, allowCodeRepoPush: false,
     })
     expect(workspace.save).toHaveBeenCalledWith('/ws', {
       openTabs: ['/ws/a.md'],
       activeTab: '/ws/a.md',
       expandedFolders: [],
       recentSearches: [],
-      git: { prompted: true, autoCommit: true, idleMinutes: 10, skipHooks: false, autoPush: true },
+      git: { prompted: true, autoCommit: true, idleMinutes: 10, skipHooks: false, autoPush: true, allowCodeRepoPush: false },
     })
   })
 
@@ -51,7 +51,7 @@ describe('useGitConfig', () => {
   // auto-commit on, which a naive full-object replace could do by accident.
   it('a partial patch leaves the other field untouched', async () => {
     useWorkspaceStore.setState({
-      git: { prompted: false, autoCommit: true, idleMinutes: 10, skipHooks: false, autoPush: true },
+      git: { prompted: false, autoCommit: true, idleMinutes: 10, skipHooks: false, autoPush: true, allowCodeRepoPush: false },
     })
     const { result } = renderHook(() => useGitConfig())
 
@@ -62,7 +62,7 @@ describe('useGitConfig', () => {
       autoCommit: true,
       idleMinutes: 10,
       skipHooks: false,
-      autoPush: true,
+      autoPush: true, allowCodeRepoPush: false,
     })
   })
 

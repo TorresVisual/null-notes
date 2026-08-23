@@ -258,6 +258,7 @@ mod tests {
         assert_eq!(state.git.idle_minutes, 10);
         assert!(!state.git.skip_hooks);
         assert!(state.git.auto_push);
+        assert!(!state.git.allow_code_repo_push);
     }
 
     #[test]

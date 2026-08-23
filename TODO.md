@@ -1,5 +1,15 @@
 # null-notes — TODO
 
+## Found Issues
+
+* [ ] Home Button
+* [ ] Outline in better place
+* [ ] Custom Modals for new for example
+* [ ] Shift + ? opens shortcuts which shouldnt happen as thats the way i write '?'
+* [ ] != converts to the enqual icon, <= >= too
+* [ ] Dragging doesnt work
+* [ ] Add $ $ Inline math as slash command
+
 Feature checklist. **The [roadmap](docs/ROADMAP.md) holds the reasoning and the Definitions of Done; this file holds the boxes.** If the two disagree, the roadmap wins.
 
 Effort: **S** ≈ hours · **M** ≈ a day or two · **L** ≈ several days.
@@ -348,7 +358,7 @@ The brief's AI ask is a *terminal* feature, not an AI feature: no AI code, no AP
 
 ---
 
-## ▸ P9 — Study & revision (M9)
+## ▸  to  — Study & revision (M9)
 
 The only phase not from the brief. Everything before it is *capture*; this is *retrieval* — what happens at exam time.
 

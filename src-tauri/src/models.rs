@@ -75,11 +75,18 @@ pub struct GitWorkspaceConfig {
     /// exactly the decision P5-2 refuses to make for them.
     #[serde(default)]
     pub skip_hooks: bool,
-    /// Push after each auto-commit. Only ever consulted for a
-    /// `RepoMode::NotesOnly` workspace — a `CodeRepo` workspace never
-    /// pushes, at any setting (P5-3, enforced in `git.rs` itself).
+    /// Push after each auto-commit. Consulted for `RepoMode::NotesOnly` and
+    /// `RepoMode::NotesMonorepo`; a `CodeRepo` workspace never pushes unless
+    /// `allow_code_repo_push` also explicitly says so (P5-3, enforced in
+    /// `git.rs` itself).
     #[serde(default = "default_auto_push")]
     pub auto_push: bool,
+    /// Explicit per-workspace override for a `CodeRepo` workspace: "I've
+    /// checked this repo and it's fine to auto-push here." Off by default
+    /// and only ever flipped on through a confirm dialog on the frontend —
+    /// `CodeRepo` otherwise never auto-pushes, at any setting.
+    #[serde(default)]
+    pub allow_code_repo_push: bool,
 }
 
 fn default_idle_minutes() -> u32 {
@@ -98,13 +105,14 @@ impl Default for GitWorkspaceConfig {
             idle_minutes: default_idle_minutes(),
             skip_hooks: false,
             auto_push: default_auto_push(),
+            allow_code_repo_push: false,
         }
     }
 }
 
-/// Which of P5's two Git modes a workspace is in, or absent when it isn't a
-/// Git repository at all. `NotesOnly` gets different defaults than
-/// `CodeRepo` throughout P5 — starting with whether auto-push is ever safe.
+/// Which of P5's Git modes a workspace is in, or absent when it isn't a Git
+/// repository at all. `NotesOnly` and `NotesMonorepo` get the same
+/// auto-push default; `CodeRepo` never pushes, at any setting.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub enum RepoMode {
@@ -113,6 +121,12 @@ pub enum RepoMode {
     /// The workspace is a subtree of a repo that also holds source other
     /// people read the log of.
     CodeRepo,
+    /// The workspace is a subtree of a repo, but every directory between it
+    /// and the repo root holds nothing but sibling note-workspaces (each its
+    /// own `.workspace.json`) — a multi-course repo, not someone else's
+    /// source. Auto-push is as safe here as in `NotesOnly`: see
+    /// `is_notes_monorepo` in `commands/git.rs`.
+    NotesMonorepo,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

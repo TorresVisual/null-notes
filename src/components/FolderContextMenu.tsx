@@ -45,6 +45,10 @@ export function FolderContextMenu() {
       closeTabsUnder(path)
       setSelectedFolder(null)
       setFolderError(null)
+      // A directory pathspec stages every deletion under it in one shot —
+      // no need to enumerate each note individually. Without this the whole
+      // subtree's deletion never enters the auto-commit's pending list.
+      useWorkspaceStore.getState().addGitPendingPath(path)
       await refreshTree()
     } catch (e) {
       setFolderError(e instanceof Error ? e.message : String(e))

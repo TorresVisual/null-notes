@@ -56,11 +56,27 @@ export function useGitAutoCommit() {
           }
         }, COMMITTED_DISPLAY_MS)
         // The only call site for pushNotes in the app — this is what makes
-        // "never for a code repo" true on the frontend side too, on top of
-        // the Rust-level guard in checked_push.
-        if (repoMode === 'notesOnly' && git.autoPush) {
+        // "never for a code repo, unless explicitly allowed" true on the
+        // frontend side too, on top of the Rust-level guard in checked_push.
+        // notesMonorepo gets the same treatment as notesOnly: is_notes_monorepo
+        // already confirmed the whole repo is nothing but sibling note
+        // workspaces. codeRepo only ever pushes once the user has opted this
+        // specific workspace in via the Settings panel's confirm dialog.
+        const canPushHere =
+          repoMode === 'notesOnly' ||
+          repoMode === 'notesMonorepo' ||
+          (repoMode === 'codeRepo' && git.allowCodeRepoPush)
+        if (canPushHere && git.autoPush) {
           try {
-            await api.git.pushNotes(path, repoMode)
+            const pushOutcome = await api.git.pushNotes(path, repoMode, git.allowCodeRepoPush)
+            // Most outcomes here are a resolved Ok value, not a thrown
+            // error — only authFailed/rejected are real failures worth
+            // surfacing. noRemote is an expected, non-error state (no
+            // GitHub remote configured yet) and pushed needs no signal.
+            if (pushOutcome.kind === 'authFailed' || pushOutcome.kind === 'rejected') {
+              setGitCommitStatus('pushFailed')
+              setGitCommitDetail(pushOutcome.output)
+            }
           } catch (e) {
             // The commit itself already succeeded and is safe in the local
             // repo — only the push failed, so this is its own status rather

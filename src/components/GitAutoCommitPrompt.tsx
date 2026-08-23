@@ -13,7 +13,9 @@ export function GitAutoCommitPrompt({ mode, onEnable, onDecline }: GitAutoCommit
   const context =
     mode === 'notesOnly'
       ? 'This workspace is a Git repository.'
-      : 'This workspace sits inside a larger code repository — auto-commit only ever touches note paths here, and never auto-pushes.'
+      : mode === 'notesMonorepo'
+        ? 'This workspace shares a Git repository with other note workspaces only — auto-commit stays scoped to its own paths, and auto-push works here too.'
+        : 'This workspace sits inside a larger code repository — auto-commit only ever touches note paths here, and never auto-pushes.'
 
   return (
     <div className="git-prompt" role="alert">

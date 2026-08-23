@@ -25,8 +25,15 @@ export interface GitWorkspaceConfig {
   idleMinutes: number
   /** Per-workspace opt-out of running commit hooks on an auto-commit. */
   skipHooks: boolean
-  /** Push after each auto-commit — only consulted when repoMode is 'notesOnly'. */
+  /** Push after each auto-commit — only consulted when repoMode is 'notesOnly' or 'notesMonorepo'. */
   autoPush: boolean
+  /**
+   * Explicit per-workspace override for a `codeRepo` workspace: "I've
+   * checked this repo and it's fine to auto-push here." Off by default and
+   * only ever flipped on through a confirm dialog — `codeRepo` otherwise
+   * never auto-pushes, at any setting.
+   */
+  allowCodeRepoPush: boolean
 }
 
 export interface WorkspaceState {
@@ -37,8 +44,14 @@ export interface WorkspaceState {
   git: GitWorkspaceConfig
 }
 
-/** Which of P5's two Git modes a workspace is in, or null when it isn't a Git repository at all. */
-export type RepoMode = 'notesOnly' | 'codeRepo'
+/**
+ * Which of P5's Git modes a workspace is in, or null when it isn't a Git
+ * repository at all. 'notesMonorepo': the workspace is a subtree of a repo,
+ * but every directory between it and the repo root holds nothing but
+ * sibling note-workspaces — a multi-course repo, not someone else's source,
+ * so it gets 'notesOnly'-like auto-push treatment.
+ */
+export type RepoMode = 'notesOnly' | 'codeRepo' | 'notesMonorepo'
 
 export type GitCommitStatus = 'idle' | 'committing' | 'committed' | 'skipped' | 'error' | 'pushFailed'
 

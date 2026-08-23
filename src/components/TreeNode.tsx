@@ -49,6 +49,10 @@ export function TreeNode({ entry, depth }: TreeNodeProps) {
       await api.notes.delete(entry.path)
       removeNote(entry.path)
       closeTab(entry.path)
+      // Otherwise the deletion never enters the auto-commit's pathspec-scoped
+      // pending list — the file is gone on disk, but `git rm` never runs, so
+      // it silently never reaches the repo (or GitHub) at all.
+      useWorkspaceStore.getState().addGitPendingPath(entry.path)
     }
 
     return (
