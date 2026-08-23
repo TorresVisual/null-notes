@@ -1,4 +1,5 @@
 import type { Editor } from '@tiptap/core'
+import { message as showMessage } from '@tauri-apps/plugin-dialog'
 import { api } from '../lib/tauri'
 import { inkApi } from '../lib/ink'
 import {
@@ -21,11 +22,11 @@ export type SplitOutcome = 'split' | 'no-structure'
  * path has had since P0-2 applies here; a command that fails has to say so.
  */
 export function report(error: unknown): void {
-  const message = error instanceof Error ? error.message : String(error)
+  const detail = error instanceof Error ? error.message : String(error)
   // Logged as well as shown: if the dialog itself is what is not getting
   // through, the console still has it.
   console.error('[split-into-tasks]', error)
-  alert(`Split Into Tasks failed: ${message}`)
+  void showMessage(`Split Into Tasks failed: ${detail}`)
 }
 
 function emptyInk(): InkData {

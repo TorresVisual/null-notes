@@ -280,6 +280,15 @@ button, [role="button"], .tree-row, .tab, .search-result, .slash-menu-item,
 .tab-flash { animation: tab-flash 900ms var(--ease-standard); }
 
 /* Editor scroll container — full width so the scrollbar sits at the window edge */
+/* Row for the scrolling note plus the outline rail beside it — .editor-scroll
+   keeps its own independent scroll regardless of the rail's presence. */
+.editor-body {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+  overflow: hidden;
+}
+
 .editor-scroll {
   flex: 1;
   overflow-y: auto;
@@ -1622,18 +1631,24 @@ code {
 
 .backlink-item:hover { text-decoration: underline; }
 
-/* Outline panel (P6-6) — shares the same in-pane strip as .backlinks-panel
-   rather than a new persistent column; toggled globally (Ctrl Shift O). */
+/* Outline panel (P6-6) — a persistent right-side rail, sibling to
+   .editor-scroll inside .editor-body, so it stays visible while the note
+   itself scrolls rather than sitting below all its content. Toggled
+   globally (Ctrl Shift O). */
 .outline-panel {
-  margin-top: var(--space-xl);
-  padding-top: var(--space-md);
-  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+  width: 220px;
+  overflow-y: auto;
+  padding: var(--space-lg) var(--space-md);
+  border-left: 1px solid var(--border);
 }
 
 .outline-panel-title {
   color: var(--text-tertiary);
   font-size: 12px;
   margin: 0 0 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
 }
 
 .outline-empty { color: var(--text-tertiary); font: var(--text-empty-state); margin: 0; }
@@ -2205,6 +2220,29 @@ code {
 .dialog-action:hover { color: var(--text-primary); border-color: var(--text-tertiary); }
 .dialog-action:disabled { opacity: var(--disabled-opacity); cursor: not-allowed; }
 
+/* Prompt dialog — the in-app replacement for window.prompt (see
+   promptText). Reuses .settings-panel for chrome, sized down for a single
+   field rather than a full settings list. */
+.prompt-dialog {
+  width: 360px;
+}
+
+.prompt-dialog-message {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.prompt-dialog-input.settings-text-wide {
+  width: 100%;
+  font-family: inherit;
+}
+
+.prompt-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-sm);
+}
+
 /* New from Template (P6-3) — reuses .settings-panel for chrome and
    .import-mode-option for the template list; these two are its own. */
 .template-empty-hint {
@@ -2597,9 +2635,9 @@ code {
   html, body { background: #fff; height: auto; overflow: visible; }
 
   .sidebar, .tab-bar, .editor-toolbar, .editor-status, .backlinks-panel,
-  .search-overlay, .code-block-open-in-ide { display: none !important; }
+  .outline-panel, .search-overlay, .code-block-open-in-ide { display: none !important; }
 
-  .layout, .main { display: block; height: auto; }
+  .layout, .main, .editor-body { display: block; height: auto; }
   .editor-scroll { overflow: visible; height: auto; }
   .editor-pane { max-width: none; margin: 0; padding: 0; }
 

@@ -2,6 +2,7 @@ import { existsSync, readFileSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { browser, expect } from '@wdio/globals'
 import { fixtureWorkspace } from '../fixtureWorkspace.js'
+import { fillPromptDialog } from '../promptDialog.js'
 
 // WebdriverIO's Element#click() runs its own overlap/visibility readiness
 // check before clicking. Through @wdio/tauri-service's official
@@ -29,22 +30,11 @@ describe('create note → type → save', () => {
     rmSync(notePath, { force: true })
 
     await clickInPage('.sidebar-new-actions button')
-
-    // window.prompt() is a native modal outside the WebView DOM — the
-    // standard WebDriver "user prompt" commands are the only way to reach it.
-    await browser.waitUntil(
-      async () => {
-        try {
-          await browser.getAlertText()
-          return true
-        } catch {
-          return false
-        }
-      },
-      { timeout: 5000, timeoutMsg: 'the note-title prompt() never appeared' },
-    )
-    await browser.sendAlertText('Test Note')
-    await browser.acceptAlert()
+    await fillPromptDialog('Test Note')
+    await browser.waitUntil(async () => browser.execute(() => !!document.querySelector('.ProseMirror')), {
+      timeout: 5000,
+      timeoutMsg: 'editor never mounted for the new note',
+    })
 
     // A plain in-page .click() focuses the contenteditable root but doesn't
     // establish a real cursor position the way a mouse click does — ProseMirror

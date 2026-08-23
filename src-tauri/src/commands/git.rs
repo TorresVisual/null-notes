@@ -16,6 +16,21 @@ use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+/// A `Command` that never flashes a console window when spawned from this
+/// GUI app. Windows shows one by default for any child process that has no
+/// parent console of its own — every `git`/`gh` call this module makes, run
+/// from the built app rather than a terminal, would otherwise pop one.
+fn no_window_command(program: &str) -> Command {
+    let mut cmd = Command::new(program);
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        cmd.creation_flags(CREATE_NO_WINDOW);
+    }
+    cmd
+}
+
 /// `git -C <workspace> rev-parse --show-toplevel`, classified against the
 /// workspace path itself.
 ///
@@ -26,7 +41,7 @@ use std::process::Command;
 /// string comparison against the workspace path as given would mismatch on
 /// separator style alone.
 pub fn detect_repo_mode(workspace: &str) -> anyhow::Result<Option<RepoMode>> {
-    let output = Command::new("git")
+    let output = no_window_command("git")
         .arg("-C")
         .arg(workspace)
         .arg("rev-parse")
@@ -154,7 +169,7 @@ impl UnsafeRepoState {
 }
 
 fn absolute_git_dir(workspace: &str) -> anyhow::Result<PathBuf> {
-    let output = Command::new("git")
+    let output = no_window_command("git")
         .arg("-C")
         .arg(workspace)
         .arg("rev-parse")
@@ -169,7 +184,7 @@ fn absolute_git_dir(workspace: &str) -> anyhow::Result<PathBuf> {
 }
 
 fn has_unresolved_conflicts(workspace: &str) -> anyhow::Result<bool> {
-    let output = Command::new("git")
+    let output = no_window_command("git")
         .arg("-C")
         .arg(workspace)
         .arg("ls-files")
@@ -237,7 +252,7 @@ fn has_pending_changes(workspace: &str, paths: &[String]) -> anyhow::Result<bool
     if paths.is_empty() {
         return Ok(false);
     }
-    let output = Command::new("git")
+    let output = no_window_command("git")
         .arg("-C")
         .arg(workspace)
         .arg("status")
@@ -248,11 +263,51 @@ fn has_pending_changes(workspace: &str, paths: &[String]) -> anyhow::Result<bool
     Ok(!output.stdout.is_empty())
 }
 
+/// Ensures `workspace`'s own `.gitignore` carries every line this app
+/// depends on (`NOTES_GITIGNORE`'s `.workspace.json` and `.*.tmp`),
+/// appending whichever are missing rather than overwriting the file —
+/// `checked_init_notes_repo`'s own "never overwrite an existing .gitignore"
+/// guarantee still has to hold for a workspace that already had one before
+/// this app ever touched it. Only meaningful for a repo this app treats as
+/// its own (`NotesOnly`/`NotesMonorepo`); a `CodeRepo`'s `.gitignore` is
+/// shared with people who never opted into this app's automation, so it's
+/// never auto-edited. Returns `true` if the file was created or changed, so
+/// the caller can fold it into the same commit as the notes that triggered
+/// this cycle.
+fn ensure_notes_gitignore(workspace: &str) -> anyhow::Result<bool> {
+    let gitignore_path = Path::new(workspace).join(".gitignore");
+    if !gitignore_path.exists() {
+        std::fs::write(&gitignore_path, NOTES_GITIGNORE)?;
+        return Ok(true);
+    }
+
+    let existing = std::fs::read_to_string(&gitignore_path)?;
+    let missing: Vec<&str> = NOTES_GITIGNORE
+        .lines()
+        .filter(|required| !existing.lines().any(|line| line == *required))
+        .collect();
+    if missing.is_empty() {
+        return Ok(false);
+    }
+
+    let mut updated = existing;
+    if !updated.is_empty() && !updated.ends_with('\n') {
+        updated.push('\n');
+    }
+    for line in missing {
+        updated.push_str(line);
+        updated.push('\n');
+    }
+    std::fs::write(&gitignore_path, updated)?;
+    Ok(true)
+}
+
 /// Commits only `paths`, never anything else staged in the repo. Backs off
 /// quietly on an unsafe repo state; aborts (without committing) if a hook
 /// rejects the commit, unless `skip_hooks` opts out of running them at all.
 pub fn checked_auto_commit(
     workspace: &str,
+    mode: RepoMode,
     paths: &[String],
     skip_hooks: bool,
 ) -> anyhow::Result<CommitOutcome> {
@@ -261,28 +316,34 @@ pub fn checked_auto_commit(
             reason: state.reason().to_string(),
         });
     }
-    if !has_pending_changes(workspace, paths)? {
+
+    let mut paths = paths.to_vec();
+    if mode != RepoMode::CodeRepo && ensure_notes_gitignore(workspace)? {
+        paths.push(".gitignore".to_string());
+    }
+
+    if !has_pending_changes(workspace, &paths)? {
         return Ok(CommitOutcome::NothingToCommit);
     }
 
-    let add_status = Command::new("git")
+    let add_status = no_window_command("git")
         .arg("-C")
         .arg(workspace)
         .arg("add")
         .arg("--")
-        .args(paths)
+        .args(&paths)
         .status()?;
     if !add_status.success() {
         anyhow::bail!("git add failed for {workspace}");
     }
 
-    let mut commit_cmd = Command::new("git");
+    let mut commit_cmd = no_window_command("git");
     commit_cmd.arg("-C").arg(workspace).arg("commit");
     if skip_hooks {
         commit_cmd.arg("--no-verify");
     }
-    commit_cmd.arg("-m").arg(build_commit_message(paths));
-    commit_cmd.arg("--").args(paths);
+    commit_cmd.arg("-m").arg(build_commit_message(&paths));
+    commit_cmd.arg("--").args(&paths);
     let output = commit_cmd.output()?;
 
     if output.status.success() {
@@ -297,10 +358,11 @@ pub fn checked_auto_commit(
 #[tauri::command]
 pub async fn auto_commit(
     workspace: String,
+    mode: RepoMode,
     paths: Vec<String>,
     skip_hooks: bool,
 ) -> Result<CommitOutcome, String> {
-    tokio::task::spawn_blocking(move || checked_auto_commit(&workspace, &paths, skip_hooks))
+    tokio::task::spawn_blocking(move || checked_auto_commit(&workspace, mode, &paths, skip_hooks))
         .await
         .map_err(|e| e.to_string())?
         .map_err(|e| e.to_string())
@@ -316,7 +378,7 @@ pub enum PushOutcome {
 }
 
 fn has_remote(workspace: &str) -> anyhow::Result<bool> {
-    let output = Command::new("git")
+    let output = no_window_command("git")
         .arg("-C")
         .arg(workspace)
         .arg("remote")
@@ -351,7 +413,7 @@ pub fn checked_push(
     // auto-commit's push would otherwise fail with "no upstream branch" —
     // silently, since that's a plain rejection, not an auth error. Safe to
     // pass unconditionally: a no-op once tracking already exists.
-    let output = Command::new("git")
+    let output = no_window_command("git")
         .arg("-C")
         .arg(workspace)
         .arg("push")
@@ -395,7 +457,7 @@ pub enum PullOutcome {
 }
 
 fn count_commits(workspace: &str, range: &str) -> anyhow::Result<u32> {
-    let output = Command::new("git")
+    let output = no_window_command("git")
         .arg("-C")
         .arg(workspace)
         .arg("rev-list")
@@ -418,7 +480,7 @@ pub fn checked_pull(workspace: &str) -> anyhow::Result<PullOutcome> {
         return Ok(PullOutcome::NoRemote);
     }
 
-    let fetch_status = Command::new("git")
+    let fetch_status = no_window_command("git")
         .arg("-C")
         .arg(workspace)
         .arg("fetch")
@@ -440,7 +502,7 @@ pub fn checked_pull(workspace: &str) -> anyhow::Result<PullOutcome> {
     // `--ff-only`: moves the branch ref if and only if it's a pure
     // fast-forward, and refuses (rather than merging) if a local
     // uncommitted change would be overwritten.
-    let merge_status = Command::new("git")
+    let merge_status = no_window_command("git")
         .arg("-C")
         .arg(workspace)
         .arg("merge")
@@ -499,7 +561,7 @@ fn slugify(name: &str) -> String {
 
 fn has_gh() -> bool {
     let probe = if cfg!(windows) { "where" } else { "which" };
-    Command::new(probe)
+    no_window_command(probe)
         .arg("gh")
         .output()
         .map(|o| o.status.success())
@@ -510,7 +572,7 @@ pub fn checked_init_notes_repo(
     workspace: &str,
     create_github_remote: bool,
 ) -> anyhow::Result<RepoInitOutcome> {
-    let init_status = Command::new("git")
+    let init_status = no_window_command("git")
         .arg("-C")
         .arg(workspace)
         .arg("init")
@@ -522,6 +584,33 @@ pub fn checked_init_notes_repo(
     let gitignore_path = Path::new(workspace).join(".gitignore");
     if !gitignore_path.exists() {
         std::fs::write(&gitignore_path, NOTES_GITIGNORE)?;
+
+        // Written to disk is not the same as versioned: a `.gitignore` that
+        // stays untracked never travels to a clone on another machine, so
+        // the very thing it's meant to hide (`.workspace.json`) is exactly
+        // what a second machine would end up tracking instead.
+        let add_status = no_window_command("git")
+            .arg("-C")
+            .arg(workspace)
+            .arg("add")
+            .arg("--")
+            .arg(".gitignore")
+            .status()?;
+        if !add_status.success() {
+            anyhow::bail!("git add .gitignore failed for {workspace}");
+        }
+        let commit_status = no_window_command("git")
+            .arg("-C")
+            .arg(workspace)
+            .arg("commit")
+            .arg("-m")
+            .arg("notes: ignore workspace state and temp files")
+            .arg("--")
+            .arg(".gitignore")
+            .status()?;
+        if !commit_status.success() {
+            anyhow::bail!("git commit of .gitignore failed for {workspace}");
+        }
     }
 
     if create_github_remote && has_gh() {
@@ -538,7 +627,7 @@ pub fn checked_init_notes_repo(
 
         // Private by default: lecture notes must not become public by
         // accident.
-        let status = Command::new("gh")
+        let status = no_window_command("gh")
             .arg("repo")
             .arg("create")
             .arg(&repo_name)
@@ -576,7 +665,7 @@ mod tests {
     use tempfile::tempdir;
 
     fn git_init(dir: &Path) {
-        let status = Command::new("git")
+        let status = no_window_command("git")
             .arg("-C")
             .arg(dir)
             .arg("init")
@@ -696,14 +785,14 @@ mod tests {
 
     fn commit_file(dir: &Path, name: &str, content: &str) {
         std::fs::write(dir.join(name), content).unwrap();
-        Command::new("git")
+        no_window_command("git")
             .arg("-C")
             .arg(dir)
             .arg("add")
             .arg(name)
             .status()
             .unwrap();
-        Command::new("git")
+        no_window_command("git")
             .arg("-C")
             .arg(dir)
             .arg("commit")
@@ -730,7 +819,7 @@ mod tests {
         let tmp = tempdir().unwrap();
         git_init(tmp.path());
         commit_file(tmp.path(), "a.md", "hello");
-        let sha = Command::new("git")
+        let sha = no_window_command("git")
             .arg("-C")
             .arg(tmp.path())
             .arg("rev-parse")
@@ -738,7 +827,7 @@ mod tests {
             .output()
             .unwrap();
         let sha = String::from_utf8_lossy(&sha.stdout).trim().to_string();
-        Command::new("git")
+        no_window_command("git")
             .arg("-C")
             .arg(tmp.path())
             .arg("checkout")
@@ -805,7 +894,7 @@ mod tests {
         commit_file(tmp.path(), "a.md", "base\n");
 
         std::fs::write(tmp.path().join("a.md"), "stashed\n").unwrap();
-        Command::new("git")
+        no_window_command("git")
             .arg("-C")
             .arg(tmp.path())
             .arg("stash")
@@ -814,7 +903,7 @@ mod tests {
             .unwrap();
         commit_file(tmp.path(), "a.md", "conflicting\n");
         // Expected to fail with a real conflict — that's the point.
-        let _ = Command::new("git")
+        let _ = no_window_command("git")
             .arg("-C")
             .arg(tmp.path())
             .arg("stash")
@@ -859,7 +948,7 @@ mod tests {
         // survive the auto-commit byte-for-byte. This is the one
         // unforgivable failure per P5-2's own DoD.
         std::fs::write(tmp.path().join("src.rs"), "fn main() { staged() }\n").unwrap();
-        Command::new("git")
+        no_window_command("git")
             .arg("-C")
             .arg(tmp.path())
             .arg("add")
@@ -878,7 +967,7 @@ mod tests {
         // comparing the unscoped listing before/after would be the wrong
         // assertion. What must be identical is src.rs's own staged and
         // unstaged content.
-        let staged_before = Command::new("git")
+        let staged_before = no_window_command("git")
             .arg("-C")
             .arg(tmp.path())
             .arg("diff")
@@ -887,7 +976,7 @@ mod tests {
             .arg("src.rs")
             .output()
             .unwrap();
-        let unstaged_before = Command::new("git")
+        let unstaged_before = no_window_command("git")
             .arg("-C")
             .arg(tmp.path())
             .arg("diff")
@@ -898,6 +987,7 @@ mod tests {
 
         let outcome = checked_auto_commit(
             &tmp.path().to_string_lossy(),
+            RepoMode::CodeRepo,
             &["note.md".to_string()],
             false,
         )
@@ -905,7 +995,7 @@ mod tests {
 
         assert_eq!(outcome, CommitOutcome::Committed);
 
-        let staged_after = Command::new("git")
+        let staged_after = no_window_command("git")
             .arg("-C")
             .arg(tmp.path())
             .arg("diff")
@@ -914,7 +1004,7 @@ mod tests {
             .arg("src.rs")
             .output()
             .unwrap();
-        let unstaged_after = Command::new("git")
+        let unstaged_after = no_window_command("git")
             .arg("-C")
             .arg(tmp.path())
             .arg("diff")
@@ -931,7 +1021,7 @@ mod tests {
             "src.rs's unstaged change must be untouched"
         );
 
-        let last_commit_files = Command::new("git")
+        let last_commit_files = no_window_command("git")
             .arg("-C")
             .arg(tmp.path())
             .arg("show")
@@ -953,6 +1043,7 @@ mod tests {
 
         let outcome = checked_auto_commit(
             &tmp.path().to_string_lossy(),
+            RepoMode::CodeRepo,
             &["note.md".to_string()],
             false,
         )
@@ -969,7 +1060,7 @@ mod tests {
         write_failing_pre_commit_hook(tmp.path());
         std::fs::write(tmp.path().join("note.md"), "# Note\nchanged\n").unwrap();
 
-        let before = Command::new("git")
+        let before = no_window_command("git")
             .arg("-C")
             .arg(tmp.path())
             .arg("rev-list")
@@ -980,13 +1071,14 @@ mod tests {
 
         let outcome = checked_auto_commit(
             &tmp.path().to_string_lossy(),
+            RepoMode::CodeRepo,
             &["note.md".to_string()],
             false,
         )
         .unwrap();
 
         assert!(matches!(outcome, CommitOutcome::HookFailed { .. }));
-        let after = Command::new("git")
+        let after = no_window_command("git")
             .arg("-C")
             .arg(tmp.path())
             .arg("rev-list")
@@ -1011,6 +1103,7 @@ mod tests {
 
         let outcome = checked_auto_commit(
             &tmp.path().to_string_lossy(),
+            RepoMode::CodeRepo,
             &["note.md".to_string()],
             true,
         )
@@ -1029,6 +1122,7 @@ mod tests {
 
         let outcome = checked_auto_commit(
             &tmp.path().to_string_lossy(),
+            RepoMode::CodeRepo,
             &["note.md".to_string()],
             false,
         )
@@ -1046,7 +1140,7 @@ mod tests {
     // the shared fixture every push/pull test in this file builds on.
     fn bare_remote_with_clone() -> (tempfile::TempDir, tempfile::TempDir) {
         let remote = tempdir().unwrap();
-        Command::new("git")
+        no_window_command("git")
             .arg("init")
             .arg("--bare")
             .arg("-q")
@@ -1055,7 +1149,7 @@ mod tests {
             .unwrap();
 
         let clone = tempdir().unwrap();
-        Command::new("git")
+        no_window_command("git")
             .arg("clone")
             .arg("-q")
             .arg(remote.path())
@@ -1063,7 +1157,7 @@ mod tests {
             .status()
             .unwrap();
         commit_file(clone.path(), "note.md", "# Note\n");
-        Command::new("git")
+        no_window_command("git")
             .arg("-C")
             .arg(clone.path())
             .arg("push")
@@ -1095,7 +1189,7 @@ mod tests {
     #[test]
     fn pushes_and_sets_upstream_on_a_repo_with_no_tracking_branch_yet() {
         let remote = tempdir().unwrap();
-        Command::new("git")
+        no_window_command("git")
             .arg("init")
             .arg("--bare")
             .arg("-q")
@@ -1106,7 +1200,7 @@ mod tests {
         let workspace = tempdir().unwrap();
         git_init(workspace.path());
         commit_file(workspace.path(), "note.md", "# Note\n");
-        Command::new("git")
+        no_window_command("git")
             .arg("-C")
             .arg(workspace.path())
             .arg("remote")
@@ -1142,7 +1236,7 @@ mod tests {
     fn a_non_fast_forward_push_is_rejected_not_forced() {
         let (remote, clone_a) = bare_remote_with_clone();
         let clone_b = tempdir().unwrap();
-        Command::new("git")
+        no_window_command("git")
             .arg("clone")
             .arg("-q")
             .arg(remote.path())
@@ -1151,7 +1245,7 @@ mod tests {
             .unwrap();
 
         commit_file(clone_a.path(), "a.md", "from a\n");
-        Command::new("git")
+        no_window_command("git")
             .arg("-C")
             .arg(clone_a.path())
             .arg("push")
@@ -1200,7 +1294,7 @@ mod tests {
     fn fast_forwards_when_purely_behind() {
         let (remote, clone_a) = bare_remote_with_clone();
         let clone_b = tempdir().unwrap();
-        Command::new("git")
+        no_window_command("git")
             .arg("clone")
             .arg("-q")
             .arg(remote.path())
@@ -1209,7 +1303,7 @@ mod tests {
             .unwrap();
 
         commit_file(clone_a.path(), "a.md", "from a\n");
-        Command::new("git")
+        no_window_command("git")
             .arg("-C")
             .arg(clone_a.path())
             .arg("push")
@@ -1238,7 +1332,7 @@ mod tests {
     fn diverged_reports_counts_and_writes_no_conflict_marker() {
         let (remote, clone_a) = bare_remote_with_clone();
         let clone_b = tempdir().unwrap();
-        Command::new("git")
+        no_window_command("git")
             .arg("clone")
             .arg("-q")
             .arg(remote.path())
@@ -1247,7 +1341,7 @@ mod tests {
             .unwrap();
 
         commit_file(clone_a.path(), "a.md", "from a\n");
-        Command::new("git")
+        no_window_command("git")
             .arg("-C")
             .arg(clone_a.path())
             .arg("push")
@@ -1298,6 +1392,41 @@ mod tests {
         assert_eq!(gitignore, NOTES_GITIGNORE);
     }
 
+    // Written to disk is not the same as versioned: a `.gitignore` that never
+    // gets committed doesn't travel to a clone on another machine, so the
+    // very thing it's meant to hide is exactly what a second machine would
+    // end up tracking instead.
+    #[test]
+    fn init_commits_the_gitignore_it_creates() {
+        let tmp = tempdir().unwrap();
+
+        checked_init_notes_repo(&tmp.path().to_string_lossy(), false).unwrap();
+
+        let status = no_window_command("git")
+            .arg("-C")
+            .arg(tmp.path())
+            .arg("status")
+            .arg("--porcelain")
+            .arg("--")
+            .arg(".gitignore")
+            .output()
+            .unwrap();
+        assert!(
+            status.stdout.is_empty(),
+            "the generated .gitignore must be committed, not left untracked: {}",
+            String::from_utf8_lossy(&status.stdout)
+        );
+        let tracked = no_window_command("git")
+            .arg("-C")
+            .arg(tmp.path())
+            .arg("ls-files")
+            .arg("--")
+            .arg(".gitignore")
+            .output()
+            .unwrap();
+        assert_eq!(String::from_utf8_lossy(&tracked.stdout).trim(), ".gitignore");
+    }
+
     #[test]
     fn init_does_not_overwrite_an_existing_gitignore() {
         let tmp = tempdir().unwrap();
@@ -1307,6 +1436,86 @@ mod tests {
 
         let gitignore = std::fs::read_to_string(tmp.path().join(".gitignore")).unwrap();
         assert_eq!(gitignore, "custom\n");
+    }
+
+    // The far more common real-world case P5-1 was built for: the workspace
+    // is already someone's existing repo, never created through this app's
+    // own init flow, so nothing has ever written its .gitignore.
+    #[test]
+    fn auto_commit_adds_missing_gitignore_entries_on_a_pre_existing_notes_repo() {
+        let tmp = tempdir().unwrap();
+        git_init(tmp.path());
+        commit_file(tmp.path(), "note.md", "# Note\n");
+        std::fs::write(tmp.path().join("note.md"), "# Note\nchanged\n").unwrap();
+
+        let outcome = checked_auto_commit(
+            &tmp.path().to_string_lossy(),
+            RepoMode::NotesOnly,
+            &["note.md".to_string()],
+            false,
+        )
+        .unwrap();
+
+        assert_eq!(outcome, CommitOutcome::Committed);
+        let gitignore = std::fs::read_to_string(tmp.path().join(".gitignore")).unwrap();
+        assert_eq!(gitignore, NOTES_GITIGNORE);
+        let tracked = no_window_command("git")
+            .arg("-C")
+            .arg(tmp.path())
+            .arg("ls-files")
+            .arg("--")
+            .arg(".gitignore")
+            .output()
+            .unwrap();
+        assert_eq!(String::from_utf8_lossy(&tracked.stdout).trim(), ".gitignore");
+    }
+
+    // A workspace whose .gitignore already exists (the user's own, or an
+    // older one from before this app added the temp-file line) must keep its
+    // own content — only the specific lines this app depends on get merged
+    // in, never a wholesale overwrite.
+    #[test]
+    fn auto_commit_merges_missing_lines_into_an_existing_gitignore() {
+        let tmp = tempdir().unwrap();
+        git_init(tmp.path());
+        std::fs::write(tmp.path().join(".gitignore"), "*.pdf\n").unwrap();
+        commit_file(tmp.path(), "note.md", "# Note\n");
+        std::fs::write(tmp.path().join("note.md"), "# Note\nchanged\n").unwrap();
+
+        checked_auto_commit(
+            &tmp.path().to_string_lossy(),
+            RepoMode::NotesOnly,
+            &["note.md".to_string()],
+            false,
+        )
+        .unwrap();
+
+        let gitignore = std::fs::read_to_string(tmp.path().join(".gitignore")).unwrap();
+        assert!(gitignore.contains("*.pdf"));
+        assert!(gitignore.contains(".workspace.json"));
+        assert!(gitignore.contains(".*.tmp"));
+    }
+
+    // The conservative case P5-1's own design insists on: a CodeRepo's
+    // .gitignore is shared with people who never opted into this app at
+    // all, so it's never auto-edited, missing entries or not.
+    #[test]
+    fn auto_commit_never_touches_gitignore_in_a_code_repo() {
+        let tmp = tempdir().unwrap();
+        git_init(tmp.path());
+        commit_file(tmp.path(), "src.rs", "fn main() {}\n");
+        commit_file(tmp.path(), "note.md", "# Note\n");
+        std::fs::write(tmp.path().join("note.md"), "# Note\nchanged\n").unwrap();
+
+        checked_auto_commit(
+            &tmp.path().to_string_lossy(),
+            RepoMode::CodeRepo,
+            &["note.md".to_string()],
+            false,
+        )
+        .unwrap();
+
+        assert!(!tmp.path().join(".gitignore").exists());
     }
 
     #[test]

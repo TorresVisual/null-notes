@@ -1,5 +1,6 @@
 import { SplitSquareVertical, Plus } from 'lucide-react'
 import type { Editor } from '@tiptap/core'
+import { message } from '@tauri-apps/plugin-dialog'
 import { splitIntoTasks, addNextTask, report } from '../splitIntoTasks'
 import { nextTaskLabel } from '../../lib/taskScaffold'
 
@@ -23,7 +24,7 @@ export function SheetGroup({ editor }: SheetGroupProps) {
           void splitIntoTasks(editor)
             .then((outcome) => {
               if (outcome === 'no-structure') {
-                alert('No exercise structure found in this note — nothing was changed.')
+                void message('No exercise structure found in this note — nothing was changed.')
               }
             })
             .catch(report)

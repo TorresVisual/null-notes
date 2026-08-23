@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import { browser, expect } from '@wdio/globals'
 import { fixtureWorkspace } from '../fixtureWorkspace.js'
 import { screenshot } from '../screenshot.js'
+import { fillPromptDialog } from '../promptDialog.js'
 
 // See create-note.e2e.ts / p6-academic-blocks.e2e.ts for why these exist.
 async function clickInPage(selector: string): Promise<void> {
@@ -71,7 +72,7 @@ describe('P6-3: templates', () => {
     const notePath = join(fixtureWorkspace, 'Analysis Blatt 4.md')
     rmSync(notePath, { force: true })
 
-    await clickButtonByText('.sidebar-new-actions button', 'New from Template')
+    await clickButtonByText('.sidebar-new-actions button', 'Template')
     await browser.waitUntil(async () => browser.execute(() => !!document.querySelector('.template-empty-hint')), {
       timeout: 5000,
       timeoutMsg: 'template dialog never showed the empty-state hint',
@@ -136,20 +137,8 @@ describe('P6-4: equation snippets', () => {
     const notePath = join(fixtureWorkspace, 'P6-4 Snippets.md')
     rmSync(notePath, { force: true })
 
-    await clickButtonByText('.sidebar-new-actions button', 'New Note')
-    await browser.waitUntil(
-      async () => {
-        try {
-          await browser.getAlertText()
-          return true
-        } catch {
-          return false
-        }
-      },
-      { timeout: 5000, timeoutMsg: 'the note-title prompt() never appeared' },
-    )
-    await browser.sendAlertText('P6-4 Snippets')
-    await browser.acceptAlert()
+    await clickButtonByText('.sidebar-new-actions button', 'Note')
+    await fillPromptDialog('P6-4 Snippets')
 
     await focusEditorEnd()
     await browser.keys(['End', 'Enter'])

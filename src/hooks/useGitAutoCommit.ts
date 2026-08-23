@@ -35,13 +35,13 @@ export function useGitAutoCommit() {
       setGitCommitStatus,
       setGitCommitDetail,
     } = useWorkspaceStore.getState()
-    if (!path || !git.autoCommit || gitPendingPaths.length === 0) return
+    if (!path || !repoMode || !git.autoCommit || gitPendingPaths.length === 0) return
 
     const paths = gitPendingPaths
     setGitCommitStatus('committing')
     setGitCommitDetail(null)
     try {
-      const outcome = await api.git.autoCommit(path, paths, git.skipHooks)
+      const outcome = await api.git.autoCommit(path, repoMode, paths, git.skipHooks)
       if (outcome.kind === 'committed') {
         clearGitPendingPaths()
         setGitCommitStatus('committed')

@@ -36,7 +36,7 @@ describe('useGitAutoCommit', () => {
     expect(git.autoCommit).not.toHaveBeenCalled()
 
     await act(() => vi.advanceTimersByTimeAsync(1 * 60_000))
-    expect(git.autoCommit).toHaveBeenCalledWith('/ws', ['/ws/a.md'], false)
+    expect(git.autoCommit).toHaveBeenCalledWith('/ws', 'notesOnly', ['/ws/a.md'], false)
   })
 
   it('clears pending paths and sets status after a successful commit', async () => {
@@ -62,6 +62,16 @@ describe('useGitAutoCommit', () => {
     expect(git.autoCommit).not.toHaveBeenCalled()
   })
 
+  it('does nothing while repo mode is not yet known', async () => {
+    useWorkspaceStore.setState({ repoMode: null })
+    renderHook(() => useGitAutoCommit())
+
+    useWorkspaceStore.getState().addGitPendingPath('/ws/a.md')
+    await act(() => vi.advanceTimersByTimeAsync(60 * 60_000))
+
+    expect(git.autoCommit).not.toHaveBeenCalled()
+  })
+
   it('flushGitCommit commits immediately, for session-end use', async () => {
     git.autoCommit.mockResolvedValue({ kind: 'committed' })
     const { result } = renderHook(() => useGitAutoCommit())
@@ -69,7 +79,7 @@ describe('useGitAutoCommit', () => {
     useWorkspaceStore.getState().addGitPendingPath('/ws/a.md')
     await act(() => result.current.flushGitCommit())
 
-    expect(git.autoCommit).toHaveBeenCalledWith('/ws', ['/ws/a.md'], false)
+    expect(git.autoCommit).toHaveBeenCalledWith('/ws', 'notesOnly', ['/ws/a.md'], false)
   })
 
   it('a non-committed outcome leaves the batch pending for the next trigger, carrying the reason as detail', async () => {

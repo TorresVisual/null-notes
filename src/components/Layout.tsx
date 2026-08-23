@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { listen } from '@tauri-apps/api/event'
+import { confirm, message } from '@tauri-apps/plugin-dialog'
 import { Sidebar } from './Sidebar'
 import { TabBar } from './TabBar'
 import { NoteEditor } from '../editor/NoteEditor'
@@ -12,6 +13,7 @@ import { OutlinePanel } from './OutlinePanel'
 import { WorkspacePicker } from './WorkspacePicker'
 import { SettingsPanel } from './SettingsPanel'
 import { ShortcutsOverlay } from './ShortcutsOverlay'
+import { PromptDialog } from './PromptDialog'
 import { TemplateDialog } from './TemplateDialog'
 import { GraphView } from './GraphView'
 import { TaskView } from './TaskView'
@@ -35,6 +37,7 @@ import { GitAutoCommitPrompt } from './GitAutoCommitPrompt'
 import { GitDivergedBar } from './GitDivergedBar'
 import { useGitConfig } from '../hooks/useGitConfig'
 import { useGitAutoCommit } from '../hooks/useGitAutoCommit'
+import { promptText } from '../store/promptDialog'
 import { api } from '../lib/tauri'
 
 type ViewMode = 'wysiwyg' | 'raw'
@@ -114,17 +117,17 @@ export function Layout() {
     async (id: string) => {
       switch (id) {
         case 'new-note': {
-          const title = prompt('Note title:')
+          const title = await promptText('Note title:')
           if (title) await createNote(title)
           break
         }
         case 'new-folder': {
-          const name = prompt('Folder name:')
+          const name = await promptText('Folder name:')
           if (name) await createFolder(name)
           break
         }
         case 'new-canvas': {
-          const title = prompt('Canvas note title:')
+          const title = await promptText('Canvas note title:')
           if (title) await createCanvasNote(title)
           break
         }
@@ -139,9 +142,9 @@ export function Layout() {
           // Confirmed because it writes into a folder the user may not think
           // of as theirs to write in — this is the one command that can put
           // files inside somebody's source repository.
-          if (!confirm(`Create a notes/ folder with starter notes in ${workspacePath}?`)) break
+          if (!(await confirm(`Create a notes/ folder with starter notes in ${workspacePath}?`))) break
           const created = await scaffoldProjectNotes()
-          if (created === 0) alert('notes/ already has all four starter notes — nothing to add.')
+          if (created === 0) await message('notes/ already has all four starter notes — nothing to add.')
           break
         }
         case 'settings':
@@ -233,12 +236,15 @@ export function Layout() {
 
   // `?` has no natural menu-accelerator form and is safe to double-fire
   // (opening an already-open overlay is a no-op), so it stays a plain
-  // DOM listener rather than a menu item.
+  // DOM listener rather than a menu item. Must skip editable targets: typing
+  // a literal `?` into a note or any text field is otherwise indistinguishable
+  // from asking for this overlay.
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      if (e.key === '?' && !e.ctrlKey && !e.metaKey) {
-        setShortcutsOpen(true)
-      }
+      if (e.key !== '?' || e.ctrlKey || e.metaKey) return
+      const target = e.target as HTMLElement | null
+      if (target?.closest('input, textarea, [contenteditable="true"]')) return
+      setShortcutsOpen(true)
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -266,6 +272,7 @@ export function Layout() {
       {switcherOpen && <QuickSwitcher onClose={() => setSwitcherOpen(false)} />}
       {settingsOpen && <SettingsPanel onClose={() => setSettingsOpen(false)} />}
       {shortcutsOpen && <ShortcutsOverlay onClose={() => setShortcutsOpen(false)} />}
+      <PromptDialog />
       {templateDialogOpen && <TemplateDialog onClose={() => setTemplateDialogOpen(false)} />}
       {graphOpen && <GraphView onClose={() => setGraphOpen(false)} />}
       {taskViewOpen && <TaskView onClose={() => setTaskViewOpen(false)} />}
@@ -302,50 +309,52 @@ export function Layout() {
             onDecline={() => void updateGit({ prompted: true })}
           />
         )}
-        <div className="editor-scroll" ref={scrollRef}>
-          <div
-            ref={editorPaneRef}
-            className={`editor-pane${!activeTab && !workspacePath ? ' editor-pane--center' : ''}`}
-            style={{ '--editor-max-width': `${settings.editorMaxWidthPx}px` } as CSSProperties}
-          >
-            {isLoading && <p className="status">Loading…</p>}
-            {!isLoading && activeTab && viewMode === 'wysiwyg' && (
-              <NoteEditor
-                content={content}
-                notePath={activeTab}
-                spellcheck={settings.spellcheck}
-                spellcheckLanguage={settings.spellcheckLanguage}
-                onChange={(md) => void save(md)}
-              />
-            )}
-            {!isLoading && activeTab && viewMode === 'raw' && (
-              <RawEditor
-                content={content}
-                spellcheck={settings.spellcheck}
-                spellcheckLanguage={settings.spellcheckLanguage}
-                onChange={(md) => void save(md)}
-              />
-            )}
-            {!activeTab && !workspacePath && <WorkspacePicker />}
-            {!activeTab && workspacePath && notes.length === 0 && (
-              <p className="empty-state">
-                Press Ctrl N to create your first note, or press ? for shortcuts
-              </p>
-            )}
-            {!activeTab && workspacePath && notes.length > 0 && (
-              <HomeView
-                onOpenTaskView={() => setTaskViewOpen(true)}
-                onOpenReview={() => setReviewOpen(true)}
-                onOpenSettings={() => setSettingsOpen(true)}
-              />
-            )}
-            {!isLoading && activeTab && viewMode === 'wysiwyg' && outlineOpen && (
-              <OutlinePanel content={content} containerRef={editorPaneRef} scrollRef={scrollRef} />
-            )}
-            {!isLoading && activeTab && currentNote && (
-              <BacklinksPanel notePath={activeTab} noteTitle={currentNote.title} />
-            )}
+        <div className="editor-body">
+          <div className="editor-scroll" ref={scrollRef}>
+            <div
+              ref={editorPaneRef}
+              className={`editor-pane${!activeTab && !workspacePath ? ' editor-pane--center' : ''}`}
+              style={{ '--editor-max-width': `${settings.editorMaxWidthPx}px` } as CSSProperties}
+            >
+              {isLoading && <p className="status">Loading…</p>}
+              {!isLoading && activeTab && viewMode === 'wysiwyg' && (
+                <NoteEditor
+                  content={content}
+                  notePath={activeTab}
+                  spellcheck={settings.spellcheck}
+                  spellcheckLanguage={settings.spellcheckLanguage}
+                  onChange={(md) => void save(md)}
+                />
+              )}
+              {!isLoading && activeTab && viewMode === 'raw' && (
+                <RawEditor
+                  content={content}
+                  spellcheck={settings.spellcheck}
+                  spellcheckLanguage={settings.spellcheckLanguage}
+                  onChange={(md) => void save(md)}
+                />
+              )}
+              {!activeTab && !workspacePath && <WorkspacePicker />}
+              {!activeTab && workspacePath && notes.length === 0 && (
+                <p className="empty-state">
+                  Press Ctrl N to create your first note, or press ? for shortcuts
+                </p>
+              )}
+              {!activeTab && workspacePath && notes.length > 0 && (
+                <HomeView
+                  onOpenTaskView={() => setTaskViewOpen(true)}
+                  onOpenReview={() => setReviewOpen(true)}
+                  onOpenSettings={() => setSettingsOpen(true)}
+                />
+              )}
+              {!isLoading && activeTab && currentNote && (
+                <BacklinksPanel notePath={activeTab} noteTitle={currentNote.title} />
+              )}
+            </div>
           </div>
+          {!isLoading && activeTab && viewMode === 'wysiwyg' && outlineOpen && (
+            <OutlinePanel content={content} containerRef={editorPaneRef} scrollRef={scrollRef} />
+          )}
         </div>
         {terminalMounted && workspacePath && (
           <TerminalPane

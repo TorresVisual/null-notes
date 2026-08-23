@@ -13,6 +13,13 @@ vi.mock('../lib/ink', () => ({
     write: (p: string, d: unknown) => writeInk(p, d),
   },
 }))
+// report() calls this on a failure — including the ink-sidecar failure some
+// of these tests exercise deliberately — and there is no Tauri IPC bridge in
+// this jsdom environment to answer it.
+vi.mock('@tauri-apps/plugin-dialog', () => ({
+  confirm: vi.fn(),
+  message: vi.fn(),
+}))
 
 const { Editor } = await import('@tiptap/core')
 const { coreExtensions } = await import('./extensions')

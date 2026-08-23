@@ -41,6 +41,7 @@ import { DivBlock } from './DivBlock'
 import { Details } from './Details'
 import { TextAlignment } from './TextAlignment'
 import { Divider } from './Divider'
+import { SmartSymbols } from './SmartSymbols'
 import { NodeRange } from '@tiptap/extension-node-range'
 
 const lowlight = createLowlight(common)
@@ -179,4 +180,5 @@ export const coreExtensions = [
   SrState,
   SrCardHighlight,
   TextAlignment,
+  SmartSymbols,
 ]

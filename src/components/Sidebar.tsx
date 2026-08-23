@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { FilePlus, FolderOpen, FolderPlus, LayoutTemplate, PenLine, Search, Settings } from 'lucide-react'
+import { FilePlus, FolderOpen, FolderPlus, Home, LayoutTemplate, PenLine, Search, Settings } from 'lucide-react'
 import { useNotesStore } from '../store/notes'
 import { useWorkspaceStore } from '../store/workspace'
 import { useWorkspace } from '../hooks/useWorkspace'
@@ -12,6 +12,7 @@ import { FolderContextMenu } from './FolderContextMenu'
 import { TagList } from './TagList'
 import { buildFolderTree } from '../lib/folderTree'
 import { folderName } from '../lib/pathPrefix'
+import { promptText } from '../store/promptDialog'
 import { api } from '../lib/tauri'
 import type { NoteMetadata } from '../types'
 
@@ -27,6 +28,7 @@ export function Sidebar({ onSearchOpen, onSettingsOpen, onTemplateOpen }: Sideba
   const workspacePath = useWorkspaceStore((s) => s.path)
   const tagFilter = useWorkspaceStore((s) => s.tagFilter)
   const openTab = useWorkspaceStore((s) => s.openTab)
+  const setActiveTab = useWorkspaceStore((s) => s.setActiveTab)
   const folderError = useWorkspaceStore((s) => s.folderError)
   const { openWorkspace } = useWorkspace()
   const createNote = useCreateNote()
@@ -45,19 +47,19 @@ export function Sidebar({ onSearchOpen, onSettingsOpen, onTemplateOpen }: Sideba
   const tree = workspacePath ? buildFolderTree(workspacePath, folders, notes) : []
 
   async function handleCreateNote() {
-    const title = prompt('Note title:')
+    const title = await promptText('Note title:')
     if (!title) return
     await createNote(title)
   }
 
   async function handleCreateCanvasNote() {
-    const title = prompt('Canvas note title:')
+    const title = await promptText('Canvas note title:')
     if (!title) return
     await createCanvasNote(title)
   }
 
   async function handleCreateFolder() {
-    const name = prompt('Folder name:')
+    const name = await promptText('Folder name:')
     if (!name) return
     await createFolder(name)
   }
@@ -87,6 +89,16 @@ export function Sidebar({ onSearchOpen, onSettingsOpen, onTemplateOpen }: Sideba
       </div>
       <ImportButton />
       <div className="sidebar-group">
+        <button
+          className="search-open-btn"
+          onClick={() => setActiveTab(null)}
+          disabled={!workspacePath}
+        >
+          <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <Home size={13} /> Home
+          </span>
+          <kbd>Ctrl H</kbd>
+        </button>
         <button className="search-open-btn" onClick={onSearchOpen}>
           <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <Search size={13} /> Search

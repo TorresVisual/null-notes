@@ -1,6 +1,7 @@
 import { useEditor, EditorContent } from '@tiptap/react'
 import { useEffect, useRef, useState } from 'react'
 import { TextSelection } from '@tiptap/pm/state'
+import { confirm, message } from '@tauri-apps/plugin-dialog'
 import { coreExtensions } from './extensions'
 import { rememberPosition, recallPosition } from '../lib/notePositions'
 import { handleEditorKeyDown, handleEditorTextInput } from './extensions/CodeBlockEditor'
@@ -126,10 +127,10 @@ export function NoteEditor({ content, notePath, spellcheck, spellcheckLanguage, 
   useEffect(() => {
     async function onSplitTasks() {
       if (!editor) return
-      if (!confirm('Rewrite this note into Task / Solution sections, each with a handwriting canvas?')) return
+      if (!(await confirm('Rewrite this note into Task / Solution sections, each with a handwriting canvas?'))) return
       try {
         if ((await splitIntoTasks(editor)) === 'no-structure') {
-          alert('No exercise structure found in this note — nothing was changed.')
+          await message('No exercise structure found in this note — nothing was changed.')
           return
         }
         onChange(getMarkdown(editor.storage))

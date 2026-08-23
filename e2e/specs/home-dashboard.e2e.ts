@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import { browser, expect } from '@wdio/globals'
 import { fixtureWorkspace } from '../fixtureWorkspace.js'
 import { screenshot } from '../screenshot.js'
+import { fillPromptDialog } from '../promptDialog.js'
 
 async function clickInPage(selector: string): Promise<void> {
   await browser.execute((sel) => {
@@ -27,21 +28,7 @@ describe('workspace dashboard', () => {
     rmSync(notePath, { force: true })
 
     await clickInPage('.sidebar-new-actions button')
-    // window.prompt() is a native modal outside the WebView DOM — the
-    // standard WebDriver "user prompt" commands are the only way to reach it.
-    await browser.waitUntil(
-      async () => {
-        try {
-          await browser.getAlertText()
-          return true
-        } catch {
-          return false
-        }
-      },
-      { timeout: 5000, timeoutMsg: 'the note-title prompt() never appeared' },
-    )
-    await browser.sendAlertText('Home Dashboard Note')
-    await browser.acceptAlert()
+    await fillPromptDialog('Home Dashboard Note')
 
     await browser.waitUntil(() => existsSync(notePath), {
       timeout: 5000,

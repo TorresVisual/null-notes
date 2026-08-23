@@ -1,6 +1,8 @@
 import { Pencil, Trash2 } from 'lucide-react'
+import { confirm } from '@tauri-apps/plugin-dialog'
 import { useWorkspaceStore } from '../store/workspace'
 import { useNotesStore } from '../store/notes'
+import { promptText } from '../store/promptDialog'
 import { api } from '../lib/tauri'
 import { refreshTree } from '../hooks/useWorkspace'
 import { isUnderPath } from '../lib/pathPrefix'
@@ -20,7 +22,7 @@ export function FolderContextMenu() {
 
   async function handleRename() {
     const currentName = path.split(/[\\/]/).filter(Boolean).pop() ?? ''
-    const name = prompt('New folder name:', currentName)
+    const name = await promptText('New folder name:', currentName)
     close()
     if (!name || name === currentName) return
     const newPath = path.replace(/[^/\\]+$/, name)
@@ -39,7 +41,7 @@ export function FolderContextMenu() {
     const name = path.split(/[\\/]/).filter(Boolean).pop() ?? ''
     close()
     const noun = count === 1 ? 'note' : 'notes'
-    if (!confirm(`Delete "${name}" and its ${count} ${noun}? This cannot be undone.`)) return
+    if (!(await confirm(`Delete "${name}" and its ${count} ${noun}? This cannot be undone.`))) return
     try {
       await api.notes.deleteFolder(path)
       closeTabsUnder(path)

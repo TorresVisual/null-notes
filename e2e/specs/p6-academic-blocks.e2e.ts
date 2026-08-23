@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import { browser, expect } from '@wdio/globals'
 import { fixtureWorkspace } from '../fixtureWorkspace.js'
 import { screenshot } from '../screenshot.js'
+import { fillPromptDialog } from '../promptDialog.js'
 
 // See create-note.e2e.ts for why these two helpers exist: WebdriverIO's own
 // click()/waitForClickable() readiness polling is a slow round trip through
@@ -64,19 +65,7 @@ async function createNote(title: string): Promise<string> {
   rmSync(notePath, { force: true })
 
   await clickInPage('.sidebar-new-actions button')
-  await browser.waitUntil(
-    async () => {
-      try {
-        await browser.getAlertText()
-        return true
-      } catch {
-        return false
-      }
-    },
-    { timeout: 5000, timeoutMsg: 'the note-title prompt() never appeared' },
-  )
-  await browser.sendAlertText(title)
-  await browser.acceptAlert()
+  await fillPromptDialog(title)
 
   await focusEditorEnd()
   await browser.keys(['End', 'Enter'])

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { confirm } from '@tauri-apps/plugin-dialog'
 import { TreeNode } from './TreeNode'
 import { useWorkspaceStore } from '../store/workspace'
 import { useNotesStore } from '../store/notes'
@@ -13,7 +14,13 @@ vi.mock('../lib/tauri', () => ({
   },
 }))
 
+vi.mock('@tauri-apps/plugin-dialog', () => ({
+  confirm: vi.fn(),
+  message: vi.fn(),
+}))
+
 const notesApi = vi.mocked(api.notes)
+const dialog = vi.mocked({ confirm })
 
 const noteEntry: NoteTreeNode = {
   type: 'note',
@@ -42,7 +49,7 @@ describe('TreeNode delete (note)', () => {
   // deletion never reaches Git, because nothing told the auto-commit batch
   // a path had been removed.
   it('queues the deleted note path for auto-commit', async () => {
-    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    dialog.confirm.mockResolvedValue(true)
     notesApi.delete.mockResolvedValue(undefined)
     render(<TreeNode entry={noteEntry} depth={0} />)
 
@@ -53,7 +60,7 @@ describe('TreeNode delete (note)', () => {
   })
 
   it('does nothing when the confirm dialog is declined', async () => {
-    vi.spyOn(window, 'confirm').mockReturnValue(false)
+    dialog.confirm.mockResolvedValue(false)
     render(<TreeNode entry={noteEntry} depth={0} />)
 
     await userEvent.click(screen.getByRole('button', { name: `Delete ${noteEntry.name}` }))

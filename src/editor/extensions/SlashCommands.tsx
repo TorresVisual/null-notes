@@ -4,6 +4,7 @@ import Suggestion from '@tiptap/suggestion'
 import { ReactRenderer } from '@tiptap/react'
 import { forwardRef, useEffect, useImperativeHandle, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { message } from '@tauri-apps/plugin-dialog'
 import { inkApi } from '../../lib/ink'
 import { nextTaskLabel } from '../../lib/taskScaffold'
 import { splitIntoTasks, addNextTask, report } from '../splitIntoTasks'
@@ -238,8 +239,8 @@ const COMMANDS: Cmd[] = [
     },
   },
   {
-    title: 'Inline Equation',
-    description: 'LaTeX inside a line of text',
+    title: 'Inline Math',
+    description: 'LaTeX math inside a line of text',
     run: ({ editor, range }) =>
       editor
         .chain()
@@ -265,7 +266,7 @@ const COMMANDS: Cmd[] = [
       void splitIntoTasks(editor)
         .then((outcome) => {
           if (outcome === 'no-structure') {
-            alert('No exercise structure found in this note — nothing was changed.')
+            void message('No exercise structure found in this note — nothing was changed.')
           }
         })
         .catch(report)

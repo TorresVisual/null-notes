@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { confirm } from '@tauri-apps/plugin-dialog'
 import { FolderContextMenu } from './FolderContextMenu'
 import { useWorkspaceStore } from '../store/workspace'
 import { useNotesStore } from '../store/notes'
@@ -12,7 +13,13 @@ vi.mock('../lib/tauri', () => ({
   },
 }))
 
+vi.mock('@tauri-apps/plugin-dialog', () => ({
+  confirm: vi.fn(),
+  message: vi.fn(),
+}))
+
 const notesApi = vi.mocked(api.notes)
+const dialog = vi.mocked({ confirm })
 
 beforeEach(() => {
   useWorkspaceStore.setState({
@@ -43,7 +50,7 @@ describe('FolderContextMenu delete', () => {
   // deletion silently never reached the repo. A single directory pathspec
   // covers every note under it — no need to enumerate each one.
   it('queues the deleted folder path for auto-commit', async () => {
-    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    dialog.confirm.mockResolvedValue(true)
     notesApi.deleteFolder.mockResolvedValue(undefined)
     render(<FolderContextMenu />)
 
@@ -54,7 +61,7 @@ describe('FolderContextMenu delete', () => {
   })
 
   it('does nothing when the confirm dialog is declined', async () => {
-    vi.spyOn(window, 'confirm').mockReturnValue(false)
+    dialog.confirm.mockResolvedValue(false)
     render(<FolderContextMenu />)
 
     await userEvent.click(screen.getByRole('button', { name: 'Delete' }))

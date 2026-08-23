@@ -2,13 +2,19 @@
 
 ## Found Issues
 
-* [ ] Home Button
-* [ ] Outline in better place
-* [ ] Custom Modals for new for example
-* [ ] Shift + ? opens shortcuts which shouldnt happen as thats the way i write '?'
-* [ ] != converts to the enqual icon, <= >= too
-* [ ] Dragging doesnt work
-* [ ] Add $ $ Inline math as slash command
+* [x] Home Button — clickable Home entry in the sidebar nav group, next to Search/Settings
+* [x] Outline in better place — now a persistent right-side rail beside the note, not stacked below its content
+* [x] Custom Modals for new for example — `PromptDialog` (in-app) replaces `window.prompt`; `window.confirm`/`alert` replaced with the native Tauri dialog already used in Settings
+* [x] Shift + ? opens shortcuts which shouldnt happen as thats the way i write '?' — the `?` listener now ignores editable targets
+* [x] != should convert to the unequal icon, <= >= too — `SmartSymbols` input rule (`≠`/`≤`/`≥`), skipped inside code
+* [x] Dragging doesnt work — Tauri's `dragDropEnabled` (on by default) was swallowing HTML5 drag events on Windows; now off
+* [x] Add $ $ Inline math as slash command — already existed as "Inline Equation"; renamed to "Inline Math" so `/math` finds it
+* [x] The auto git doesnt handle its own .gitignore — `checked_init_notes_repo` now commits the `.gitignore` it writes; auto-commit also merges the required lines into a pre-existing repo's `.gitignore` (Notes-only/Notes-monorepo only)
+* [x] Git actions constantly open terminals in the built app — every `git`/`gh` spawn now sets `CREATE_NO_WINDOW` on Windows
+
+## Features
+
+* [ ]  Use the built git feature to sync workspaces to other machines
 
 Feature checklist. **The [roadmap](docs/ROADMAP.md) holds the reasoning and the Definitions of Done; this file holds the boxes.** If the two disagree, the roadmap wins.
 

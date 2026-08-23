@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import { browser, expect } from '@wdio/globals'
 import { fixtureWorkspace } from '../fixtureWorkspace.js'
 import { screenshot } from '../screenshot.js'
+import { fillPromptDialog } from '../promptDialog.js'
 
 async function clickButtonByText(selector: string, text: string): Promise<void> {
   await browser.execute(
@@ -34,20 +35,8 @@ async function createNote(title: string): Promise<string> {
   const notePath = join(fixtureWorkspace, `${title}.md`)
   rmSync(notePath, { force: true })
 
-  await clickButtonByText('.sidebar-new-actions button', 'New Note')
-  await browser.waitUntil(
-    async () => {
-      try {
-        await browser.getAlertText()
-        return true
-      } catch {
-        return false
-      }
-    },
-    { timeout: 5000, timeoutMsg: 'the note-title prompt() never appeared' },
-  )
-  await browser.sendAlertText(title)
-  await browser.acceptAlert()
+  await clickButtonByText('.sidebar-new-actions button', 'Note')
+  await fillPromptDialog(title)
   await browser.waitUntil(async () => browser.execute(() => !!document.querySelector('.ProseMirror')), {
     timeout: 5000,
     timeoutMsg: 'editor never mounted for the new note',

@@ -1,7 +1,9 @@
 import { useState } from 'react'
 import { ChevronRight, Pencil, Trash2 } from 'lucide-react'
+import { confirm } from '@tauri-apps/plugin-dialog'
 import { useWorkspaceStore } from '../store/workspace'
 import { useNotesStore } from '../store/notes'
+import { promptText } from '../store/promptDialog'
 import { api } from '../lib/tauri'
 import { refreshTree } from '../hooks/useWorkspace'
 import type { TreeEntry } from '../lib/folderTree'
@@ -32,7 +34,7 @@ export function TreeNode({ entry, depth }: TreeNodeProps) {
 
     async function handleRename(e: React.MouseEvent) {
       e.stopPropagation()
-      const newTitle = prompt('New title:', entry.name)
+      const newTitle = await promptText('New title:', entry.name)
       if (!newTitle || newTitle === entry.name) return
       try {
         await api.notes.rename(entry.path, newTitle, workspace)
@@ -45,7 +47,7 @@ export function TreeNode({ entry, depth }: TreeNodeProps) {
 
     async function handleDelete(e: React.MouseEvent) {
       e.stopPropagation()
-      if (!confirm(`Delete "${entry.name}"?`)) return
+      if (!(await confirm(`Delete "${entry.name}"?`))) return
       await api.notes.delete(entry.path)
       removeNote(entry.path)
       closeTab(entry.path)
