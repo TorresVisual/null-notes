@@ -2265,32 +2265,47 @@ code {
 }
 
 .import-mode-cancel {
-  align-self: flex-end;
-  margin-top: var(--space-xs);
-  padding: 5px 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 28px;
+  padding: 0 12px;
   background: none;
   border: 1px solid var(--border-strong);
   border-radius: 4px;
   color: var(--text-secondary);
   font-size: 12px;
-  line-height: 1.4;
   appearance: none;
   cursor: pointer;
 }
 
 .import-mode-cancel:hover { color: var(--text-primary); border-color: var(--text-tertiary); }
 
+/* Only .import-mode-dialog lays this button out on its own, in a
+   column-direction dialog — flex-end there means "push right" and the top
+   margin means "space below the option buttons above it". Reused elsewhere
+   (PromptDialog, TemplateDialog) inside a row-direction actions bar, where
+   align-self/margin-top would mean "push down" instead and misalign it
+   against its sibling button — so these stay scoped to this one dialog. */
+.import-mode-dialog .import-mode-cancel {
+  align-self: flex-end;
+  margin-top: var(--space-xs);
+}
+
 /* Generic dialog action button (Cancel/Generate/Create-style) — same shape as
    .import-mode-cancel, reusable wherever a dialog needs a plain bordered
    action button rather than that one's own flex-alignment specifics. */
 .dialog-action {
-  padding: 5px 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 28px;
+  padding: 0 12px;
   background: none;
   border: 1px solid var(--border-strong);
   border-radius: 4px;
   color: var(--text-secondary);
   font-size: 12px;
-  line-height: 1.4;
   appearance: none;
   cursor: pointer;
 }
@@ -2302,14 +2317,17 @@ code {
    reads as the default choice against a ghost Cancel/Back next to it — same
    filled-accent language as .workspace-picker-browse. */
 .dialog-action-primary {
-  padding: 5px 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 28px;
+  padding: 0 12px;
   background: var(--accent);
   border: 1px solid var(--accent);
   border-radius: 4px;
   color: var(--accent-contrast);
   font-size: 12px;
   font-weight: 600;
-  line-height: 1.4;
   appearance: none;
   cursor: pointer;
 }
