@@ -48,7 +48,7 @@ export function PromptDialog() {
         <p className="prompt-dialog-message">{message}</p>
         <input
           ref={inputRef}
-          className="settings-text settings-text-wide prompt-dialog-input"
+          className="prompt-dialog-input"
           type="text"
           value={value}
           onChange={(e) => setValue(e.target.value)}
@@ -58,7 +58,7 @@ export function PromptDialog() {
           <button type="button" className="import-mode-cancel" onClick={cancel}>
             Cancel
           </button>
-          <button type="submit" className="dialog-action" disabled={!value.trim()}>
+          <button type="submit" className="dialog-action-primary" disabled={!value.trim()}>
             OK
           </button>
         </div>

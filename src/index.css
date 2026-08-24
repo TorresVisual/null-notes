@@ -1128,6 +1128,8 @@ code {
   position: fixed;
   inset: 0;
   background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
   z-index: 100;
   display: flex;
   align-items: flex-start;
@@ -1138,7 +1140,7 @@ code {
 .search-modal {
   background: var(--bg-raised);
   border: 1px solid var(--border-strong);
-  border-radius: 8px;
+  border-radius: 10px;
   width: 580px;
   max-width: calc(100vw - 40px);
   box-shadow: var(--shadow-modal);
@@ -1853,7 +1855,7 @@ code {
 .settings-panel {
   background: var(--bg-raised);
   border: 1px solid var(--border-strong);
-  border-radius: 8px;
+  border-radius: 10px;
   width: 440px;
   max-width: calc(100vw - 40px);
   box-shadow: var(--shadow-modal);
@@ -2201,7 +2203,7 @@ code {
 .import-mode-dialog {
   background: var(--bg-raised);
   border: 1px solid var(--border-strong);
-  border-radius: 8px;
+  border-radius: 10px;
   box-shadow: var(--shadow-modal);
   padding: var(--space-lg);
   width: min(460px, 90vw);
@@ -2211,8 +2213,8 @@ code {
 }
 
 .import-mode-dialog h2 {
-  font-size: 14px;
-  font-weight: 500;
+  font-size: 15px;
+  font-weight: 600;
   color: var(--text-primary);
   margin-bottom: var(--space-xs);
 }
@@ -2271,6 +2273,8 @@ code {
   border-radius: 4px;
   color: var(--text-secondary);
   font-size: 12px;
+  line-height: 1.4;
+  appearance: none;
   cursor: pointer;
 }
 
@@ -2286,11 +2290,40 @@ code {
   border-radius: 4px;
   color: var(--text-secondary);
   font-size: 12px;
+  line-height: 1.4;
+  appearance: none;
   cursor: pointer;
 }
 
 .dialog-action:hover { color: var(--text-primary); border-color: var(--text-tertiary); }
 .dialog-action:disabled { opacity: var(--disabled-opacity); cursor: not-allowed; }
+
+/* Filled variant for a dialog's one affirmative action (OK/Create), so it
+   reads as the default choice against a ghost Cancel/Back next to it — same
+   filled-accent language as .workspace-picker-browse. */
+.dialog-action-primary {
+  padding: 5px 12px;
+  background: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  color: var(--accent-contrast);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4;
+  appearance: none;
+  cursor: pointer;
+}
+
+.dialog-action-primary:hover {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(126, 231, 135, 0.3);
+}
+
+.dialog-action-primary:active { background: var(--accent); transform: translateY(0) scale(0.96); }
+.dialog-action-primary:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.dialog-action-primary:disabled { opacity: var(--disabled-opacity); cursor: not-allowed; transform: none; box-shadow: none; }
 
 /* Prompt dialog — the in-app replacement for window.prompt (see
    promptText). Reuses .settings-panel for chrome, sized down for a single
@@ -2304,10 +2337,22 @@ code {
   color: var(--text-secondary);
 }
 
-.prompt-dialog-input.settings-text-wide {
+/* Self-contained, unlike .settings-row-control input — this input sits
+   directly in the dialog, not under that wrapper, so it needs its own full
+   chrome rather than borrowing that selector's parent-scoped styling. */
+.prompt-dialog-input {
   width: 100%;
+  padding: 6px 10px;
+  background: var(--bg-hover);
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  color: var(--text-primary);
+  font-size: 13px;
   font-family: inherit;
 }
+
+.prompt-dialog-input:hover { border-color: var(--text-tertiary); }
+.prompt-dialog-input:focus-visible { outline: none; box-shadow: var(--focus-ring); border-color: var(--accent); }
 
 .prompt-dialog-actions {
   display: flex;

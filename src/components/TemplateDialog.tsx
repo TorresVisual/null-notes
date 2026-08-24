@@ -134,7 +134,7 @@ export function TemplateDialog({ onClose }: TemplateDialogProps) {
               <button className="import-mode-cancel" onClick={() => setSelected(null)}>
                 Back
               </button>
-              <button className="dialog-action" onClick={() => void handleCreate()}>Create</button>
+              <button className="dialog-action-primary" onClick={() => void handleCreate()}>Create</button>
             </div>
           </>
         )}
