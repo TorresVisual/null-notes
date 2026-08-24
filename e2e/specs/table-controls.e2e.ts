@@ -13,9 +13,11 @@ async function clickInPage(selector: string): Promise<void> {
   }, selector)
 }
 
-// Grip buttons listen for mousedown (not click) so the browser never steals
-// focus/selection out of the table before the handler runs — dispatch the
-// same event a real mouse would send.
+// Menu-item and append/corner buttons listen for mousedown (not click) so
+// the browser never steals focus/selection out of the table before the
+// handler runs — dispatch the same event a real mouse would send. The grip
+// summary itself is a real <details>/<summary> toggle, so opening a menu
+// uses a genuine click (clickInPage) instead.
 async function mousedownInPage(selector: string): Promise<void> {
   await browser.execute((sel) => {
     const el = document.querySelector(sel)
@@ -59,8 +61,8 @@ async function waitForSavedContent(notePath: string, needle: string): Promise<st
   return readFileSync(notePath, 'utf-8')
 }
 
-describe('table row/column hover-grip controls', () => {
-  it('deletes a column via its grip and adds a row via the trailing append control', async () => {
+describe('table row/column grip menus', () => {
+  it('deletes a column via its grip menu and adds a row via the persistent append control', async () => {
     const notePath = await createNote('Table Controls')
 
     await clickInPage('[aria-label="Insert table"]')
@@ -93,7 +95,8 @@ describe('table row/column hover-grip controls', () => {
     )
     expect(colsBefore).toBe(3)
 
-    await mousedownInPage('.table-col-grip[data-col-index="1"] .table-grip-delete')
+    await clickInPage('.table-col-menu[data-col-index="1"] > summary')
+    await mousedownInPage('.table-col-menu[data-col-index="1"] [data-action="delete"]')
     await browser.waitUntil(
       async () =>
         (await browser.execute(() => document.querySelectorAll('.note-editor tr:first-child > th').length)) === 2,
@@ -101,7 +104,7 @@ describe('table row/column hover-grip controls', () => {
     )
 
     const rowsBefore = await browser.execute(() => document.querySelectorAll('.note-editor tr').length)
-    await mousedownInPage('.table-row-append')
+    await mousedownInPage('.table-append-row')
     await browser.waitUntil(
       async () => (await browser.execute(() => document.querySelectorAll('.note-editor tr').length)) === rowsBefore + 1,
       { timeout: 5000, timeoutMsg: 'row was never appended' },

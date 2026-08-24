@@ -80,7 +80,8 @@ describe('table column alignment persistence', () => {
     await browser.keys('Runtime')
     await waitForSavedContent(notePath, 'Runtime')
 
-    await mousedownInPage('.table-col-grip[data-col-index="1"] .table-grip-align')
+    await clickInPage('.table-col-menu[data-col-index="1"] > summary')
+    await mousedownInPage('.table-col-menu[data-col-index="1"] [data-action="align"]')
     const content = await waitForSavedContent(notePath, ':---:')
     expect(content).toMatch(/\|\s*---\s*\|\s*:---:\s*\|\s*---\s*\|/)
 

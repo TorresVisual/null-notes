@@ -786,11 +786,14 @@ code {
 .note-editor ul[data-type="taskList"] li[data-checked="true"] > div { opacity: 0.55; text-decoration: line-through; }
 
 /* Tables */
-/* Padding reserves a dedicated strip for the hover-grip controls (below) so
-   they sit beside the header row/first column instead of overlapping their
-   text — inset: 0 on an absolutely positioned child spans the padding box,
-   so the grips land exactly in this reserved margin. */
-.note-editor .tableWrapper { position: relative; overflow-x: auto; margin: 0.8em 0; padding: 15px 0 0 15px; }
+/* Padding reserves dedicated strips on every edge: top/left for the
+   column/row grip handles, right/bottom for the single append-column /
+   append-row control — inset: 0 on an absolutely positioned child spans the
+   padding box, so every control lands in its reserved margin without
+   overlapping table content. Resizing is off (see TableMarkdown.configure in
+   extensions/index.ts): column widths aren't persisted to the .md file, so a
+   drag handle here would only ever be a session-local illusion of control. */
+.note-editor .tableWrapper { position: relative; overflow-x: auto; margin: 0.8em 0; padding: 22px 18px 18px 22px; }
 .note-editor table {
   border-collapse: collapse;
   width: 100%;
@@ -815,20 +818,23 @@ code {
 .note-editor th { background: var(--accent-bg); font-weight: 600; border-bottom: 2px solid var(--border-strong); }
 .note-editor tr:nth-child(even) td { background: var(--bg-hover); }
 
-.note-editor .column-resize-handle {
+/* Tints the column/row a grip's menu currently targets, so the user can
+   confirm what they're about to insert/delete before committing. A JS-drawn
+   overlay rather than a class on the th/td themselves — those are
+   ProseMirror-owned content nodes, and mutating their attributes directly
+   competes with ProseMirror's own DOM reconciliation. */
+.note-editor .table-highlight {
   position: absolute;
-  right: -2px;
-  top: 0;
-  bottom: -2px;
-  width: 4px;
-  z-index: 20;
-  background: var(--accent);
   pointer-events: none;
+  background: var(--accent-bg-hover);
+  z-index: 1;
 }
-.note-editor .ProseMirror.resize-cursor { cursor: col-resize; }
 
-/* Hover-grip row/column controls. Bars live in the padding strip reserved
-   above/left of the table (see .tableWrapper), never on top of its content. */
+/* Grip/menu/append overlay. Lives in the padding strip reserved around the
+   table (see .tableWrapper), never on top of its content. `:has([open])`
+   keeps it visible while a menu is open even if the pointer has drifted off
+   the wrapper — losing the hover state mid-menu would otherwise fade the
+   whole overlay out from under an open dropdown. */
 .note-editor .table-controls {
   position: absolute;
   inset: 0;
@@ -837,68 +843,67 @@ code {
   transition: opacity var(--duration-fast) var(--ease-standard);
 }
 .note-editor .tableWrapper:hover .table-controls,
-.note-editor .table-controls:focus-within { opacity: 1; }
+.note-editor .table-controls:focus-within,
+.note-editor .table-controls:has([open]) { opacity: 1; }
 
-.note-editor .table-col-grips,
-.note-editor .table-row-grips { position: absolute; top: 0; left: 0; z-index: 3; }
-.note-editor .table-col-grips { height: 15px; right: 0; }
-.note-editor .table-row-grips { width: 15px; bottom: 0; }
-
-.note-editor .table-col-grip,
-.note-editor .table-row-grip {
+.note-editor .table-controls-corner,
+.note-editor .table-append-col,
+.note-editor .table-append-row {
   position: absolute;
+  pointer-events: auto;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 3px;
-  pointer-events: auto;
-  background: var(--bg-hover);
-  border: 1px solid var(--border-strong);
-  cursor: pointer;
-}
-.note-editor .table-col-grip:hover,
-.note-editor .table-row-grip:hover { background: var(--accent-bg); border-color: var(--accent); }
-.note-editor .table-col-grip { top: 0; height: 15px; border-top: none; }
-.note-editor .table-row-grip { left: 0; width: 15px; flex-direction: column; border-left: none; }
-
-.note-editor .table-col-append,
-.note-editor .table-row-append,
-.note-editor .table-controls-corner {
-  position: absolute;
-  top: 0;
-  left: 0;
-  pointer-events: auto;
-  background: var(--bg-hover);
-  border: 1px solid var(--border-strong);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-}
-.note-editor .table-col-append:hover,
-.note-editor .table-row-append:hover,
-.note-editor .table-controls-corner:hover { background: var(--accent-bg); border-color: var(--accent); }
-.note-editor .table-col-append { width: 15px; height: 15px; border-top: none; }
-.note-editor .table-row-append { width: 15px; height: 15px; border-left: none; }
-.note-editor .table-controls-corner { width: 15px; height: 15px; z-index: 4; }
-
-.note-editor .table-grip-insert,
-.note-editor .table-grip-align,
-.note-editor .table-grip-delete,
-.note-editor .table-col-append,
-.note-editor .table-row-append,
-.note-editor .table-controls-corner {
   border: none;
+  border-radius: 4px;
   background: transparent;
   color: var(--text-tertiary);
-  font: 700 11px/1 var(--font-mono);
-  padding: 0;
   cursor: pointer;
 }
-.note-editor .table-grip-insert:hover { color: var(--accent); }
-.note-editor .table-grip-align:hover { color: var(--accent-hover); }
-.note-editor .table-grip-delete:hover,
-.note-editor .table-controls-corner:hover { color: var(--danger); }
+.note-editor .table-controls-corner:hover { background: rgba(224, 80, 80, 0.15); color: var(--danger); }
+.note-editor .table-append-col:hover,
+.note-editor .table-append-row:hover { background: var(--bg-hover); color: var(--accent); }
+.note-editor .table-controls-corner svg,
+.note-editor .table-append-col svg,
+.note-editor .table-append-row svg { width: 11px; height: 11px; }
+.note-editor .table-controls-corner { top: 0; left: 0; width: 18px; height: 18px; z-index: 4; }
+/* Single persistent append point per axis, Notion-style — a thin strip on
+   the table's outer edge rather than a control glued to the last column/row. */
+.note-editor .table-append-col { top: 22px; right: 0; bottom: 0; width: 16px; }
+.note-editor .table-append-row { left: 22px; right: 0; bottom: 0; height: 16px; }
+
+/* One grip per column/row, centered over its cell. JS (positionGrips) sets
+   only the offset along the cell's own axis each render; centering along the
+   other axis is a fixed flex rule so it never needs recomputing. */
+.note-editor .table-col-menu,
+.note-editor .table-row-menu { position: absolute; display: flex; z-index: 3; }
+.note-editor .table-col-menu { top: 0; height: 22px; align-items: center; transform: translateX(-50%); }
+.note-editor .table-row-menu { left: 0; width: 22px; align-items: center; justify-content: center; transform: translateY(-50%); }
+
+.note-editor .table-grip {
+  list-style: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 18px;
+  border-radius: 4px;
+  color: var(--text-tertiary);
+  cursor: pointer;
+}
+.note-editor .table-grip::-webkit-details-marker { display: none; }
+.note-editor .table-grip:hover { background: var(--bg-hover); color: var(--text-secondary); }
+.note-editor .table-col-menu[open] > .table-grip,
+.note-editor .table-row-menu[open] > .table-grip { background: var(--accent-bg); color: var(--accent); }
+.note-editor .table-grip svg { width: 13px; height: 13px; }
+
+/* Dropdown content reuses .context-menu's look (see "Folder context menu"
+   below) — same visual language as every other menu in the app — with just
+   the position overridden to anchor off the grip instead of the cursor. */
+.note-editor .table-menu-panel { position: absolute; z-index: 30; min-width: 160px; }
+.note-editor .table-col-menu .table-menu-panel { top: 20px; left: 50%; transform: translateX(-50%); }
+.note-editor .table-row-menu .table-menu-panel { top: 0; left: 24px; }
+.note-editor .table-menu-panel svg { width: 13px; height: 13px; flex: none; }
 
 /* Syntax-highlighted code blocks (lowlight) */
 .note-editor pre {
@@ -1529,6 +1534,7 @@ code {
 
 .context-menu button:hover { background: var(--bg-hover); }
 .context-menu button.danger { color: var(--danger); }
+.context-menu hr { border: none; border-top: 1px solid var(--border); margin: 4px 0; }
 
 .tree-row.drag-over { background: var(--accent-bg); outline: 1px dashed var(--accent); }
 
