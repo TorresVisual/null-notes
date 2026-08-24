@@ -21,20 +21,20 @@
 * [ ] Web app
 
 ## Checklist
-* [ ]True rich-text editing while preserving Markdown underneath
-* [ ]Headings, lists, tables, quotes
-* [ ]Inline/code blocks
-* [ ]Links and images
-* [ ]Callouts/admonitions
-* [ ]Checklists
-* [ ]Footnotes
-* [ ]Collapsible sections
-* [ ]Drag-and-drop block reordering
-* [ ]Slash command menu /
-* [ ]Markdown shortcuts
-* [ ]Keyboard-first editing
-* [ ]Paste cleanup / smart formatting
-* [ ]Undo/redo that works across all block types
+* True rich-text editing while preserving Markdown underneath
+* Headings, lists, tables, quotes
+* Inline/code blocks
+* Links and images
+* Callouts/admonitions
+* Checklists
+* Footnotes
+* Collapsible sections
+* Drag-and-drop block reordering
+* Slash command menu /
+* Markdown shortcuts
+* Keyboard-first editing
+* Paste cleanup / smart formatting
+* Undo/redo that works across all block types
 * Inline LaTeX
 * Display equations
 * Live rendering
