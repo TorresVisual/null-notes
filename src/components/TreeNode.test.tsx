@@ -1,16 +1,16 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { confirm } from '@tauri-apps/plugin-dialog'
 import { TreeNode } from './TreeNode'
 import { useWorkspaceStore } from '../store/workspace'
 import { useNotesStore } from '../store/notes'
 import { api } from '../lib/tauri'
-import type { NoteTreeNode } from '../lib/folderTree'
+import type { FolderTreeNode, NoteTreeNode } from '../lib/folderTree'
 
 vi.mock('../lib/tauri', () => ({
   api: {
-    notes: { delete: vi.fn(), rename: vi.fn(), scan: vi.fn() },
+    notes: { delete: vi.fn(), rename: vi.fn(), scan: vi.fn(), renameFolder: vi.fn(), moveNote: vi.fn() },
   },
 }))
 
@@ -29,15 +29,28 @@ const noteEntry: NoteTreeNode = {
   note: { id: '1', title: 'Lecture 7', path: '/ws/Lecture 7.md', workspace: '/ws', updatedAt: 0 },
 }
 
+const folderEntry: FolderTreeNode = {
+  type: 'folder',
+  name: 'Target',
+  path: '/ws/Target',
+  children: [],
+}
+
+function dropWithPaths(target: Element, data: Record<string, string>) {
+  fireEvent.drop(target, { dataTransfer: { getData: (type: string) => data[type] ?? '' } })
+}
+
 beforeEach(() => {
   useWorkspaceStore.setState({
     path: '/ws',
     openTabs: [noteEntry.path],
     activeTab: noteEntry.path,
     expandedFolders: [],
+    selectedFolder: null,
     gitPendingPaths: [],
   })
   useNotesStore.setState({ notes: [noteEntry.note], folders: [], tags: [] })
+  notesApi.scan.mockResolvedValue({ notes: [], folders: [] })
 })
 
 afterEach(() => {
@@ -67,5 +80,65 @@ describe('TreeNode delete (note)', () => {
 
     expect(notesApi.delete).not.toHaveBeenCalled()
     expect(useWorkspaceStore.getState().gitPendingPaths).toEqual([])
+  })
+})
+
+describe('TreeNode drop (folder)', () => {
+  it('nests a dropped folder inside the target folder', async () => {
+    notesApi.renameFolder.mockResolvedValue(undefined)
+    render(<TreeNode entry={folderEntry} depth={0} />)
+
+    const row = screen.getByText('Target').closest('.tree-folder')!
+    dropWithPaths(row, { 'text/folder-path': '/ws/Source' })
+
+    await waitFor(() => {
+      expect(notesApi.renameFolder).toHaveBeenCalledWith('/ws/Source', '/ws/Target/Source')
+    })
+  })
+
+  it('refuses to drop a folder onto itself', () => {
+    render(<TreeNode entry={folderEntry} depth={0} />)
+
+    const row = screen.getByText('Target').closest('.tree-folder')!
+    dropWithPaths(row, { 'text/folder-path': '/ws/Target' })
+
+    expect(notesApi.renameFolder).not.toHaveBeenCalled()
+  })
+
+  it('refuses to drop a folder onto its own descendant', () => {
+    const nested: FolderTreeNode = { ...folderEntry, path: '/ws/Source/Nested' }
+    render(<TreeNode entry={nested} depth={0} />)
+
+    const row = screen.getByText('Target').closest('.tree-folder')!
+    dropWithPaths(row, { 'text/folder-path': '/ws/Source' })
+
+    expect(notesApi.renameFolder).not.toHaveBeenCalled()
+  })
+
+  it('moves a dropped note into the target folder', async () => {
+    notesApi.moveNote.mockResolvedValue('/ws/Target/a.md')
+    render(<TreeNode entry={folderEntry} depth={0} />)
+
+    const row = screen.getByText('Target').closest('.tree-folder')!
+    dropWithPaths(row, { 'text/note-path': '/ws/a.md' })
+
+    await waitFor(() => {
+      expect(notesApi.moveNote).toHaveBeenCalledWith('/ws/a.md', '/ws/Target')
+    })
+    expect(notesApi.renameFolder).not.toHaveBeenCalled()
+  })
+
+  // The bug this guards against: a note or folder dropped into a collapsed
+  // folder had nothing on screen to show it had landed anywhere.
+  it('expands the target folder after a successful drop', async () => {
+    notesApi.moveNote.mockResolvedValue('/ws/Target/a.md')
+    render(<TreeNode entry={folderEntry} depth={0} />)
+
+    const row = screen.getByText('Target').closest('.tree-folder')!
+    dropWithPaths(row, { 'text/note-path': '/ws/a.md' })
+
+    await waitFor(() => {
+      expect(useWorkspaceStore.getState().expandedFolders).toContain('/ws/Target')
+    })
   })
 })

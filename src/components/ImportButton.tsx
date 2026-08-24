@@ -37,6 +37,7 @@ export function ImportButton() {
   const selectedFolder = useWorkspaceStore((s) => s.selectedFolder)
   const addNote = useNotesStore((s) => s.addNote)
   const openTab = useWorkspaceStore((s) => s.openTab)
+  const expandFolder = useWorkspaceStore((s) => s.expandFolder)
   const settings = useSettingsStore((s) => s.settings)
   const setSettings = useSettingsStore((s) => s.setSettings)
   const [pending, setPending] = useState<PickedPdf | null>(null)
@@ -112,6 +113,9 @@ export function ImportButton() {
       await api.notes.reindex(note.path, workspacePath, content)
       addNote({ ...note, title: picked.title })
       openTab(note.path)
+      // Same gap as the New Note/New Folder buttons: a collapsed target
+      // folder would otherwise leave the freshly imported note invisible.
+      expandFolder(folder)
     } catch (e) {
       // Names the file, states what's provably true regardless of which step
       // failed (the source PDF is only ever read, never written to), and

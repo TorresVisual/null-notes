@@ -11,6 +11,7 @@ pub async fn index_note(pool: &SqlitePool, note: &NoteMetadata) -> Result<()> {
          VALUES (?, ?, ?, ?, ?)
          ON CONFLICT(path) DO UPDATE SET
            title      = excluded.title,
+           workspace  = excluded.workspace,
            updated_at = excluded.updated_at",
     )
     .bind(&note.id)
@@ -512,6 +513,29 @@ mod tests {
         let notes = list_by_workspace(&pool, "/ws").await.unwrap();
         assert_eq!(notes.len(), 1);
         assert_eq!(notes[0].title, "Note A");
+    }
+
+    // The bug this guards against: the same physical folder opened as two
+    // different workspace roots (a subfolder used both standalone and as
+    // part of its parent) indexes the same path twice with two different
+    // `workspace` values. The second scan's own `list_by_workspace` call
+    // must see it, or the note is invisible from whichever workspace didn't
+    // index it first — forever, since nothing else ever corrects the column.
+    #[tokio::test]
+    async fn test_upsert_updates_workspace() {
+        let pool = make_pool().await;
+        index_note(&pool, &note("a", "A", "/outer/Sub/a.md", "/outer/Sub"))
+            .await
+            .unwrap();
+        index_note(&pool, &note("a", "A", "/outer/Sub/a.md", "/outer"))
+            .await
+            .unwrap();
+
+        assert_eq!(list_by_workspace(&pool, "/outer").await.unwrap().len(), 1);
+        assert_eq!(
+            list_by_workspace(&pool, "/outer/Sub").await.unwrap().len(),
+            0
+        );
     }
 
     #[tokio::test]

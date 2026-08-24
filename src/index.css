@@ -466,6 +466,12 @@ code {
   white-space: nowrap;
 }
 
+/* The root-level folder-tree list itself is the "move back to root" drop
+   target (see FolderTree.tsx) — it fills the sidebar's remaining height via
+   `.sidebar > .folder-tree { flex: 1 }`, so the whole background gets the
+   same outline a folder row shows, not just its items. */
+.folder-tree.drag-over { outline: 1px dashed var(--accent); outline-offset: -1px; }
+
 .import-pdf { display: flex; flex-direction: column; gap: var(--space-xs); }
 .import-progress { font-size: 12px; color: var(--text-secondary); }
 .import-error { font-size: 12px; color: var(--danger); }

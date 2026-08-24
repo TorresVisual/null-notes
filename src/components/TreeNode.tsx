@@ -6,6 +6,7 @@ import { useNotesStore } from '../store/notes'
 import { promptText } from '../store/promptDialog'
 import { api } from '../lib/tauri'
 import { refreshTree } from '../hooks/useWorkspace'
+import { folderName, isUnderPath } from '../lib/pathPrefix'
 import type { TreeEntry } from '../lib/folderTree'
 
 interface TreeNodeProps {
@@ -22,6 +23,7 @@ export function TreeNode({ entry, depth }: TreeNodeProps) {
   const setSelectedFolder = useWorkspaceStore((s) => s.setSelectedFolder)
   const setTagFilter = useWorkspaceStore((s) => s.setTagFilter)
   const openFolderContextMenu = useWorkspaceStore((s) => s.openFolderContextMenu)
+  const expandFolder = useWorkspaceStore((s) => s.expandFolder)
   const replaceOpenPath = useWorkspaceStore((s) => s.replaceOpenPath)
   const setFolderError = useWorkspaceStore((s) => s.setFolderError)
   const openTab = useWorkspaceStore((s) => s.openTab)
@@ -91,12 +93,25 @@ export function TreeNode({ entry, depth }: TreeNodeProps) {
 
   async function handleDrop(e: React.DragEvent) {
     e.preventDefault()
+    e.stopPropagation()
     setDragOver(false)
     const notePath = e.dataTransfer.getData('text/note-path')
-    if (!notePath) return
+    const draggedFolderPath = e.dataTransfer.getData('text/folder-path')
     try {
-      const newPath = await api.notes.moveNote(notePath, entry.path)
-      replaceOpenPath(notePath, newPath)
+      if (notePath) {
+        const newPath = await api.notes.moveNote(notePath, entry.path)
+        replaceOpenPath(notePath, newPath)
+      } else if (draggedFolderPath && !isUnderPath(entry.path, draggedFolderPath)) {
+        const separator = entry.path.includes('\\') ? '\\' : '/'
+        const newPath = `${entry.path}${separator}${folderName(draggedFolderPath)}`
+        await api.notes.renameFolder(draggedFolderPath, newPath)
+        replaceOpenPath(draggedFolderPath, newPath)
+      } else {
+        return
+      }
+      // Otherwise a drop into a collapsed folder leaves nothing on screen to
+      // show it landed anywhere at all.
+      expandFolder(entry.path)
       setFolderError(null)
       await refreshTree()
     } catch (err) {
@@ -109,6 +124,8 @@ export function TreeNode({ entry, depth }: TreeNodeProps) {
       <div
         className={`tree-row tree-folder${isSelected ? ' selected' : ''}${dragOver ? ' drag-over' : ''}`}
         style={{ paddingLeft: 8 + depth * 14 }}
+        draggable
+        onDragStart={(e) => e.dataTransfer.setData('text/folder-path', entry.path)}
         onClick={() => {
           toggleFolder(entry.path)
           setSelectedFolder(entry.path)

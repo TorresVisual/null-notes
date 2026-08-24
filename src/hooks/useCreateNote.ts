@@ -13,6 +13,7 @@ export function useCreateNote() {
   const workspacePath = useWorkspaceStore((s) => s.path)
   const selectedFolder = useWorkspaceStore((s) => s.selectedFolder)
   const openTab = useWorkspaceStore((s) => s.openTab)
+  const expandFolder = useWorkspaceStore((s) => s.expandFolder)
   const setFolderError = useWorkspaceStore((s) => s.setFolderError)
   const setFlashTabPath = useWorkspaceStore((s) => s.setFlashTabPath)
   const inFlight = useRef(false)
@@ -22,10 +23,15 @@ export function useCreateNote() {
       if (!workspacePath || inFlight.current) return null
       inFlight.current = true
       try {
-        const meta = await api.notes.create(workspacePath, selectedFolder ?? workspacePath, title)
+        const folder = selectedFolder ?? workspacePath
+        const meta = await api.notes.create(workspacePath, folder, title)
         addNote(meta)
         openTab(meta.path)
         setFlashTabPath(meta.path)
+        // A collapsed target folder (freshly created, or re-collapsed while
+        // still selected) would otherwise hide the note the instant it's
+        // created — there'd be nothing on screen to show for the action.
+        expandFolder(folder)
         setFolderError(null)
         return meta
       } catch (e) {
@@ -35,6 +41,6 @@ export function useCreateNote() {
         inFlight.current = false
       }
     },
-    [workspacePath, selectedFolder, addNote, openTab, setFolderError, setFlashTabPath],
+    [workspacePath, selectedFolder, addNote, openTab, expandFolder, setFolderError, setFlashTabPath],
   )
 }

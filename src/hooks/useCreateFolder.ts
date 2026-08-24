@@ -9,6 +9,7 @@ export function useCreateFolder() {
   const workspacePath = useWorkspaceStore((s) => s.path)
   const selectedFolder = useWorkspaceStore((s) => s.selectedFolder)
   const setSelectedFolder = useWorkspaceStore((s) => s.setSelectedFolder)
+  const expandFolder = useWorkspaceStore((s) => s.expandFolder)
   const setFolderError = useWorkspaceStore((s) => s.setFolderError)
 
   return useCallback(
@@ -18,6 +19,10 @@ export function useCreateFolder() {
       try {
         const newPath = await api.notes.createFolder(parent, name)
         setSelectedFolder(newPath)
+        // Otherwise the new folder renders collapsed and anything created
+        // inside it next (the common next action) is invisible until the
+        // user knows to click its chevron.
+        expandFolder(newPath)
         setFolderError(null)
         await refreshTree()
         return newPath
@@ -26,6 +31,6 @@ export function useCreateFolder() {
         return null
       }
     },
-    [workspacePath, selectedFolder, setSelectedFolder, setFolderError],
+    [workspacePath, selectedFolder, setSelectedFolder, expandFolder, setFolderError],
   )
 }

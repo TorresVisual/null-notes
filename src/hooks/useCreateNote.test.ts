@@ -24,6 +24,7 @@ describe('useCreateNote', () => {
       openTabs: [],
       activeTab: null,
       folderError: null,
+      expandedFolders: [],
     })
     useNotesStore.setState({ notes: [] })
     notes.create.mockResolvedValue(meta('/ws/Missing.md', 'Missing'))
@@ -43,6 +44,19 @@ describe('useCreateNote', () => {
     expect(notes.create).toHaveBeenCalledWith('/ws', '/ws/Course101', 'Missing')
     expect(useNotesStore.getState().notes[0]?.title).toBe('Missing')
     expect(useWorkspaceStore.getState().activeTab).toBe('/ws/Course101/Missing.md')
+  })
+
+  // The bug this guards against: a note created inside a collapsed folder
+  // (freshly created, or re-collapsed while still selected) rendered nowhere
+  // in the sidebar tree — nothing on screen showed the create had happened.
+  it('expands the target folder so the new note is visible', async () => {
+    useWorkspaceStore.setState({ selectedFolder: '/ws/Course101' })
+    notes.create.mockResolvedValue(meta('/ws/Course101/Missing.md', 'Missing'))
+    const { result } = renderHook(() => useCreateNote())
+
+    await result.current('Missing')
+
+    expect(useWorkspaceStore.getState().expandedFolders).toContain('/ws/Course101')
   })
 
   it('falls back to the workspace root when no folder is selected', async () => {

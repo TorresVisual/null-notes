@@ -19,6 +19,7 @@ export function useCreateCanvasNote() {
   const workspacePath = useWorkspaceStore((s) => s.path)
   const selectedFolder = useWorkspaceStore((s) => s.selectedFolder)
   const openTab = useWorkspaceStore((s) => s.openTab)
+  const expandFolder = useWorkspaceStore((s) => s.expandFolder)
   const setFolderError = useWorkspaceStore((s) => s.setFolderError)
 
   return useCallback(
@@ -36,6 +37,7 @@ export function useCreateCanvasNote() {
         await api.notes.reindex(meta.path, workspacePath, body)
         addNote(meta)
         openTab(meta.path)
+        expandFolder(folder)
         setFolderError(null)
         return meta
       } catch (e) {
@@ -43,6 +45,6 @@ export function useCreateCanvasNote() {
         return null
       }
     },
-    [workspacePath, selectedFolder, addNote, openTab, setFolderError],
+    [workspacePath, selectedFolder, addNote, openTab, expandFolder, setFolderError],
   )
 }

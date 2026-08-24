@@ -62,6 +62,13 @@ describe('useWorkspaceStore', () => {
     expect(useWorkspaceStore.getState().selectedFolder).toBe('/ws')
   })
 
+  it('expandFolder adds a folder to expandedFolders without toggling it closed again', () => {
+    useWorkspaceStore.getState().expandFolder('/ws/A')
+    expect(useWorkspaceStore.getState().expandedFolders).toEqual(['/ws/A'])
+    useWorkspaceStore.getState().expandFolder('/ws/A')
+    expect(useWorkspaceStore.getState().expandedFolders).toEqual(['/ws/A'])
+  })
+
   it('toggleFolder adds then removes a folder from expandedFolders', () => {
     useWorkspaceStore.getState().toggleFolder('/ws/A')
     expect(useWorkspaceStore.getState().expandedFolders).toContain('/ws/A')
@@ -77,6 +84,20 @@ describe('useWorkspaceStore', () => {
       '/ws/Renamed/a.md',
       '/ws/Course10/b.md',
     ])
+  })
+
+  it('replaceOpenPath also rewrites expandedFolders and selectedFolder under the old prefix', () => {
+    useWorkspaceStore.getState().toggleFolder('/ws/Course1')
+    useWorkspaceStore.getState().toggleFolder('/ws/Course1/Sub')
+    useWorkspaceStore.getState().toggleFolder('/ws/Course10')
+    useWorkspaceStore.getState().setSelectedFolder('/ws/Course1')
+    useWorkspaceStore.getState().replaceOpenPath('/ws/Course1', '/ws/Renamed')
+    expect(useWorkspaceStore.getState().expandedFolders).toEqual([
+      '/ws/Renamed',
+      '/ws/Renamed/Sub',
+      '/ws/Course10',
+    ])
+    expect(useWorkspaceStore.getState().selectedFolder).toBe('/ws/Renamed')
   })
 
   it('closeTabsUnder closes only tabs under the given prefix', () => {

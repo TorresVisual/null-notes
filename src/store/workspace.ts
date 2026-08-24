@@ -33,6 +33,7 @@ interface WorkspaceStore {
   closeTab: (notePath: string) => void
   setActiveTab: (notePath: string | null) => void
   toggleFolder: (folderPath: string) => void
+  expandFolder: (folderPath: string) => void
   setExpandedFolders: (paths: string[]) => void
   setSelectedFolder: (path: string | null) => void
   openFolderContextMenu: (path: string, x: number, y: number) => void
@@ -130,6 +131,15 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
     })
   },
 
+  // Adds a folder to expandedFolders if it isn't already there — unlike
+  // toggleFolder, never collapses. Used wherever a note or folder just
+  // landed inside a folder (created or dropped into it) so it doesn't land
+  // somewhere the user can't see without knowing to click the chevron.
+  expandFolder: (folderPath) => {
+    const { expandedFolders } = get()
+    if (expandedFolders.includes(folderPath)) return
+    set({ expandedFolders: [...expandedFolders, folderPath] })
+  },
   setExpandedFolders: (paths) => set({ expandedFolders: paths }),
   setSelectedFolder: (path) => set({ selectedFolder: path }),
 
@@ -137,10 +147,12 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   closeFolderContextMenu: () => set({ folderContextMenu: null }),
 
   replaceOpenPath: (oldPrefix, newPrefix) => {
-    const { openTabs, activeTab } = get()
+    const { openTabs, activeTab, expandedFolders, selectedFolder } = get()
     set({
       openTabs: openTabs.map((p) => replacePathPrefix(p, oldPrefix, newPrefix)),
       activeTab: activeTab ? replacePathPrefix(activeTab, oldPrefix, newPrefix) : activeTab,
+      expandedFolders: expandedFolders.map((p) => replacePathPrefix(p, oldPrefix, newPrefix)),
+      selectedFolder: selectedFolder ? replacePathPrefix(selectedFolder, oldPrefix, newPrefix) : selectedFolder,
     })
   },
 
