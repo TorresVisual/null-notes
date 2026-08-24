@@ -876,7 +876,7 @@ code {
    only the offset along the cell's own axis each render; centering along the
    other axis is a fixed flex rule so it never needs recomputing. */
 .note-editor .table-col-menu,
-.note-editor .table-row-menu { position: absolute; display: flex; z-index: 3; }
+.note-editor .table-row-menu { position: absolute; display: flex; z-index: 3; pointer-events: auto; }
 .note-editor .table-col-menu { top: 0; height: 22px; align-items: center; transform: translateX(-50%); }
 .note-editor .table-row-menu { left: 0; width: 22px; align-items: center; justify-content: center; transform: translateY(-50%); }
 

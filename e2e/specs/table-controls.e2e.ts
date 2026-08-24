@@ -26,6 +26,22 @@ async function mousedownInPage(selector: string): Promise<void> {
   }, selector)
 }
 
+// `clickInPage`/`mousedownInPage` call DOM methods directly, which bypass
+// hit-testing entirely — they'd happily "click" an element sitting under a
+// `pointer-events: none` ancestor that a real mouse could never reach.
+// `elementFromPoint` is what a real click actually resolves against, so
+// this is the only way to catch that class of bug (see the grip's own
+// pointer-events regression this guards against).
+async function isHitTestable(selector: string): Promise<boolean> {
+  return browser.execute((sel) => {
+    const el = document.querySelector(sel)
+    if (!(el instanceof HTMLElement)) throw new Error(`isHitTestable: no element matching ${sel}`)
+    const r = el.getBoundingClientRect()
+    const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2)
+    return hit !== null && el.contains(hit)
+  }, selector)
+}
+
 async function focusEditorEnd(): Promise<void> {
   await browser.execute(() => {
     const el = document.querySelector('.ProseMirror')
@@ -89,6 +105,14 @@ describe('table row/column grip menus', () => {
     // overlay is actually visible for the screenshot.
     await $('.note-editor .tableWrapper').moveTo()
     await screenshot('table-controls-hover')
+
+    // A real mouse click has to actually land on these — not just find them
+    // in the DOM (see isHitTestable above).
+    expect(await isHitTestable('.table-col-menu[data-col-index="0"] > summary')).toBe(true)
+    expect(await isHitTestable('.table-row-menu[data-row-index="0"] > summary')).toBe(true)
+    expect(await isHitTestable('.table-append-col')).toBe(true)
+    expect(await isHitTestable('.table-append-row')).toBe(true)
+    expect(await isHitTestable('.table-controls-corner')).toBe(true)
 
     const colsBefore = await browser.execute(
       () => document.querySelectorAll('.note-editor tr:first-child > th').length,
