@@ -19,7 +19,88 @@
 
 ## Features
 
-* [ ]  Use the built git feature to sync workspaces to other machines
+* [ ] Use the built git feature to sync workspaces to other machines
+* [ ] Mobile app (need to think how we get syncing working)
+* [ ] Web app
+
+## Checklist
+* True rich-text editing while preserving Markdown underneath
+* Headings, lists, tables, quotes
+* Inline/code blocks
+* Links and images
+* Callouts/admonitions
+* Checklists
+* Footnotes
+* Collapsible sections
+* Drag-and-drop block reordering
+* Slash command menu /
+* Markdown shortcuts
+* Keyboard-first editing
+* Paste cleanup / smart formatting
+* Undo/redo that works across all block types
+* Inline LaTeX
+* Display equations
+* Live rendering
+* Equation editing
+* Copy LaTeX
+* Equation numbering
+* References like Equation (3)
+* Matrices
+* Aligned equations
+* Cases
+* Greek symbols
+* Math keyboard/palette
+* Symbol picker
+* Equation autocomplete
+* LaTeX error highlighting
+* Convert handwritten equations → LaTeX
+* Syntax highlighting
+* Language detection
+* Line numbers
+* Copy button
+* Word wrap
+* Code folding
+* Search
+* Minimap optional
+* Themes
+* Adjustable font size
+* Tabs/spaces configuration
+* Executable code blocks
+* Pen
+* Pencil
+* Highlighter
+* Eraser
+* Lasso selection
+* Shapes
+* Lines/arrows
+* Text
+* Color picker
+* Stroke width
+* Pressure sensitivity
+* Zoom
+* Infinite canvas
+* Flowchart
+* UML
+* Class diagrams
+* State machines
+* ER diagrams
+* Trees
+* Graphs
+* Binary trees
+* Linked lists
+* Memory diagrams
+* CPU/register diagrams
+* Network diagrams
+
+Search across:
+
+* Notes
+* PDFs
+* Code
+* Drawings/OCR
+* Equations
+* Tags
+* Metadata
 
 Feature checklist. **The [roadmap](docs/ROADMAP.md) holds the reasoning and the Definitions of Done; this file holds the boxes.** If the two disagree, the roadmap wins.
 
