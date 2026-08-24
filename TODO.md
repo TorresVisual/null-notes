@@ -16,7 +16,9 @@
 
 ## Features
 
-* [ ]  Use the built git feature to sync workspaces to other machines
+* [ ] Use the built git feature to sync workspaces to other machines
+* [ ] Mobile app (need to think how we get syncing working)
+* [ ] Web app
 
 Feature checklist. **The [roadmap](docs/ROADMAP.md) holds the reasoning and the Definitions of Done; this file holds the boxes.** If the two disagree, the roadmap wins.
 
