@@ -786,20 +786,119 @@ code {
 .note-editor ul[data-type="taskList"] li[data-checked="true"] > div { opacity: 0.55; text-decoration: line-through; }
 
 /* Tables */
+/* Padding reserves a dedicated strip for the hover-grip controls (below) so
+   they sit beside the header row/first column instead of overlapping their
+   text — inset: 0 on an absolutely positioned child spans the padding box,
+   so the grips land exactly in this reserved margin. */
+.note-editor .tableWrapper { position: relative; overflow-x: auto; margin: 0.8em 0; padding: 15px 0 0 15px; }
 .note-editor table {
   border-collapse: collapse;
   width: 100%;
-  margin: 0.8em 0;
+  margin: 0;
   font-size: 0.93em;
 }
 .note-editor th,
 .note-editor td {
   border: 1px solid var(--border-strong);
-  padding: 6px 12px;
+  padding: 8px 12px;
   text-align: left;
 }
-.note-editor th { background: var(--bg-hover); font-weight: 600; }
+/* A cell holds a single prose paragraph, so the paragraph-spacing rule
+   (`.note-editor p { margin-bottom: 0.6em }`) has no sibling to create space
+   against — it just sits below the text, and vertical-align: middle (the
+   browser default for td/th) centers that whole margin box rather than the
+   text itself, visibly pushing the text off-center. */
+.note-editor td p,
+.note-editor th p { margin-bottom: 0; }
+/* Accent-tinted so the header never collides with the zebra shade on the
+   first body row, which otherwise renders as one solid block. */
+.note-editor th { background: var(--accent-bg); font-weight: 600; border-bottom: 2px solid var(--border-strong); }
 .note-editor tr:nth-child(even) td { background: var(--bg-hover); }
+
+.note-editor .column-resize-handle {
+  position: absolute;
+  right: -2px;
+  top: 0;
+  bottom: -2px;
+  width: 4px;
+  z-index: 20;
+  background: var(--accent);
+  pointer-events: none;
+}
+.note-editor .ProseMirror.resize-cursor { cursor: col-resize; }
+
+/* Hover-grip row/column controls. Bars live in the padding strip reserved
+   above/left of the table (see .tableWrapper), never on top of its content. */
+.note-editor .table-controls {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity var(--duration-fast) var(--ease-standard);
+}
+.note-editor .tableWrapper:hover .table-controls,
+.note-editor .table-controls:focus-within { opacity: 1; }
+
+.note-editor .table-col-grips,
+.note-editor .table-row-grips { position: absolute; top: 0; left: 0; z-index: 3; }
+.note-editor .table-col-grips { height: 15px; right: 0; }
+.note-editor .table-row-grips { width: 15px; bottom: 0; }
+
+.note-editor .table-col-grip,
+.note-editor .table-row-grip {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  pointer-events: auto;
+  background: var(--bg-hover);
+  border: 1px solid var(--border-strong);
+  cursor: pointer;
+}
+.note-editor .table-col-grip:hover,
+.note-editor .table-row-grip:hover { background: var(--accent-bg); border-color: var(--accent); }
+.note-editor .table-col-grip { top: 0; height: 15px; border-top: none; }
+.note-editor .table-row-grip { left: 0; width: 15px; flex-direction: column; border-left: none; }
+
+.note-editor .table-col-append,
+.note-editor .table-row-append,
+.note-editor .table-controls-corner {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: auto;
+  background: var(--bg-hover);
+  border: 1px solid var(--border-strong);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.note-editor .table-col-append:hover,
+.note-editor .table-row-append:hover,
+.note-editor .table-controls-corner:hover { background: var(--accent-bg); border-color: var(--accent); }
+.note-editor .table-col-append { width: 15px; height: 15px; border-top: none; }
+.note-editor .table-row-append { width: 15px; height: 15px; border-left: none; }
+.note-editor .table-controls-corner { width: 15px; height: 15px; z-index: 4; }
+
+.note-editor .table-grip-insert,
+.note-editor .table-grip-align,
+.note-editor .table-grip-delete,
+.note-editor .table-col-append,
+.note-editor .table-row-append,
+.note-editor .table-controls-corner {
+  border: none;
+  background: transparent;
+  color: var(--text-tertiary);
+  font: 700 11px/1 var(--font-mono);
+  padding: 0;
+  cursor: pointer;
+}
+.note-editor .table-grip-insert:hover { color: var(--accent); }
+.note-editor .table-grip-align:hover { color: var(--accent-hover); }
+.note-editor .table-grip-delete:hover,
+.note-editor .table-controls-corner:hover { color: var(--danger); }
 
 /* Syntax-highlighted code blocks (lowlight) */
 .note-editor pre {

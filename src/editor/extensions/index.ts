@@ -4,7 +4,6 @@ import { markInputRule, Extension, InputRule } from '@tiptap/core'
 import type { ResolvedPos } from '@tiptap/pm/model'
 import { Markdown } from 'tiptap-markdown'
 import Placeholder from '@tiptap/extension-placeholder'
-import { Table } from '@tiptap/extension-table'
 import { TableRow } from '@tiptap/extension-table-row'
 import { TableCell } from '@tiptap/extension-table-cell'
 import { TableHeader } from '@tiptap/extension-table-header'
@@ -43,6 +42,8 @@ import { TextAlignment } from './TextAlignment'
 import { Divider } from './Divider'
 import { SmartSymbols } from './SmartSymbols'
 import { NodeRange } from '@tiptap/extension-node-range'
+import { TableControls } from './TableControls'
+import { TableMarkdown } from './TableMarkdown'
 
 const lowlight = createLowlight(common)
 
@@ -136,10 +137,11 @@ export const coreExtensions = [
   NodeRange.configure({ key: 'Shift' }),
   CodeWithRegexpRule.configure({ HTMLAttributes: NO_SPELLCHECK }),
   CodeBlockEditor.configure({ lowlight, HTMLAttributes: NO_SPELLCHECK }),
-  Table.configure({ resizable: false }),
+  TableMarkdown.configure({ resizable: true }),
   TableRow,
   TableHeader,
   TableCell,
+  TableControls,
   TaskList,
   TaskItemInLists.configure({ nested: true }),
   Link.configure({ openOnClick: false, autolink: true }),
