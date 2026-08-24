@@ -108,11 +108,15 @@ export function Layout() {
     return () => void unlisten.then((off) => off())
   }, [flush, saveSession, flushGitCommit])
 
-  // The native File/Edit/View menu is the single source of truth for every
-  // modifier-key shortcut (accelerators shown on the menu items themselves) —
-  // this dispatcher is the only place any of these actions actually runs, so
-  // there is no risk of a menu accelerator and a DOM keydown handler both
-  // firing the same action from one keystroke.
+  // The native menu is the only place these commands are defined, but on
+  // Windows its accelerator table doesn't reliably fire `on_menu_event` from
+  // the keyboard (WebView2 either claims the combo for its own browser-chrome
+  // shortcut — Ctrl+P prints, Ctrl+Shift+R hard-reloads, Ctrl+Shift+I opens
+  // DevTools — or the keystroke is just swallowed with no menu event at all;
+  // both are upstream Tauri/wry issues, not something in our control). The
+  // keydown listener further down is what actually makes every accelerator
+  // shown on a menu item work — the menu's own dispatch only reliably fires
+  // from a mouse click.
   const runCommand = useCallback(
     async (id: string) => {
       switch (id) {
@@ -249,6 +253,41 @@ export function Layout() {
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [])
+
+  // Every CmdOrCtrl accelerator shown in `build_menu` (src-tauri/src/lib.rs)
+  // needs this to actually fire on Windows — see the comment on `runCommand`.
+  // None of these combinations are ever legitimate to type into a note (they
+  // all require Ctrl), so unlike the `?` listener above there's no editable
+  // target to guard against.
+  useEffect(() => {
+    const KEY_COMMANDS: Record<string, string> = {
+      n: 'new-note',
+      'shift+n': 'new-folder',
+      'shift+t': 'new-from-template',
+      o: 'open-workspace',
+      k: 'search',
+      p: 'quick-switch',
+      e: 'toggle-view',
+      'shift+i': 'insert-ink',
+      g: 'graph-view',
+      '`': 'toggle-terminal',
+      'shift+o': 'toggle-outline',
+      'shift+k': 'task-view',
+      'shift+r': 'review',
+      ',': 'settings',
+      h: 'home',
+    }
+    function onKey(e: KeyboardEvent) {
+      if (!(e.ctrlKey || e.metaKey) || e.altKey) return
+      const key = e.key.length === 1 ? e.key.toLowerCase() : e.key
+      const commandId = KEY_COMMANDS[e.shiftKey ? `shift+${key}` : key]
+      if (!commandId) return
+      e.preventDefault()
+      void runCommand(commandId)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [runCommand])
 
   useEffect(() => {
     void api.workspace.initialWorkspace().then((path) => {

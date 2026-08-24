@@ -195,6 +195,33 @@ pub fn run() {
             app.manage(commands::watcher::WatcherState::default());
             app.manage(commands::terminal::PtyState::default());
             app.manage(commands::workspace::InitialWorkspace(initial_workspace));
+
+            // WebView2 claims some of our menu accelerators for its own browser-chrome
+            // shortcuts before our menu ever sees the keystroke: Ctrl+P prints,
+            // Ctrl+Shift+R hard-reloads, Ctrl+Shift+I opens DevTools, Ctrl+G finds
+            // next. Turning this off is the only way to stop that; Tauri doesn't
+            // expose it through config. It does *not* explain every dead
+            // accelerator on Windows — see the comment on Layout.tsx's `runCommand`
+            // for the rest, which this can't fix.
+            #[cfg(windows)]
+            if let Some(webview) = app.get_webview_window("main") {
+                let _ = webview.with_webview(|platform_webview| {
+                    use webview2_com::Microsoft::Web::WebView2::Win32::ICoreWebView2Settings3;
+                    use windows::core::Interface;
+                    unsafe {
+                        let Ok(core_webview) = platform_webview.controller().CoreWebView2() else {
+                            return;
+                        };
+                        let Ok(settings) = core_webview.Settings() else {
+                            return;
+                        };
+                        if let Ok(settings3) = settings.cast::<ICoreWebView2Settings3>() {
+                            let _ = settings3.SetAreBrowserAcceleratorKeysEnabled(false);
+                        }
+                    }
+                });
+            }
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![

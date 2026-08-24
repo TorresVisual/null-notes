@@ -39,6 +39,10 @@ unicode-normalization = "0.1.25"
 random_word = { version = "0.5", features = ["de", "en"] }
 portable-pty = "0.9.0"
 
+[target.'cfg(windows)'.dependencies]
+webview2-com = "0.38"
+windows = "0.61"
+
 [features]
 default = ["pdf-native"]
 pdf-native = ["pdfium-render"]

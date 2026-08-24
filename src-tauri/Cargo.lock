@@ -2573,6 +2573,8 @@ dependencies = [
  "tokio",
  "unicode-normalization",
  "uuid",
+ "webview2-com",
+ "windows",
 ]
 
 [[package]]
