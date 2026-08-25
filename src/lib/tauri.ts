@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core'
-import type { NoteMetadata, WorkspaceState, WorkspaceTree, SearchResult, AppSettings, GraphLink, GraphTag, RepoMode, CommitOutcome, PushOutcome, PullOutcome, RepoInitOutcome, TemplateMetadata, CrossRefTarget, OpenTask, DueCard, Grade } from '../types'
+import type { NoteMetadata, WorkspaceState, WorkspaceTree, SearchResult, AppSettings, GraphLink, GraphTag, RepoMode, CommitOutcome, PushOutcome, PullOutcome, RepoInitOutcome, TemplateMetadata, CrossRefTarget, OpenTask, DueCard, Grade, NoteHistoryEntry } from '../types'
 import type { PdfPage, PdfMarkdownImport } from '../pdf/types'
 
 export const api = {
@@ -104,6 +104,10 @@ export const api = {
       invoke<PullOutcome>('fetch_and_compare', { workspace }),
     initNotesRepo: (workspace: string, createGithubRemote: boolean) =>
       invoke<RepoInitOutcome>('init_notes_repo', { workspace, createGithubRemote }),
+    listNoteHistory: (workspace: string, notePath: string) =>
+      invoke<NoteHistoryEntry[]>('list_note_history', { workspace, notePath }),
+    readNoteAtCommit: (workspace: string, notePath: string, sha: string) =>
+      invoke<string>('read_note_at_commit', { workspace, notePath, sha }),
   },
   settings: {
     load: () =>

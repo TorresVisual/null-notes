@@ -77,6 +77,12 @@ export type RepoInitOutcome =
   | { kind: 'initializedWithRemote' }
   | { kind: 'initializedLocalOnly'; remoteAddCommand: string }
 
+export interface NoteHistoryEntry {
+  sha: string
+  timestampMs: number
+  message: string
+}
+
 export type PdfImportMode = 'pages' | 'markdown'
 
 export interface AppSettings {
