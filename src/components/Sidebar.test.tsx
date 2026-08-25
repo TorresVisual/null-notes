@@ -47,3 +47,16 @@ describe('Sidebar Home button', () => {
     expect(useWorkspaceStore.getState().activeTab).toBeNull()
   })
 })
+
+describe('Sidebar Open Workspace button', () => {
+  beforeEach(() => {
+    useNotesStore.setState({ notes: [], folders: [], tags: [] })
+  })
+
+  it('shows "Opening…" and disables itself while folderLoading is true', () => {
+    useWorkspaceStore.setState({ path: null, activeTab: null, tagFilter: null, folderLoading: true })
+    render(<Sidebar {...props} />)
+
+    expect(screen.getByRole('button', { name: /Opening…/ })).toBeDisabled()
+  })
+})

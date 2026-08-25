@@ -5,6 +5,7 @@ import { folderName } from '../lib/pathPrefix'
 
 export function WorkspacePicker() {
   const recents = useWorkspaceStore((s) => s.recentWorkspaces)
+  const folderLoading = useWorkspaceStore((s) => s.folderLoading)
   const { openWorkspace, openWorkspaceAt } = useWorkspace()
 
   return (
@@ -23,7 +24,7 @@ export function WorkspacePicker() {
           <ul className="workspace-picker-recents">
             {recents.map((path) => (
               <li key={path}>
-                <button onClick={() => void openWorkspaceAt(path)} title={path}>
+                <button onClick={() => void openWorkspaceAt(path)} title={path} disabled={folderLoading}>
                   <span className="workspace-picker-name">{folderName(path)}</span>
                   <span className="workspace-picker-path">{path}</span>
                 </button>
@@ -33,8 +34,8 @@ export function WorkspacePicker() {
         </>
       )}
 
-      <button className="workspace-picker-browse" onClick={() => void openWorkspace()}>
-        <FolderOpen size={14} /> Choose a folder…
+      <button className="workspace-picker-browse" onClick={() => void openWorkspace()} disabled={folderLoading}>
+        <FolderOpen size={14} /> {folderLoading ? 'Opening…' : 'Choose a folder…'}
       </button>
     </div>
   )

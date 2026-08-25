@@ -30,6 +30,7 @@ export function Sidebar({ onSearchOpen, onSettingsOpen, onTemplateOpen }: Sideba
   const openTab = useWorkspaceStore((s) => s.openTab)
   const setActiveTab = useWorkspaceStore((s) => s.setActiveTab)
   const folderError = useWorkspaceStore((s) => s.folderError)
+  const folderLoading = useWorkspaceStore((s) => s.folderLoading)
   const { openWorkspace } = useWorkspace()
   const createNote = useCreateNote()
   const createFolder = useCreateFolder()
@@ -69,8 +70,8 @@ export function Sidebar({ onSearchOpen, onSettingsOpen, onTemplateOpen }: Sideba
   return (
     <aside className="sidebar">
       {workspaceName && <p className="workspace-name" title={workspacePath ?? ''}>{workspaceName}</p>}
-      <button className="sidebar-workspace-btn" onClick={() => void openWorkspace()}>
-        <FolderOpen size={14} /> Open Workspace
+      <button className="sidebar-workspace-btn" onClick={() => void openWorkspace()} disabled={folderLoading}>
+        <FolderOpen size={14} /> {folderLoading ? 'Opening…' : 'Open Workspace'}
       </button>
       <p className="section-label">New</p>
       <div className="sidebar-new-actions">
