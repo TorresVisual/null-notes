@@ -26,3 +26,15 @@ if (!Range.prototype.getBoundingClientRect) {
     return { x: 0, y: 0, width: 0, height: 0, top: 0, left: 0, right: 0, bottom: 0, toJSON: () => ({}) } as DOMRect
   }
 }
+
+// jsdom doesn't implement ResizeObserver, which cmdk (shadcn's Command
+// component, used by SearchModal/QuickSwitcher) observes internally to
+// track its list height — any test that mounts one throws a
+// ReferenceError before the component ever renders.
+if (!window.ResizeObserver) {
+  window.ResizeObserver = class ResizeObserver {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  }
+}
