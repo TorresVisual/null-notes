@@ -368,6 +368,71 @@ pub async fn auto_commit(
         .map_err(|e| e.to_string())
 }
 
+/// How many recent commits `list_note_history_at` returns for one note —
+/// enough for "did I lose anything recently," not a full audit log.
+pub const NOTE_HISTORY_LIMIT: usize = 20;
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct NoteHistoryEntry {
+    pub sha: String,
+    pub timestamp_ms: i64,
+    pub message: String,
+}
+
+/// The commits touching `note_path`, newest first, capped at
+/// `NOTE_HISTORY_LIMIT`. `--follow` keeps history intact across a rename —
+/// history is exactly the case where that must not look like the file's
+/// story restarted. `note_path` is the note's ordinary absolute path: a git
+/// pathspec resolves an absolute path correctly regardless of `-C`, the
+/// same assumption `checked_auto_commit`'s own `paths` argument already
+/// relies on — unlike `read_note_at_commit_at` below, no relativizing here.
+pub fn list_note_history_at(workspace: &str, note_path: &str) -> anyhow::Result<Vec<NoteHistoryEntry>> {
+    let output = no_window_command("git")
+        .arg("-C")
+        .arg(workspace)
+        .arg("log")
+        .arg("--follow")
+        .arg(format!("-n{NOTE_HISTORY_LIMIT}"))
+        .arg("--format=%H%x1f%at%x1f%s")
+        .arg("--")
+        .arg(note_path)
+        .output()?;
+
+    if !output.status.success() {
+        anyhow::bail!(
+            "git log failed for {note_path}: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+
+    let text = String::from_utf8_lossy(&output.stdout);
+    let mut entries = Vec::new();
+    for line in text.lines() {
+        let mut fields = line.splitn(3, '\u{1f}');
+        let sha = fields.next().unwrap_or_default().to_string();
+        let timestamp_s: i64 = fields.next().unwrap_or_default().parse().unwrap_or(0);
+        let message = fields.next().unwrap_or_default().to_string();
+        entries.push(NoteHistoryEntry {
+            sha,
+            timestamp_ms: timestamp_s * 1000,
+            message,
+        });
+    }
+    Ok(entries)
+}
+
+#[tauri::command]
+pub async fn list_note_history(
+    workspace: String,
+    note_path: String,
+) -> Result<Vec<NoteHistoryEntry>, String> {
+    tokio::task::spawn_blocking(move || list_note_history_at(&workspace, &note_path))
+        .await
+        .map_err(|e| e.to_string())?
+        .map_err(|e| e.to_string())
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub enum PushOutcome {
@@ -711,6 +776,123 @@ mod tests {
             .unwrap();
         assert!(status.success());
         configure_test_identity(dest);
+    }
+
+    fn commit_sha_of_head(dir: &Path) -> String {
+        let output = no_window_command("git")
+            .arg("-C")
+            .arg(dir)
+            .arg("rev-parse")
+            .arg("HEAD")
+            .output()
+            .unwrap();
+        assert!(output.status.success());
+        String::from_utf8_lossy(&output.stdout).trim().to_string()
+    }
+
+    fn commit_note_file(dir: &Path, relative_path: &str, content: &str, message: &str) -> String {
+        let path = dir.join(relative_path);
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent).unwrap();
+        }
+        std::fs::write(&path, content).unwrap();
+        let add_status = no_window_command("git")
+            .arg("-C")
+            .arg(dir)
+            .arg("add")
+            .arg("--")
+            .arg(relative_path)
+            .status()
+            .unwrap();
+        assert!(add_status.success());
+        let commit_status = no_window_command("git")
+            .arg("-C")
+            .arg(dir)
+            .arg("commit")
+            .arg("-m")
+            .arg(message)
+            .status()
+            .unwrap();
+        assert!(commit_status.success());
+        commit_sha_of_head(dir)
+    }
+
+    #[test]
+    fn list_note_history_returns_commits_touching_the_path_newest_first() {
+        let tmp = tempdir().unwrap();
+        git_init(tmp.path());
+        let note_path = tmp.path().join("Todo.md").to_string_lossy().into_owned();
+
+        let first_sha = commit_note_file(tmp.path(), "Todo.md", "# Todo\n\n- one\n", "notes: update Todo");
+        let second_sha = commit_note_file(tmp.path(), "Todo.md", "# Todo\n\n- one\n- two\n", "notes: update Todo");
+
+        let entries = list_note_history_at(&tmp.path().to_string_lossy(), &note_path).unwrap();
+
+        assert_eq!(entries.len(), 2);
+        assert_eq!(entries[0].sha, second_sha, "newest first");
+        assert_eq!(entries[0].message, "notes: update Todo");
+        assert_eq!(entries[1].sha, first_sha);
+    }
+
+    #[test]
+    fn list_note_history_is_capped_at_the_limit() {
+        let tmp = tempdir().unwrap();
+        git_init(tmp.path());
+        let note_path = tmp.path().join("Todo.md").to_string_lossy().into_owned();
+
+        for i in 0..(NOTE_HISTORY_LIMIT + 5) {
+            commit_note_file(tmp.path(), "Todo.md", &format!("edit {i}\n"), &format!("edit {i}"));
+        }
+
+        let entries = list_note_history_at(&tmp.path().to_string_lossy(), &note_path).unwrap();
+
+        assert_eq!(entries.len(), NOTE_HISTORY_LIMIT);
+    }
+
+    #[test]
+    fn list_note_history_follows_a_rename() {
+        let tmp = tempdir().unwrap();
+        git_init(tmp.path());
+        let old_sha = commit_note_file(tmp.path(), "Old.md", "# Old\n", "notes: update Old");
+
+        let rename_status = no_window_command("git")
+            .arg("-C")
+            .arg(tmp.path())
+            .arg("mv")
+            .arg("Old.md")
+            .arg("New.md")
+            .status()
+            .unwrap();
+        assert!(rename_status.success());
+        let commit_status = no_window_command("git")
+            .arg("-C")
+            .arg(tmp.path())
+            .arg("commit")
+            .arg("-m")
+            .arg("rename Old to New")
+            .status()
+            .unwrap();
+        assert!(commit_status.success());
+        let rename_sha = commit_sha_of_head(tmp.path());
+        let new_path = tmp.path().join("New.md").to_string_lossy().into_owned();
+
+        let entries = list_note_history_at(&tmp.path().to_string_lossy(), &new_path).unwrap();
+
+        assert_eq!(entries.len(), 2, "history must survive the rename");
+        assert_eq!(entries[0].sha, rename_sha);
+        assert_eq!(entries[1].sha, old_sha);
+    }
+
+    #[test]
+    fn list_note_history_returns_empty_for_a_path_with_no_history() {
+        let tmp = tempdir().unwrap();
+        git_init(tmp.path());
+        commit_note_file(tmp.path(), "Other.md", "# Other\n", "notes: update Other");
+        let untouched_path = tmp.path().join("Todo.md").to_string_lossy().into_owned();
+
+        let entries = list_note_history_at(&tmp.path().to_string_lossy(), &untouched_path).unwrap();
+
+        assert!(entries.is_empty());
     }
 
     #[test]
