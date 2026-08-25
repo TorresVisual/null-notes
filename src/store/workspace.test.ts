@@ -10,6 +10,7 @@ const reset = () =>
     selectedFolder: null,
     folderContextMenu: null,
     folderError: null,
+    folderLoading: false,
     tagFilter: null,
     recentWorkspaces: [],
     recentSearches: [],
@@ -119,6 +120,15 @@ describe('useWorkspaceStore', () => {
     expect(useWorkspaceStore.getState().folderError).toBe('a folder named X already exists')
     useWorkspaceStore.getState().setFolderError(null)
     expect(useWorkspaceStore.getState().folderError).toBeNull()
+  })
+
+  it('setFolderLoading toggles the loading flag independently of folderError', () => {
+    useWorkspaceStore.getState().setFolderLoading(true)
+    expect(useWorkspaceStore.getState().folderLoading).toBe(true)
+    expect(useWorkspaceStore.getState().folderError).toBeNull()
+
+    useWorkspaceStore.getState().setFolderLoading(false)
+    expect(useWorkspaceStore.getState().folderLoading).toBe(false)
   })
 
   it('sets and clears the tag filter', () => {

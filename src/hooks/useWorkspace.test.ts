@@ -35,6 +35,8 @@ describe('useWorkspace', () => {
       activeTab: null,
       expandedFolders: [],
       repoMode: null,
+      folderLoading: false,
+      folderError: null,
       git: { prompted: false, autoCommit: false, idleMinutes: 10, skipHooks: false, autoPush: true, allowCodeRepoPush: false },
     })
     useNotesStore.setState({ notes: [], folders: [], tags: [] })
@@ -59,6 +61,26 @@ describe('useWorkspace', () => {
     await result.current.openWorkspaceAt('/ws')
 
     expect(useWorkspaceStore.getState().git).toEqual({ prompted: true, autoCommit: true, idleMinutes: 10, skipHooks: false, autoPush: true, allowCodeRepoPush: false })
+  })
+
+  it('sets folderLoading true while scanning, false once settled', async () => {
+    const { result } = renderHook(() => useWorkspace())
+
+    const promise = result.current.openWorkspaceAt('/ws')
+    expect(useWorkspaceStore.getState().folderLoading).toBe(true)
+
+    await promise
+    expect(useWorkspaceStore.getState().folderLoading).toBe(false)
+  })
+
+  it('clears folderLoading even when the scan fails', async () => {
+    notes.scan.mockRejectedValue(new Error('not found'))
+    const { result } = renderHook(() => useWorkspace())
+
+    await result.current.openWorkspaceAt('/ws')
+
+    expect(useWorkspaceStore.getState().folderLoading).toBe(false)
+    expect(useWorkspaceStore.getState().folderError).toBe('not found')
   })
 
   it('does not persist to recent workspaces when remember is false', async () => {

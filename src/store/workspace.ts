@@ -42,6 +42,8 @@ interface WorkspaceStore {
   closeTabsUnder: (prefix: string) => void
   folderError: string | null
   setFolderError: (message: string | null) => void
+  folderLoading: boolean
+  setFolderLoading: (loading: boolean) => void
   tagFilter: string | null
   setTagFilter: (tag: string | null) => void
   recentWorkspaces: string[]
@@ -90,6 +92,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   selectedFolder: null,
   folderContextMenu: null,
   folderError: null,
+  folderLoading: false,
   tagFilter: null,
   recentWorkspaces: [],
   recentSearches: [],
@@ -164,6 +167,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   },
 
   setFolderError: (message) => set({ folderError: message }),
+  setFolderLoading: (loading) => set({ folderLoading: loading }),
   setTagFilter: (tag) => set({ tagFilter: tag }),
   setRecentWorkspaces: (paths) => set({ recentWorkspaces: paths }),
   setRecentSearches: (queries) => set({ recentSearches: queries }),

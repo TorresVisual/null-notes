@@ -40,8 +40,9 @@ export function useWorkspace() {
   const openWorkspaceAt = useCallback(
     async (selected: string, opts: { remember?: boolean } = {}) => {
       const { remember = true } = opts
-      const { setFolderError, setRecentWorkspaces, setRecentSearches, setGit, setRepoMode } =
+      const { setFolderError, setFolderLoading, setRecentWorkspaces, setRecentSearches, setGit, setRepoMode } =
         useWorkspaceStore.getState()
+      setFolderLoading(true)
       let tree, session
       try {
         ;[tree, session] = await Promise.all([
@@ -50,6 +51,7 @@ export function useWorkspace() {
         ])
       } catch (e) {
         setFolderError(e instanceof Error ? e.message : String(e))
+        setFolderLoading(false)
         return
       }
 
@@ -80,6 +82,7 @@ export function useWorkspace() {
       } catch {
         setRepoMode(null)
       }
+      setFolderLoading(false)
     },
     [setPath, setNotes, setFolders, setExpandedFolders, openTab, resetForNewWorkspace, saveSession, checkForUpdates],
   )
