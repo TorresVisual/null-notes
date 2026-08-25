@@ -39,8 +39,6 @@ export const api = {
       invoke<string>('create_folder', { parent, name }),
     splitIntoTasks: (markdown: string) =>
       invoke<string>('split_into_tasks', { markdown }),
-    scaffoldProjectNotes: (workspace: string) =>
-      invoke<NoteMetadata[]>('scaffold_project_notes', { workspace }),
     resolveCodeLinks: (workspace: string, targets: string[]) =>
       invoke<boolean[]>('resolve_code_links', { workspace, targets }),
     openInEditor: (workspace: string, target: string, line: number | null, template: string) =>
