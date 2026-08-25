@@ -40,15 +40,6 @@ fn build_menu(handle: &tauri::AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
                 true,
                 Some("CmdOrCtrl+O"),
             )?,
-            // A menu item and nothing else: scaffolding is on request only, so
-            // it must never be reachable by opening a workspace.
-            &MenuItem::with_id(
-                handle,
-                "scaffold-notes",
-                "Scaffold Project Notes",
-                true,
-                None::<&str>,
-            )?,
             &PredefinedMenuItem::separator(handle)?,
             // On request only: a PDF import never does this on its own, because
             // "this document is an exercise sheet" is a claim about the
@@ -246,7 +237,6 @@ pub fn run() {
             commands::notes::graph_links,
             commands::notes::graph_tags,
             commands::notes::create_folder,
-            commands::notes::scaffold_project_notes,
             commands::notes::split_into_tasks,
             commands::notes::list_templates,
             commands::notes::read_template,
