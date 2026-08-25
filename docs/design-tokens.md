@@ -168,3 +168,29 @@ Two more concrete "currently silent" fixes named directly in the task brief:
 
 - **A task being ticked** — `TaskView.tsx`'s checkbox used to remove the row from the list the instant the write resolved, with no confirmation. It now optimistically shows checked + struck-through (`.task-view-item.checked`) for `TASK_CHECK_FADE_MS` (320ms) before the row leaves the list.
 - **A note being created** — a newly created note's tab used to just appear with no acknowledgement. It now gets one `tab-flash` accent pulse (900ms), cleared via `onAnimationEnd` rather than a timer so it can never outlive its own animation. ("Copied" doesn't apply — there is no whole-note copy feature, only block duplication inside the editor, which already gives correct positional feedback via node selection; animating the newly-duplicated block itself would need a ProseMirror decoration plugin, a larger change than this pass's scope, so it's left for a follow-up rather than folded in here.)
+
+---
+
+## The shadcn/ui token bridge (P10)
+
+The app shell (Layout, Sidebar, TabBar, all dialogs/overlays, the command palette, the folder context menu) runs on Tailwind CSS v4 + shadcn/ui (Radix primitives) as of P10 — adopted for real focus-trap/Escape/keyboard-nav behavior the hand-rolled overlays lacked, not as a visual identity change. Terminal Precision's actual palette, type, spacing and motion are unchanged; every shadcn-generated component is re-skinned onto the tokens above via a bridge block in `src/index.css`'s `:root`, appended after the tokens it points at:
+
+```css
+--background: var(--bg-base);
+--foreground: var(--text-primary);
+--card: var(--bg-raised);           --card-foreground: var(--text-primary);
+--popover: var(--bg-raised);        --popover-foreground: var(--text-primary);
+--primary: var(--accent);           --primary-foreground: var(--accent-contrast);
+--secondary: var(--bg-hover);       --secondary-foreground: var(--text-primary);
+--muted: var(--bg-hover);           --muted-foreground: var(--text-secondary);
+--menu-highlight-bg: var(--bg-hover); --menu-highlight-fg: var(--text-primary);
+--destructive: var(--danger);       --destructive-foreground: var(--accent-contrast);
+--input: var(--border-strong);      --ring: var(--accent);
+--radius: 0.625rem;
+```
+
+**The one deliberate naming resolution**: shadcn's own `--accent`/`--accent-foreground` mean "subtle hover/highlight background" (menu-item hover, `Command` item highlight) — a different concept from this file's `--accent` (the signal-green brand color, unchanged above). Reusing the literal name would make one CSS declaration silently overwrite the other, since both would collide in the same `:root` block. Brand green rides shadcn's `--primary` instead (what `Button`'s default variant and `--ring` actually key off); the hover/highlight pair is routed through `--menu-highlight-*`, never `--accent`, so both concepts survive under different names. A `@theme inline` block right after registers these as Tailwind utilities (`bg-primary`, `text-foreground`, `border-border-strong`, `shadow-modal`, etc.) — see that block's own comment in `index.css` for the full mapping, including the three `--shadow-*` tokens and `--font-sans`/`--font-mono` registered the same way.
+
+No dark-mode variant block exists or is needed — the app is always-dark, single theme; a `.dark` class toggle was never wired up.
+
+**Extending this further**: a new shadcn component almost always Just Works once added via the CLI, because it consumes these same semantic classes rather than hard-coded colors. The one recurring gotcha is CSS cascade layers — Tailwind's own utility classes live inside `@layer utilities`, so any *pre-existing*, unlayered selector in this file (e.g. `.sidebar button`, `.context-menu button`) always wins over a Tailwind utility on the same property, regardless of specificity, whenever a new component lands inside an old, not-yet-restyled container. The fix each time has been the same: either scope/remove the old selector, or (for a component whose established look should simply carry over, like the context menu or the search input row) point the new component's `className` at the *existing* class name so the old, already-correct CSS wins deliberately rather than by accident.

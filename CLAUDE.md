@@ -8,6 +8,7 @@ A WYSIWYG Markdown note-taking app for CS students. Desktop-primary (Tauri + Win
 - **Backend:** Rust (file I/O, PDF pipeline, OCR orchestration)
 - **Frontend:** React 19 + TypeScript (strict)
 - **Editor:** TipTap 3 (ProseMirror)
+- **Styling:** Tailwind v4 + shadcn/ui (app shell) · plain CSS in `src/index.css` (editor)
 - **Ink:** Canvas API + perfect-freehand
 - **Storage:** Plain `.md` files + SQLite index
 
@@ -203,6 +204,14 @@ const { strokes, addStroke, undo } = useInkCanvas(canvasRef)
 
 // bad — logic lives in the component
 ```
+
+### Styling
+
+The app shell (Layout, Sidebar, TabBar, dialogs/overlays, command palette, folder context menu) runs on Tailwind CSS v4 + shadcn/ui; `src/components/ui/` is generated but owned — edit it directly, it's not a vendored dependency. The TipTap editor surface stays on plain CSS in `src/index.css`, untouched by this.
+
+Every shadcn component reads Terminal Precision's existing tokens through a bridge block in `src/index.css`'s `:root` (see `docs/design-tokens.md`'s "shadcn/ui token bridge") — never hardcode a color for a new one. Tailwind utilities live in `@layer utilities`; any pre-existing unlayered selector (`.sidebar button`, `.context-menu button`, …) always beats a same-property Tailwind utility regardless of specificity, so a new shadcn component dropped inside an old container needs the old selector scoped/removed, or its `className` pointed at the existing class so that CSS wins on purpose.
+
+`cn()` (clsx + tailwind-merge) lives in `src/lib/utils.ts`. `@/*` resolves to `src/*` (both `tsconfig.json` and `vite.config.ts`).
 
 ### TipTap extensions
 
