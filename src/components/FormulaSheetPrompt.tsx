@@ -4,6 +4,7 @@ import { api } from '../lib/tauri'
 import { useWorkspaceStore } from '../store/workspace'
 import { useNotesStore } from '../store/notes'
 import { parseSearchQuery } from '../lib/searchQuery'
+import { Dialog, DialogContent, DialogTitle } from './ui/dialog'
 
 interface FormulaSheetPromptProps {
   onClose: () => void
@@ -38,10 +39,12 @@ export function FormulaSheetPrompt({ onClose }: FormulaSheetPromptProps) {
   }
 
   return (
-    <div className="search-overlay" onMouseDown={onClose}>
-      <div className="formula-sheet-prompt" onMouseDown={(e) => e.stopPropagation()}>
+    <Dialog open onOpenChange={(next) => !next && onClose()}>
+      <DialogContent className="formula-sheet-prompt" showCloseButton={false}>
         <div className="settings-panel-header">
-          <h2>Generate Formula Sheet</h2>
+          <DialogTitle asChild>
+            <h2>Generate Formula Sheet</h2>
+          </DialogTitle>
           <button className="settings-panel-close" onClick={onClose} aria-label="Close">
             <X size={16} />
           </button>
@@ -59,7 +62,6 @@ export function FormulaSheetPrompt({ onClose }: FormulaSheetPromptProps) {
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === 'Enter') void generate()
-            else if (e.key === 'Escape') onClose()
           }}
         />
         {error && <p className="formula-sheet-prompt-error">{error}</p>}
@@ -69,7 +71,7 @@ export function FormulaSheetPrompt({ onClose }: FormulaSheetPromptProps) {
             {isGenerating ? 'Generating…' : 'Generate'}
           </button>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   )
 }

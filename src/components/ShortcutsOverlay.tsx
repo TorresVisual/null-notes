@@ -1,3 +1,5 @@
+import { Dialog, DialogContent, DialogTitle } from './ui/dialog'
+
 interface ShortcutsOverlayProps {
   onClose: () => void
 }
@@ -56,10 +58,12 @@ const SHORTCUT_GROUPS: ShortcutGroup[] = [
 
 export function ShortcutsOverlay({ onClose }: ShortcutsOverlayProps) {
   return (
-    <div className="search-overlay" onMouseDown={onClose}>
-      <div className="settings-panel" onMouseDown={(e) => e.stopPropagation()}>
+    <Dialog open onOpenChange={(next) => !next && onClose()}>
+      <DialogContent className="settings-panel" showCloseButton={false}>
         <div className="settings-panel-header">
-          <h2>Keyboard Shortcuts</h2>
+          <DialogTitle asChild>
+            <h2>Keyboard Shortcuts</h2>
+          </DialogTitle>
         </div>
         {SHORTCUT_GROUPS.map((group) => (
           <div className="settings-section" key={group.label}>
@@ -74,7 +78,7 @@ export function ShortcutsOverlay({ onClose }: ShortcutsOverlayProps) {
             </ul>
           </div>
         ))}
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   )
 }

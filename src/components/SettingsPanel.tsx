@@ -5,6 +5,7 @@ import { useSettingsStore, DEFAULT_SETTINGS } from '../store/settings'
 import { useWorkspaceStore } from '../store/workspace'
 import { useGitConfig } from '../hooks/useGitConfig'
 import { api } from '../lib/tauri'
+import { Dialog, DialogContent, DialogTitle } from './ui/dialog'
 
 interface SettingsPanelProps {
   onClose: () => void
@@ -40,10 +41,12 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
   }
 
   return (
-    <div className="search-overlay settings-overlay" onMouseDown={onClose}>
-      <div className="settings-panel settings-panel--lg" onMouseDown={(e) => e.stopPropagation()}>
+    <Dialog open onOpenChange={(next) => !next && onClose()}>
+      <DialogContent className="settings-panel settings-panel--lg" showCloseButton={false}>
         <div className="settings-panel-header">
-          <h2>Settings</h2>
+          <DialogTitle asChild>
+            <h2>Settings</h2>
+          </DialogTitle>
           <button className="settings-panel-close" onClick={onClose} aria-label="Close settings" title="Close settings">
             <X size={16} />
           </button>
@@ -352,7 +355,7 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
             Reset to defaults
           </button>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   )
 }

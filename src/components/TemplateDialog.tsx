@@ -6,6 +6,7 @@ import { useCreateNoteFromTemplate } from '../hooks/useCreateNoteFromTemplate'
 import { useWorkspaceStore } from '../store/workspace'
 import { showToast } from '../store/toast'
 import type { TemplateMetadata } from '../types'
+import { Dialog, DialogContent, DialogTitle } from './ui/dialog'
 
 interface TemplateDialogProps {
   onClose: () => void
@@ -72,10 +73,12 @@ export function TemplateDialog({ onClose }: TemplateDialogProps) {
   }
 
   return (
-    <div className="search-overlay" onMouseDown={onClose}>
-      <div className="settings-panel" onMouseDown={(e) => e.stopPropagation()}>
+    <Dialog open onOpenChange={(next) => !next && onClose()}>
+      <DialogContent className="settings-panel" showCloseButton={false}>
         <div className="settings-panel-header">
-          <h2>{selected ? selected.meta.name : 'New from Template'}</h2>
+          <DialogTitle asChild>
+            <h2>{selected ? selected.meta.name : 'New from Template'}</h2>
+          </DialogTitle>
           <button className="settings-panel-close" onClick={onClose} aria-label="Close" title="Close">
             <X size={16} />
           </button>
@@ -142,7 +145,7 @@ export function TemplateDialog({ onClose }: TemplateDialogProps) {
             </div>
           </>
         )}
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   )
 }

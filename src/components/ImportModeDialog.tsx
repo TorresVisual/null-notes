@@ -1,5 +1,6 @@
 import { FileImage, FileText } from 'lucide-react'
 import type { PdfImportMode } from '../types'
+import { Dialog, DialogContent, DialogTitle } from './ui/dialog'
 
 interface ImportModeDialogProps {
   fileName: string
@@ -15,9 +16,11 @@ export function ImportModeDialog({
   onCancel,
 }: ImportModeDialogProps) {
   return (
-    <div className="search-overlay" onMouseDown={onCancel}>
-      <div className="import-mode-dialog" onMouseDown={(e) => e.stopPropagation()}>
-        <h2>Import {fileName}</h2>
+    <Dialog open onOpenChange={(next) => !next && onCancel()}>
+      <DialogContent className="import-mode-dialog" showCloseButton={false}>
+        <DialogTitle asChild>
+          <h2>Import {fileName}</h2>
+        </DialogTitle>
 
         <button
           className={`import-mode-option${initialMode === 'markdown' ? ' preferred' : ''}`}
@@ -52,7 +55,7 @@ export function ImportModeDialog({
         <button className="import-mode-cancel" onClick={onCancel}>
           Cancel
         </button>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   )
 }

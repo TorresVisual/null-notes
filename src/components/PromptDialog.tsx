@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
-import type { FormEvent, KeyboardEvent } from 'react'
+import type { FormEvent } from 'react'
 import { usePromptDialogStore } from '../store/promptDialog'
+import { Dialog, DialogContent, DialogTitle } from './ui/dialog'
 
 // The in-app replacement for window.prompt (see promptText) — a native
 // browser prompt looks completely out of place next to the rest of this
@@ -34,35 +35,30 @@ export function PromptDialog() {
     submit(trimmed)
   }
 
-  function handleKeyDown(e: KeyboardEvent) {
-    if (e.key === 'Escape') cancel()
-  }
-
   return (
-    <div className="search-overlay" onMouseDown={cancel}>
-      <form
-        className="settings-panel prompt-dialog"
-        onMouseDown={(e) => e.stopPropagation()}
-        onSubmit={handleSubmit}
-      >
-        <p className="prompt-dialog-message">{message}</p>
-        <input
-          ref={inputRef}
-          className="prompt-dialog-input"
-          type="text"
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          onKeyDown={handleKeyDown}
-        />
-        <div className="prompt-dialog-actions">
-          <button type="button" className="import-mode-cancel" onClick={cancel}>
-            Cancel
-          </button>
-          <button type="submit" className="dialog-action-primary" disabled={!value.trim()}>
-            OK
-          </button>
-        </div>
-      </form>
-    </div>
+    <Dialog open onOpenChange={(next) => !next && cancel()}>
+      <DialogContent className="settings-panel prompt-dialog" showCloseButton={false}>
+        <form onSubmit={handleSubmit}>
+          <DialogTitle asChild>
+            <p className="prompt-dialog-message">{message}</p>
+          </DialogTitle>
+          <input
+            ref={inputRef}
+            className="prompt-dialog-input"
+            type="text"
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+          />
+          <div className="prompt-dialog-actions">
+            <button type="button" className="import-mode-cancel" onClick={cancel}>
+              Cancel
+            </button>
+            <button type="submit" className="dialog-action-primary" disabled={!value.trim()}>
+              OK
+            </button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
   )
 }
