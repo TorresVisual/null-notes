@@ -1,5 +1,19 @@
 import { useEffect, useState } from 'react'
-import { FilePlus, FolderOpen, FolderPlus, Home, LayoutTemplate, PenLine, Search, Settings } from 'lucide-react'
+import {
+  FilePlus,
+  FolderOpen,
+  FolderPlus,
+  GraduationCap,
+  Home,
+  LayoutTemplate,
+  ListChecks,
+  Network,
+  PenLine,
+  Search,
+  Settings,
+  Sigma,
+  SquareTerminal,
+} from 'lucide-react'
 import { useNotesStore } from '../store/notes'
 import { useWorkspaceStore } from '../store/workspace'
 import { useWorkspace } from '../hooks/useWorkspace'
@@ -20,9 +34,23 @@ interface SidebarProps {
   onSearchOpen: () => void
   onSettingsOpen: () => void
   onTemplateOpen: () => void
+  onGraphOpen: () => void
+  onTaskOpen: () => void
+  onReviewOpen: () => void
+  onFormulaSheetOpen: () => void
+  onTerminalToggle: () => void
 }
 
-export function Sidebar({ onSearchOpen, onSettingsOpen, onTemplateOpen }: SidebarProps) {
+export function Sidebar({
+  onSearchOpen,
+  onSettingsOpen,
+  onTemplateOpen,
+  onGraphOpen,
+  onTaskOpen,
+  onReviewOpen,
+  onFormulaSheetOpen,
+  onTerminalToggle,
+}: SidebarProps) {
   const notes = useNotesStore((s) => s.notes)
   const folders = useNotesStore((s) => s.folders)
   const workspacePath = useWorkspaceStore((s) => s.path)
@@ -91,7 +119,7 @@ export function Sidebar({ onSearchOpen, onSettingsOpen, onTemplateOpen }: Sideba
       <ImportButton />
       <div className="sidebar-group">
         <button
-          className="search-open-btn"
+          className="sidebar-nav-btn"
           onClick={() => setActiveTab(null)}
           disabled={!workspacePath}
         >
@@ -100,16 +128,63 @@ export function Sidebar({ onSearchOpen, onSettingsOpen, onTemplateOpen }: Sideba
           </span>
           <kbd>Ctrl H</kbd>
         </button>
-        <button className="search-open-btn" onClick={onSearchOpen}>
+        <button className="sidebar-nav-btn" onClick={onSearchOpen}>
           <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <Search size={13} /> Search
           </span>
           <kbd>Ctrl K</kbd>
         </button>
-        <button className="search-open-btn" onClick={onSettingsOpen}>
+        <button className="sidebar-nav-btn" onClick={onSettingsOpen}>
           <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <Settings size={13} /> Settings
           </span>
+        </button>
+      </div>
+      <div className="sidebar-secondary-actions">
+        <button
+          className="toolbar-button"
+          onClick={onGraphOpen}
+          disabled={!workspacePath}
+          aria-label="Graph view"
+          title="Graph view (Ctrl G)"
+        >
+          <Network size={14} />
+        </button>
+        <button
+          className="toolbar-button"
+          onClick={onTaskOpen}
+          disabled={!workspacePath}
+          aria-label="Tasks"
+          title="Tasks (Ctrl Shift K)"
+        >
+          <ListChecks size={14} />
+        </button>
+        <button
+          className="toolbar-button"
+          onClick={onReviewOpen}
+          disabled={!workspacePath}
+          aria-label="Review"
+          title="Review (Ctrl Shift R)"
+        >
+          <GraduationCap size={14} />
+        </button>
+        <button
+          className="toolbar-button"
+          onClick={onTerminalToggle}
+          disabled={!workspacePath}
+          aria-label="Terminal"
+          title="Terminal (Ctrl `)"
+        >
+          <SquareTerminal size={14} />
+        </button>
+        <button
+          className="toolbar-button"
+          onClick={onFormulaSheetOpen}
+          disabled={!workspacePath}
+          aria-label="Generate formula sheet"
+          title="Generate formula sheet"
+        >
+          <Sigma size={14} />
         </button>
       </div>
       {folderError && <p className="sidebar-error">{folderError}</p>}

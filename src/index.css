@@ -276,6 +276,9 @@ button, [role="button"], .tree-row, .tab, .search-result, .slash-menu-item,
   color: var(--text-tertiary);
   cursor: pointer;
   font-size: 13px;
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
@@ -1234,19 +1237,32 @@ code {
 .wiki-link-missing { color: var(--text-tertiary); text-decoration: underline dotted var(--border-strong); }
 .wiki-link-missing:hover { color: var(--text-secondary); background: var(--bg-hover); }
 
-/* Sidebar search-open button */
-.search-open-btn {
+/* Shared style for every sidebar nav row (Home, Search, Settings, and the
+   secondary-feature icon row below it) — named for what it is, not for
+   which row happened to use it first. */
+.sidebar-nav-btn {
   display: flex;
   justify-content: space-between;
   align-items: center;
   color: var(--text-tertiary) !important;
 }
 
+/* Secondary features (graph, tasks, review, terminal, formula sheet)
+   previously had no persistent entry point — menu-only, on a platform
+   where WebView2 doesn't reliably fire menu accelerators from the
+   keyboard. One compact icon row, reusing .toolbar-button's established
+   ghost-square look rather than inventing a second button style. */
+.sidebar-secondary-actions {
+  display: flex;
+  gap: var(--space-xs);
+  margin: var(--space-xs) 0;
+}
+
 /* Deliberately more muted and smaller than .shortcuts-row kbd: this is a
    peripheral hint next to the "Search" label, not the point of the row the
    way a shortcuts-overlay entry is — padding matches so the two don't drift
    for no reason, but size/color stay distinct on purpose. */
-.search-open-btn kbd {
+.sidebar-nav-btn kbd {
   font-size: 10px;
   color: var(--text-disabled);
   background: var(--bg-base);
@@ -1895,7 +1911,13 @@ code {
   flex-direction: column;
   align-items: flex-end;
   gap: 7px;
+  max-height: 100%;
+  overflow-y: auto;
   pointer-events: auto;
+  /* A heading-heavy note would otherwise overflow this centered, fixed-height
+     rail with no way to reach the ticks past the fold — scroll instead of
+     spilling past the panel's own bounds. */
+  scrollbar-width: thin;
 }
 
 .outline-tick {
@@ -2161,6 +2183,12 @@ code {
   align-items: center;
   justify-content: space-between;
   gap: var(--space-md);
+  /* .settings-panel--lg is sized for the Git section's longer prose, but
+     `justify-content: space-between` on a short label + a narrow control
+     turns that width into a gap between them, not a home for content — cap
+     it so the common rows (Editor/Writing/Tools) don't pay rent for the
+     Git section's edge case. */
+  max-width: 640px;
 }
 
 .settings-row > span:first-child {
@@ -2216,13 +2244,13 @@ code {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: var(--bg-sunken);
-  border: 1px solid var(--border-strong);
+  background: var(--bg-hover);
+  border: 1px solid var(--text-tertiary);
   border-radius: 4px;
   cursor: pointer;
 }
 
-.settings-row-control input[type='checkbox']:hover { border-color: var(--text-tertiary); }
+.settings-row-control input[type='checkbox']:hover { border-color: var(--text-secondary); }
 
 .settings-row-control input[type='checkbox']:checked {
   background: var(--accent);

@@ -1,0 +1,47 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "bounce-easing",
+        "value": "var(--ease-spring)",
+        "createdAt": "2026-08-25T18:24:37.576Z",
+        "reason": "Claude (audit 2026-08-25): deliberately narrow overshoot token, documented inline at index.css:69-75 as reserved only for button-press/surface-entrance/selection-landing moments that should feel physically weighted, explicitly never applied to plain color transitions where overshoot would read as a glitch. Not the generic elastic/bounce tell the rule targets — was the deliverable of a dedicated P9.5-4 motion-polish task, not accidental."
+      },
+      {
+        "rule": "bounce-easing",
+        "value": "cubic-bezier(0.34, 1.56, 0.64, 1)",
+        "createdAt": "2026-08-25T18:24:37.689Z",
+        "reason": "Claude (audit 2026-08-25): same token as var(--ease-spring) above, flagged separately at its own definition site (index.css:79). Same reasoning applies — deliberate, narrow, documented overshoot, not generic bounce/elastic slop."
+      },
+      {
+        "rule": "side-tab",
+        "value": "*",
+        "files": [
+          "src/index.css"
+        ],
+        "createdAt": "2026-08-25T18:24:37.801Z",
+        "reason": "Claude (audit 2026-08-25): all 3 current hits are Markdown content semantics, not decorative AI-dashboard-card accents — .details-wrapper (collapsible section), .note-editor blockquote (literal Markdown blockquote, universal convention), .callout (theorem/proof/algorithm blocks with per-type color). None are cards; all render actual note content the app's own content model defines."
+      },
+      {
+        "rule": "codex-grid-background",
+        "value": "*",
+        "files": [
+          "src/index.css"
+        ],
+        "createdAt": "2026-08-25T18:24:37.915Z",
+        "reason": "Claude (audit 2026-08-25): the one hit is .ink-canvas's handwriting guide grid, the literal 'actual canvas... surface' this rule's own description carves out as legitimate use, not a decorative dashboard background. Comment at the rule's own site confirms: grid guides handwriting, never saved into the .svg sidecar."
+      },
+      {
+        "rule": "broken-image",
+        "value": "*",
+        "files": [
+          "src/editor/extensions/NoteImage.tsx"
+        ],
+        "createdAt": "2026-08-25T18:25:06.139Z",
+        "reason": "Claude (audit 2026-08-25): false positive — this is markdown-serializer code (typed.write(...) building a Markdown string for round-trip export), not a rendered DOM element. attrs always includes a populated src=\"${encodedSrc}\" built two lines above from the node's real src attr; there is no empty/placeholder src path here. broken-image isn't in the detector's directValueRules whitelist, so a literal-snippet value silently never matches — wildcard+file scope is the only form that works for this rule (confirmed by reading impeccable-config.mjs's extractFindingIgnoreValue)."
+      }
+    ]
+  }
+}

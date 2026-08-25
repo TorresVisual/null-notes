@@ -10,6 +10,11 @@ interface SettingsPanelProps {
   onClose: () => void
 }
 
+function clampNumber(raw: number, min: number, max: number): number {
+  if (Number.isNaN(raw)) return min
+  return Math.min(max, Math.max(min, raw))
+}
+
 export function SettingsPanel({ onClose }: SettingsPanelProps) {
   const settings = useSettingsStore((s) => s.settings)
   const setSettings = useSettingsStore((s) => s.setSettings)
@@ -59,7 +64,9 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
                   max={5000}
                   step={100}
                   value={settings.autosaveDebounceMs}
-                  onChange={(e) => void update({ autosaveDebounceMs: Number(e.target.value) })}
+                  onChange={(e) =>
+                    void update({ autosaveDebounceMs: clampNumber(Number(e.target.value), 100, 5000) })
+                  }
                 />
                 <span className="settings-unit">ms</span>
               </span>
@@ -77,7 +84,9 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
                   max={1600}
                   step={20}
                   value={settings.editorMaxWidthPx}
-                  onChange={(e) => void update({ editorMaxWidthPx: Number(e.target.value) })}
+                  onChange={(e) =>
+                    void update({ editorMaxWidthPx: clampNumber(Number(e.target.value), 480, 1600) })
+                  }
                 />
                 <span className="settings-unit">px</span>
               </span>
@@ -228,7 +237,9 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
                         min={1}
                         max={120}
                         value={gitIdleMinutes}
-                        onChange={(e) => void updateGit({ idleMinutes: Number(e.target.value) })}
+                        onChange={(e) =>
+                          void updateGit({ idleMinutes: clampNumber(Number(e.target.value), 1, 120) })
+                        }
                       />
                       <span className="settings-unit">min</span>
                     </span>
@@ -331,7 +342,12 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
         <div className="settings-panel-footer">
           <button
             className="settings-reset"
-            onClick={() => void update(DEFAULT_SETTINGS)}
+            onClick={() => {
+              void (async () => {
+                const proceed = await confirm('Reset every setting on this page to its default value?')
+                if (proceed) await update(DEFAULT_SETTINGS)
+              })()
+            }}
           >
             Reset to defaults
           </button>

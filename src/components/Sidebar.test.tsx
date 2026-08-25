@@ -15,7 +15,16 @@ vi.mock('../hooks/useCreateNote', () => ({ useCreateNote: () => vi.fn() }))
 vi.mock('../hooks/useCreateFolder', () => ({ useCreateFolder: () => vi.fn() }))
 vi.mock('../hooks/useCreateCanvasNote', () => ({ useCreateCanvasNote: () => vi.fn() }))
 
-const props = { onSearchOpen: vi.fn(), onSettingsOpen: vi.fn(), onTemplateOpen: vi.fn() }
+const props = {
+  onSearchOpen: vi.fn(),
+  onSettingsOpen: vi.fn(),
+  onTemplateOpen: vi.fn(),
+  onGraphOpen: vi.fn(),
+  onTaskOpen: vi.fn(),
+  onReviewOpen: vi.fn(),
+  onFormulaSheetOpen: vi.fn(),
+  onTerminalToggle: vi.fn(),
+}
 
 afterEach(() => {
   cleanup()

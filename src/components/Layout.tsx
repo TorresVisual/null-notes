@@ -47,6 +47,8 @@ type ViewMode = 'wysiwyg' | 'raw'
 export function Layout() {
   const activeTab = useWorkspaceStore((s) => s.activeTab)
   const setActiveTab = useWorkspaceStore((s) => s.setActiveTab)
+  const openTabs = useWorkspaceStore((s) => s.openTabs)
+  const closeTab = useWorkspaceStore((s) => s.closeTab)
   const workspacePath = useWorkspaceStore((s) => s.path)
   const notes = useNotesStore((s) => s.notes)
   const currentNote = notes.find((n) => n.path === activeTab)
@@ -192,13 +194,26 @@ export function Layout() {
         case 'toggle-outline':
           if (activeTab) setOutlineOpen((o) => !o)
           break
+        case 'close-tab':
+          if (activeTab) closeTab(activeTab)
+          break
+        case 'next-tab':
+        case 'prev-tab': {
+          if (openTabs.length < 2 || !activeTab) break
+          const i = openTabs.indexOf(activeTab)
+          const step = id === 'next-tab' ? 1 : -1
+          setActiveTab(openTabs[(i + step + openTabs.length) % openTabs.length] ?? null)
+          break
+        }
       }
     },
     [
       activeTab,
       viewMode,
       workspacePath,
+      openTabs,
       setActiveTab,
+      closeTab,
       createNote,
       createFolder,
       createCanvasNote,
@@ -259,6 +274,9 @@ export function Layout() {
       'shift+r': 'review',
       ',': 'settings',
       h: 'home',
+      w: 'close-tab',
+      Tab: 'next-tab',
+      'shift+Tab': 'prev-tab',
     }
     function onKey(e: KeyboardEvent) {
       if (!(e.ctrlKey || e.metaKey) || e.altKey) return
@@ -305,6 +323,14 @@ export function Layout() {
         onSearchOpen={() => openOverlay('search')}
         onSettingsOpen={() => openOverlay('settings')}
         onTemplateOpen={() => openOverlay('template')}
+        onGraphOpen={() => openOverlay('graph')}
+        onTaskOpen={() => openOverlay('task')}
+        onReviewOpen={() => openOverlay('review')}
+        onFormulaSheetOpen={() => openOverlay('formulaSheet')}
+        onTerminalToggle={() => {
+          setTerminalMounted(true)
+          setTerminalOpen((o) => !o)
+        }}
       />
       <div className="main">
         <TabBar

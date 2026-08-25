@@ -45,7 +45,7 @@ export function TabBar({
               if (isFlashing) setFlashTabPath(null)
             }}
           >
-            <button onClick={() => setActiveTab(path)}>{name}</button>
+            <button onClick={() => setActiveTab(path)} title={name}>{name}</button>
             <button className="tab-close" onClick={() => closeTab(path)} aria-label={`Close ${name}`}>
               <X size={12} />
             </button>
