@@ -1780,6 +1780,89 @@ code {
 
 .backlink-item:hover { text-decoration: underline; }
 
+.note-history-panel {
+  margin-top: var(--space-md);
+}
+
+.note-history-toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  background: none;
+  border: none;
+  color: var(--text-tertiary);
+  font-size: 12px;
+  cursor: pointer;
+  padding: var(--space-xs) 0;
+}
+
+.note-history-empty {
+  color: var(--text-tertiary);
+  font: var(--text-empty-state);
+  margin: 0;
+}
+
+.note-history-error { font-size: 12px; color: var(--danger); }
+
+.note-history-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.note-history-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  width: 100%;
+  background: none;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+  padding: var(--space-xs) 0;
+}
+
+.note-history-timestamp {
+  color: var(--text-tertiary);
+  font-size: 11px;
+}
+
+.note-history-message {
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.note-history-preview {
+  margin-top: var(--space-sm);
+  padding: var(--space-sm);
+  background: var(--bg-sunken);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.note-history-preview pre {
+  white-space: pre-wrap;
+  font-size: 12px;
+  max-height: 240px;
+  overflow-y: auto;
+  margin: 0 0 var(--space-sm);
+}
+
+.note-history-restore {
+  background: none;
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  padding: var(--space-xs) var(--space-sm);
+  cursor: pointer;
+}
+
+.note-history-restore:hover {
+  color: var(--text-primary);
+  border-color: var(--text-tertiary);
+}
+
 /* Outline panel (P6-6) — a persistent right-side rail, overlaid on top of
    .editor-scroll (not a flex sibling — see .editor-body's own comment for
    why) so it stays visible while the note itself scrolls, and reads as

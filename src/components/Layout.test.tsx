@@ -37,6 +37,10 @@ vi.mock('../lib/tauri', () => ({
       notesWithTag: vi.fn().mockResolvedValue([]),
       listOpenTasks: vi.fn().mockResolvedValue([]),
       listDueCards: vi.fn().mockResolvedValue([]),
+      backlinksFor: vi.fn().mockResolvedValue([]),
+    },
+    git: {
+      listNoteHistory: vi.fn().mockResolvedValue([]),
     },
   },
 }))
@@ -86,6 +90,23 @@ beforeEach(() => {
   useWorkspaceStore.setState({ path: null, activeTab: null, tagFilter: null })
   useNotesStore.setState({ notes: [], folders: [], tags: [] })
   useSettingsStore.setState({ settings: DEFAULT_SETTINGS })
+  // vi.clearAllMocks() (afterEach, below) clears call history but not a
+  // mockReturnValue override from a previous test — without this, a test
+  // further down the file that overrides useNote (e.g. isLoading: true)
+  // would leak that override into every test that runs after it.
+  vi.mocked(useNote).mockReturnValue({
+    content: '',
+    save: vi.fn(),
+    isLoading: false,
+    saveState: 'clean',
+    saveError: null,
+    flush: vi.fn().mockResolvedValue(undefined),
+    retrySave: vi.fn(),
+    dismissError: vi.fn(),
+    conflict: false,
+    keepMine: vi.fn(),
+    reloadTheirs: vi.fn(),
+  })
 })
 
 afterEach(() => {
@@ -155,5 +176,43 @@ describe('Layout note-loading indicator', () => {
 
     expect(screen.getByText('Loading…')).toBeInTheDocument()
     expect(document.querySelector('.spin')).toBeInTheDocument()
+  })
+})
+
+describe('Layout note history panel', () => {
+  it('shows the history panel only when the workspace is a Git repository', () => {
+    useWorkspaceStore.setState({
+      path: '/ws',
+      activeTab: '/ws/Lecture.md',
+      tagFilter: null,
+      repoMode: null,
+    })
+    useNotesStore.setState({
+      notes: [{ id: '1', path: '/ws/Lecture.md', title: 'Lecture', workspace: '/ws', updatedAt: 0 }],
+      folders: [],
+      tags: [],
+    })
+
+    render(<Layout />)
+
+    expect(screen.queryByText(/History \(/)).not.toBeInTheDocument()
+  })
+
+  it('shows the history panel when the workspace is a Git repository', async () => {
+    useWorkspaceStore.setState({
+      path: '/ws',
+      activeTab: '/ws/Lecture.md',
+      tagFilter: null,
+      repoMode: 'notesOnly',
+    })
+    useNotesStore.setState({
+      notes: [{ id: '1', path: '/ws/Lecture.md', title: 'Lecture', workspace: '/ws', updatedAt: 0 }],
+      folders: [],
+      tags: [],
+    })
+
+    render(<Layout />)
+
+    expect(await screen.findByText(/History \(/)).toBeInTheDocument()
   })
 })

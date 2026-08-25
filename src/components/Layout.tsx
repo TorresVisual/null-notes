@@ -9,6 +9,7 @@ import { RawEditor } from '../editor/RawEditor'
 import { SearchModal } from './SearchModal'
 import { QuickSwitcher } from './QuickSwitcher'
 import { BacklinksPanel } from './BacklinksPanel'
+import { NoteHistoryPanel } from './NoteHistoryPanel'
 import { OutlinePanel } from './OutlinePanel'
 import { WorkspacePicker } from './WorkspacePicker'
 import { SettingsPanel } from './SettingsPanel'
@@ -375,6 +376,13 @@ export function Layout() {
               )}
               {!isLoading && activeTab && currentNote && (
                 <BacklinksPanel notePath={activeTab} noteTitle={currentNote.title} />
+              )}
+              {!isLoading && activeTab && repoMode && (
+                <NoteHistoryPanel
+                  notePath={activeTab}
+                  saveState={saveState}
+                  onRestore={(content) => void save(content)}
+                />
               )}
             </div>
           </div>
