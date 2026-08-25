@@ -6,6 +6,7 @@ import { useNotesStore } from '../store/notes'
 import { useSettingsStore } from '../store/settings'
 import { ImportModeDialog } from './ImportModeDialog'
 import { api } from '../lib/tauri'
+import { showToast } from '../store/toast'
 import { encodeSrc } from '../editor/extensions/NoteImage'
 import type { PdfPage, PdfMarkdownImport } from '../pdf/types'
 import type { PdfImportMode } from '../types'
@@ -116,6 +117,7 @@ export function ImportButton() {
       // Same gap as the New Note/New Folder buttons: a collapsed target
       // folder would otherwise leave the freshly imported note invisible.
       expandFolder(folder)
+      showToast(`Imported "${picked.title}"`)
     } catch (e) {
       // Names the file, states what's provably true regardless of which step
       // failed (the source PDF is only ever read, never written to), and
