@@ -28,7 +28,7 @@
 
 - [x] The ctrl e shortcut doesnt work
 
-- [ ] Total links and history should be colapsed by default
+- [ ] Total links and history should be collapsed by default
 
 ## Features
 
@@ -654,7 +654,7 @@ Do not let these influence P0–P9 design.
 
 <details>
 <summary>P0 — Trustworthy daily driver (M0 ✅)</summary>
-\- \[x\] P0-1 Debounced autosave with \`clean|dirty|saving|error\` state; flushes on tab switch, unmount, window close
+\\- \\\[x\\\] P0-1 Debounced autosave with \\\`clean|dirty|saving|error\\\` state; flushes on tab switch, unmount, window close
 
 - [x] P0-2 Save failures surface with retry; buffer stays dirty on failure
 
@@ -669,7 +669,7 @@ Do not let these influence P0–P9 design.
 </details>
 <details>
 <summary>P1 — Everyday-use completeness (M1 ✅)</summary>
-\- \[x\] P1-1 Clicking an unresolved \`\[\[link\]\]\` creates and opens the note
+\\- \\\[x\\\] P1-1 Clicking an unresolved \\\`\\\[\\\[link\\\]\\\]\\\` creates and opens the note
 
 - [x] P1-2 Recent workspaces + `Ctrl+P` quick switcher
 
@@ -682,7 +682,7 @@ Do not let these influence P0–P9 design.
 </details>
 <details>
 <summary>P2 — Feel & ergonomics (M2 ✅)</summary>
-\- \[x\] P2-1 Settings panel — autosave delay, editor width; persists to \`settings.json\` in the app data dir
+\\- \\\[x\\\] P2-1 Settings panel — autosave delay, editor width; persists to \\\`settings.json\\\` in the app data dir
 
 - [x] P2-2 Native File/Edit/View menu + shortcuts overlay, one command dispatcher
 
@@ -703,7 +703,7 @@ Do not let these influence P0–P9 design.
 </details>
 <details>
 <summary>P3 — Headline features (M3 ✅)</summary>
-\- \[x\] P3-1 PDF import as reference images; OCR pipeline deleted; pages land in a \`NoteName.pdf/\` sidecar
+\\- \\\[x\\\] P3-1 PDF import as reference images; OCR pipeline deleted; pages land in a \\\`NoteName.pdf/\\\` sidecar
 
 - [x] P3-2 Export to PDF via the WebView print pipeline + a `@media print` stylesheet
 
@@ -714,7 +714,7 @@ Do not let these influence P0–P9 design.
 </details>
 <details>
 <summary>Editing core (pre-roadmap)</summary>
-\- \[x\] Live-preview WYSIWYG, plain \`.md\` as the only format, GitHub Markdown
+\\- \\\[x\\\] Live-preview WYSIWYG, plain \\\`.md\\\` as the only format, GitHub Markdown
 
 - [x] KaTeX (inline + block), Mermaid, syntax-highlighted code, callouts, tables, task lists
 
@@ -729,7 +729,7 @@ Do not let these influence P0–P9 design.
 - [x] "Terminal Precision" design system
 
 </details>
-\---
+\\---
 
 ## Not doing
 
