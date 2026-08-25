@@ -50,7 +50,9 @@
 
 - [ ] ![image.png](TODO.assets/image-1787696238603.png)![image.png](TODO.assets/image-1787696268102.png)This modal needs to be fixed
 
-- [ ] ![image.png](TODO.assets/image-1787696138751.png)These infos position needs to be better
+- [ ] ![image.png](TODO.assets/image-1787696138751.png)These info's position needs to be better
+
+- [ ] .assets folders aren't auto committed
 
 ## Checklist
 
