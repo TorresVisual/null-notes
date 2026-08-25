@@ -1,6 +1,6 @@
 # null-notes — TODO
 
-## Found Issues
+## TODO's
 
 - [x] Home Button — clickable Home entry in the sidebar nav group, next to Search/Settings
 
@@ -29,8 +29,6 @@
 - [x] The ctrl e shortcut doesnt work
 
 - [ ] Total links and history should be collapsed by default
-
-## Features
 
 - [ ] Use the built git feature to sync workspaces to other machines
 
