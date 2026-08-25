@@ -4,6 +4,7 @@ import { Layout } from './Layout'
 import { useWorkspaceStore } from '../store/workspace'
 import { useNotesStore } from '../store/notes'
 import { useSettingsStore, DEFAULT_SETTINGS } from '../store/settings'
+import { useNote } from '../hooks/useNote'
 
 vi.mock('@tauri-apps/api/event', () => ({
   listen: vi.fn().mockResolvedValue(vi.fn()),
@@ -40,7 +41,7 @@ vi.mock('../lib/tauri', () => ({
   },
 }))
 vi.mock('../hooks/useNote', () => ({
-  useNote: () => ({
+  useNote: vi.fn(() => ({
     content: '',
     save: vi.fn(),
     isLoading: false,
@@ -52,7 +53,7 @@ vi.mock('../hooks/useNote', () => ({
     conflict: false,
     keepMine: vi.fn(),
     reloadTheirs: vi.fn(),
-  }),
+  })),
 }))
 vi.mock('../hooks/useWorkspace', () => ({
   useWorkspace: () => ({
@@ -125,5 +126,34 @@ describe('Layout overlay exclusivity', () => {
     act(() => pressKey('Escape'))
 
     expect(screen.queryByPlaceholderText(/Search notes/)).not.toBeInTheDocument()
+  })
+})
+
+describe('Layout note-loading indicator', () => {
+  it('shows a spinner next to the loading text while a note is loading', () => {
+    useWorkspaceStore.setState({ path: '/ws', activeTab: '/ws/Lecture.md', tagFilter: null })
+    useNotesStore.setState({
+      notes: [{ id: '1', path: '/ws/Lecture.md', title: 'Lecture', workspace: '/ws', updatedAt: 0 }],
+      folders: [],
+      tags: [],
+    })
+    vi.mocked(useNote).mockReturnValue({
+      content: '',
+      save: vi.fn(),
+      isLoading: true,
+      saveState: 'clean',
+      saveError: null,
+      flush: vi.fn().mockResolvedValue(undefined),
+      retrySave: vi.fn(),
+      dismissError: vi.fn(),
+      conflict: false,
+      keepMine: vi.fn(),
+      reloadTheirs: vi.fn(),
+    })
+
+    render(<Layout />)
+
+    expect(screen.getByText('Loading…')).toBeInTheDocument()
+    expect(document.querySelector('.spin')).toBeInTheDocument()
   })
 })

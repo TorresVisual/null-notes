@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { listen } from '@tauri-apps/api/event'
+import { Loader2 } from 'lucide-react'
 import { Sidebar } from './Sidebar'
 import { TabBar } from './TabBar'
 import { NoteEditor } from '../editor/NoteEditor'
@@ -337,7 +338,11 @@ export function Layout() {
               className={`editor-pane${!activeTab && !workspacePath ? ' editor-pane--center' : ''}`}
               style={{ '--editor-max-width': `${settings.editorMaxWidthPx}px` } as CSSProperties}
             >
-              {isLoading && <p className="status">Loading…</p>}
+              {isLoading && (
+                <p className="status">
+                  <Loader2 size={14} className="spin" /> Loading…
+                </p>
+              )}
               {!isLoading && activeTab && viewMode === 'wysiwyg' && (
                 <NoteEditor
                   content={content}

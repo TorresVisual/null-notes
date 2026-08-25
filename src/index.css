@@ -454,6 +454,14 @@ button, [role="button"], .tree-row, .tab, .search-result, .slash-menu-item,
   font: var(--text-empty-state);
 }
 
+.spin {
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
 /* Second line under an empty-state message — "what to do next," per P9.5-5.
    Shared by every empty-state class (.empty-state, .search-empty,
    .backlinks-empty, .home-empty) rather than each defining its own. */
