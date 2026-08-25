@@ -191,6 +191,21 @@ export function handleEditorTextInput(view: EditorView, from: number, to: number
 
 export const CodeBlockEditor = CodeBlockLowlight.extend({
 
+  // Presentation-only, like `Details`' collapse state (P6-1): word-wrap is a
+  // per-block view preference, not content, and tiptap-markdown's built-in
+  // codeBlock serializer only ever reads `language` — so this never reaches
+  // the fence info string and never dirties the round-trip.
+  addAttributes() {
+    return {
+      ...this.parent?.(),
+      wrap: {
+        default: false,
+        parseHTML: (element) => element.getAttribute('data-wrap') === 'true',
+        renderHTML: (attributes) => ({ 'data-wrap': attributes['wrap'] ? 'true' : 'false' }),
+      },
+    }
+  },
+
   addProseMirrorPlugins() {
     const parentPlugins = this.parent?.() ?? []
 
