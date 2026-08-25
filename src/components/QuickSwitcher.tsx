@@ -49,9 +49,7 @@ export function QuickSwitcher({ onClose }: QuickSwitcherProps) {
   }
 
   function handleKeyDown(e: React.KeyboardEvent) {
-    if (e.key === 'Escape') {
-      onClose()
-    } else if (e.key === 'ArrowDown') {
+    if (e.key === 'ArrowDown') {
       e.preventDefault()
       setSelected((s) => Math.min(s + 1, results.length - 1))
     } else if (e.key === 'ArrowUp') {

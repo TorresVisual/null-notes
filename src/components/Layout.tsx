@@ -30,6 +30,7 @@ import { useCreateNote } from '../hooks/useCreateNote'
 import { useCreateFolder } from '../hooks/useCreateFolder'
 import { useCreateCanvasNote } from '../hooks/useCreateCanvasNote'
 import { useScrollRestoration } from '../hooks/useScrollRestoration'
+import { useOverlayManager } from '../hooks/useOverlayManager'
 import { ConflictBar } from './ConflictBar'
 import { GitAutoCommitPrompt } from './GitAutoCommitPrompt'
 import { GitDivergedBar } from './GitDivergedBar'
@@ -72,17 +73,9 @@ export function Layout() {
   const createFolder = useCreateFolder()
   const createCanvasNote = useCreateCanvasNote()
   const [viewMode, setViewMode] = useState<ViewMode>('wysiwyg')
-  const [searchOpen, setSearchOpen] = useState(false)
-  const [switcherOpen, setSwitcherOpen] = useState(false)
-  const [settingsOpen, setSettingsOpen] = useState(false)
-  const [shortcutsOpen, setShortcutsOpen] = useState(false)
-  const [templateDialogOpen, setTemplateDialogOpen] = useState(false)
+  const { activeOverlay, openOverlay, closeOverlay } = useOverlayManager()
   const [outlineOpen, setOutlineOpen] = useState(true)
   const editorPaneRef = useRef<HTMLDivElement>(null)
-  const [graphOpen, setGraphOpen] = useState(false)
-  const [taskViewOpen, setTaskViewOpen] = useState(false)
-  const [reviewOpen, setReviewOpen] = useState(false)
-  const [formulaSheetOpen, setFormulaSheetOpen] = useState(false)
   const [terminalMounted, setTerminalMounted] = useState(false)
   const [terminalOpen, setTerminalOpen] = useState(false)
   const settings = useSettingsStore((s) => s.settings)
@@ -133,19 +126,19 @@ export function Layout() {
           break
         }
         case 'new-from-template':
-          if (workspacePath) setTemplateDialogOpen(true)
+          if (workspacePath) openOverlay('template')
           break
         case 'open-workspace':
           await openWorkspace()
           break
         case 'settings':
-          setSettingsOpen(true)
+          openOverlay('settings')
           break
         case 'search':
-          setSearchOpen(true)
+          openOverlay('search')
           break
         case 'quick-switch':
-          setSwitcherOpen(true)
+          openOverlay('switcher')
           break
         case 'home':
           if (workspacePath) setActiveTab(null)
@@ -174,19 +167,19 @@ export function Layout() {
           }
           break
         case 'shortcuts-help':
-          setShortcutsOpen(true)
+          openOverlay('shortcuts')
           break
         case 'graph-view':
-          if (workspacePath) setGraphOpen(true)
+          if (workspacePath) openOverlay('graph')
           break
         case 'task-view':
-          if (workspacePath) setTaskViewOpen(true)
+          if (workspacePath) openOverlay('task')
           break
         case 'review':
-          if (workspacePath) setReviewOpen(true)
+          if (workspacePath) openOverlay('review')
           break
         case 'generate-formula-sheet':
-          if (workspacePath) setFormulaSheetOpen(true)
+          if (workspacePath) openOverlay('formulaSheet')
           break
         case 'toggle-terminal':
           if (!workspacePath) break
@@ -207,6 +200,7 @@ export function Layout() {
       createFolder,
       createCanvasNote,
       openWorkspace,
+      openOverlay,
     ],
   )
 
@@ -234,11 +228,11 @@ export function Layout() {
       if (e.key !== '?' || e.ctrlKey || e.metaKey) return
       const target = e.target as HTMLElement | null
       if (target?.closest('input, textarea, [contenteditable="true"]')) return
-      setShortcutsOpen(true)
+      openOverlay('shortcuts')
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [])
+  }, [openOverlay])
 
   // Every CmdOrCtrl accelerator shown in `build_menu` (src-tauri/src/lib.rs)
   // needs this to actually fire on Windows — see the comment on `runCommand`.
@@ -293,20 +287,20 @@ export function Layout() {
 
   return (
     <div className="layout">
-      {searchOpen && <SearchModal onClose={() => setSearchOpen(false)} />}
-      {switcherOpen && <QuickSwitcher onClose={() => setSwitcherOpen(false)} />}
-      {settingsOpen && <SettingsPanel onClose={() => setSettingsOpen(false)} />}
-      {shortcutsOpen && <ShortcutsOverlay onClose={() => setShortcutsOpen(false)} />}
+      {activeOverlay === 'search' && <SearchModal onClose={closeOverlay} />}
+      {activeOverlay === 'switcher' && <QuickSwitcher onClose={closeOverlay} />}
+      {activeOverlay === 'settings' && <SettingsPanel onClose={closeOverlay} />}
+      {activeOverlay === 'shortcuts' && <ShortcutsOverlay onClose={closeOverlay} />}
       <PromptDialog />
-      {templateDialogOpen && <TemplateDialog onClose={() => setTemplateDialogOpen(false)} />}
-      {graphOpen && <GraphView onClose={() => setGraphOpen(false)} />}
-      {taskViewOpen && <TaskView onClose={() => setTaskViewOpen(false)} />}
-      {reviewOpen && <ReviewSession onClose={() => setReviewOpen(false)} />}
-      {formulaSheetOpen && <FormulaSheetPrompt onClose={() => setFormulaSheetOpen(false)} />}
+      {activeOverlay === 'template' && <TemplateDialog onClose={closeOverlay} />}
+      {activeOverlay === 'graph' && <GraphView onClose={closeOverlay} />}
+      {activeOverlay === 'task' && <TaskView onClose={closeOverlay} />}
+      {activeOverlay === 'review' && <ReviewSession onClose={closeOverlay} />}
+      {activeOverlay === 'formulaSheet' && <FormulaSheetPrompt onClose={closeOverlay} />}
       <Sidebar
-        onSearchOpen={() => setSearchOpen(true)}
-        onSettingsOpen={() => setSettingsOpen(true)}
-        onTemplateOpen={() => setTemplateDialogOpen(true)}
+        onSearchOpen={() => openOverlay('search')}
+        onSettingsOpen={() => openOverlay('settings')}
+        onTemplateOpen={() => openOverlay('template')}
       />
       <div className="main">
         <TabBar
@@ -367,9 +361,9 @@ export function Layout() {
               )}
               {!activeTab && workspacePath && notes.length > 0 && (
                 <HomeView
-                  onOpenTaskView={() => setTaskViewOpen(true)}
-                  onOpenReview={() => setReviewOpen(true)}
-                  onOpenSettings={() => setSettingsOpen(true)}
+                  onOpenTaskView={() => openOverlay('task')}
+                  onOpenReview={() => openOverlay('review')}
+                  onOpenSettings={() => openOverlay('settings')}
                 />
               )}
               {!isLoading && activeTab && currentNote && (
