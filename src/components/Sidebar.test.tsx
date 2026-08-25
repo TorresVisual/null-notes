@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event'
 import { Sidebar } from './Sidebar'
 import { useWorkspaceStore } from '../store/workspace'
 import { useNotesStore } from '../store/notes'
+import { TooltipProvider } from './ui/tooltip'
 
 vi.mock('../lib/tauri', () => ({
   api: { notes: { notesWithTag: vi.fn().mockResolvedValue([]) } },
@@ -31,6 +32,16 @@ afterEach(() => {
   vi.clearAllMocks()
 })
 
+// Sidebar's secondary-action icons are wrapped in shadcn Tooltips, which
+// throw outside a TooltipProvider — mirrors the real provider Layout mounts.
+function renderSidebar() {
+  return render(
+    <TooltipProvider>
+      <Sidebar {...props} />
+    </TooltipProvider>,
+  )
+}
+
 describe('Sidebar Home button', () => {
   beforeEach(() => {
     useNotesStore.setState({ notes: [], folders: [], tags: [] })
@@ -38,7 +49,7 @@ describe('Sidebar Home button', () => {
 
   it('is disabled with no workspace open', () => {
     useWorkspaceStore.setState({ path: null, activeTab: null, tagFilter: null })
-    render(<Sidebar {...props} />)
+    renderSidebar()
 
     expect(screen.getByRole('button', { name: /Home/ })).toBeDisabled()
   })
@@ -49,7 +60,7 @@ describe('Sidebar Home button', () => {
   it('returns to the home view when clicked', async () => {
     const user = userEvent.setup()
     useWorkspaceStore.setState({ path: '/ws', activeTab: '/ws/Note.md', tagFilter: null })
-    render(<Sidebar {...props} />)
+    renderSidebar()
 
     await user.click(screen.getByRole('button', { name: /Home/ }))
 
@@ -64,7 +75,7 @@ describe('Sidebar Open Workspace button', () => {
 
   it('shows "Opening…" and disables itself while folderLoading is true', () => {
     useWorkspaceStore.setState({ path: null, activeTab: null, tagFilter: null, folderLoading: true })
-    render(<Sidebar {...props} />)
+    renderSidebar()
 
     expect(screen.getByRole('button', { name: /Opening…/ })).toBeDisabled()
   })

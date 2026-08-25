@@ -10,7 +10,14 @@ import type { FolderTreeNode, NoteTreeNode } from '../lib/folderTree'
 
 vi.mock('../lib/tauri', () => ({
   api: {
-    notes: { delete: vi.fn(), rename: vi.fn(), scan: vi.fn(), renameFolder: vi.fn(), moveNote: vi.fn() },
+    notes: {
+      delete: vi.fn(),
+      rename: vi.fn(),
+      scan: vi.fn(),
+      renameFolder: vi.fn(),
+      moveNote: vi.fn(),
+      deleteFolder: vi.fn(),
+    },
   },
 }))
 
@@ -79,6 +86,43 @@ describe('TreeNode delete (note)', () => {
     await userEvent.click(screen.getByRole('button', { name: `Delete ${noteEntry.name}` }))
 
     expect(notesApi.delete).not.toHaveBeenCalled()
+    expect(useWorkspaceStore.getState().gitPendingPaths).toEqual([])
+  })
+})
+
+describe('TreeNode delete (folder, via right-click context menu)', () => {
+  // The bug this guards against: deleting a whole course folder removed the
+  // files locally but never queued the subtree for auto-commit, so the
+  // deletion silently never reached the repo. A single directory pathspec
+  // covers every note under it — no need to enumerate each one.
+  it('queues the deleted folder path for auto-commit', async () => {
+    useNotesStore.setState({
+      notes: [
+        { id: '1', title: 'L1', path: '/ws/Target/L1.md', workspace: '/ws', updatedAt: 0 },
+        { id: '2', title: 'L2', path: '/ws/Target/L2.md', workspace: '/ws', updatedAt: 0 },
+      ],
+      folders: [],
+      tags: [],
+    })
+    dialog.confirm.mockResolvedValue(true)
+    notesApi.deleteFolder.mockResolvedValue(undefined)
+    render(<TreeNode entry={folderEntry} depth={0} />)
+
+    fireEvent.contextMenu(screen.getByText('Target').closest('.tree-folder')!)
+    await userEvent.click(await screen.findByRole('menuitem', { name: /Delete/ }))
+
+    expect(notesApi.deleteFolder).toHaveBeenCalledWith('/ws/Target')
+    expect(useWorkspaceStore.getState().gitPendingPaths).toEqual(['/ws/Target'])
+  })
+
+  it('does nothing when the confirm dialog is declined', async () => {
+    dialog.confirm.mockResolvedValue(false)
+    render(<TreeNode entry={folderEntry} depth={0} />)
+
+    fireEvent.contextMenu(screen.getByText('Target').closest('.tree-folder')!)
+    await userEvent.click(await screen.findByRole('menuitem', { name: /Delete/ }))
+
+    expect(notesApi.deleteFolder).not.toHaveBeenCalled()
     expect(useWorkspaceStore.getState().gitPendingPaths).toEqual([])
   })
 })

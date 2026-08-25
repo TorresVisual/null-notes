@@ -22,13 +22,13 @@ import { useCreateFolder } from '../hooks/useCreateFolder'
 import { useCreateCanvasNote } from '../hooks/useCreateCanvasNote'
 import { ImportButton } from './ImportButton'
 import { FolderTree } from './FolderTree'
-import { FolderContextMenu } from './FolderContextMenu'
 import { TagList } from './TagList'
 import { buildFolderTree } from '../lib/folderTree'
 import { folderName } from '../lib/pathPrefix'
 import { promptText } from '../store/promptDialog'
 import { api } from '../lib/tauri'
 import type { NoteMetadata } from '../types'
+import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip'
 
 interface SidebarProps {
   onSearchOpen: () => void
@@ -141,51 +141,71 @@ export function Sidebar({
         </button>
       </div>
       <div className="sidebar-secondary-actions">
-        <button
-          className="toolbar-button"
-          onClick={onGraphOpen}
-          disabled={!workspacePath}
-          aria-label="Graph view"
-          title="Graph view (Ctrl G)"
-        >
-          <Network size={14} />
-        </button>
-        <button
-          className="toolbar-button"
-          onClick={onTaskOpen}
-          disabled={!workspacePath}
-          aria-label="Tasks"
-          title="Tasks (Ctrl Shift K)"
-        >
-          <ListChecks size={14} />
-        </button>
-        <button
-          className="toolbar-button"
-          onClick={onReviewOpen}
-          disabled={!workspacePath}
-          aria-label="Review"
-          title="Review (Ctrl Shift R)"
-        >
-          <GraduationCap size={14} />
-        </button>
-        <button
-          className="toolbar-button"
-          onClick={onTerminalToggle}
-          disabled={!workspacePath}
-          aria-label="Terminal"
-          title="Terminal (Ctrl `)"
-        >
-          <SquareTerminal size={14} />
-        </button>
-        <button
-          className="toolbar-button"
-          onClick={onFormulaSheetOpen}
-          disabled={!workspacePath}
-          aria-label="Generate formula sheet"
-          title="Generate formula sheet"
-        >
-          <Sigma size={14} />
-        </button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              className="toolbar-button"
+              onClick={onGraphOpen}
+              disabled={!workspacePath}
+              aria-label="Graph view"
+            >
+              <Network size={14} />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent>Graph view (Ctrl G)</TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              className="toolbar-button"
+              onClick={onTaskOpen}
+              disabled={!workspacePath}
+              aria-label="Tasks"
+            >
+              <ListChecks size={14} />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent>Tasks (Ctrl Shift K)</TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              className="toolbar-button"
+              onClick={onReviewOpen}
+              disabled={!workspacePath}
+              aria-label="Review"
+            >
+              <GraduationCap size={14} />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent>Review (Ctrl Shift R)</TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              className="toolbar-button"
+              onClick={onTerminalToggle}
+              disabled={!workspacePath}
+              aria-label="Terminal"
+            >
+              <SquareTerminal size={14} />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent>Terminal (Ctrl `)</TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              className="toolbar-button"
+              onClick={onFormulaSheetOpen}
+              disabled={!workspacePath}
+              aria-label="Generate formula sheet"
+            >
+              <Sigma size={14} />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent>Generate formula sheet</TooltipContent>
+        </Tooltip>
       </div>
       {folderError && <p className="sidebar-error">{folderError}</p>}
       <TagList />
@@ -208,7 +228,6 @@ export function Sidebar({
       ) : (
         <FolderTree entries={tree} />
       )}
-      <FolderContextMenu />
     </aside>
   )
 }

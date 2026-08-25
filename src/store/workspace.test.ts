@@ -8,7 +8,6 @@ const reset = () =>
     activeTab: null,
     expandedFolders: [],
     selectedFolder: null,
-    folderContextMenu: null,
     folderError: null,
     folderLoading: false,
     tagFilter: null,
@@ -108,13 +107,6 @@ describe('useWorkspaceStore', () => {
     expect(useWorkspaceStore.getState().openTabs).toEqual(['/ws/Course10/b.md'])
   })
 
-  it('opens and closes the folder context menu', () => {
-    useWorkspaceStore.getState().openFolderContextMenu('/ws/A', 10, 20)
-    expect(useWorkspaceStore.getState().folderContextMenu).toEqual({ path: '/ws/A', x: 10, y: 20 })
-    useWorkspaceStore.getState().closeFolderContextMenu()
-    expect(useWorkspaceStore.getState().folderContextMenu).toBeNull()
-  })
-
   it('sets and clears the folder error message', () => {
     useWorkspaceStore.getState().setFolderError('a folder named X already exists')
     expect(useWorkspaceStore.getState().folderError).toBe('a folder named X already exists')
@@ -142,7 +134,6 @@ describe('useWorkspaceStore', () => {
     useWorkspaceStore.getState().openTab('/ws/a.md')
     useWorkspaceStore.getState().toggleFolder('/ws/A')
     useWorkspaceStore.getState().setSelectedFolder('/ws/A')
-    useWorkspaceStore.getState().openFolderContextMenu('/ws/A', 10, 20)
     useWorkspaceStore.getState().setFolderError('some error')
     useWorkspaceStore.getState().setTagFilter('cs101')
 
@@ -152,7 +143,6 @@ describe('useWorkspaceStore', () => {
     expect(useWorkspaceStore.getState().activeTab).toBeNull()
     expect(useWorkspaceStore.getState().expandedFolders).toEqual([])
     expect(useWorkspaceStore.getState().selectedFolder).toBeNull()
-    expect(useWorkspaceStore.getState().folderContextMenu).toBeNull()
     expect(useWorkspaceStore.getState().folderError).toBeNull()
     expect(useWorkspaceStore.getState().tagFilter).toBeNull()
   })

@@ -15,19 +15,12 @@ const DEFAULT_GIT_CONFIG: GitWorkspaceConfig = {
   allowCodeRepoPush: false,
 }
 
-interface FolderContextMenuState {
-  path: string
-  x: number
-  y: number
-}
-
 interface WorkspaceStore {
   path: string | null
   openTabs: string[]
   activeTab: string | null
   expandedFolders: string[]
   selectedFolder: string | null
-  folderContextMenu: FolderContextMenuState | null
   setPath: (path: string) => void
   openTab: (notePath: string) => void
   closeTab: (notePath: string) => void
@@ -36,8 +29,6 @@ interface WorkspaceStore {
   expandFolder: (folderPath: string) => void
   setExpandedFolders: (paths: string[]) => void
   setSelectedFolder: (path: string | null) => void
-  openFolderContextMenu: (path: string, x: number, y: number) => void
-  closeFolderContextMenu: () => void
   replaceOpenPath: (oldPrefix: string, newPrefix: string) => void
   closeTabsUnder: (prefix: string) => void
   folderError: string | null
@@ -90,7 +81,6 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   activeTab: null,
   expandedFolders: [],
   selectedFolder: null,
-  folderContextMenu: null,
   folderError: null,
   folderLoading: false,
   tagFilter: null,
@@ -146,9 +136,6 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   setExpandedFolders: (paths) => set({ expandedFolders: paths }),
   setSelectedFolder: (path) => set({ selectedFolder: path }),
 
-  openFolderContextMenu: (path, x, y) => set({ folderContextMenu: { path, x, y } }),
-  closeFolderContextMenu: () => set({ folderContextMenu: null }),
-
   replaceOpenPath: (oldPrefix, newPrefix) => {
     const { openTabs, activeTab, expandedFolders, selectedFolder } = get()
     set({
@@ -198,7 +185,6 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
       activeTab: null,
       expandedFolders: [],
       selectedFolder: null,
-      folderContextMenu: null,
       folderError: null,
       tagFilter: null,
       recentSearches: [],

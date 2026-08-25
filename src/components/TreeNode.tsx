@@ -8,6 +8,7 @@ import { api } from '../lib/tauri'
 import { refreshTree } from '../hooks/useWorkspace'
 import { folderName, isUnderPath } from '../lib/pathPrefix'
 import type { TreeEntry } from '../lib/folderTree'
+import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from './ui/context-menu'
 
 interface TreeNodeProps {
   entry: TreeEntry
@@ -22,12 +23,13 @@ export function TreeNode({ entry, depth }: TreeNodeProps) {
   const toggleFolder = useWorkspaceStore((s) => s.toggleFolder)
   const setSelectedFolder = useWorkspaceStore((s) => s.setSelectedFolder)
   const setTagFilter = useWorkspaceStore((s) => s.setTagFilter)
-  const openFolderContextMenu = useWorkspaceStore((s) => s.openFolderContextMenu)
   const expandFolder = useWorkspaceStore((s) => s.expandFolder)
   const replaceOpenPath = useWorkspaceStore((s) => s.replaceOpenPath)
+  const closeTabsUnder = useWorkspaceStore((s) => s.closeTabsUnder)
   const setFolderError = useWorkspaceStore((s) => s.setFolderError)
   const openTab = useWorkspaceStore((s) => s.openTab)
   const closeTab = useWorkspaceStore((s) => s.closeTab)
+  const notes = useNotesStore((s) => s.notes)
   const removeNote = useNotesStore((s) => s.removeNote)
 
   if (entry.type === 'note') {
@@ -119,34 +121,75 @@ export function TreeNode({ entry, depth }: TreeNodeProps) {
     }
   }
 
+  async function handleRenameFolder() {
+    const name = await promptText('New folder name:', entry.name)
+    if (!name || name === entry.name) return
+    const newPath = entry.path.replace(/[^/\\]+$/, name)
+    try {
+      await api.notes.renameFolder(entry.path, newPath)
+      replaceOpenPath(entry.path, newPath)
+      setFolderError(null)
+      await refreshTree()
+    } catch (e) {
+      setFolderError(e instanceof Error ? e.message : String(e))
+    }
+  }
+
+  async function handleDeleteFolder() {
+    const count = notes.filter((n) => isUnderPath(n.path, entry.path)).length
+    const noun = count === 1 ? 'note' : 'notes'
+    if (!(await confirm(`Delete "${entry.name}" and its ${count} ${noun}? This cannot be undone.`))) return
+    try {
+      await api.notes.deleteFolder(entry.path)
+      closeTabsUnder(entry.path)
+      setSelectedFolder(null)
+      setFolderError(null)
+      // A directory pathspec stages every deletion under it in one shot —
+      // no need to enumerate each note individually. Without this the whole
+      // subtree's deletion never enters the auto-commit's pending list.
+      useWorkspaceStore.getState().addGitPendingPath(entry.path)
+      await refreshTree()
+    } catch (e) {
+      setFolderError(e instanceof Error ? e.message : String(e))
+    }
+  }
+
   return (
     <li>
-      <div
-        className={`tree-row tree-folder${isSelected ? ' selected' : ''}${dragOver ? ' drag-over' : ''}`}
-        style={{ paddingLeft: 8 + depth * 14 }}
-        draggable
-        onDragStart={(e) => e.dataTransfer.setData('text/folder-path', entry.path)}
-        onClick={() => {
-          toggleFolder(entry.path)
-          setSelectedFolder(entry.path)
-          setTagFilter(null)
-        }}
-        onContextMenu={(e) => {
-          e.preventDefault()
-          openFolderContextMenu(entry.path, e.clientX, e.clientY)
-        }}
-        onDragOver={(e) => {
-          e.preventDefault()
-          setDragOver(true)
-        }}
-        onDragLeave={() => setDragOver(false)}
-        onDrop={(e) => void handleDrop(e)}
-      >
-        <span className="tree-toggle">
-          <ChevronRight size={12} className={`tree-toggle-icon${isExpanded ? ' open' : ''}`} />
-        </span>
-        <span className="tree-label">{entry.name}</span>
-      </div>
+      <ContextMenu>
+        <ContextMenuTrigger asChild>
+          <div
+            className={`tree-row tree-folder${isSelected ? ' selected' : ''}${dragOver ? ' drag-over' : ''}`}
+            style={{ paddingLeft: 8 + depth * 14 }}
+            draggable
+            onDragStart={(e) => e.dataTransfer.setData('text/folder-path', entry.path)}
+            onClick={() => {
+              toggleFolder(entry.path)
+              setSelectedFolder(entry.path)
+              setTagFilter(null)
+            }}
+            onDragOver={(e) => {
+              e.preventDefault()
+              setDragOver(true)
+            }}
+            onDragLeave={() => setDragOver(false)}
+            onDrop={(e) => void handleDrop(e)}
+          >
+            <span className="tree-toggle">
+              <ChevronRight size={12} className={`tree-toggle-icon${isExpanded ? ' open' : ''}`} />
+            </span>
+            <span className="tree-label">{entry.name}</span>
+          </div>
+        </ContextMenuTrigger>
+        <ContextMenuContent className="context-menu">
+          <ContextMenuItem onSelect={() => void handleRenameFolder()}>
+            <Pencil size={14} /> Rename
+          </ContextMenuItem>
+          <ContextMenuItem variant="destructive" onSelect={() => void handleDeleteFolder()}>
+            <Trash2 size={14} /> Delete
+          </ContextMenuItem>
+        </ContextMenuContent>
+      </ContextMenu>
       {isExpanded && (
         <ul className="folder-tree">
           {entry.children.map((child) => (

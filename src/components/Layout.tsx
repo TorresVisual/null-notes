@@ -4,6 +4,7 @@ import { listen } from '@tauri-apps/api/event'
 import { Loader2 } from 'lucide-react'
 import { Sidebar } from './Sidebar'
 import { TabBar } from './TabBar'
+import { TooltipProvider } from './ui/tooltip'
 import { NoteEditor } from '../editor/NoteEditor'
 import { RawEditor } from '../editor/RawEditor'
 import { SearchModal } from './SearchModal'
@@ -307,6 +308,7 @@ export function Layout() {
   }, [activeTab])
 
   return (
+    <TooltipProvider>
     <div className="layout">
       {activeOverlay === 'search' && <SearchModal onClose={closeOverlay} />}
       {activeOverlay === 'switcher' && <QuickSwitcher onClose={closeOverlay} />}
@@ -427,5 +429,6 @@ export function Layout() {
         )}
       </div>
     </div>
+    </TooltipProvider>
   )
 }
