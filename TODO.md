@@ -52,7 +52,11 @@
 
 - [ ] ![image.png](TODO.assets/image-1787696138751.png)These info's position needs to be better
 
+- [ ] ![image.png](TODO.assets/image-1787702297675.png)these tooltips designs
+
 - [ ] .assets folders aren't auto committed
+
+- [ ] add a open in null notes in my ide
 
 Feature checklist. **The [roadmap](docs/ROADMAP.md) holds the reasoning and the Definitions of Done; this file holds the boxes.** If the two disagree, the roadmap wins. Gaps found against this checklist (audited 2026-08-26) are tracked as **P11–P15** below.
 
@@ -580,8 +584,11 @@ Do not let these influence P0–P9 design.
 Syntax highlighting and manual language selection are the only code-block features that exist today. Executable code blocks stay under **P10-2** — not duplicated here.
 
 - [x] P11-1 Read-only affordances — **S**
+
   - [x] Copy button on every code block
+
   - [x] Line numbers (gutter)
+
   - [x] Word wrap toggle
 
 > All three are widget decorations (`CodeBlockToolbar.ts`), the same shape as P7-2's "Open in IDE" button — nothing new in the document except a `codeBlock.wrap` attribute, and that one is presentation-only like P6-1's collapse-state decision, so it never reaches the markdown fence (tiptap-markdown's codeBlock serializer only ever reads `language`). Line numbers count **source lines, not visual rows** — exact whenever wrap is off (the default), approximate once a block wraps, the same simplification most lightweight editors accept over measuring real layout. Copy tries `navigator.clipboard.writeText` first and falls back to a hidden-textarea `execCommand('copy')` if the WebView rejects it. Covered by 9 new frontend tests and an e2e spec (`p11-1-code-block-affordances.e2e.ts`); the word-wrap-toggle case passed on every run (including its own screenshot). The other two cases hit a pre-existing cold-start flake in this WebView/driver combination — confirmed unrelated to this feature by re-running an already-shipped, untouched spec (`p6-academic-blocks.e2e.ts`) in isolation and seeing its own first test fail the same way.
@@ -589,12 +596,17 @@ Syntax highlighting and manual language selection are the only code-block featur
 - [ ] P11-2 Language auto-detect — **S/M**. `lowlight`'s `highlightAuto` on paste/creation, still overridable via the existing toolbar picker — never silently overrides a language picked by hand.
 
 - [ ] P11-3 Editing ergonomics — **M**
+
   - [ ] Configurable tab width / tabs-vs-spaces (hardcoded to 2 spaces today)
+
   - [ ] Code folding
+
   - [ ] In-block search (find within the current code block)
 
 - [ ] P11-4 Appearance — **S**
+
   - [ ] Syntax highlight theme picker (one hardcoded palette today)
+
   - [ ] Adjustable font size for code blocks, independent of the editor's prose size
 
 - Minimap — **not scheduled**. Note-sized snippets rarely run long enough to need one.
@@ -648,7 +660,9 @@ The two remaining "checklist has it, the app doesn't" gaps in the writing surfac
 Do not let this influence P0–P14 design. Bundles the two checklist items needing a capability the app doesn't have (recognizing handwritten ink) — sits next to, not in reversal of, the already-cut "Handwriting search" (that verdict assumed no recognition capability existed). Revisit only if real use of P13's ink tools wants this.
 
 - [ ] P15-1 Decision fork — **L**. Choose or rule out an approach before any code; gates P15-2/P15-3 entirely.
+
 - [ ] P15-2 Ink-to-LaTeX conversion — **L**. Gated on P15-1.
+
 - [ ] P15-3 Search across drawings — **M**. Gated on P15-1 — once ink has a recognized text representation, index it like any other content.
 
 ---
@@ -657,7 +671,7 @@ Do not let this influence P0–P14 design. Bundles the two checklist items needi
 
 <details>
 <summary>P0 — Trustworthy daily driver (M0 ✅)</summary>
-\\\\\\\\- \\\\\\\\\\\\\\\[x\\\\\\\\\\\\\\\] P0-1 Debounced autosave with \\\\\\\\\\\\\\\`clean|dirty|saving|error\\\\\\\\\\\\\\\` state; flushes on tab switch, unmount, window close
+\\\\\\\\\\\\\\\\- \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\[x\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\] P0-1 Debounced autosave with \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\`clean|dirty|saving|error\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\` state; flushes on tab switch, unmount, window close
 
 - [x] P0-2 Save failures surface with retry; buffer stays dirty on failure
 
@@ -672,7 +686,7 @@ Do not let this influence P0–P14 design. Bundles the two checklist items needi
 </details>
 <details>
 <summary>P1 — Everyday-use completeness (M1 ✅)</summary>
-\\\\\\\\- \\\\\\\\\\\\\\\[x\\\\\\\\\\\\\\\] P1-1 Clicking an unresolved \\\\\\\\\\\\\\\`\\\\\\\\\\\\\\\[\\\\\\\\\\\\\\\[link\\\\\\\\\\\\\\\]\\\\\\\\\\\\\\\]\\\\\\\\\\\\\\\` creates and opens the note
+\\\\\\\\\\\\\\\\- \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\[x\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\] P1-1 Clicking an unresolved \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\`\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\[\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\[link\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\]\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\]\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\` creates and opens the note
 
 - [x] P1-2 Recent workspaces + `Ctrl+P` quick switcher
 
@@ -685,7 +699,7 @@ Do not let this influence P0–P14 design. Bundles the two checklist items needi
 </details>
 <details>
 <summary>P2 — Feel & ergonomics (M2 ✅)</summary>
-\\\\\\\\- \\\\\\\\\\\\\\\[x\\\\\\\\\\\\\\\] P2-1 Settings panel — autosave delay, editor width; persists to \\\\\\\\\\\\\\\`settings.json\\\\\\\\\\\\\\\` in the app data dir
+\\\\\\\\\\\\\\\\- \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\[x\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\] P2-1 Settings panel — autosave delay, editor width; persists to \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\`settings.json\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\` in the app data dir
 
 - [x] P2-2 Native File/Edit/View menu + shortcuts overlay, one command dispatcher
 
@@ -706,7 +720,7 @@ Do not let this influence P0–P14 design. Bundles the two checklist items needi
 </details>
 <details>
 <summary>P3 — Headline features (M3 ✅)</summary>
-\\\\\\\\- \\\\\\\\\\\\\\\[x\\\\\\\\\\\\\\\] P3-1 PDF import as reference images; OCR pipeline deleted; pages land in a \\\\\\\\\\\\\\\`NoteName.pdf/\\\\\\\\\\\\\\\` sidecar
+\\\\\\\\\\\\\\\\- \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\[x\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\] P3-1 PDF import as reference images; OCR pipeline deleted; pages land in a \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\`NoteName.pdf/\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\` sidecar
 
 - [x] P3-2 Export to PDF via the WebView print pipeline + a `@media print` stylesheet
 
@@ -717,7 +731,7 @@ Do not let this influence P0–P14 design. Bundles the two checklist items needi
 </details>
 <details>
 <summary>Editing core (pre-roadmap)</summary>
-\\\\\\\\- \\\\\\\\\\\\\\\[x\\\\\\\\\\\\\\\] Live-preview WYSIWYG, plain \\\\\\\\\\\\\\\`.md\\\\\\\\\\\\\\\` as the only format, GitHub Markdown
+\\\\\\\\\\\\\\\\- \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\[x\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\] Live-preview WYSIWYG, plain \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\`.md\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\` as the only format, GitHub Markdown
 
 - [x] KaTeX (inline + block), Mermaid, syntax-highlighted code, callouts, tables, task lists
 
@@ -732,7 +746,7 @@ Do not let this influence P0–P14 design. Bundles the two checklist items needi
 - [x] "Terminal Precision" design system
 
 </details>
-\\\\\\\\---
+\\\\\\\\\\\\\\\\---
 
 ## Not doing
 
