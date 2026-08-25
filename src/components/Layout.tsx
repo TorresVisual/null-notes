@@ -20,6 +20,7 @@ import { ReviewSession } from './ReviewSession'
 import { HomeView } from './HomeView'
 import { FormulaSheetPrompt } from './FormulaSheetPrompt'
 import { TerminalPane } from './TerminalPane'
+import { ToastStack } from './ToastStack'
 import { useWorkspaceStore } from '../store/workspace'
 import { useNotesStore } from '../store/notes'
 import { useSettingsStore } from '../store/settings'
@@ -292,6 +293,7 @@ export function Layout() {
       {activeOverlay === 'settings' && <SettingsPanel onClose={closeOverlay} />}
       {activeOverlay === 'shortcuts' && <ShortcutsOverlay onClose={closeOverlay} />}
       <PromptDialog />
+      <ToastStack />
       {activeOverlay === 'template' && <TemplateDialog onClose={closeOverlay} />}
       {activeOverlay === 'graph' && <GraphView onClose={closeOverlay} />}
       {activeOverlay === 'task' && <TaskView onClose={closeOverlay} />}
