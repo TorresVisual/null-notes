@@ -433,6 +433,60 @@ pub async fn list_note_history(
         .map_err(|e| e.to_string())
 }
 
+/// Reads `note_path`'s content as of `sha`. Unlike `list_note_history_at`'s
+/// pathspec, `git show <rev>:<path>` always resolves `<path>` relative to
+/// the repo root, never to `-C`'s working directory — the one place this
+/// feature must not treat `workspace` as if it were the repo root, since
+/// `RepoMode::CodeRepo` means it can be a subtree of one.
+pub fn read_note_at_commit_at(workspace: &str, note_path: &str, sha: &str) -> anyhow::Result<String> {
+    let toplevel_output = no_window_command("git")
+        .arg("-C")
+        .arg(workspace)
+        .arg("rev-parse")
+        .arg("--show-toplevel")
+        .output()?;
+    if !toplevel_output.status.success() {
+        anyhow::bail!("{workspace} is not a Git repository");
+    }
+    let root = String::from_utf8_lossy(&toplevel_output.stdout).trim().to_string();
+    let root_canon = std::fs::canonicalize(Path::new(&root))?;
+    let note_canon = std::fs::canonicalize(Path::new(note_path))?;
+    let relative = note_canon.strip_prefix(&root_canon).map_err(|_| {
+        anyhow::anyhow!("{note_path} is not inside repo root {}", root_canon.display())
+    })?;
+    // git's <rev>:<path> syntax wants forward slashes even on Windows,
+    // matching how detect_repo_mode already normalises rev-parse
+    // --show-toplevel's own output before comparing paths.
+    let relative_git = relative.to_string_lossy().replace('\\', "/");
+
+    let output = no_window_command("git")
+        .arg("-C")
+        .arg(workspace)
+        .arg("show")
+        .arg(format!("{sha}:{relative_git}"))
+        .output()?;
+
+    if !output.status.success() {
+        anyhow::bail!(
+            "git show failed for {sha}:{relative_git}: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+    Ok(String::from_utf8_lossy(&output.stdout).into_owned())
+}
+
+#[tauri::command]
+pub async fn read_note_at_commit(
+    workspace: String,
+    note_path: String,
+    sha: String,
+) -> Result<String, String> {
+    tokio::task::spawn_blocking(move || read_note_at_commit_at(&workspace, &note_path, &sha))
+        .await
+        .map_err(|e| e.to_string())?
+        .map_err(|e| e.to_string())
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub enum PushOutcome {
@@ -893,6 +947,38 @@ mod tests {
         let entries = list_note_history_at(&tmp.path().to_string_lossy(), &untouched_path).unwrap();
 
         assert!(entries.is_empty());
+    }
+
+    #[test]
+    fn read_note_at_commit_returns_the_historical_content() {
+        let tmp = tempdir().unwrap();
+        git_init(tmp.path());
+        let note_path = tmp.path().join("Todo.md").to_string_lossy().into_owned();
+        let first_sha = commit_note_file(tmp.path(), "Todo.md", "# Todo\n\n- one\n", "notes: update Todo");
+        commit_note_file(tmp.path(), "Todo.md", "# Todo\n\n- one\n- two\n", "notes: update Todo");
+
+        let content = read_note_at_commit_at(&tmp.path().to_string_lossy(), &note_path, &first_sha).unwrap();
+
+        assert_eq!(content, "# Todo\n\n- one\n");
+    }
+
+    #[test]
+    fn read_note_at_commit_resolves_the_path_relative_to_repo_root_not_workspace() {
+        // A RepoMode::CodeRepo shape: the workspace is a subdirectory of the
+        // repo, not the repo root itself — the exact case
+        // read_note_at_commit_at must handle correctly, unlike
+        // list_note_history_at's plain pathspec matching.
+        let tmp = tempdir().unwrap();
+        git_init(tmp.path());
+        let notes_dir = tmp.path().join("notes");
+        std::fs::create_dir(&notes_dir).unwrap();
+        let note_path = notes_dir.join("Todo.md").to_string_lossy().into_owned();
+
+        let sha = commit_note_file(tmp.path(), "notes/Todo.md", "# Todo\n\n- one\n", "notes: update Todo");
+
+        let content = read_note_at_commit_at(&notes_dir.to_string_lossy(), &note_path, &sha).unwrap();
+
+        assert_eq!(content, "# Todo\n\n- one\n");
     }
 
     #[test]

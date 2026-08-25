@@ -252,6 +252,7 @@ pub fn run() {
             commands::git::fetch_and_compare,
             commands::git::init_notes_repo,
             commands::git::list_note_history,
+            commands::git::read_note_at_commit,
             commands::terminal::terminal_open,
             commands::terminal::terminal_write,
             commands::terminal::terminal_resize,
