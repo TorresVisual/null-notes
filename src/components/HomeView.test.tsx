@@ -169,4 +169,26 @@ describe('HomeView', () => {
     const { getByText } = render(<HomeView onOpenTaskView={() => {}} onOpenReview={() => {}} onOpenSettings={() => {}} />)
     expect(getByText('1 ahead, 3 behind')).toBeInTheDocument()
   })
+
+  it('renders a one-line summary above the sections, combining tasks, due cards, and Git status', async () => {
+    listOpenTasks.mockResolvedValue([
+      { notePath: '/ws/a.md', noteTitle: 'A', text: 'Finish proof', position: 0 },
+    ])
+    listDueCards.mockResolvedValue([
+      { notePath: '/ws/a.md', noteTitle: 'A', kind: 'qa', front: 'Q', back: 'A', position: 0 },
+    ])
+    useWorkspaceStore.setState({ repoMode: 'notesOnly', gitDiverged: null, gitPendingPaths: [] })
+
+    render(<HomeView onOpenTaskView={() => {}} onOpenReview={() => {}} onOpenSettings={() => {}} />)
+
+    expect(await screen.findByText('1 task open, 1 card due.')).toBeInTheDocument()
+  })
+
+  it('renders the clean-repo summary when nothing is outstanding', async () => {
+    useWorkspaceStore.setState({ repoMode: 'notesOnly', gitDiverged: null, gitPendingPaths: [] })
+
+    render(<HomeView onOpenTaskView={() => {}} onOpenReview={() => {}} onOpenSettings={() => {}} />)
+
+    expect(await screen.findByText("Nothing outstanding — everything's up to date.")).toBeInTheDocument()
+  })
 })

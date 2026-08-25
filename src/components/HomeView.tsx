@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useWorkspaceStore } from '../store/workspace'
 import { useNotesStore } from '../store/notes'
 import { api } from '../lib/tauri'
+import { buildHomeSummary } from '../lib/homeSummary'
 import type { OpenTask, DueCard } from '../types'
 
 const SECTION_CAP = 5
@@ -62,6 +63,10 @@ export function HomeView({ onOpenTaskView, onOpenReview, onOpenSettings }: HomeV
 
   return (
     <div className="home-view">
+      <p className="home-summary">
+        {buildHomeSummary({ taskCount: tasks.length, dueCount: dueCards.length, gitStatus })}
+      </p>
+      <div className="home-view-grid">
       <section className="home-section">
         <h2>Continue</h2>
         {continueItems.length === 0 ? (
@@ -147,6 +152,7 @@ export function HomeView({ onOpenTaskView, onOpenReview, onOpenSettings }: HomeV
           </>
         )}
       </section>
+      </div>
     </div>
   )
 }

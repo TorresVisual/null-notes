@@ -2735,10 +2735,22 @@ code {
    overlay, since it replaces the empty-state slot rather than sitting
    on top of a note. */
 .home-view {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+  padding: var(--space-xl) 0;
+}
+
+.home-summary {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.home-view-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
   gap: var(--space-lg);
-  padding: var(--space-xl) 0;
 }
 
 .home-section {
