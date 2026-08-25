@@ -1,6 +1,10 @@
 # null-notes — Product & Technical Roadmap
 
-**Last updated:** 2026-08-20 (**P9.5-8 done — editor feel re-pass, closing M9.5.** P6's "theorem/proof/algorithm blocks" turned out to be one node type (`Callout`, color variants only), so the real re-pass surface was five extensions: `Callout`, `Details`, `BlockMath`, `InlineMath`, `CrossRef`. Two real regressions found and fixed: collapsing a `Details` section left a cursor silently accepting keystrokes into the now-hidden body — fixed with `TextSelection.near` after discovering TipTap's own `focus(number)` doesn't search for the nearest valid position, it constructs one at the exact number given — and a second bug the fix's own test caught, where clicking the summary let ProseMirror's mousedown handling move the selection into the body before the collapse logic ran at all. `BlockMath` computed a `selected` state with no CSS rule to show it (`InlineMath`'s working equivalent existed right next to it, never carried over), and both math node types were mouse-only for reopening an existing equation, now fixed with a keyboard-focusable path. Two spacing differences were reviewed and left alone with reasons (visual-weight hierarchy; KaTeX glyph overflow containment) rather than force-matched. Code-level audit plus targeted fixes, not a live WebDriver pass — recorded as such. **M9.5 reached** — all eight P9.5 tasks done.)
+**Last updated:** 2026-08-26 (**P11-1 done — read-only code-block affordances.** Copy button, line-number gutter, and a per-block word-wrap toggle, all as widget decorations in a new `CodeBlockToolbar.ts` — the same shape as P7-2's "Open in IDE" button, so nothing new is stored in the document beyond a deliberately presentation-only `codeBlock.wrap` attribute (same call as P6-1's `Details` collapse state). Line numbers count source lines, exact when wrap is off. Verified with 9 new frontend tests plus an e2e spec; the wrap-toggle case passed on every run and is screenshotted, while the other two hit a pre-existing WebView cold-start flake confirmed unrelated to this feature — an already-shipped, untouched spec fails its own first test the same way in isolation. See the P11-1 entry for the full account.)
+
+*Previously, same day: **P11–P15 added**, from a full audit of the checklist in `TODO.md` against the app as built. Five new phases, none reviving a previously-cut feature: **P11** closes the code-block gap — today's blocks have only syntax highlighting and manual language selection, missing everything else the checklist names (line numbers, copy button, folding, in-block search, theme picker, font size, tab config, language auto-detect); executable code blocks stay under the existing P10-2 rather than duplicating it here. **P12** is the reference/fix/find layer math authoring is still missing — copy-LaTeX, equation numbering with `Equation (N)` cross-references reusing P6-7's resolver, in-place error highlighting, and a real symbol palette beyond today's fixed 20-entry snippet menu. **P13** closes the two remaining structural gaps in the writing surface: footnotes, and three ink-tool gaps (pencil, text tool, true infinite canvas). **P14** is guided authoring for the checklist's named diagram types — scaffolding Mermaid's own grammar, not a new rendering engine, so it does not reopen the already-cut Graphviz/TikZ rows in §4. **P15** is gated exactly like P10: it bundles ink-to-LaTeX conversion with search-across-drawings, since both need a handwriting-recognition capability the app doesn't have, and sits deliberately next to — not in reversal of — the already-cut "Handwriting search" row, whose verdict assumed no such capability existed. See each phase's own section for tasks and DoDs.*
+
+*Previously, 2026-08-20: **P9.5-8 done — editor feel re-pass, closing M9.5.** P6's "theorem/proof/algorithm blocks" turned out to be one node type (`Callout`, color variants only), so the real re-pass surface was five extensions: `Callout`, `Details`, `BlockMath`, `InlineMath`, `CrossRef`. Two real regressions found and fixed: collapsing a `Details` section left a cursor silently accepting keystrokes into the now-hidden body — fixed with `TextSelection.near` after discovering TipTap's own `focus(number)` doesn't search for the nearest valid position, it constructs one at the exact number given — and a second bug the fix's own test caught, where clicking the summary let ProseMirror's mousedown handling move the selection into the body before the collapse logic ran at all. `BlockMath` computed a `selected` state with no CSS rule to show it (`InlineMath`'s working equivalent existed right next to it, never carried over), and both math node types were mouse-only for reopening an existing equation, now fixed with a keyboard-focusable path. Two spacing differences were reviewed and left alone with reasons (visual-weight hierarchy; KaTeX glyph overflow containment) rather than force-matched. Code-level audit plus targeted fixes, not a live WebDriver pass — recorded as such. **M9.5 reached** — all eight P9.5 tasks done.*
 
 *Previously, same day: **P9.5-7 done — product onboarding pass.** `WorkspacePicker` — the very first screen, before a workspace is even picked — gains one new two-sentence paragraph between the app name and the existing "Open a folder..." instruction, leading with the single sharpest differentiator (the PDF-to-real-editable-Markdown pipeline, genuinely rare among Markdown editors) rather than a feature list, and framing plain-`.md`-ownership as the answer to "why not Notion." Read cold: what this is → why different → what to do, in that order, with P2-4's existing mechanical flow untouched below it.)
 
@@ -203,6 +207,11 @@ Given "personal daily driver," priority = `(daily-use value) × (risk of data lo
 | **P9** | Study & revision | **M9:** the app helps me *revise*, not just capture | ✅ | The only phase not derived from the brief — see below |
 | **P9.5** | Productization / polish | **M9.5:** the app looks and feels considered, not just working |  | Explicit maintainer preference — craft is a legitimate prioritization term (below), not gated on audience size |
 | **P10** | Gated stretch | **M10:** in-app AI + code execution | gated | Explicitly deferred; do not let it pull focus |
+| **P11** | Code block IDE parity | **M11:** code blocks feel like a lightweight IDE pane, not a plain `<pre>` |  | Constant daily surface with almost nothing beyond highlighting; each item is small and independent |
+| **P12** | Math authoring polish | **M12:** equations are as fast to reference and fix as they are to write |  | Compounds on every STEM note, same reasoning P6 was prioritized on |
+| **P13** | Editor & ink completion | **M13:** footnotes and ink match the rest of the writing surface |  | Two small, independent gaps left over from the editing core |
+| **P14** | Diagram templates | **M14:** the checklist's diagram types have a guided way to build them |  | Lower daily-use value than P11/P12 — mostly Mermaid scaffolding, not new capability |
+| **P15** | Handwriting recognition | **M15:** ink-to-LaTeX and drawing search, if ever proven worth it | gated | Same posture as P10 — a real new capability with real risk, kept from influencing everything above it |
 
 Priority within the new phases follows the same formula (**daily value × friction ÷ effort**), which is why P6 (many small wins on infra that already exists) outranks P7 (a whole new integration surface) despite P7 being the more distinctive feature.
 
@@ -1031,6 +1040,154 @@ Added 2026-08-20 from a second review pass (`notes/Roadmap-Update2.md`). The pas
 
 - Run fenced code blocks and show output inline. Real sandboxing, toolchain detection, and security review required before this is more than a toy.
 - **Gate:** significant security surface; do not start without a dedicated design+security pass.
+
+---
+
+## Phase 11 — Code Block IDE Parity (P11)
+
+**Milestone M11:** *A code block feels like a lightweight IDE pane, not a plain* `<pre>`*.* Syntax highlighting (`lowlight`) and manual language selection are the only two things a code block has today — everything else on the checklist is missing. Executable code blocks are **not** part of this phase; that's the existing, separately-gated P10-2.
+
+### P11-1 — Read-only affordances — **S** ✅
+
+- Copy button on every code block; line numbers in a gutter; a word-wrap toggle (blocks are `overflow-x: auto` only today).
+- **Dependency:** none.
+- **DoD:** every rendered code block shows a copy button and line numbers; word wrap can be toggled per block or globally, and the un-wrapped state still scrolls horizontally as it does now.
+
+*Done:* all three are widget decorations in a new `CodeBlockToolbar.ts`, structurally the same as P7-2's "Open in IDE" button — nothing new stored in the document beyond a `codeBlock.wrap` attribute, and that one is deliberately presentation-only, the same call P6-1 made for `Details`' collapse state: tiptap-markdown's built-in codeBlock serializer only ever reads `language`, so `wrap` never reaches the fence and never dirties the round-trip. Line numbers count *source* lines, not visual rows — exact whenever a block's wrap toggle is off (the default), and approximate once wrapping is on, the same simplification most lightweight editors accept rather than measuring real per-line layout. The copy button tries `navigator.clipboard.writeText` first and falls back to a hidden-textarea `execCommand('copy')` if the WebView rejects the async call. Toggled per block, per the DoD's "per block or globally" — a global setting was not needed to satisfy it. Covered by 9 new frontend tests (`codeBlockToolbar.test.ts`) plus the existing 5-test P7-2 suite, both green, and `tsc --noEmit` clean. An e2e spec (`p11-1-code-block-affordances.e2e.ts`) exercises all three against the real compiled app; its word-wrap case passed on every run, screenshotted. The other two cases hit a pre-existing cold-start flake in this WebView/driver combination, not a defect in this feature — confirmed by re-running an already-shipped, untouched spec (`p6-academic-blocks.e2e.ts`) in isolation and watching its own first test fail the identical way.
+
+### P11-2 — Language auto-detect — **S/M**
+
+- Run `lowlight`'s `highlightAuto` on paste/creation when no language is set; the result stays editable through the existing toolbar `<select>`, exactly like a manual pick.
+- **Dependency:** none.
+- **DoD:** pasting an unlabeled code snippet highlights correctly without the user opening the language picker; a language picked by hand is never silently overridden afterward.
+
+### P11-3 — Editing ergonomics — **M**
+
+- Configurable tab width / tabs-vs-spaces (hardcoded to a 2-space insert today, `CodeBlockEditor.ts`); code folding; find-within-the-current-block.
+- **Dependency:** none.
+- **DoD:** a setting controls indent width and character; a long block can fold a region and still round-trip through save/reload unchanged; `Ctrl+F` inside a focused code block searches only that block's text.
+
+### P11-4 — Appearance — **S**
+
+- A syntax-highlight theme picker (one hardcoded palette today, `src/index.css`); adjustable font size for code blocks specifically, independent of the editor's prose font size.
+- **Dependency:** none.
+- **DoD:** at least two themes are selectable and persist in settings; code block font size has its own control, separate from the general editor font-size setting.
+
+**Not scheduled: minimap.** Note-sized snippets rarely run long enough to need one — revisit only if a real note's code block turns out to.
+
+---
+
+## Phase 12 — Math Authoring Polish (P12)
+
+**Milestone M12:** *Writing an equation, referencing it, and fixing it are all as fast as the first draft.* Core authoring — inline/display equations, live preview, click-to-edit, matrices, cases, Greek via raw LaTeX — already works (P6-4). This phase is what's left: the reference/fix/find layer.
+
+### P12-1 — Copy LaTeX — **S**
+
+- A copy action on both `InlineMath` and `BlockMath`, alongside the existing edit/delete/commit/cancel controls.
+- **Dependency:** none.
+- **DoD:** clicking the action puts the equation's raw LaTeX source on the clipboard, verified by a test, not just visually.
+
+### P12-2 — Equation numbering + cross-references — **M**
+
+- A `number` attribute on `BlockMath`, and `Equation (3)` recognized in prose the same way P6-7 already resolves `Theorem 3.2` — same decoration/resolution machinery (`CrossRef.ts`), not a second resolver.
+- **Dependency:** P6-1/P6-7 (the numbering + cross-ref pattern this reuses).
+- **DoD:** a numbered display equation shows its number; typing `Equation (3)` elsewhere in the workspace resolves and jumps to it; an unresolvable reference renders inert, same "prefer a miss" posture as every other resolver in this codebase.
+
+### P12-3 — In-place LaTeX error highlighting — **S**
+
+- Mark the offending span in the source when KaTeX fails to parse, not just show the error message below the preview (today's behavior in both math node types).
+- **Dependency:** none.
+- **DoD:** an intentionally malformed equation shows the error location inline, in addition to the existing message text.
+
+### P12-4 — Symbol palette — **S/M**
+
+- A browsable palette (Greek letters, common operators/relations) beyond today's fixed 20-entry `/`-triggered snippet menu (`mathSnippets.ts`).
+- **Dependency:** none — additive to P6-4's existing menu, doesn't replace it.
+- **DoD:** a symbol can be inserted by browsing, not only by knowing its snippet trigger already.
+
+### P12-5 — Aligned-equation snippet — **S**
+
+- `\begin{aligned}`/`\begin{align}` already render correctly via raw KaTeX; add a discoverable entry to `mathSnippets.ts`.
+- **Dependency:** none.
+- **DoD:** `/align` (or equivalent) appears in the snippet menu and inserts a working `aligned` skeleton.
+
+---
+
+## Phase 13 — Editor & Ink Completion (P13)
+
+**Milestone M13:** *The two remaining "checklist has it, the app doesn't" gaps in the writing surface are closed.*
+
+### P13-1 — Footnotes — **M**
+
+- A new TipTap extension for GFM `[^1]` footnote syntax, full `addStorage().markdown.serialize/parse` per the CLAUDE.md rule every custom node follows.
+- **Dependency:** none.
+- **DoD:** a footnote reference and its definition round-trip through save/reload byte-identical to hand-written GFM footnote syntax; renders as a jump-to-note link.
+
+### P13-2 — Ink pencil tool — **S**
+
+- A second stroke preset distinct from the existing single pen — thinner, harder-edged — following the same "a preset, not a new subsystem" pattern the highlighter already uses (`pens.ts`).
+- **Dependency:** none.
+- **DoD:** a pencil preset is selectable alongside the existing pen presets and produces a visually distinct stroke.
+
+### P13-3 — Ink text tool — **M**
+
+- Typed text placed directly on the ink canvas — distinct from the note's own prose, for labeling a diagram or sketch.
+- **Dependency:** none.
+- **DoD:** text can be placed, moved, and edited on the ink canvas; persists through the existing `.ink` SVG sidecar format.
+
+### P13-4 — True infinite canvas — **M/L, decision first**
+
+- Today's canvas auto-grows vertically only, with fixed persisted dimensions (`InkData.width/height`, `useInkCanvas.ts`). Decide bounded-grow-in-every-direction vs. genuinely unbounded before writing code — it changes what an *existing* `.ink` sidecar's stored dimensions mean, so it isn't refactorable later, the same way P9-3's storage fork wasn't.
+- **Dependency:** none, but blocks on its own decision.
+- **DoD:** the decision is recorded here with reasoning; the chosen behavior is implemented and existing `.ink` files still load with their current content in the same place.
+
+---
+
+## Phase 14 — Diagram Templates (P14)
+
+**Milestone M14:** *The diagram types the checklist names have a guided way to build them, not just "type Mermaid by hand."* **Not a Graphviz/TikZ revival** — both stay cut (§4). This is guided authoring for specific shapes, mostly by scaffolding Mermaid's own grammar rather than adding a new rendering engine.
+
+### P14-1 — Mermaid template gallery — **S/M**
+
+- Slash-command entries that scaffold a starting flowchart / class diagram / state machine / ER diagram / generic graph — covers UML, class diagrams, state machines, ER diagrams, trees, graphs and flowcharts directly through Mermaid's existing grammar (`MermaidBlock.tsx`).
+- **Dependency:** none — pure authoring convenience over an already-shipped renderer.
+- **DoD:** each named diagram type has a `/`-reachable starting template that renders correctly on insertion, not an empty fence.
+
+### P14-2 — CS-structure templates — **M**
+
+- Guided starting points for a binary tree and a linked list specifically — the two structures a CS student draws constantly, and that Mermaid's generic graph grammar makes fiddly to write by hand.
+- **Dependency:** P14-1 (same slash-command + Mermaid-scaffolding mechanism).
+- **DoD:** inserting a binary-tree or linked-list template produces a correctly-connected starting shape, editable as ordinary Mermaid text afterward.
+
+### P14-3 — Memory / CPU-register / network diagrams — **M/L, decision first**
+
+- No Mermaid grammar covers these shapes. Decide whether a small custom box-and-arrow diagram primitive earns its keep before building one — a half-built diagram primitive is worse than the freehand ink that already covers this today.
+- **Dependency:** none, but blocks on its own decision, same posture as P13-4.
+- **DoD:** the decision is recorded here with reasoning; if "build," a DoD for the chosen primitive is written before implementation starts; if "don't," this row moves to §4 with the reasoning that closed it.
+
+---
+
+## Phase 15 — Handwriting Recognition (P15) — explicitly gated
+
+**Milestone M15:** *Only after M0–M14 are solid, and only if real use of P13's ink tools actually wants this.* **Do not let this influence P0–P14 design**, same posture as P10. Bundles the two checklist items that both need a capability the app doesn't have — recognizing handwritten ink — because building that recognition step once and feeding two consumers is cheaper than building it twice. This sits deliberately *next to*, not in reversal of, the already-cut "Handwriting search" row in §4: that verdict was reached with no recognition capability on the table at all, for a narrower purpose (archival retrieval). Revisit only if daily use of P13's ink tools genuinely wants this — not speculatively, the same standard §1's closed questions already hold every other phase to.
+
+### P15-1 — Decision fork — **L**
+
+- Choose (or explicitly rule out) an approach to handwritten-math recognition before any implementation code — on-device model, external service, or "not worth it." This determines whether P15-2/P15-3 are buildable at all, and at what accuracy/latency/privacy cost.
+- **Dependency:** none, but gates P15-2 and P15-3 completely.
+- **DoD:** a decision is recorded here with reasoning, the same way P9-3's storage fork and P4-2e's pipeline-freeze criteria were recorded before their own code.
+
+### P15-2 — Ink-to-LaTeX conversion — **L**
+
+- Convert a handwritten equation (drawn in an ink block) to editable LaTeX, feeding the existing `InlineMath`/`BlockMath` nodes.
+- **Dependency:** P15-1.
+- **DoD:** a hand-drawn equation converts to LaTeX that renders correctly through the existing math nodes; a failed/low-confidence conversion fails inert (offers the raw ink, not a wrong equation), same "prefer a miss" posture as every resolver in this codebase.
+
+### P15-3 — Search across drawings — **M**
+
+- Once ink has any recognized text representation (from P15-2's own pipeline or a lighter general-purpose pass), index it into the existing FTS the same way note bodies already are.
+- **Dependency:** P15-1.
+- **DoD:** a search for a word that only appears inside a hand-drawn note returns that note; delete `index.db`, reopen — the recognized text rebuilds the same way `note_tags`/`note_tasks` already do (per §5's derived-not-authoritative rule).
 
 ---
 

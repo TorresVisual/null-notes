@@ -54,87 +54,7 @@
 
 - [ ] .assets folders aren't auto committed
 
-## Checklist
-
-- True rich-text editing while preserving Markdown underneath
-- Headings, lists, tables, quotes
-- Inline/code blocks
-- Links and images
-- Callouts/admonitions
-- Checklists
-- Footnotes
-- Collapsible sections
-- Drag-and-drop block reordering
-- Slash command menu /
-- Markdown shortcuts
-- Keyboard-first editing
-- Paste cleanup / smart formatting
-- Undo/redo that works across all block types
-- Inline LaTeX
-- Display equations
-- Live rendering
-- Equation editing
-- Copy LaTeX
-- Equation numbering
-- References like Equation (3)
-- Matrices
-- Aligned equations
-- Cases
-- Greek symbols
-- Math keyboard/palette
-- Symbol picker
-- Equation autocomplete
-- LaTeX error highlighting
-- Convert handwritten equations → LaTeX
-- Syntax highlighting
-- Language detection
-- Line numbers
-- Copy button
-- Word wrap
-- Code folding
-- Search
-- Minimap optional
-- Themes
-- Adjustable font size
-- Tabs/spaces configuration
-- Executable code blocks
-- Pen
-- Pencil
-- Highlighter
-- Eraser
-- Lasso selection
-- Shapes
-- Lines/arrows
-- Text
-- Color picker
-- Stroke width
-- Pressure sensitivity
-- Zoom
-- Infinite canvas
-- Flowchart
-- UML
-- Class diagrams
-- State machines
-- ER diagrams
-- Trees
-- Graphs
-- Binary trees
-- Linked lists
-- Memory diagrams
-- CPU/register diagrams
-- Network diagrams
-
-Search across:
-
-- Notes
-- PDFs
-- Code
-- Drawings/OCR
-- Equations
-- Tags
-- Metadata
-
-Feature checklist. **The [roadmap](docs/ROADMAP.md) holds the reasoning and the Definitions of Done; this file holds the boxes.** If the two disagree, the roadmap wins.
+Feature checklist. **The [roadmap](docs/ROADMAP.md) holds the reasoning and the Definitions of Done; this file holds the boxes.** If the two disagree, the roadmap wins. Gaps found against this checklist (audited 2026-08-26) are tracked as **P11–P15** below.
 
 Effort: **S** ≈ hours · **M** ≈ a day or two · **L** ≈ several days.
 
@@ -185,6 +105,11 @@ Effort: **S** ≈ hours · **M** ≈ a day or two · **L** ≈ several days.
 | P8 Embedded terminal | M8 — `claude` runs against the open note | ✅ |
 | P9 Study & revision | M9 — the app helps me *revise*, not just capture |  |
 | P10 Gated stretch | M10 — in-app AI + code execution | gated |
+| P11 Code block IDE parity | M11 — code blocks feel like a lightweight IDE pane |  |
+| P12 Math authoring polish | M12 — equations are as fast to reference and fix as they are to write |  |
+| P13 Editor & ink completion | M13 — footnotes and ink match the rest of the writing surface |  |
+| P14 Diagram templates | M14 — the checklist's diagram types have a guided way to build them |  |
+| P15 Handwriting recognition | M15 — ink-to-LaTeX and drawing search, if ever proven worth it | gated |
 
 ---
 
@@ -646,9 +571,85 @@ The only phase not from the brief. Everything before it is *capture*; this is *r
 
 Do not let these influence P0–P9 design.
 
-- [ ] **P10-1 In-app AI assistant** — **L**. Gated on M0 *and* on P8 proving insufficient; if the terminal covers the need, this may never need building.
-
 - [ ] **P10-2 In-editor code execution** (Python / C++) — **L**. Gated on a dedicated design + security pass.
+
+---
+
+## ▸ P11 — Code block IDE parity (M11)
+
+Syntax highlighting and manual language selection are the only code-block features that exist today. Executable code blocks stay under **P10-2** — not duplicated here.
+
+- [x] P11-1 Read-only affordances — **S**
+  - [x] Copy button on every code block
+  - [x] Line numbers (gutter)
+  - [x] Word wrap toggle
+
+> All three are widget decorations (`CodeBlockToolbar.ts`), the same shape as P7-2's "Open in IDE" button — nothing new in the document except a `codeBlock.wrap` attribute, and that one is presentation-only like P6-1's collapse-state decision, so it never reaches the markdown fence (tiptap-markdown's codeBlock serializer only ever reads `language`). Line numbers count **source lines, not visual rows** — exact whenever wrap is off (the default), approximate once a block wraps, the same simplification most lightweight editors accept over measuring real layout. Copy tries `navigator.clipboard.writeText` first and falls back to a hidden-textarea `execCommand('copy')` if the WebView rejects it. Covered by 9 new frontend tests and an e2e spec (`p11-1-code-block-affordances.e2e.ts`); the word-wrap-toggle case passed on every run (including its own screenshot). The other two cases hit a pre-existing cold-start flake in this WebView/driver combination — confirmed unrelated to this feature by re-running an already-shipped, untouched spec (`p6-academic-blocks.e2e.ts`) in isolation and seeing its own first test fail the same way.
+
+- [ ] P11-2 Language auto-detect — **S/M**. `lowlight`'s `highlightAuto` on paste/creation, still overridable via the existing toolbar picker — never silently overrides a language picked by hand.
+
+- [ ] P11-3 Editing ergonomics — **M**
+  - [ ] Configurable tab width / tabs-vs-spaces (hardcoded to 2 spaces today)
+  - [ ] Code folding
+  - [ ] In-block search (find within the current code block)
+
+- [ ] P11-4 Appearance — **S**
+  - [ ] Syntax highlight theme picker (one hardcoded palette today)
+  - [ ] Adjustable font size for code blocks, independent of the editor's prose size
+
+- Minimap — **not scheduled**. Note-sized snippets rarely run long enough to need one.
+
+---
+
+## ▸ P12 — Math authoring polish (M12)
+
+Core authoring (inline/display equations, live preview, click-to-edit, matrices, cases, Greek via raw LaTeX) already works. This is the remaining reference/fix/find layer.
+
+- [ ] P12-1 Copy LaTeX — **S**
+
+- [ ] P12-2 Equation numbering + `Equation (3)` cross-references — **M**. Reuses P6-7's `CrossRef` resolver, not a second one.
+
+- [ ] P12-3 In-place LaTeX error highlighting — **S**. Marks the offending span, not just today's message-below-preview.
+
+- [ ] P12-4 Symbol palette — **S/M**. Browsable, beyond today's fixed 20-entry `/` snippet menu.
+
+- [ ] P12-5 Aligned-equation snippet — **S**. `\begin{aligned}` already renders; add it to `mathSnippets.ts` for discoverability.
+
+---
+
+## ▸ P13 — Editor & ink completion (M13)
+
+The two remaining "checklist has it, the app doesn't" gaps in the writing surface.
+
+- [ ] P13-1 Footnotes — **M**. New extension, GFM `[^1]` syntax, full markdown serialize/parse.
+
+- [ ] P13-2 Ink pencil tool — **S**. A second, harder-edged stroke preset — same "preset, not a new tool" pattern the highlighter already uses.
+
+- [ ] P13-3 Ink text tool — **M**. Typed text placed on the ink canvas, distinct from the note's own prose.
+
+- [ ] P13-4 True infinite canvas — **M/L, decision first**. Today's canvas auto-grows vertically only, fixed persisted dimensions. Decide bounded-grow-in-every-direction vs. genuinely unbounded before writing code — it changes what an existing `.ink` sidecar's stored dimensions mean.
+
+---
+
+## ▸ P14 — Diagram templates (M14)
+
+**Not a Graphviz/TikZ revival** — both stay cut. Guided authoring for the checklist's named diagram types, mostly by scaffolding Mermaid's own grammar rather than a new rendering engine.
+
+- [ ] P14-1 Mermaid template gallery — **S/M**. Starting flowchart/class/state-machine/ER/graph templates — covers UML, class diagrams, state machines, ER diagrams, trees, graphs and flowcharts through Mermaid's existing grammar.
+
+- [ ] P14-2 CS-structure templates — **M**. Guided binary-tree and linked-list starting points specifically — the two shapes drawn constantly and fiddly in Mermaid's generic graph syntax.
+
+- [ ] P14-3 Memory / CPU-register / network diagrams — **M/L, decision first**. No Mermaid grammar covers these. Decide whether a custom box-and-arrow primitive earns its keep before building one — a half-built primitive is worse than the freehand ink that already covers this today.
+
+---
+
+## ▸ P15 — Handwriting recognition (M15) — gated, like P10
+
+Do not let this influence P0–P14 design. Bundles the two checklist items needing a capability the app doesn't have (recognizing handwritten ink) — sits next to, not in reversal of, the already-cut "Handwriting search" (that verdict assumed no recognition capability existed). Revisit only if real use of P13's ink tools wants this.
+
+- [ ] P15-1 Decision fork — **L**. Choose or rule out an approach before any code; gates P15-2/P15-3 entirely.
+- [ ] P15-2 Ink-to-LaTeX conversion — **L**. Gated on P15-1.
+- [ ] P15-3 Search across drawings — **M**. Gated on P15-1 — once ink has a recognized text representation, index it like any other content.
 
 ---
 
