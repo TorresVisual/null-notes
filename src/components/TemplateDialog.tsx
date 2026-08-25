@@ -4,6 +4,7 @@ import { api } from '../lib/tauri'
 import { extractPlaceholders, fillTemplate } from '../lib/templatePlaceholders'
 import { useCreateNoteFromTemplate } from '../hooks/useCreateNoteFromTemplate'
 import { useWorkspaceStore } from '../store/workspace'
+import { showToast } from '../store/toast'
 import type { TemplateMetadata } from '../types'
 
 interface TemplateDialogProps {
@@ -64,7 +65,10 @@ export function TemplateDialog({ onClose }: TemplateDialogProps) {
     }
     const content = fillTemplate(selected.content, values)
     const meta = await createNoteFromTemplate(title, content)
-    if (meta) onClose()
+    if (meta) {
+      showToast(`Created "${meta.title}"`)
+      onClose()
+    }
   }
 
   return (
