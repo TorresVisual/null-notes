@@ -60,6 +60,8 @@
 
 - [ ] search doesnt jump
 
+- [ ] fix top toolbar
+
 Feature checklist. **The [roadmap](docs/ROADMAP.md) holds the reasoning and the Definitions of Done; this file holds the boxes.** If the two disagree, the roadmap wins. Gaps found against this checklist (audited 2026-08-26) are tracked as **P11–P15** below.
 
 Effort: **S** ≈ hours · **M** ≈ a day or two · **L** ≈ several days.
@@ -597,7 +599,7 @@ Syntax highlighting and manual language selection are the only code-block featur
 
 - [x] P11-2 Language auto-detect — **S/M**. `lowlight`'s `highlightAuto` on paste/creation, still overridable via the existing toolbar picker — never silently overrides a language picked by hand.
 
-> Fires once per code block, exactly on a real paste (`uiEvent: 'paste'`, the same meta ProseMirror's own `doPaste` tags its transaction with — never on ordinary typing), and never again once `language` is anything but `null` (the schema default): a hand-picked language, or even an explicit "Plain text" choice (`''`), both stick permanently. Calibrating the confidence bar directly against `lowlight.highlightAuto` turned up a real risk worth guarding against — plain academic prose (a proof sketch, a paragraph about eigenvalues) regularly scores in the *same* single-digit relevance range as short, genuine code snippets, so a naive "any positive relevance" rule would have mislabeled prose as a programming language a meaningful fraction of the time. `MIN_CONFIDENT_RELEVANCE` sets the bar well above that overlap zone, trading some under-detection for zero observed false positives on the prose samples tested — the same "prefer a miss" posture as every other resolver in this codebase (P1-1, P7-1, P6-7). Verified with 6 new unit tests (confident detection, low-confidence prose left unset, no effect on ordinary typing, both flavors of hand-picked language surviving a later paste, detection on a brand-new pasted-in block) and an e2e spec driving a real OS-clipboard paste + `Ctrl+V` through the compiled app — confirmed passing once, screenshotted (dropdown correctly reads "Bash", fence gets `` ```bash ``); later reruns hit the same environment-wide WebView cold-start flake already on record for P11-1, not a defect in this feature.
+> Fires once per code block, exactly on a real paste (`uiEvent: 'paste'`, the same meta ProseMirror's own `doPaste` tags its transaction with — never on ordinary typing), and never again once `language` is anything but `null` (the schema default): a hand-picked language, or even an explicit "Plain text" choice (`''`), both stick permanently. Calibrating the confidence bar directly against `lowlight.highlightAuto` turned up a real risk worth guarding against — plain academic prose (a proof sketch, a paragraph about eigenvalues) regularly scores in the *same* single-digit relevance range as short, genuine code snippets, so a naive "any positive relevance" rule would have mislabeled prose as a programming language a meaningful fraction of the time. `MIN_CONFIDENT_RELEVANCE` sets the bar well above that overlap zone, trading some under-detection for zero observed false positives on the prose samples tested — the same "prefer a miss" posture as every other resolver in this codebase (P1-1, P7-1, P6-7). Verified with 6 new unit tests (confident detection, low-confidence prose left unset, no effect on ordinary typing, both flavors of hand-picked language surviving a later paste, detection on a brand-new pasted-in block) and an e2e spec driving a real OS-clipboard paste + `Ctrl+V` through the compiled app — confirmed passing once, screenshotted (dropdown correctly reads "Bash", fence gets ```` ```bash ````); later reruns hit the same environment-wide WebView cold-start flake already on record for P11-1, not a defect in this feature.
 
 **Also fixed in passing:** P11-1's line-number gutter had a real, since-fixed alignment bug the single-line screenshot it originally shipped with never exposed — a genuinely multi-line block (the one this task's own e2e spec pastes) showed numbers bunching two-per-row and running out before the last lines. Rebuilt as one marker per line (`inline-block` + matching negative margin, netting zero width in the surrounding text's own flow) instead of one absolutely-positioned column of newline-joined text — the number now shares its line's own line box by construction, rather than merely being *positioned* to line up with it.
 
@@ -610,10 +612,8 @@ Syntax highlighting and manual language selection are the only code-block featur
   - [x] In-block search (find within the current code block)
 
 > **Indent setting** (`codeIndentWidth`/`codeIndentChar` in `settings.json`, app-wide like every other editor preference) replaces all six sites in `CodeBlockEditor.ts` that hardcoded a 2-space unit — Tab insert, Shift+Tab outdent (both single-line and multi-line-selection variants), and the nested-indent-after-`{` cases. Defaults preserve the exact old behavior byte-for-byte.
->
-> **Code folding** is indentation-based (a line folds if its next non-blank line is indented deeper; a run of deeper lines closes the fold, with a dangling trailing blank line never ending one) and lives in `CodeBlockToolbar.ts` alongside the line-number gutter, since both are fundamentally the same per-line gutter concern — keeping them in one file avoided a fragile cross-plugin assumption about whether a line-number widget would inherit `display:none` from a separately-owned hide decoration. Fold state is a plain `Set` of positions in plugin state, remapped via `tr.mapping` on every edit and never written to the note — the same presentation-only call as P6-1's `Details` collapse state. **Real bug found and fixed before shipping:** a classic closure-over-mutated-loop-variable trap — the fold placeholder's widget factory closed over the loop's own `i`, which gets reassigned (`i = end`) later in the *same* iteration to skip past hidden lines; since a widget factory only runs when ProseMirror actually builds the DOM (after the whole loop has finished), it read the mutated value and reported the wrong hidden-line count. Fixed by snapshotting `i`/`end` into their own `const`s before the reassignment. Caught by the test suite itself, not manual inspection.
->
-> **In-block search** (`Ctrl+F`, new `CodeBlockSearch.ts`) intercepts the key only when the caret is inside a code block, otherwise leaving WebView2's own native find dialog untouched (nothing else in this app currently intercepts `Ctrl+F`). The query lives in plugin state, not just the `<input>`'s own DOM value, because `decorations(state)` — where the match highlights come from — only ever receives `state`, never the live view; the search bar's own widget carries a stable decoration `key` so ProseMirror reuses the same DOM node (and the input keeps focus and cursor position) across every keystroke, with the match counter and scroll-into-view handled imperatively in the plugin's `view()` hook instead, the same idiom `CodeBlockOpenInIde.ts`'s ask/redraw cycle already uses.
+> ****Code folding** is indentation-based (a line folds if its next non-blank line is indented deeper; a run of deeper lines closes the fold, with a dangling trailing blank line never ending one) and lives in `CodeBlockToolbar.ts` alongside the line-number gutter, since both are fundamentally the same per-line gutter concern — keeping them in one file avoided a fragile cross-plugin assumption about whether a line-number widget would inherit `display:none` from a separately-owned hide decoration. Fold state is a plain `Set` of positions in plugin state, remapped via `tr.mapping` on every edit and never written to the note — the same presentation-only call as P6-1's `Details` collapse state. **Real bug found and fixed before shipping:** a classic closure-over-mutated-loop-variable trap — the fold placeholder's widget factory closed over the loop's own `i`, which gets reassigned (`i = end`) later in the *same* iteration to skip past hidden lines; since a widget factory only runs when ProseMirror actually builds the DOM (after the whole loop has finished), it read the mutated value and reported the wrong hidden-line count. Fixed by snapshotting `i`/`end` into their own `const`s before the reassignment. Caught by the test suite itself, not manual inspection.
+> ****In-block search** (`Ctrl+F`, new `CodeBlockSearch.ts`) intercepts the key only when the caret is inside a code block, otherwise leaving WebView2's own native find dialog untouched (nothing else in this app currently intercepts `Ctrl+F`). The query lives in plugin state, not just the `<input>`'s own DOM value, because `decorations(state)` — where the match highlights come from — only ever receives `state`, never the live view; the search bar's own widget carries a stable decoration `key` so ProseMirror reuses the same DOM node (and the input keeps focus and cursor position) across every keystroke, with the match counter and scroll-into-view handled imperatively in the plugin's `view()` hook instead, the same idiom `CodeBlockOpenInIde.ts`'s ask/redraw cycle already uses.
 >
 > Covered by 7 new indent tests, 13 new fold tests (pure `foldEndIndex`/`splitLines` cases plus DOM integration), 12 new search tests (pure `findMatches` plus DOM integration), and an e2e spec exercising all three against the real compiled app — each sub-feature confirmed passing at least once with a screenshot (search, fold) or a file-content assertion (tab character), all independently, since the well-documented WebView cold-start flake (P11-1/P11-2) meant no single run happened to land all three at once. One real e2e-authoring bug found and fixed along the way: closing the Settings dialog via `Ctrl+,` doesn't return focus to the editor, so the next test's `/` landed nowhere until the spec explicitly refocused first.
 
@@ -699,7 +699,7 @@ Do not let this influence P0–P14 design. Bundles the two checklist items needi
 
 <details>
 <summary>P0 — Trustworthy daily driver (M0 ✅)</summary>
-\\\\\\\\\\\\\\\\- \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\[x\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\] P0-1 Debounced autosave with \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\`clean|dirty|saving|error\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\` state; flushes on tab switch, unmount, window close
+\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\- \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\[x\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\] P0-1 Debounced autosave with \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\`clean|dirty|saving|error\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\` state; flushes on tab switch, unmount, window close
 
 - [x] P0-2 Save failures surface with retry; buffer stays dirty on failure
 
@@ -714,7 +714,7 @@ Do not let this influence P0–P14 design. Bundles the two checklist items needi
 </details>
 <details>
 <summary>P1 — Everyday-use completeness (M1 ✅)</summary>
-\\\\\\\\\\\\\\\\- \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\[x\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\] P1-1 Clicking an unresolved \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\`\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\[\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\[link\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\]\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\]\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\` creates and opens the note
+\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\- \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\[x\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\] P1-1 Clicking an unresolved \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\`\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\[\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\[link\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\]\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\]\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\` creates and opens the note
 
 - [x] P1-2 Recent workspaces + `Ctrl+P` quick switcher
 
@@ -727,7 +727,7 @@ Do not let this influence P0–P14 design. Bundles the two checklist items needi
 </details>
 <details>
 <summary>P2 — Feel & ergonomics (M2 ✅)</summary>
-\\\\\\\\\\\\\\\\- \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\[x\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\] P2-1 Settings panel — autosave delay, editor width; persists to \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\`settings.json\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\` in the app data dir
+\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\- \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\[x\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\] P2-1 Settings panel — autosave delay, editor width; persists to \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\`settings.json\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\` in the app data dir
 
 - [x] P2-2 Native File/Edit/View menu + shortcuts overlay, one command dispatcher
 
@@ -748,7 +748,7 @@ Do not let this influence P0–P14 design. Bundles the two checklist items needi
 </details>
 <details>
 <summary>P3 — Headline features (M3 ✅)</summary>
-\\\\\\\\\\\\\\\\- \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\[x\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\] P3-1 PDF import as reference images; OCR pipeline deleted; pages land in a \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\`NoteName.pdf/\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\` sidecar
+\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\- \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\[x\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\] P3-1 PDF import as reference images; OCR pipeline deleted; pages land in a \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\`NoteName.pdf/\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\` sidecar
 
 - [x] P3-2 Export to PDF via the WebView print pipeline + a `@media print` stylesheet
 
@@ -759,7 +759,7 @@ Do not let this influence P0–P14 design. Bundles the two checklist items needi
 </details>
 <details>
 <summary>Editing core (pre-roadmap)</summary>
-\\\\\\\\\\\\\\\\- \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\[x\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\] Live-preview WYSIWYG, plain \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\`.md\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\` as the only format, GitHub Markdown
+\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\- \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\[x\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\] Live-preview WYSIWYG, plain \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\`.md\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\` as the only format, GitHub Markdown
 
 - [x] KaTeX (inline + block), Mermaid, syntax-highlighted code, callouts, tables, task lists
 
@@ -774,7 +774,7 @@ Do not let this influence P0–P14 design. Bundles the two checklist items needi
 - [x] "Terminal Precision" design system
 
 </details>
-\\\\\\\\\\\\\\\\---
+\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\---
 
 ## Not doing
 
