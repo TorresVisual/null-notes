@@ -21,6 +21,15 @@ function getMarkdown(e: Editor): string {
   return ((e.storage as unknown as Record<string, unknown>)['markdown'] as MarkdownStorage).getMarkdown()
 }
 
+function detailsBodyText(e: Editor): string {
+  let text = ''
+  e.state.doc.descendants((node) => {
+    if (node.type.name === 'details') text = node.textBetween(0, node.content.size, '\n')
+    return true
+  })
+  return text
+}
+
 afterEach(() => {
   editor?.destroy()
   editor = null
@@ -95,6 +104,46 @@ describe('Details node', () => {
     const md = getMarkdown(e)
     expect(md).toContain('<details>')
     expect(md).not.toContain('<details open>')
+  })
+
+  // `<details>` opens a CommonMark raw-HTML block that swallows every
+  // following line verbatim until a real blank line — without one, body
+  // text starting with a markdown-significant character (`-`, `[`, `` ` ``)
+  // never reparses as real markdown on the next load, and its escaping
+  // compounds without bound on every subsequent save (found via TODO.md's
+  // own archived sections, corrupted across many real save cycles).
+  it('separates the summary and body with a real blank line, not just a newline', () => {
+    const html = '<details><summary>Click me</summary><p>Body content</p></details>'
+    const md = getMarkdown(mount(html))
+    expect(md).toContain('</summary>\n\nBody content')
+  })
+
+  it('separates the body and closing tag with a real blank line too', () => {
+    const html = '<details><summary>Click me</summary><p>Body content</p></details>'
+    const md = getMarkdown(mount(html))
+    expect(md).toContain('Body content\n\n</details>')
+  })
+
+  it('round-trips markdown-significant body text losslessly, even across repeated save cycles', () => {
+    const original = '- [x] item with `code` and [brackets]'
+    const html = `<details><summary>Phase log</summary><p>${original}</p></details>`
+    const first = mount(html)
+    expect(detailsBodyText(first)).toBe(original)
+    const firstSave = getMarkdown(first)
+
+    // Reparse the saved markdown as a fresh note (a second open+save cycle)
+    // and save again — this is exactly the compounding step that corrupted
+    // TODO.md commit over commit. A correct serializer/parser pair is
+    // idempotent here: some backslash-escaping in the saved *source* is
+    // expected and correct (a paragraph starting with "- " genuinely needs
+    // it to not become a real list item) — what must never happen is that
+    // escaping growing on every cycle, or the resolved *text* drifting from
+    // the original.
+    const second = mount(firstSave)
+    expect(detailsBodyText(second)).toBe(original)
+    const secondSave = getMarkdown(second)
+
+    expect(secondSave).toBe(firstSave)
   })
 })
 

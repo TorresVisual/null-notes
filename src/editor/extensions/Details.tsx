@@ -129,13 +129,28 @@ export const Details = Node.create({
           const s = state as {
             write: (text: string) => void
             ensureNewLine: () => void
+            closeBlock: (n: unknown) => void
             renderContent: (n: unknown) => void
           }
           s.ensureNewLine()
           s.write('<details>')
           s.ensureNewLine()
           s.write(`<summary>${node.attrs.summary}</summary>`)
-          s.ensureNewLine()
+          // A real blank line, not just a newline: `<details>` opens a
+          // CommonMark raw-HTML block that swallows every following line
+          // verbatim until a blank line is reached — without one here, the
+          // whole body (a bulleted line, a code span, anything starting
+          // with a markdown-significant character) never reparses as real
+          // markdown on the next load. It comes back as opaque text, whose
+          // paragraph serializer then defensively backslash-escapes those
+          // same leading characters — including, on the *next* round, the
+          // backslash it just added — compounding without bound on every
+          // save. `closeBlock` is how every other adjacent block pair in
+          // this serializer already gets its blank line (the first write()
+          // inside `renderContent` flushes it); `<summary>` just never went
+          // through that machinery on its own, since it isn't one of
+          // prosemirror-markdown's own block-node serializers.
+          s.closeBlock(node)
           s.renderContent(node)
           s.ensureNewLine()
           s.write('</details>')
