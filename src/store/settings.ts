@@ -9,6 +9,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
   pdfImportMode: 'pages',
   editorCommand: 'code -g {file}:{line}',
   terminalShell: 'powershell',
+  codeIndentWidth: 2,
+  codeIndentChar: 'space',
 }
 
 interface SettingsStore {

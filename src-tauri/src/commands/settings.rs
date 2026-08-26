@@ -70,6 +70,8 @@ mod tests {
             pdf_import_mode: crate::models::PdfImportMode::Markdown,
             editor_command: "nvim +{line} {file}".to_string(),
             terminal_shell: "wsl -d Ubuntu".to_string(),
+            code_indent_width: 4,
+            code_indent_char: crate::models::CodeIndentChar::Tab,
         };
         save_settings_to_dir(dir.path(), &original).await.unwrap();
         let loaded = load_settings_from_dir(dir.path()).await.unwrap();
@@ -83,6 +85,8 @@ mod tests {
             crate::models::PdfImportMode::Markdown
         );
         assert_eq!(loaded.terminal_shell, "wsl -d Ubuntu");
+        assert_eq!(loaded.code_indent_width, 4);
+        assert_eq!(loaded.code_indent_char, crate::models::CodeIndentChar::Tab);
     }
 
     // Detection fills the editor command only when there is nothing to keep.
@@ -173,6 +177,11 @@ mod tests {
         // to mean the same as a fresh install, or an older settings.json comes
         // back with no dictionary chosen at all.
         assert_eq!(loaded.spellcheck_language, "de");
+        // Same guarantee for P11-3: a settings.json from before this setting
+        // existed must load as the 2-space behavior every code block already
+        // had, not some other implicit width.
+        assert_eq!(loaded.code_indent_width, 2);
+        assert_eq!(loaded.code_indent_char, crate::models::CodeIndentChar::Space);
     }
 
     #[tokio::test]

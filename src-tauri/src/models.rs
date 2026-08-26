@@ -242,6 +242,18 @@ pub enum PdfImportMode {
     Markdown,
 }
 
+/// What a Tab keypress inserts inside a code block (P11-3). Space is the
+/// default because it matches the behavior every code block already had
+/// before this setting existed — a settings.json from before P11-3 loads as
+/// `Space`/2 via `#[serde(default)]`, not some other implicit width.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum CodeIndentChar {
+    #[default]
+    Space,
+    Tab,
+}
+
 // App-wide preferences, not per-workspace state — lives in the app data dir
 // alongside recent-workspaces.json, not inside any one workspace folder.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -278,10 +290,21 @@ pub struct AppSettings {
     /// `commands::terminal`. Empty means "detect on next load."
     #[serde(default)]
     pub terminal_shell: String,
+    /// Width of one indent level in a code block, in spaces — ignored when
+    /// `code_indent_char` is `Tab`, where one keypress always inserts one
+    /// literal tab character regardless of this number.
+    #[serde(default = "default_code_indent_width")]
+    pub code_indent_width: u32,
+    #[serde(default)]
+    pub code_indent_char: CodeIndentChar,
 }
 
 fn default_spellcheck_language() -> String {
     "de".to_string()
+}
+
+fn default_code_indent_width() -> u32 {
+    2
 }
 
 impl Default for AppSettings {
@@ -294,6 +317,8 @@ impl Default for AppSettings {
             pdf_import_mode: PdfImportMode::Pages,
             editor_command: String::new(),
             terminal_shell: String::new(),
+            code_indent_width: default_code_indent_width(),
+            code_indent_char: CodeIndentChar::Space,
         }
     }
 }

@@ -17,6 +17,8 @@ describe('useSettingsStore', () => {
       pdfImportMode: 'markdown',
       editorCommand: 'nvim +{line} {file}',
       terminalShell: 'wsl -d Ubuntu',
+      codeIndentWidth: 4,
+      codeIndentChar: 'tab',
     })
     expect(useSettingsStore.getState().settings).toEqual({
       autosaveDebounceMs: 1200,
@@ -26,6 +28,8 @@ describe('useSettingsStore', () => {
       pdfImportMode: 'markdown',
       editorCommand: 'nvim +{line} {file}',
       terminalShell: 'wsl -d Ubuntu',
+      codeIndentWidth: 4,
+      codeIndentChar: 'tab',
     })
   })
 })

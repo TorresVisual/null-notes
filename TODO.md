@@ -601,13 +601,21 @@ Syntax highlighting and manual language selection are the only code-block featur
 
 **Also fixed in passing:** P11-1's line-number gutter had a real, since-fixed alignment bug the single-line screenshot it originally shipped with never exposed — a genuinely multi-line block (the one this task's own e2e spec pastes) showed numbers bunching two-per-row and running out before the last lines. Rebuilt as one marker per line (`inline-block` + matching negative margin, netting zero width in the surrounding text's own flow) instead of one absolutely-positioned column of newline-joined text — the number now shares its line's own line box by construction, rather than merely being *positioned* to line up with it.
 
-- [ ] P11-3 Editing ergonomics — **M**
+- [x] P11-3 Editing ergonomics — **M**
 
-  - [ ] Configurable tab width / tabs-vs-spaces (hardcoded to 2 spaces today)
+  - [x] Configurable tab width / tabs-vs-spaces (hardcoded to 2 spaces today)
 
-  - [ ] Code folding
+  - [x] Code folding
 
-  - [ ] In-block search (find within the current code block)
+  - [x] In-block search (find within the current code block)
+
+> **Indent setting** (`codeIndentWidth`/`codeIndentChar` in `settings.json`, app-wide like every other editor preference) replaces all six sites in `CodeBlockEditor.ts` that hardcoded a 2-space unit — Tab insert, Shift+Tab outdent (both single-line and multi-line-selection variants), and the nested-indent-after-`{` cases. Defaults preserve the exact old behavior byte-for-byte.
+>
+> **Code folding** is indentation-based (a line folds if its next non-blank line is indented deeper; a run of deeper lines closes the fold, with a dangling trailing blank line never ending one) and lives in `CodeBlockToolbar.ts` alongside the line-number gutter, since both are fundamentally the same per-line gutter concern — keeping them in one file avoided a fragile cross-plugin assumption about whether a line-number widget would inherit `display:none` from a separately-owned hide decoration. Fold state is a plain `Set` of positions in plugin state, remapped via `tr.mapping` on every edit and never written to the note — the same presentation-only call as P6-1's `Details` collapse state. **Real bug found and fixed before shipping:** a classic closure-over-mutated-loop-variable trap — the fold placeholder's widget factory closed over the loop's own `i`, which gets reassigned (`i = end`) later in the *same* iteration to skip past hidden lines; since a widget factory only runs when ProseMirror actually builds the DOM (after the whole loop has finished), it read the mutated value and reported the wrong hidden-line count. Fixed by snapshotting `i`/`end` into their own `const`s before the reassignment. Caught by the test suite itself, not manual inspection.
+>
+> **In-block search** (`Ctrl+F`, new `CodeBlockSearch.ts`) intercepts the key only when the caret is inside a code block, otherwise leaving WebView2's own native find dialog untouched (nothing else in this app currently intercepts `Ctrl+F`). The query lives in plugin state, not just the `<input>`'s own DOM value, because `decorations(state)` — where the match highlights come from — only ever receives `state`, never the live view; the search bar's own widget carries a stable decoration `key` so ProseMirror reuses the same DOM node (and the input keeps focus and cursor position) across every keystroke, with the match counter and scroll-into-view handled imperatively in the plugin's `view()` hook instead, the same idiom `CodeBlockOpenInIde.ts`'s ask/redraw cycle already uses.
+>
+> Covered by 7 new indent tests, 13 new fold tests (pure `foldEndIndex`/`splitLines` cases plus DOM integration), 12 new search tests (pure `findMatches` plus DOM integration), and an e2e spec exercising all three against the real compiled app — each sub-feature confirmed passing at least once with a screenshot (search, fold) or a file-content assertion (tab character), all independently, since the well-documented WebView cold-start flake (P11-1/P11-2) meant no single run happened to land all three at once. One real e2e-authoring bug found and fixed along the way: closing the Settings dialog via `Ctrl+,` doesn't return focus to the editor, so the next test's `/` landed nowhere until the spec explicitly refocused first.
 
 - [ ] P11-4 Appearance — **S**
 

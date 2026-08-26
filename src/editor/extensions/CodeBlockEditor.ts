@@ -5,6 +5,21 @@ import { liftListItem, sinkListItem } from '@tiptap/pm/schema-list'
 import { joinTextblockBackward } from '@tiptap/pm/commands'
 import type { Node as ProseMirrorNode, NodeType } from '@tiptap/pm/model'
 import type { EditorView } from '@tiptap/pm/view'
+import { useSettingsStore } from '../../store/settings'
+
+// P11-3: what one Tab keypress inserts, and what one Shift+Tab removes.
+// Read live from the settings store rather than passed in, same as
+// `CodeBlockOpenInIde.ts`'s editor-command lookup — these are plain
+// functions with no tiptap options plumbing of their own.
+function indentUnit(): string {
+  const { codeIndentWidth, codeIndentChar } = useSettingsStore.getState().settings
+  return codeIndentChar === 'tab' ? '\t' : ' '.repeat(Math.max(1, codeIndentWidth))
+}
+
+function outdentPattern(): RegExp {
+  const { codeIndentWidth, codeIndentChar } = useSettingsStore.getState().settings
+  return codeIndentChar === 'tab' ? /^\t/ : new RegExp(`^ {1,${Math.max(1, codeIndentWidth)}}`)
+}
 
 interface AutoDetectLowlight {
   highlightAuto: (value: string) => { data?: { language?: string; relevance?: number } }
@@ -75,33 +90,37 @@ export function handleCodeBlockKeyDown(view: EditorView, event: KeyboardEvent): 
     event.preventDefault()
 
     if (event.shiftKey) {
+      const outdentRe = outdentPattern()
+
       if (empty) {
         const beforeCursor = $from.parent.textContent.slice(0, $from.parentOffset)
         const lineStart = beforeCursor.lastIndexOf('\n') + 1
         const line = beforeCursor.slice(lineStart)
-        const spaces = line.match(/^ {1,2}/)?.[0].length ?? 0
-        if (!spaces) return true
+        const removed = line.match(outdentRe)?.[0].length ?? 0
+        if (!removed) return true
 
         const start = $from.start() + lineStart
-        const transaction = view.state.tr.delete(start, start + spaces)
-        transaction.setSelection(TextSelection.create(transaction.doc, Math.max(start, from - spaces)))
+        const transaction = view.state.tr.delete(start, start + removed)
+        transaction.setSelection(TextSelection.create(transaction.doc, Math.max(start, from - removed)))
         view.dispatch(transaction)
         return true
       }
 
       const text = view.state.doc.textBetween(from, to, '\n', '\n')
-      const outdented = text.split('\n').map((line) => line.replace(/^ {1,2}/, '')).join('\n')
+      const outdented = text.split('\n').map((line) => line.replace(outdentRe, '')).join('\n')
       view.dispatch(view.state.tr.replaceWith(from, to, schema.text(outdented)))
       return true
     }
 
+    const unit = indentUnit()
+
     if (empty) {
-      view.dispatch(view.state.tr.insertText('  ', from, to))
+      view.dispatch(view.state.tr.insertText(unit, from, to))
       return true
     }
 
     const text = view.state.doc.textBetween(from, to, '\n', '\n')
-    const indented = text.split('\n').map((line) => `  ${line}`).join('\n')
+    const indented = text.split('\n').map((line) => `${unit}${line}`).join('\n')
     view.dispatch(view.state.tr.replaceWith(from, to, schema.text(indented)))
     return true
   }
@@ -116,14 +135,14 @@ export function handleCodeBlockKeyDown(view: EditorView, event: KeyboardEvent): 
   const closing = opening ? OPENING_PAIRS[opening] : undefined
 
   if (closing && afterCursor.startsWith(closing)) {
-    const nestedIndent = `${indent}  `
+    const nestedIndent = `${indent}${indentUnit()}`
     const transaction = view.state.tr.insertText(`\n${nestedIndent}\n${indent}`, from, to)
     transaction.setSelection(TextSelection.create(transaction.doc, from + nestedIndent.length + 1))
     view.dispatch(transaction)
     return true
   }
 
-  const nextIndent = /[\{\[\(]\s*$/.test(beforeCursor) ? `${indent}  ` : indent
+  const nextIndent = /[\{\[\(]\s*$/.test(beforeCursor) ? `${indent}${indentUnit()}` : indent
   view.dispatch(view.state.tr.insertText(`\n${nextIndent}`, from, to))
   return true
 }

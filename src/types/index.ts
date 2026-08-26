@@ -85,6 +85,8 @@ export interface NoteHistoryEntry {
 
 export type PdfImportMode = 'pages' | 'markdown'
 
+export type CodeIndentChar = 'space' | 'tab'
+
 export interface AppSettings {
   autosaveDebounceMs: number
   editorMaxWidthPx: number
@@ -96,6 +98,9 @@ export interface AppSettings {
   editorCommand: string
   /** Shell a terminal pane spawns, e.g. `powershell` or `wsl -d Ubuntu`. */
   terminalShell: string
+  /** Width of one indent level in a code block. Ignored when `codeIndentChar` is `'tab'`. */
+  codeIndentWidth: number
+  codeIndentChar: CodeIndentChar
 }
 
 export interface GraphLink {

@@ -22,6 +22,7 @@ import { WikiLink } from './WikiLink'
 import { CodeLink } from './CodeLink'
 import { CodeBlockOpenInIde } from './CodeBlockOpenInIde'
 import { CodeBlockToolbar } from './CodeBlockToolbar'
+import { CodeBlockSearch } from './CodeBlockSearch'
 import { CrossRef } from './CrossRef'
 import { Tag } from './Tag'
 import { NoteContext } from './NoteContext'
@@ -165,6 +166,7 @@ export const coreExtensions = [
   CodeLink,
   CodeBlockOpenInIde,
   CodeBlockToolbar,
+  CodeBlockSearch,
   CrossRef,
   NoteContext,
   SlashCommands,

@@ -1033,6 +1033,42 @@ code {
   pointer-events: none;
 }
 
+/* P11-3 code folding — a foldable line's own marker doubles as its toggle,
+   rather than adding a second per-line element next to it. `pointer-events`
+   is re-enabled only here since the plain marker above deliberately stays
+   click-through so it never steals a text-selection drag. */
+.code-line-number.foldable {
+  cursor: pointer;
+  pointer-events: auto;
+}
+.code-line-number.foldable::before {
+  content: '▾';
+  display: inline-block;
+  width: 0.7em;
+  font-size: 0.7em;
+  vertical-align: 1px;
+}
+.code-line-number.foldable.folded::before { content: '▸'; }
+
+/* The hidden lines stay in the document (nothing here touches content) —
+   `display: none` only removes their *rendered* box, line breaks included,
+   which is what lets the fold placeholder sit flush against the line
+   before it. */
+.code-fold-hidden { display: none; }
+
+.code-fold-placeholder {
+  cursor: pointer;
+  color: var(--text-tertiary);
+  background: var(--bg-hover);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 0 6px;
+  margin-left: 6px;
+  font-size: 0.85em;
+  user-select: none;
+}
+.code-fold-placeholder:hover { color: var(--accent); border-color: var(--accent); }
+
 /* Copy button + word-wrap toggle (P11-1), bottom-right so they never
    collide with P7-2's "Open in IDE" button in the top-right corner. */
 .code-block-actions {
@@ -1053,6 +1089,58 @@ code {
   cursor: pointer;
 }
 .code-block-copy:hover, .code-block-wrap-toggle:hover { color: var(--accent); border-color: var(--accent); }
+
+/* P11-3 in-block search — floats over the top of the block on `Ctrl+F`,
+   since it's transient/on-demand rather than always visible like the
+   gutter or the corner buttons; overlapping the first line while open is
+   the same tradeoff most editors' inline find widgets make. */
+.code-search-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  background: var(--bg-raised);
+  border-bottom: 1px solid var(--border);
+  border-radius: 6px 6px 0 0;
+  z-index: 2;
+}
+.code-search-input {
+  flex: 1;
+  min-width: 0;
+  padding: 3px 6px;
+  background: var(--bg-hover);
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  color: var(--text-primary);
+  font-size: 12px;
+  font-family: var(--font-mono);
+}
+.code-search-input:focus-visible { outline: none; box-shadow: var(--focus-ring); border-color: var(--accent); }
+.code-search-count {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  min-width: 3.5em;
+  text-align: right;
+  flex: none;
+}
+.code-search-nav, .code-search-close {
+  padding: 2px 6px;
+  background: var(--bg-hover);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-tertiary);
+  font-size: 12px;
+  cursor: pointer;
+  flex: none;
+}
+.code-search-nav:hover, .code-search-close:hover { color: var(--accent); border-color: var(--accent); }
+
+.code-search-match { background: var(--accent-bg); border-radius: 2px; }
+.code-search-match-active { background: var(--accent); color: var(--accent-contrast); }
 .code-block-copy.copied { color: var(--accent); border-color: var(--accent); }
 .code-block-wrap-toggle.active { color: var(--accent); border-color: var(--accent); background: var(--accent-bg); }
 
@@ -2389,6 +2477,20 @@ code {
   width: 200px;
   font-family: var(--font-mono);
 }
+
+/* A bare <select> has no rule to inherit from the input styling above —
+   without this it renders as an unstyled native widget sitting right next
+   to a themed number input (P11-3's code-indent-char picker). */
+.settings-row-control select {
+  padding: 5px 8px;
+  background: var(--bg-hover);
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  color: var(--text-primary);
+  font-size: 13px;
+}
+.settings-row-control select:hover { border-color: var(--text-tertiary); }
+.settings-row-control select:focus-visible { outline: none; box-shadow: var(--focus-ring); border-color: var(--accent); }
 
 /* A code deep link reads as a link only when it resolves. An unresolved one
    keeps the wiki-link precedent: visibly a reference, visibly not pointing

@@ -94,6 +94,34 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
                 <span className="settings-unit">px</span>
               </span>
             </label>
+
+            <label className="settings-row">
+              <span>
+                Code block indent
+                <small>What a Tab keypress inserts in a code block.</small>
+              </span>
+              <span className="settings-row-control">
+                <select
+                  value={settings.codeIndentChar}
+                  onChange={(e) => void update({ codeIndentChar: e.target.value as 'space' | 'tab' })}
+                >
+                  <option value="space">Spaces</option>
+                  <option value="tab">Tab</option>
+                </select>
+                {settings.codeIndentChar === 'space' && (
+                  <input
+                    type="number"
+                    min={1}
+                    max={8}
+                    step={1}
+                    value={settings.codeIndentWidth}
+                    onChange={(e) =>
+                      void update({ codeIndentWidth: clampNumber(Number(e.target.value), 1, 8) })
+                    }
+                  />
+                )}
+              </span>
+            </label>
           </div>
 
           <div className="settings-section">
