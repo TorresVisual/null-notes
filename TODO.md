@@ -58,6 +58,8 @@
 
 - [ ] add a open in null notes in my ide
 
+- [ ] search doesnt jump
+
 Feature checklist. **The [roadmap](docs/ROADMAP.md) holds the reasoning and the Definitions of Done; this file holds the boxes.** If the two disagree, the roadmap wins. Gaps found against this checklist (audited 2026-08-26) are tracked as **P11–P15** below.
 
 Effort: **S** ≈ hours · **M** ≈ a day or two · **L** ≈ several days.
