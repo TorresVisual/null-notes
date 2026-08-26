@@ -1,9 +1,52 @@
 import { CodeBlockLowlight } from '@tiptap/extension-code-block-lowlight'
 import { Plugin, TextSelection } from '@tiptap/pm/state'
+import type { Transaction } from '@tiptap/pm/state'
 import { liftListItem, sinkListItem } from '@tiptap/pm/schema-list'
 import { joinTextblockBackward } from '@tiptap/pm/commands'
-import type { NodeType } from '@tiptap/pm/model'
+import type { Node as ProseMirrorNode, NodeType } from '@tiptap/pm/model'
 import type { EditorView } from '@tiptap/pm/view'
+
+interface AutoDetectLowlight {
+  highlightAuto: (value: string) => { data?: { language?: string; relevance?: number } }
+}
+
+// Calibrated against real CS-lecture prose, not just real code: a paragraph
+// of academic prose about, say, eigenvalues or induction proofs regularly
+// scores 4-8 on lowlight's relevance scale — the same range plenty of short,
+// genuine code snippets land in. There is no relevance value that reliably
+// tells "plain paragraph a student pasted into a bare code block" apart from
+// "real code" below roughly this line, so anything under it is left unset
+// rather than risk mislabeling prose as a programming language — the same
+// "prefer a miss" posture as every other resolver in this codebase (P1-1's
+// unresolved wiki-links, P7-1's code links, P6-7's cross-references).
+const MIN_CONFIDENT_RELEVANCE = 10
+
+// P11-2: guess a pasted-in block's language once, the moment it has enough
+// text to guess from — never on every keystroke, and never once a language
+// is anything other than `null` (the schema default). `null` is "never
+// decided"; an empty string is a real decision (the user picked "Plain
+// text" from the toolbar, or a prior detection came up inconclusive), and
+// both stop this from running again on that node, same as a real language
+// pick would.
+function detectPastedLanguage(lowlight: AutoDetectLowlight, transactions: readonly Transaction[], newState: { doc: ProseMirrorNode; tr: Transaction }): Transaction | null {
+  if (!transactions.some((tr) => tr.getMeta('uiEvent') === 'paste')) return null
+
+  let result: Transaction | null = null
+  newState.doc.descendants((node, pos) => {
+    if (node.type.name !== 'codeBlock') return true
+    if (node.attrs['language'] !== null) return false
+
+    const text = node.textContent
+    if (!text.trim()) return false
+
+    const detected = lowlight.highlightAuto(text)
+    if (!detected.data?.language || (detected.data.relevance ?? 0) < MIN_CONFIDENT_RELEVANCE) return false
+
+    result = (result ?? newState.tr).setNodeMarkup(pos, undefined, { ...node.attrs, language: detected.data.language })
+    return false
+  })
+  return result
+}
 
 const OPENING_PAIRS: Record<string, string> = {
   '"': '"',
@@ -208,9 +251,13 @@ export const CodeBlockEditor = CodeBlockLowlight.extend({
 
   addProseMirrorPlugins() {
     const parentPlugins = this.parent?.() ?? []
+    const lowlight = this.options.lowlight as AutoDetectLowlight
 
     return [
       ...parentPlugins,
+      new Plugin({
+        appendTransaction: (transactions, _oldState, newState) => detectPastedLanguage(lowlight, transactions, newState),
+      }),
       new Plugin({
         props: {
           handleTextInput: (view, from, to, text) => {

@@ -993,7 +993,9 @@ code {
 .note-editor pre {
   position: relative;
   background: var(--bg-hover);
-  padding: 14px 16px 14px calc(16px + 2.4em + 10px);
+  --gutter-width: 2.4em;
+  --gutter-gap: 10px;
+  padding: 14px 16px 14px calc(16px + var(--gutter-width) + var(--gutter-gap));
   border-radius: 6px;
   overflow-x: auto;
   margin: 0.8em 0;
@@ -1007,16 +1009,25 @@ code {
    default, matching the pre-existing horizontal-scroll behaviour above. */
 .note-editor pre[data-wrap="true"] { white-space: pre-wrap; overflow-x: hidden; word-break: break-word; }
 
-/* Line-number gutter (P11-1) — always shown, one entry per source line.
-   Sits in the space `pre`'s own left padding was widened to make room for;
+/* Line-number gutter (P11-1) — one marker per source line, not one
+   absolutely-positioned column for the whole block. `inline-block` plus a
+   negative left margin nets zero width in the surrounding text's own flow,
+   so each number rides in the exact same line box as its line's first
+   character: it cannot drift out of alignment with it the way a separate
+   box only *positioned* to line up can, if line-height or font metrics ever
+   diverge between the two. The negative margin pulls the marker back by
+   its own width plus the gap (into the room `pre`'s padding-left reserved
+   above); the matching positive `margin-right` gives that same width back,
+   so the code text after it lands exactly where the padding alone would
+   put it — same shared `--gutter-width`/`--gutter-gap` custom properties
+   as `pre`'s padding, so the two can't drift out of sync with each other.
    `user-select: none` keeps a code drag-select from also grabbing numbers. */
-.code-line-numbers {
-  position: absolute;
-  top: 14px;
-  left: 16px;
-  width: 2.4em;
+.code-line-number {
+  display: inline-block;
+  width: var(--gutter-width);
+  margin-left: calc(-1 * (var(--gutter-width) + var(--gutter-gap)));
+  margin-right: var(--gutter-gap);
   text-align: right;
-  white-space: pre;
   color: var(--text-tertiary);
   user-select: none;
   pointer-events: none;

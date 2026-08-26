@@ -16,8 +16,8 @@ function codeBlock(text: string, language = 'rust'): string {
   return `<pre><code class="language-${language}">${text}</code></pre>`
 }
 
-function gutters(e: InstanceType<typeof Editor>): HTMLElement[] {
-  return [...e.view.dom.querySelectorAll('.code-line-numbers')] as HTMLElement[]
+function lineNumbers(e: InstanceType<typeof Editor>): string[] {
+  return [...e.view.dom.querySelectorAll('.code-line-number')].map((el) => el.textContent ?? '')
 }
 
 function actionsFor(e: InstanceType<typeof Editor>): HTMLElement {
@@ -32,28 +32,25 @@ afterEach(() => {
 })
 
 describe('code block line numbers', () => {
-  it('lists one number per source line', () => {
+  it('lists one marker per source line', () => {
     const e = mount(codeBlock('fn main() {}\nlet x = 1;\nlet y = 2;'))
-    const [gutter] = gutters(e)
-    expect(gutter?.textContent).toBe('1\n2\n3')
+    expect(lineNumbers(e)).toEqual(['1', '2', '3'])
   })
 
-  it('renders exactly one number for a single-line block', () => {
+  it('renders exactly one marker for a single-line block', () => {
     const e = mount(codeBlock('let x = 1;'))
-    const [gutter] = gutters(e)
-    expect(gutter?.textContent).toBe('1')
+    expect(lineNumbers(e)).toEqual(['1'])
   })
 
   it('updates as lines are added', () => {
     const e = mount(codeBlock('one'))
     e.commands.insertContent('\ntwo')
-    const [gutter] = gutters(e)
-    expect(gutter?.textContent).toBe('1\n2')
+    expect(lineNumbers(e)).toEqual(['1', '2'])
   })
 
-  it('renders a gutter per code block, not one for the whole document', () => {
+  it('renders markers for both code blocks, not just the first', () => {
     const e = mount(`${codeBlock('a')}${codeBlock('b')}`)
-    expect(gutters(e)).toHaveLength(2)
+    expect(lineNumbers(e)).toEqual(['1', '1'])
   })
 })
 

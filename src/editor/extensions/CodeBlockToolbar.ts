@@ -21,15 +21,30 @@ import type { EditorView } from '@tiptap/pm/view'
 
 const codeBlockToolbarKey = new PluginKey('codeBlockToolbar')
 
-function lineNumberGutter(node: ProseMirrorNode): HTMLElement {
-  const gutter = document.createElement('div')
-  gutter.className = 'code-line-numbers'
-  gutter.contentEditable = 'false'
-  const count = node.textContent.split('\n').length
-  const numbers: string[] = []
-  for (let i = 1; i <= count; i += 1) numbers.push(String(i))
-  gutter.textContent = numbers.join('\n')
-  return gutter
+// One marker per source line, not one box for the whole gutter: an
+// `inline-block` with a matching negative left margin nets zero width in
+// the text flow, so each number rides along in the *same* line box as its
+// own line's first character — structurally impossible to drift out of
+// alignment with it, unlike a separately-positioned column that only
+// *looks* lined up if its own font metrics happen to match the code's.
+function lineNumberMarker(n: number): HTMLElement {
+  const marker = document.createElement('span')
+  marker.className = 'code-line-number'
+  marker.contentEditable = 'false'
+  marker.textContent = String(n)
+  return marker
+}
+
+function lineNumberDecorations(node: ProseMirrorNode, pos: number): Decoration[] {
+  const text = node.textContent
+  const lineOffsets = [0]
+  for (let i = 0; i < text.length; i += 1) {
+    if (text[i] === '\n') lineOffsets.push(i + 1)
+  }
+
+  return lineOffsets.map((offset, index) =>
+    Decoration.widget(pos + 1 + offset, () => lineNumberMarker(index + 1), { side: -1, ignoreSelection: true }),
+  )
 }
 
 function blockActions(pos: number, wrap: boolean): HTMLElement {
@@ -84,7 +99,7 @@ function decorate(state: EditorState): DecorationSet {
     if (node.type.name !== 'codeBlock') return true
 
     decorations.push(
-      Decoration.widget(pos + 1, () => lineNumberGutter(node), { side: -1, ignoreSelection: true }),
+      ...lineNumberDecorations(node, pos),
       Decoration.widget(pos + 1, () => blockActions(pos, node.attrs['wrap'] === true), {
         side: -1,
         ignoreSelection: true,
