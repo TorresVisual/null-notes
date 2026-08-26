@@ -145,3 +145,15 @@ export function filterMathSymbols(query: string): MathSymbolCategory[] {
     ),
   })).filter((category) => category.symbols.length > 0)
 }
+
+/** Shared by `BlockMath`/`InlineMath`'s registered `insertSymbol` handles —
+ *  the palette itself now lives in the top toolbar (outside either node
+ *  view), so only this pure "where does it land" computation is common
+ *  enough to share; the toolbar reaches whichever node view is currently
+ *  being edited through `useMathEditorStore`. Takes the raw latex string
+ *  rather than a whole `MathSymbol` — `MathEditorHandle.insertSymbol` only
+ *  ever has the string, not the symbol's display glyph or name. */
+export function insertSymbolAt(value: string, cursor: number, latex: string): { text: string; cursor: number } {
+  const text = value.slice(0, cursor) + latex + value.slice(cursor)
+  return { text, cursor: cursor + latex.length }
+}

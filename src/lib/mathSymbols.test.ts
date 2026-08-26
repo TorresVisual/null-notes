@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { MATH_SYMBOL_CATEGORIES, filterMathSymbols } from './mathSymbols'
+import { MATH_SYMBOL_CATEGORIES, filterMathSymbols, insertSymbolAt } from './mathSymbols'
 
 describe('filterMathSymbols', () => {
   it('returns every category for an empty query', () => {
@@ -35,5 +35,18 @@ describe('filterMathSymbols', () => {
 
   it('is case-insensitive', () => {
     expect(filterMathSymbols('ALPHA')).toEqual(filterMathSymbols('alpha'))
+  })
+})
+
+describe('insertSymbolAt', () => {
+  it('inserts at the cursor and moves it past the inserted latex', () => {
+    const result = insertSymbolAt('x = ', 4, '\\alpha')
+    expect(result.text).toBe('x = \\alpha')
+    expect(result.cursor).toBe(4 + '\\alpha'.length)
+  })
+
+  it('leaves text after the cursor untouched', () => {
+    const result = insertSymbolAt('x =  + 1', 4, '\\alpha')
+    expect(result.text).toBe('x = \\alpha + 1')
   })
 })

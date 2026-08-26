@@ -737,33 +737,20 @@ code {
 .math-copy-button:hover { color: var(--accent); border-color: var(--accent); }
 .math-copy-button.copied { color: var(--accent); border-color: var(--accent); }
 
-/* P12-4 — symbol palette toggle, same footprint as the copy button next to
-   it. `.symbol-palette-anchor` is the positioning context for the popover;
-   it's a plain inline/block wrapper (never given its own explicit `display`)
-   so it doesn't disturb whichever flow context its parent (a block row in
-   BlockMath, an inline run in InlineMath) already established. */
+/* P12-4 — symbol palette, toggled from a plain `.toolbar-button` (Omega
+   icon) in `InsertGroup`, same as every other insert action. Only the
+   popover's own positioning context is bespoke: `.symbol-palette-anchor`
+   wraps just that one button so the popover's `position: absolute` doesn't
+   anchor to the whole `.toolbar-group` row. */
 .symbol-palette-anchor {
   position: relative;
+  display: inline-flex;
 }
-
-.math-symbol-palette-button {
-  margin-top: var(--space-xs);
-  margin-left: 6px;
-  padding: 2px 8px;
-  background: var(--bg-hover);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  color: var(--text-tertiary);
-  font-size: 12px;
-  font-family: var(--font-mono);
-  cursor: pointer;
-}
-.math-symbol-palette-button:hover { color: var(--accent); border-color: var(--accent); }
 
 .symbol-palette {
   position: absolute;
   top: calc(100% + 4px);
-  right: 0;
+  left: 0;
   z-index: 60;
   display: flex;
   flex-direction: column;

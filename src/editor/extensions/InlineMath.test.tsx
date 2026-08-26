@@ -1,10 +1,11 @@
-import { describe, it, expect, afterEach, vi } from 'vitest'
+import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest'
 import { render, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useEditor, EditorContent } from '@tiptap/react'
 import type { Editor } from '@tiptap/core'
 import { useEffect } from 'react'
 import { coreExtensions } from './index'
+import { useMathEditorStore } from '../../store/mathEditor'
 
 let editor: Editor | null = null
 
@@ -120,9 +121,10 @@ describe('inline math editing — interactive', () => {
     expect(container.querySelector('.math-error-mark .math-error-caret')).toBeInTheDocument()
   })
 
-  // P12-4: browsable, additive to the "/" snippet menu — a symbol can be
-  // found without already knowing its trigger.
-  it('inserts a symbol from the palette at the cursor and keeps the editor open', async () => {
+  // P12-4 follow-up: the symbol palette moved to the top toolbar, outside
+  // this node view entirely — this is the node view's half of that contract,
+  // the toolbar's own half (InsertGroup) is covered in insertGroup.test.tsx.
+  it('registers an insertSymbol handle with the math editor store while open', async () => {
     const user = userEvent.setup()
     const { container } = mount('<p></p>')
     editor!.commands.insertContent({ type: 'inlineMath', attrs: { latex: '' } })
@@ -133,24 +135,27 @@ describe('inline math editing — interactive', () => {
     })
     await user.type(input, 'x = ')
 
-    const paletteButton = container.querySelector('.math-symbol-palette-button') as HTMLButtonElement
-    await user.click(paletteButton)
-    // Opening the palette autofocuses its search input, which blurs the
-    // real field — a regression risk this test guards against: the editor
-    // must stay open (see commitUnlessFocusLeaves).
-    await waitFor(() => expect(container.querySelector('.symbol-palette')).toBeInTheDocument())
-    expect(getInput(container)).toBeInTheDocument()
+    const active = useMathEditorStore.getState().activeEditor
+    expect(active).not.toBeNull()
+    active!.insertSymbol('\\alpha')
 
-    const search = container.querySelector('.symbol-palette-search') as HTMLInputElement
-    await user.type(search, 'alpha')
-    const alphaButton = await waitFor(() => {
-      const el = container.querySelector<HTMLButtonElement>('.symbol-palette-item[title^="alpha"]')
-      if (!el) throw new Error('alpha symbol not found')
+    await waitFor(() => expect(getInput(container)!.value).toBe('x = \\alpha'))
+  })
+
+  it('unregisters from the math editor store once the editor closes', async () => {
+    const user = userEvent.setup()
+    const { container } = mount('<p></p>')
+    editor!.commands.insertContent({ type: 'inlineMath', attrs: { latex: '' } })
+    const input = await waitFor(() => {
+      const el = getInput(container)
+      if (!el) throw new Error('editor not open yet')
       return el
     })
-    await user.click(alphaButton)
+    expect(useMathEditorStore.getState().activeEditor).not.toBeNull()
 
-    await waitFor(() => expect(container.querySelector('.symbol-palette')).not.toBeInTheDocument())
-    expect(getInput(container)!.value).toBe('x = \\alpha')
+    await user.type(input, 'x{Escape}')
+    await waitFor(() => expect(useMathEditorStore.getState().activeEditor).toBeNull())
   })
 })
+
+beforeEach(() => useMathEditorStore.setState({ activeEditor: null, activeEditorId: null }))

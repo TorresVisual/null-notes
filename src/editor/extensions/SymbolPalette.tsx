@@ -6,16 +6,20 @@ import type { MathSymbol } from '../../lib/mathSymbols'
 interface SymbolPaletteProps {
   onSelect: (symbol: MathSymbol) => void
   onClose: () => void
-  /** The search input steals focus on mount (`autoFocus`) the same way the
-   *  equation-number field can — the caller passes the same
-   *  `commitUnlessFocusLeaves`-backed handler its own latex field uses, so
-   *  blurring *out of the whole editor* from in here still commits, and
-   *  blurring *into* it (the normal open case) doesn't. */
+  /** The search input steals focus on mount (`autoFocus`). This lives in
+   *  the top toolbar, outside any math node's own editing overlay — the
+   *  caller uses this to notice when focus leaves the palette *and* doesn't
+   *  land back in whichever equation is active, so that equation still
+   *  commits and closes on a real "click away," the same as if the palette
+   *  had never opened. */
   onBlur?: (e: FocusEvent<HTMLInputElement>) => void
 }
 
 /** P12-4: browsable, additive to `MathSnippetMenu`'s fixed `/`-triggered
- *  menu — a symbol can be found here without already knowing its trigger. */
+ *  menu — a symbol can be found here without already knowing its trigger.
+ *  Lives in the top toolbar (`InsertGroup`), not inside either math node's
+ *  own editing overlay, so it works whether or not an equation is
+ *  currently open. */
 export function SymbolPalette({ onSelect, onClose, onBlur }: SymbolPaletteProps) {
   const [query, setQuery] = useState('')
   const categories = filterMathSymbols(query)

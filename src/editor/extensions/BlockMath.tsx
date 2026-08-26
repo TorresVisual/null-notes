@@ -1,15 +1,15 @@
 import { Node } from '@tiptap/core'
 import { ReactNodeViewRenderer, NodeViewWrapper } from '@tiptap/react'
 import type { ReactNodeViewProps } from '@tiptap/react'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { renderMath } from '../../lib/mathRender'
 import { commitUnlessFocusLeaves } from '../../lib/mathEditorFocus'
+import { insertSymbolAt } from '../../lib/mathSymbols'
 import { useMathSnippetMenu } from '../../hooks/useMathSnippetMenu'
-import { useSymbolPalette } from '../../hooks/useSymbolPalette'
+import { useMathEditorStore } from '../../store/mathEditor'
 import { MathSnippetMenu } from './MathSnippetMenu'
 import { MathCopyButton } from './MathCopyButton'
 import { MathErrorOverlay } from './MathErrorOverlay'
-import { SymbolPalette } from './SymbolPalette'
 
 interface BlockMathAttrs {
   latex: string
@@ -26,11 +26,42 @@ function BlockMathView({ node, editor, getPos, updateAttributes, deleteNode, sel
   const [cursor, setCursor] = useState(0)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const snippetMenu = useMathSnippetMenu(draft, cursor, setDraft, textareaRef)
-  const symbolPalette = useSymbolPalette(draft, cursor, setDraft, setCursor, textareaRef)
+
+  const editorId = useId()
+  const setActiveMathEditor = useMathEditorStore((s) => s.setActiveEditor)
+  const clearActiveMathEditor = useMathEditorStore((s) => s.clearActiveEditor)
+  // Read fresh inside the registered handle without making the registration
+  // effect re-run (and thus re-register) on every keystroke or render.
+  const draftRef = useRef(draft)
+  draftRef.current = draft
+  const cursorRef = useRef(cursor)
+  cursorRef.current = cursor
+  const commitRef = useRef<(refocus: boolean) => void>(() => {})
 
   useEffect(() => {
     if (editing) textareaRef.current?.focus()
   }, [editing])
+
+  // The symbol palette lives in the top toolbar (P12-4 follow-up), outside
+  // this node view entirely — this is the only path back into its local
+  // (draft, cursor) state, the same shape `ink.ts`'s `CanvasHandle`
+  // registration already uses for the toolbar's undo/redo/zoom controls.
+  useEffect(() => {
+    if (!editing) return
+    setActiveMathEditor(editorId, {
+      insertSymbol: (latex) => {
+        const result = insertSymbolAt(draftRef.current, cursorRef.current, latex)
+        setDraft(result.text)
+        setCursor(result.cursor)
+        requestAnimationFrame(() => {
+          textareaRef.current?.focus()
+          textareaRef.current?.setSelectionRange(result.cursor, result.cursor)
+        })
+      },
+      commitAndClose: () => commitRef.current(false),
+    })
+    return () => clearActiveMathEditor(editorId)
+  }, [editing, editorId, setActiveMathEditor, clearActiveMathEditor])
 
   function open() {
     if (!editor.isEditable) return
@@ -58,6 +89,7 @@ function BlockMathView({ node, editor, getPos, updateAttributes, deleteNode, sel
     updateAttributes({ latex: next, number: draftNumber.trim() || null })
     close(refocus)
   }
+  commitRef.current = commit
 
   function cancel() {
     if (!latex) {
@@ -115,7 +147,7 @@ function BlockMathView({ node, editor, getPos, updateAttributes, deleteNode, sel
                 }}
                 onClick={(e) => setCursor(e.currentTarget.selectionStart ?? 0)}
                 onKeyUp={(e) => setCursor(e.currentTarget.selectionStart ?? 0)}
-                onBlur={(e) => commitUnlessFocusLeaves('.block-math-editor', e.currentTarget, commit)}
+                onBlur={() => commitUnlessFocusLeaves(commit)}
                 onKeyDown={(e) => {
                   e.stopPropagation()
                   if (snippetMenu.handleKeyDown(e)) return
@@ -142,7 +174,7 @@ function BlockMathView({ node, editor, getPos, updateAttributes, deleteNode, sel
               placeholder="№"
               title="Equation number (optional) — makes it resolvable as Equation (N)"
               onChange={(e) => setDraftNumber(e.target.value)}
-              onBlur={(e) => commitUnlessFocusLeaves('.block-math-editor', e.currentTarget, commit)}
+              onBlur={() => commitUnlessFocusLeaves(commit)}
               onKeyDown={(e) => {
                 e.stopPropagation()
                 if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
@@ -155,26 +187,6 @@ function BlockMathView({ node, editor, getPos, updateAttributes, deleteNode, sel
               }}
             />
             <MathCopyButton latex={draft} className="math-copy-button" />
-            <div className="symbol-palette-anchor">
-              <button
-                type="button"
-                className="math-symbol-palette-button"
-                title="Symbol palette"
-                onMouseDown={(e) => {
-                  e.preventDefault()
-                  symbolPalette.toggle()
-                }}
-              >
-                Ω
-              </button>
-              {symbolPalette.open && (
-                <SymbolPalette
-                  onSelect={symbolPalette.insert}
-                  onClose={symbolPalette.close}
-                  onBlur={(e) => commitUnlessFocusLeaves('.block-math-editor', e.currentTarget, commit)}
-                />
-              )}
-            </div>
             <MathSnippetMenu
               matches={snippetMenu.matches}
               selected={snippetMenu.selected}
