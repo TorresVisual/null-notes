@@ -2,21 +2,17 @@ import { Node } from '@tiptap/core'
 import { ReactNodeViewRenderer, NodeViewWrapper } from '@tiptap/react'
 import type { ReactNodeViewProps } from '@tiptap/react'
 import { useEffect, useRef, useState } from 'react'
-import katex from 'katex'
+import { renderMath } from '../../lib/mathRender'
 import { useMathSnippetMenu } from '../../hooks/useMathSnippetMenu'
 import { MathSnippetMenu } from './MathSnippetMenu'
 import { MathCopyButton } from './MathCopyButton'
+import { MathErrorOverlay } from './MathErrorOverlay'
 
 interface BlockMathAttrs {
   latex: string
   /** P12-2: `Equation (3)` cross-references resolve against this, the same
    *  numbering pattern P6-1 gave `Callout`. `null` (not `''`) means unnumbered. */
   number: string | null
-}
-
-interface Rendered {
-  html: string
-  error: string | null
 }
 
 // The editing overlay now has two focusable fields (latex, number) instead
@@ -40,18 +36,6 @@ function commitUnlessFocusStaysInEditor(editorField: HTMLElement, commit: (refoc
     if (editorEl?.contains(document.activeElement)) return
     commit(false)
   }, 0)
-}
-
-function render(latex: string): Rendered {
-  try {
-    return { html: katex.renderToString(latex, { throwOnError: true, displayMode: true }), error: null }
-  } catch (e) {
-    const message = e instanceof Error ? e.message : String(e)
-    return {
-      html: katex.renderToString(latex, { throwOnError: false, displayMode: true }),
-      error: message.replace(/^KaTeX parse error: /, ''),
-    }
-  }
 }
 
 function BlockMathView({ node, editor, getPos, updateAttributes, deleteNode, selected }: ReactNodeViewProps) {
@@ -106,8 +90,8 @@ function BlockMathView({ node, editor, getPos, updateAttributes, deleteNode, sel
     close(true)
   }
 
-  const display = render(latex)
-  const preview = render(draft)
+  const display = renderMath(latex, true)
+  const preview = renderMath(draft, true)
 
   return (
     <NodeViewWrapper
@@ -137,31 +121,39 @@ function BlockMathView({ node, editor, getPos, updateAttributes, deleteNode, sel
       {editing && (
         <div className="block-math-editor" contentEditable={false} onMouseDown={(e) => e.stopPropagation()}>
           <div className="math-snippet-anchor">
-            <textarea
-              ref={textareaRef}
-              className="block-math-editor-input"
-              value={draft}
-              spellCheck={false}
-              placeholder="e^{i\pi} + 1 = 0  (Mod-Enter to apply, Escape to cancel, / for a snippet)"
-              onChange={(e) => {
-                setDraft(e.target.value)
-                setCursor(e.target.selectionStart ?? e.target.value.length)
-              }}
-              onClick={(e) => setCursor(e.currentTarget.selectionStart ?? 0)}
-              onKeyUp={(e) => setCursor(e.currentTarget.selectionStart ?? 0)}
-              onBlur={(e) => commitUnlessFocusStaysInEditor(e.currentTarget, commit)}
-              onKeyDown={(e) => {
-                e.stopPropagation()
-                if (snippetMenu.handleKeyDown(e)) return
-                if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-                  e.preventDefault()
-                  commit(true)
-                } else if (e.key === 'Escape') {
-                  e.preventDefault()
-                  cancel()
-                }
-              }}
-            />
+            <div className="block-math-input-wrap">
+              <textarea
+                ref={textareaRef}
+                className="block-math-editor-input"
+                value={draft}
+                spellCheck={false}
+                placeholder="e^{i\pi} + 1 = 0  (Mod-Enter to apply, Escape to cancel, / for a snippet)"
+                onChange={(e) => {
+                  setDraft(e.target.value)
+                  setCursor(e.target.selectionStart ?? e.target.value.length)
+                }}
+                onClick={(e) => setCursor(e.currentTarget.selectionStart ?? 0)}
+                onKeyUp={(e) => setCursor(e.currentTarget.selectionStart ?? 0)}
+                onBlur={(e) => commitUnlessFocusStaysInEditor(e.currentTarget, commit)}
+                onKeyDown={(e) => {
+                  e.stopPropagation()
+                  if (snippetMenu.handleKeyDown(e)) return
+                  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                    e.preventDefault()
+                    commit(true)
+                  } else if (e.key === 'Escape') {
+                    e.preventDefault()
+                    cancel()
+                  }
+                }}
+              />
+              <MathErrorOverlay
+                latex={draft}
+                errorPosition={preview.errorPosition}
+                errorLength={preview.errorLength}
+                className="block-math-editor-input"
+              />
+            </div>
             <input
               type="text"
               className="block-math-number-input"

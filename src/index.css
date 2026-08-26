@@ -765,6 +765,15 @@ code {
 
 .block-math-editor-input:focus { border-color: var(--accent); }
 
+/* P12-3 — wraps just the textarea (not its sibling number input/copy
+   button) so the error overlay's `inset: 0` matches the textarea's own box,
+   including a manual `resize: vertical` drag — the wrap has no height of
+   its own, it tracks whatever the in-flow textarea just established. */
+.block-math-input-wrap {
+  position: relative;
+  width: 100%;
+}
+
 .block-math-editor-preview {
   display: block;
   min-height: 1.6em;
@@ -828,6 +837,15 @@ code {
 
 .math-editor-input:focus { border-color: var(--accent); }
 
+/* P12-3 — deliberately left `display: inline` (the default for a <span>):
+   `.math-editor` is a column flex container, which blockifies its direct
+   child `.math-snippet-anchor` into a definite-width box regardless of the
+   `display` written for it here — giving the input's own `width: 100%` a
+   real width to resolve against without this wrap needing one of its own. */
+.math-input-wrap {
+  position: relative;
+}
+
 .math-editor-preview {
   display: block;
   min-height: 1.4em;
@@ -842,6 +860,43 @@ code {
   font-size: 11px;
   line-height: 1.35;
   color: var(--danger);
+}
+
+/* P12-3 — in-place LaTeX error highlighting. `MathErrorOverlay` sits *on
+   top* of the real field, not behind it: its own text is fully transparent,
+   so the field's real, opaque glyphs show through untouched, and only the
+   marked span paints anything — a translucent tint over those real glyphs,
+   the same way a native text-selection highlight sits over text rather
+   than replacing it. `className` is shared with the field it overlays
+   (`block-math-editor-input`/`math-editor-input`), which is what keeps
+   font/padding/line-height/border identical; the rules below only add
+   positioning and transparency on top of that shared box. */
+.math-error-overlay {
+  position: absolute;
+  inset: 0;
+  color: transparent;
+  background: transparent;
+  border-color: transparent;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.math-error-mark {
+  background: color-mix(in srgb, var(--danger) 35%, transparent);
+  color: inherit;
+  border-radius: 2px;
+}
+
+/* An end-of-input error reports a zero-length span — nothing to underline,
+   so this stands in as a thin insertion-point caret instead. */
+.math-error-caret {
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  vertical-align: text-bottom;
+  background: var(--danger);
 }
 
 /* Equation snippets (P6-4) — the "/" trigger reimplemented for LaTeX-source

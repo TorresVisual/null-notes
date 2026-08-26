@@ -85,4 +85,38 @@ describe('inline math editing — interactive', () => {
 
     expect(writeText).toHaveBeenCalledWith('e^{i\\pi} + 1 = 0')
   })
+
+  // P12-3: the offending span gets marked in the source itself, not just
+  // named in the message below it.
+  it('marks the offending span in the source when the draft fails to parse', async () => {
+    const user = userEvent.setup()
+    const { container } = mount('<p></p>')
+    editor!.commands.insertContent({ type: 'inlineMath', attrs: { latex: '' } })
+    const input = await waitFor(() => {
+      const el = getInput(container)
+      if (!el) throw new Error('editor not open yet')
+      return el
+    })
+    await user.type(input, '\\alpa')
+    await waitFor(() => expect(container.querySelector('.math-editor-error')).toBeInTheDocument())
+
+    const mark = container.querySelector('.math-error-mark')
+    expect(mark).toBeInTheDocument()
+    expect(mark!.textContent).toBe('\\alpa')
+  })
+
+  it('renders a caret marker, not an empty span, for a zero-length end-of-input error', async () => {
+    const user = userEvent.setup()
+    const { container } = mount('<p></p>')
+    editor!.commands.insertContent({ type: 'inlineMath', attrs: { latex: '' } })
+    const input = await waitFor(() => {
+      const el = getInput(container)
+      if (!el) throw new Error('editor not open yet')
+      return el
+    })
+    await user.type(input, 'x_{{')
+    await waitFor(() => expect(container.querySelector('.math-editor-error')).toBeInTheDocument())
+
+    expect(container.querySelector('.math-error-mark .math-error-caret')).toBeInTheDocument()
+  })
 })

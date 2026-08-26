@@ -174,6 +174,40 @@ describe('block math editing', () => {
     await waitFor(() => expect(mathNodes(editor!)).toEqual([{ latex: 'e^{i\\pi} + 1 = 0', number: '3' }]))
     expect(container.querySelector('.block-math-number')?.textContent).toBe('(3)')
   })
+
+  // P12-3: the offending span gets marked in the source itself, not just
+  // named in the message below it.
+  it('marks the offending span in the source when the draft fails to parse', async () => {
+    const user = userEvent.setup()
+    const { container } = mount('<p></p>')
+    editor!.commands.insertContent({ type: 'blockMath', attrs: { latex: '' } })
+    const textarea = await waitFor(() => {
+      const el = getTextarea(container)
+      if (!el) throw new Error('editor not open yet')
+      return el
+    })
+    await user.type(textarea, '\\alpa')
+    await waitFor(() => expect(container.querySelector('.block-math-editor-error')).toBeInTheDocument())
+
+    const mark = container.querySelector('.math-error-mark')
+    expect(mark).toBeInTheDocument()
+    expect(mark!.textContent).toBe('\\alpa')
+  })
+
+  it('renders a caret marker, not an empty span, for a zero-length end-of-input error', async () => {
+    const user = userEvent.setup()
+    const { container } = mount('<p></p>')
+    editor!.commands.insertContent({ type: 'blockMath', attrs: { latex: '' } })
+    const textarea = await waitFor(() => {
+      const el = getTextarea(container)
+      if (!el) throw new Error('editor not open yet')
+      return el
+    })
+    await user.type(textarea, 'x_{{')
+    await waitFor(() => expect(container.querySelector('.block-math-editor-error')).toBeInTheDocument())
+
+    expect(container.querySelector('.math-error-mark .math-error-caret')).toBeInTheDocument()
+  })
 })
 
 afterEach(() => {

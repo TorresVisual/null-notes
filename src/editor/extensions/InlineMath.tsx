@@ -2,32 +2,14 @@ import { Node, InputRule } from '@tiptap/core'
 import { ReactNodeViewRenderer, NodeViewWrapper } from '@tiptap/react'
 import type { ReactNodeViewProps } from '@tiptap/react'
 import { useEffect, useRef, useState } from 'react'
-import katex from 'katex'
+import { renderMath } from '../../lib/mathRender'
 import { useMathSnippetMenu } from '../../hooks/useMathSnippetMenu'
 import { MathSnippetMenu } from './MathSnippetMenu'
 import { MathCopyButton } from './MathCopyButton'
+import { MathErrorOverlay } from './MathErrorOverlay'
 
 interface InlineMathAttrs {
   latex: string
-}
-
-interface Rendered {
-  html: string
-  error: string | null
-}
-
-// throwOnError:true is only a way to get the message out — the fallback render
-// is the same red error markup KaTeX would have produced on its own.
-function render(latex: string): Rendered {
-  try {
-    return { html: katex.renderToString(latex, { throwOnError: true, displayMode: false }), error: null }
-  } catch (e) {
-    const message = e instanceof Error ? e.message : String(e)
-    return {
-      html: katex.renderToString(latex, { throwOnError: false, displayMode: false }),
-      error: message.replace(/^KaTeX parse error: /, ''),
-    }
-  }
 }
 
 function InlineMathView({ node, editor, getPos, updateAttributes, deleteNode, selected }: ReactNodeViewProps) {
@@ -84,8 +66,8 @@ function InlineMathView({ node, editor, getPos, updateAttributes, deleteNode, se
     close(true)
   }
 
-  const display = render(latex)
-  const preview = render(draft)
+  const display = renderMath(latex, false)
+  const preview = renderMath(draft, false)
 
   return (
     <NodeViewWrapper
@@ -109,31 +91,40 @@ function InlineMathView({ node, editor, getPos, updateAttributes, deleteNode, se
       {editing && (
         <span className="math-editor" contentEditable={false} onMouseDown={(e) => e.stopPropagation()}>
           <span className="math-snippet-anchor">
-            <input
-              ref={inputRef}
-              className="math-editor-input"
-              value={draft}
-              spellCheck={false}
-              placeholder="e^{i\pi} + 1 = 0, or /gradient for a snippet"
-              onChange={(e) => {
-                setDraft(e.target.value)
-                setCursor(e.target.selectionStart ?? e.target.value.length)
-              }}
-              onClick={(e) => setCursor(e.currentTarget.selectionStart ?? 0)}
-              onKeyUp={(e) => setCursor(e.currentTarget.selectionStart ?? 0)}
-              onBlur={() => commit(false)}
-              onKeyDown={(e) => {
-                e.stopPropagation()
-                if (snippetMenu.handleKeyDown(e)) return
-                if (e.key === 'Enter') {
-                  e.preventDefault()
-                  commit(true)
-                } else if (e.key === 'Escape') {
-                  e.preventDefault()
-                  cancel()
-                }
-              }}
-            />
+            <span className="math-input-wrap">
+              <input
+                ref={inputRef}
+                className="math-editor-input"
+                value={draft}
+                spellCheck={false}
+                placeholder="e^{i\pi} + 1 = 0, or /gradient for a snippet"
+                onChange={(e) => {
+                  setDraft(e.target.value)
+                  setCursor(e.target.selectionStart ?? e.target.value.length)
+                }}
+                onClick={(e) => setCursor(e.currentTarget.selectionStart ?? 0)}
+                onKeyUp={(e) => setCursor(e.currentTarget.selectionStart ?? 0)}
+                onBlur={() => commit(false)}
+                onKeyDown={(e) => {
+                  e.stopPropagation()
+                  if (snippetMenu.handleKeyDown(e)) return
+                  if (e.key === 'Enter') {
+                    e.preventDefault()
+                    commit(true)
+                  } else if (e.key === 'Escape') {
+                    e.preventDefault()
+                    cancel()
+                  }
+                }}
+              />
+              <MathErrorOverlay
+                as="span"
+                latex={draft}
+                errorPosition={preview.errorPosition}
+                errorLength={preview.errorLength}
+                className="math-editor-input"
+              />
+            </span>
             <MathSnippetMenu
               matches={snippetMenu.matches}
               selected={snippetMenu.selected}
