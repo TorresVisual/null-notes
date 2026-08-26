@@ -3,39 +3,19 @@ import { ReactNodeViewRenderer, NodeViewWrapper } from '@tiptap/react'
 import type { ReactNodeViewProps } from '@tiptap/react'
 import { useEffect, useRef, useState } from 'react'
 import { renderMath } from '../../lib/mathRender'
+import { commitUnlessFocusLeaves } from '../../lib/mathEditorFocus'
 import { useMathSnippetMenu } from '../../hooks/useMathSnippetMenu'
+import { useSymbolPalette } from '../../hooks/useSymbolPalette'
 import { MathSnippetMenu } from './MathSnippetMenu'
 import { MathCopyButton } from './MathCopyButton'
 import { MathErrorOverlay } from './MathErrorOverlay'
+import { SymbolPalette } from './SymbolPalette'
 
 interface BlockMathAttrs {
   latex: string
   /** P12-2: `Equation (3)` cross-references resolve against this, the same
    *  numbering pattern P6-1 gave `Callout`. `null` (not `''`) means unnumbered. */
   number: string | null
-}
-
-// The editing overlay now has two focusable fields (latex, number) instead
-// of one — moving focus *between* them must not count as "leaving" the
-// editor. Without this, clicking from the latex textarea into the number
-// field blurs the textarea, which commits with whatever the number field
-// held *before* the user had a chance to type into it, and closes the
-// whole editor out from under the click.
-//
-// Deliberately not `event.relatedTarget`: it's the standard way to ask
-// "where did focus go", but it isn't reliably populated for every
-// focus-shift path (least of all in jsdom, this codebase's test
-// environment) — the robust version of this check is the same
-// setTimeout-deferred `document.activeElement` read most component
-// libraries use for exactly this "did focus leave the whole widget"
-// question, since by the next tick the browser has always settled on
-// wherever focus actually landed.
-function commitUnlessFocusStaysInEditor(editorField: HTMLElement, commit: (refocus: boolean) => void): void {
-  const editorEl = editorField.closest('.block-math-editor')
-  setTimeout(() => {
-    if (editorEl?.contains(document.activeElement)) return
-    commit(false)
-  }, 0)
 }
 
 function BlockMathView({ node, editor, getPos, updateAttributes, deleteNode, selected }: ReactNodeViewProps) {
@@ -46,6 +26,7 @@ function BlockMathView({ node, editor, getPos, updateAttributes, deleteNode, sel
   const [cursor, setCursor] = useState(0)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const snippetMenu = useMathSnippetMenu(draft, cursor, setDraft, textareaRef)
+  const symbolPalette = useSymbolPalette(draft, cursor, setDraft, setCursor, textareaRef)
 
   useEffect(() => {
     if (editing) textareaRef.current?.focus()
@@ -134,7 +115,7 @@ function BlockMathView({ node, editor, getPos, updateAttributes, deleteNode, sel
                 }}
                 onClick={(e) => setCursor(e.currentTarget.selectionStart ?? 0)}
                 onKeyUp={(e) => setCursor(e.currentTarget.selectionStart ?? 0)}
-                onBlur={(e) => commitUnlessFocusStaysInEditor(e.currentTarget, commit)}
+                onBlur={(e) => commitUnlessFocusLeaves('.block-math-editor', e.currentTarget, commit)}
                 onKeyDown={(e) => {
                   e.stopPropagation()
                   if (snippetMenu.handleKeyDown(e)) return
@@ -161,7 +142,7 @@ function BlockMathView({ node, editor, getPos, updateAttributes, deleteNode, sel
               placeholder="№"
               title="Equation number (optional) — makes it resolvable as Equation (N)"
               onChange={(e) => setDraftNumber(e.target.value)}
-              onBlur={(e) => commitUnlessFocusStaysInEditor(e.currentTarget, commit)}
+              onBlur={(e) => commitUnlessFocusLeaves('.block-math-editor', e.currentTarget, commit)}
               onKeyDown={(e) => {
                 e.stopPropagation()
                 if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
@@ -174,6 +155,26 @@ function BlockMathView({ node, editor, getPos, updateAttributes, deleteNode, sel
               }}
             />
             <MathCopyButton latex={draft} className="math-copy-button" />
+            <div className="symbol-palette-anchor">
+              <button
+                type="button"
+                className="math-symbol-palette-button"
+                title="Symbol palette"
+                onMouseDown={(e) => {
+                  e.preventDefault()
+                  symbolPalette.toggle()
+                }}
+              >
+                Ω
+              </button>
+              {symbolPalette.open && (
+                <SymbolPalette
+                  onSelect={symbolPalette.insert}
+                  onClose={symbolPalette.close}
+                  onBlur={(e) => commitUnlessFocusLeaves('.block-math-editor', e.currentTarget, commit)}
+                />
+              )}
+            </div>
             <MathSnippetMenu
               matches={snippetMenu.matches}
               selected={snippetMenu.selected}

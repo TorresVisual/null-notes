@@ -647,7 +647,9 @@ Core authoring (inline/display equations, live preview, click-to-edit, matrices,
 
 > A shared `renderMath` (`src/lib/mathRender.ts`) replaces both node types' near-identical local `render()`, reading KaTeX's own `ParseError.position`/`.length` off the thrown error. `MathErrorOverlay` sits on top of the real field with fully transparent text — only the `<mark>` over the offending span paints anything, a translucent tint over the field's real glyphs underneath, same as a native text-selection highlight. A zero-length span (end-of-input errors) falls back to a thin caret. Verified with `mathRender.test.ts` plus two new tests per math node type (720-test frontend suite green); **not verified live** — jsdom has no real layout engine, so pixel alignment is asserted structurally, not visually. A real-browser look is still owed.
 
-- [ ] P12-4 Symbol palette — **S/M**. Browsable, beyond today's fixed 20-entry `/` snippet menu.
+- [x] P12-4 Symbol palette — **S/M**. Browsable, beyond today's fixed 20-entry `/` snippet menu.
+
+> An "Ω" button in both math node types' editing overlays opens a categorized, searchable grid (`src/lib/mathSymbols.ts`), additive to `MathSnippetMenu`. **A real bug caught by writing the interaction test first:** the palette's autofocused search input blurs the field it sits next to, and `InlineMath` still used a naive `onBlur={() => commit(false)}` that would have closed the whole editor the moment the palette opened — generalized P12-2's blur guard into a shared `commitUnlessFocusLeaves` and applied it everywhere a field in either editor can blur. Verified with 7 new tests; full 727-test suite green. Not verified live — same posture as P12-3.
 
 - [ ] P12-5 Aligned-equation snippet — **S**. `\begin{aligned}` already renders; add it to `mathSnippets.ts` for discoverability.
 

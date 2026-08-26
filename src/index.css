@@ -737,6 +737,97 @@ code {
 .math-copy-button:hover { color: var(--accent); border-color: var(--accent); }
 .math-copy-button.copied { color: var(--accent); border-color: var(--accent); }
 
+/* P12-4 — symbol palette toggle, same footprint as the copy button next to
+   it. `.symbol-palette-anchor` is the positioning context for the popover;
+   it's a plain inline/block wrapper (never given its own explicit `display`)
+   so it doesn't disturb whichever flow context its parent (a block row in
+   BlockMath, an inline run in InlineMath) already established. */
+.symbol-palette-anchor {
+  position: relative;
+}
+
+.math-symbol-palette-button {
+  margin-top: var(--space-xs);
+  margin-left: 6px;
+  padding: 2px 8px;
+  background: var(--bg-hover);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-tertiary);
+  font-size: 12px;
+  font-family: var(--font-mono);
+  cursor: pointer;
+}
+.math-symbol-palette-button:hover { color: var(--accent); border-color: var(--accent); }
+
+.symbol-palette {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  width: 280px;
+  max-height: 320px;
+  padding: var(--space-sm);
+  background: var(--bg-raised);
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  box-shadow: var(--shadow-popover);
+}
+
+.symbol-palette-search {
+  width: 100%;
+  padding: 5px 7px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-primary);
+  background: var(--bg-sunken);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  outline: none;
+}
+.symbol-palette-search:focus { border-color: var(--accent); }
+
+.symbol-palette-body {
+  overflow-y: auto;
+}
+
+.symbol-palette-category + .symbol-palette-category { margin-top: var(--space-sm); }
+
+.symbol-palette-category-name {
+  margin-bottom: 4px;
+  color: var(--text-tertiary);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.symbol-palette-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 4px;
+}
+
+.symbol-palette-item {
+  padding: 4px 0;
+  background: var(--bg-hover);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  color: var(--text-primary);
+  font-size: 15px;
+  cursor: pointer;
+}
+.symbol-palette-item:hover { color: var(--accent); border-color: var(--accent); }
+
+.symbol-palette-empty {
+  padding: var(--space-sm) 0;
+  color: var(--text-tertiary);
+  font-size: 12px;
+  text-align: center;
+}
+
 .block-math-editor {
   display: flex;
   flex-direction: column;

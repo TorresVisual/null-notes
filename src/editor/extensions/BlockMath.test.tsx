@@ -208,6 +208,40 @@ describe('block math editing', () => {
 
     expect(container.querySelector('.math-error-mark .math-error-caret')).toBeInTheDocument()
   })
+
+  // P12-4: browsable, additive to the "/" snippet menu — a symbol can be
+  // found without already knowing its trigger.
+  it('inserts a symbol from the palette at the cursor and keeps the editor open', async () => {
+    const user = userEvent.setup()
+    const { container } = mount('<p></p>')
+    editor!.commands.insertContent({ type: 'blockMath', attrs: { latex: '' } })
+    const textarea = await waitFor(() => {
+      const el = getTextarea(container)
+      if (!el) throw new Error('editor not open yet')
+      return el
+    })
+    await user.type(textarea, 'x = ')
+
+    const paletteButton = container.querySelector('.math-symbol-palette-button') as HTMLButtonElement
+    await user.click(paletteButton)
+    // Opening the palette autofocuses its search input, which blurs the
+    // textarea — a regression risk this test guards against: the editor
+    // must stay open (see commitUnlessFocusLeaves).
+    await waitFor(() => expect(container.querySelector('.symbol-palette')).toBeInTheDocument())
+    expect(getTextarea(container)).toBeInTheDocument()
+
+    const search = container.querySelector('.symbol-palette-search') as HTMLInputElement
+    await user.type(search, 'alpha')
+    const alphaButton = await waitFor(() => {
+      const el = container.querySelector<HTMLButtonElement>('.symbol-palette-item[title^="alpha"]')
+      if (!el) throw new Error('alpha symbol not found')
+      return el
+    })
+    await user.click(alphaButton)
+
+    await waitFor(() => expect(container.querySelector('.symbol-palette')).not.toBeInTheDocument())
+    expect(getTextarea(container)!.value).toBe('x = \\alpha')
+  })
 })
 
 afterEach(() => {

@@ -3,10 +3,13 @@ import { ReactNodeViewRenderer, NodeViewWrapper } from '@tiptap/react'
 import type { ReactNodeViewProps } from '@tiptap/react'
 import { useEffect, useRef, useState } from 'react'
 import { renderMath } from '../../lib/mathRender'
+import { commitUnlessFocusLeaves } from '../../lib/mathEditorFocus'
 import { useMathSnippetMenu } from '../../hooks/useMathSnippetMenu'
+import { useSymbolPalette } from '../../hooks/useSymbolPalette'
 import { MathSnippetMenu } from './MathSnippetMenu'
 import { MathCopyButton } from './MathCopyButton'
 import { MathErrorOverlay } from './MathErrorOverlay'
+import { SymbolPalette } from './SymbolPalette'
 
 interface InlineMathAttrs {
   latex: string
@@ -21,6 +24,7 @@ function InlineMathView({ node, editor, getPos, updateAttributes, deleteNode, se
   const [cursor, setCursor] = useState(0)
   const inputRef = useRef<HTMLInputElement>(null)
   const snippetMenu = useMathSnippetMenu(draft, cursor, setDraft, inputRef)
+  const symbolPalette = useSymbolPalette(draft, cursor, setDraft, setCursor, inputRef)
 
   useEffect(() => {
     if (editing) inputRef.current?.focus()
@@ -104,7 +108,7 @@ function InlineMathView({ node, editor, getPos, updateAttributes, deleteNode, se
                 }}
                 onClick={(e) => setCursor(e.currentTarget.selectionStart ?? 0)}
                 onKeyUp={(e) => setCursor(e.currentTarget.selectionStart ?? 0)}
-                onBlur={() => commit(false)}
+                onBlur={(e) => commitUnlessFocusLeaves('.math-editor', e.currentTarget, commit)}
                 onKeyDown={(e) => {
                   e.stopPropagation()
                   if (snippetMenu.handleKeyDown(e)) return
@@ -132,6 +136,26 @@ function InlineMathView({ node, editor, getPos, updateAttributes, deleteNode, se
             />
           </span>
           <MathCopyButton latex={draft} className="math-copy-button" />
+          <span className="symbol-palette-anchor">
+            <button
+              type="button"
+              className="math-symbol-palette-button"
+              title="Symbol palette"
+              onMouseDown={(e) => {
+                e.preventDefault()
+                symbolPalette.toggle()
+              }}
+            >
+              Ω
+            </button>
+            {symbolPalette.open && (
+              <SymbolPalette
+                onSelect={symbolPalette.insert}
+                onClose={symbolPalette.close}
+                onBlur={(e) => commitUnlessFocusLeaves('.math-editor', e.currentTarget, commit)}
+              />
+            )}
+          </span>
           <span className="math-editor-preview" dangerouslySetInnerHTML={{ __html: preview.html }} />
           {preview.error && <span className="math-editor-error">{preview.error}</span>}
         </span>
