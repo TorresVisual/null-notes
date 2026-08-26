@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from 'react'
 import katex from 'katex'
 import { useMathSnippetMenu } from '../../hooks/useMathSnippetMenu'
 import { MathSnippetMenu } from './MathSnippetMenu'
+import { MathCopyButton } from './MathCopyButton'
 
 interface InlineMathAttrs {
   latex: string
@@ -139,6 +140,7 @@ function InlineMathView({ node, editor, getPos, updateAttributes, deleteNode, se
               onSelect={snippetMenu.select}
             />
           </span>
+          <MathCopyButton latex={draft} className="math-copy-button" />
           <span className="math-editor-preview" dangerouslySetInnerHTML={{ __html: preview.html }} />
           {preview.error && <span className="math-editor-error">{preview.error}</span>}
         </span>

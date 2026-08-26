@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach } from 'vitest'
+import { describe, it, expect, afterEach, vi } from 'vitest'
 import { render, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useEditor, EditorContent } from '@tiptap/react'
@@ -62,5 +62,27 @@ describe('inline math editing — interactive', () => {
     getRender(container).focus()
     await user.keyboard(' ')
     await waitFor(() => expect(getInput(container)).toBeInTheDocument())
+  })
+
+  // P12-1: a copy action alongside the editor overlay's existing
+  // edit/commit/cancel controls.
+  it('copies the raw LaTeX source via the copy button in the editor overlay', async () => {
+    // `userEvent.setup()` installs its own clipboard stub on `navigator` —
+    // this mock has to be set up *after* it, or setup() silently
+    // overwrites it.
+    const user = userEvent.setup()
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
+
+    const { container } = mount('the identity $e^{i\\pi} + 1 = 0$ is neat')
+    await waitFor(() => expect(getRender(container)).toBeInTheDocument())
+    await user.click(getRender(container))
+    await waitFor(() => expect(getInput(container)).toBeInTheDocument())
+
+    const copyButton = container.querySelector('.math-copy-button') as HTMLButtonElement
+    expect(copyButton).toBeInTheDocument()
+    await user.click(copyButton)
+
+    expect(writeText).toHaveBeenCalledWith('e^{i\\pi} + 1 = 0')
   })
 })

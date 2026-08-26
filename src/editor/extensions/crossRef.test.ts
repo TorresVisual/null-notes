@@ -121,3 +121,56 @@ describe('cross-references', () => {
     expect(refs(e)).toHaveLength(0)
   })
 })
+
+// P12-2: `Equation (3)` resolves against a numbered `BlockMath`, not a
+// `Callout` — same decoration/resolution plumbing, a different backend
+// target and a different DOM selector for the scroll-to-block jump.
+describe('cross-references: equations (P12-2)', () => {
+  it('recognizes both the parenthesized and bare number forms as calloutType "equation"', async () => {
+    resolveCrossRefs.mockResolvedValue(['/ws/physics.md', '/ws/physics.md'])
+    mount('<p>See Equation (3) and also Equation 5</p>')
+
+    await settle()
+
+    expect(resolveCrossRefs.mock.calls[0]?.[1]).toEqual([
+      { calloutType: 'equation', number: '3' },
+      { calloutType: 'equation', number: '5' },
+    ])
+  })
+
+  it('jumps to the numbered block-math element, not a .callout selector', async () => {
+    resolveCrossRefs.mockResolvedValue(['/ws/physics.md'])
+    const e = mount('<p>See Equation (3) for the derivation</p>')
+    await settle()
+
+    // A plain DOM node outside the ProseMirror tree, standing in for the
+    // real BlockMath render: mounting `<div class="block-math">` as editor
+    // *content* wouldn't work, since it matches no node's parseHTML rule
+    // and would just be dropped by the document parser.
+    const target = document.createElement('div')
+    target.className = 'block-math'
+    target.setAttribute('data-number', '3')
+    document.body.appendChild(target)
+
+    const [ref] = refs(e)
+    ref?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+
+    expect(useWorkspaceStore.getState().activeTab).toBe('/ws/physics.md')
+    expect(target.classList.contains('cross-ref-target')).toBe(true)
+
+    target.remove()
+  })
+
+  it('leaves an unresolved equation reference inert', async () => {
+    resolveCrossRefs.mockResolvedValue([null])
+    const e = mount('<p>See Equation (9) for details</p>')
+    await settle()
+
+    const [ref] = refs(e)
+    expect(ref?.classList.contains('cross-ref-missing')).toBe(true)
+
+    ref?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+
+    expect(useWorkspaceStore.getState().activeTab).toBeNull()
+  })
+})

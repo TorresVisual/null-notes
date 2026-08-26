@@ -1,7 +1,9 @@
 //! P6-7: resolving a `Theorem 3.2`-style prose reference to the numbered
 //! callout block it names, anywhere in the workspace — the same "prefer a
 //! miss" posture P7-1's `resolve_code_links` and P1-1's unresolved
-//! wiki-links already take.
+//! wiki-links already take. P12-2 extends this to `Equation (3)`, resolved
+//! against a numbered `BlockMath` instead of a `Callout` — same command,
+//! same batching, a different marker-pattern function underneath.
 
 use crate::db::{self, DbPool};
 use serde::Deserialize;
@@ -26,7 +28,11 @@ pub async fn resolve_cross_refs(
 ) -> Result<Vec<Option<String>>, String> {
     let mut out = Vec::with_capacity(targets.len());
     for target in &targets {
-        let pattern = db::notes::marker_like_pattern(&target.callout_type, &target.number);
+        let pattern = if target.callout_type == "equation" {
+            db::notes::equation_marker_like_pattern(&target.number)
+        } else {
+            db::notes::marker_like_pattern(&target.callout_type, &target.number)
+        };
         let path = db::notes::note_containing_marker(&db, &workspace, &pattern)
             .await
             .map_err(|e| e.to_string())?;

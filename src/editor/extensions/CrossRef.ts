@@ -102,16 +102,22 @@ function decorate(state: EditorState, workspace: string | null): DecorationSet {
   return DecorationSet.create(state.doc, decorations)
 }
 
-/** Scrolls to and briefly highlights the numbered callout, once it exists
- * in the DOM. The target note may still be loading — a fresh tab opened by
- * this same click, or the same note re-rendering — so this retries across a
- * bounded number of frames rather than giving up on the first miss. */
+/** Scrolls to and briefly highlights the numbered target block, once it
+ * exists in the DOM. The target note may still be loading — a fresh tab
+ * opened by this same click, or the same note re-rendering — so this
+ * retries across a bounded number of frames rather than giving up on the
+ * first miss. `equation` is P12-2's one non-`Callout` block kind this
+ * resolves against — `BlockMath`'s own `data-number`, not a callout type. */
 function scrollToBlock(calloutType: string, number: string, attempt = 0): void {
-  const el = document.querySelector<HTMLElement>(
-    `.callout[data-callout-type="${calloutType}"][data-callout-number="${number}"]`,
-  )
+  const selector =
+    calloutType === 'equation'
+      ? `.block-math[data-number="${number}"]`
+      : `.callout[data-callout-type="${calloutType}"][data-callout-number="${number}"]`
+  const el = document.querySelector<HTMLElement>(selector)
   if (el) {
-    el.scrollIntoView({ block: 'center', behavior: 'smooth' })
+    // Optional chaining on the method itself, not just the element: jsdom
+    // (this codebase's test environment) has no scrollIntoView implementation.
+    el.scrollIntoView?.({ block: 'center', behavior: 'smooth' })
     el.classList.add('cross-ref-target')
     setTimeout(() => el.classList.remove('cross-ref-target'), 1500)
     return

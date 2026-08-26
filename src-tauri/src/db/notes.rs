@@ -401,6 +401,19 @@ pub fn marker_like_pattern(callout_type: &str, number: &str) -> String {
     )
 }
 
+/// The LIKE pattern for a numbered equation's own serialized opening fence
+/// line (see `BlockMath.tsx`: a bare `$` immediately followed by its number,
+/// with nothing between them). Used by P12-2's `Equation (3)` cross-references
+/// — reusing `note_containing_marker` below exactly like `marker_like_pattern`
+/// does, just with a different marker shape, since an equation has no
+/// bracketed marker to match against. The trailing newline is what
+/// disambiguates equation 3 from equation 34, the same role `marker_like_pattern`'s
+/// closing `]` plays — a longer number always has another digit between the
+/// target digits and the line break, so it can never match instead.
+pub fn equation_marker_like_pattern(number: &str) -> String {
+    format!("%${}\n%", escape_like(number))
+}
+
 /// The path of a note in `workspace` whose raw content matches
 /// `like_pattern` (built by [`marker_like_pattern`]), or `None` if no note
 /// defines it.
@@ -944,6 +957,65 @@ mod tests {
             .unwrap();
 
         assert_eq!(found, Some("/ws/b.md".to_string()));
+    }
+
+    // P12-2: `Equation (3)` resolves against `BlockMath.tsx`'s own
+    // serialized marker (a bare `$` immediately followed by the number, on
+    // its own line) — not the callout `[!TYPE NUM]` bracket form above.
+    #[tokio::test]
+    async fn test_equation_marker_finds_the_defining_note() {
+        let pool = make_pool().await;
+        index_note(&pool, &note("a", "Analysis", "/ws/a.md", "/ws"))
+            .await
+            .unwrap();
+        index_note_content(&pool, "/ws/a.md", "Analysis", "prose\n\n$3\ne = mc^2\n$\n")
+            .await
+            .unwrap();
+
+        let pattern = equation_marker_like_pattern("3");
+        let found = note_containing_marker(&pool, "/ws", &pattern)
+            .await
+            .unwrap();
+
+        assert_eq!(found, Some("/ws/a.md".to_string()));
+    }
+
+    // The disambiguating role `marker_like_pattern`'s closing `]` plays —
+    // equation 3's pattern must never also match equation 34.
+    #[tokio::test]
+    async fn test_equation_marker_does_not_match_a_longer_number() {
+        let pool = make_pool().await;
+        index_note(&pool, &note("a", "A", "/ws/a.md", "/ws"))
+            .await
+            .unwrap();
+        index_note_content(&pool, "/ws/a.md", "A", "$34\nx\n$\n")
+            .await
+            .unwrap();
+
+        let pattern = equation_marker_like_pattern("3");
+        let found = note_containing_marker(&pool, "/ws", &pattern)
+            .await
+            .unwrap();
+
+        assert_eq!(found, None);
+    }
+
+    #[tokio::test]
+    async fn test_equation_marker_is_none_when_no_note_defines_it() {
+        let pool = make_pool().await;
+        index_note(&pool, &note("a", "A", "/ws/a.md", "/ws"))
+            .await
+            .unwrap();
+        index_note_content(&pool, "/ws/a.md", "A", "$3\nx\n$\n")
+            .await
+            .unwrap();
+
+        let pattern = equation_marker_like_pattern("9.9");
+        let found = note_containing_marker(&pool, "/ws", &pattern)
+            .await
+            .unwrap();
+
+        assert_eq!(found, None);
     }
 
     #[tokio::test]

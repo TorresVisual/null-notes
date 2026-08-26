@@ -108,3 +108,65 @@ describe('block maths delimiters', () => {
     expect(storage.markdown.getMarkdown()).toBe('$\nx^2\n$')
   })
 })
+
+function mathNumbers(e: Editor): Array<string | null> {
+  const found: Array<string | null> = []
+  e.state.doc.descendants((node) => {
+    if (node.type.name === 'blockMath') found.push(node.attrs['number'] as string | null)
+    return true
+  })
+  return found
+}
+
+function markdownOf(e: Editor): string {
+  const storage = e.storage as unknown as { markdown: { getMarkdown: () => string } }
+  return storage.markdown.getMarkdown()
+}
+
+// P12-2: a numbered equation's opening fence carries its number directly
+// (`$3`), no space — read by `equation_marker_like_pattern` on the backend
+// to resolve `Equation (3)` cross-references.
+describe('block maths numbering (P12-2)', () => {
+  it('parses a numbered lone-$ fence', () => {
+    const e = mount('$3\nx^2\n$')
+
+    expect(mathLatex(e)).toEqual(['x^2'])
+    expect(mathNumbers(e)).toEqual(['3'])
+  })
+
+  it('parses a numbered $$ fence, including a dotted number', () => {
+    const e = mount('$$3.2\nx^2\n$$')
+
+    expect(mathLatex(e)).toEqual(['x^2'])
+    expect(mathNumbers(e)).toEqual(['3.2'])
+  })
+
+  it('leaves an unnumbered equation with number: null', () => {
+    const e = mount('$\nx^2\n$')
+
+    expect(mathNumbers(e)).toEqual([null])
+  })
+
+  it('serializes the number onto the opening fence and leaves the closing fence bare', () => {
+    const e = mount('<p></p>')
+    e.commands.insertContent({ type: 'blockMath', attrs: { latex: 'x^2', number: '3' } })
+
+    expect(markdownOf(e)).toBe('$3\nx^2\n$')
+  })
+
+  it('omits the number entirely when unset, matching the pre-P12-2 fence exactly', () => {
+    const e = mount('<p></p>')
+    e.commands.insertContent({ type: 'blockMath', attrs: { latex: 'x^2', number: null } })
+
+    expect(markdownOf(e)).toBe('$\nx^2\n$')
+  })
+
+  // A fence closes on the bare marker it opened with — repeating the number
+  // on the closing line is the same kind of mismatch as opening `$$` and
+  // closing `$`, and is treated the same way: it doesn't close there.
+  it('does not close a numbered fence on a line that repeats the number', () => {
+    const e = mount('$3\nx^2\n$3\n\nmore prose')
+
+    expect(mathLatex(e)).toEqual([])
+  })
+})

@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach } from 'vitest'
+import { describe, it, expect, afterEach, vi } from 'vitest'
 import { render, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useEditor, EditorContent } from '@tiptap/react'
@@ -62,7 +62,7 @@ describe('block math editing', () => {
     await user.clear(textarea)
     await user.type(textarea, 'b^3{Control>}{Enter}{/Control}')
     await waitFor(() => expect(getTextarea(container)).toBeNull())
-    expect(mathNodes(editor!)).toEqual([{ latex: 'b^3' }])
+    expect(mathNodes(editor!)).toEqual([{ latex: 'b^3', number: null }])
   })
 
   it('reverts to the committed latex and closes on Escape', async () => {
@@ -78,7 +78,7 @@ describe('block math editing', () => {
     await user.clear(textarea)
     await user.type(textarea, 'garbage{Escape}')
     await waitFor(() => expect(getTextarea(container)).toBeNull())
-    expect(mathNodes(editor!)).toEqual([{ latex: 'e^{i\\pi} + 1 = 0' }])
+    expect(mathNodes(editor!)).toEqual([{ latex: 'e^{i\\pi} + 1 = 0', number: null }])
   })
 
   it('deletes the node when committing an empty draft', async () => {
@@ -112,7 +112,7 @@ describe('block math editing', () => {
     await waitFor(() => expect(getTextarea(container)!.value).toBe('\\nabla f(x)'))
 
     await user.type(textarea, '{Control>}{Enter}{/Control}')
-    await waitFor(() => expect(mathNodes(editor!)).toEqual([{ latex: '\\nabla f(x)' }]))
+    await waitFor(() => expect(mathNodes(editor!)).toEqual([{ latex: '\\nabla f(x)', number: null }]))
   })
 
   it('opens the editor via keyboard (Enter) on the rendered formula, not just a click', async () => {
@@ -132,6 +132,47 @@ describe('block math editing', () => {
     const user = userEvent.setup()
     await user.type(getTextarea(container)!, '{Escape}')
     await waitFor(() => expect(mathNodes(editor!)).toHaveLength(0))
+  })
+
+  // P12-1: a copy action alongside the editor overlay's existing
+  // edit/commit/cancel controls.
+  it('copies the raw LaTeX source via the copy button in the editor overlay', async () => {
+    // `userEvent.setup()` installs its own clipboard stub on `navigator` —
+    // this mock has to be set up *after* it, or setup() silently
+    // overwrites it.
+    const user = userEvent.setup()
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
+
+    const { container } = mount('$\n\ne^{i\\pi} + 1 = 0\n\n$')
+    await waitFor(() => expect(getRender(container)).toBeInTheDocument())
+    await user.click(getRender(container))
+    await waitFor(() => expect(getTextarea(container)).toBeInTheDocument())
+
+    const copyButton = container.querySelector('.math-copy-button') as HTMLButtonElement
+    expect(copyButton).toBeInTheDocument()
+    await user.click(copyButton)
+
+    expect(writeText).toHaveBeenCalledWith('e^{i\\pi} + 1 = 0')
+  })
+
+  // P12-2: the number typed here is what makes the equation resolvable as
+  // `Equation (N)` elsewhere in the workspace.
+  it('sets the equation number from the editor overlay and shows it once committed', async () => {
+    const user = userEvent.setup()
+    const { container } = mount('$\n\ne^{i\\pi} + 1 = 0\n\n$')
+    await waitFor(() => expect(getRender(container)).toBeInTheDocument())
+    await user.click(getRender(container))
+    const numberInput = await waitFor(() => {
+      const el = container.querySelector<HTMLInputElement>('.block-math-number-input')
+      if (!el) throw new Error('number input not open yet')
+      return el
+    })
+
+    await user.type(numberInput, '3{Control>}{Enter}{/Control}')
+
+    await waitFor(() => expect(mathNodes(editor!)).toEqual([{ latex: 'e^{i\\pi} + 1 = 0', number: '3' }]))
+    expect(container.querySelector('.block-math-number')?.textContent).toBe('(3)')
   })
 })
 

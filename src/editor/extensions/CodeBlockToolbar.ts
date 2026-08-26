@@ -4,6 +4,7 @@ import { Decoration, DecorationSet } from '@tiptap/pm/view'
 import type { EditorState } from '@tiptap/pm/state'
 import type { Node as ProseMirrorNode } from '@tiptap/pm/model'
 import type { EditorView } from '@tiptap/pm/view'
+import { writeToClipboard } from '../../lib/clipboard'
 
 /**
  * P11-1 read-only affordances: a line-number gutter and a copy button on
@@ -172,25 +173,6 @@ function blockActions(pos: number, wrap: boolean): HTMLElement {
   container.appendChild(wrapToggle)
 
   return container
-}
-
-async function writeToClipboard(text: string): Promise<void> {
-  if (navigator.clipboard?.writeText) {
-    try {
-      await navigator.clipboard.writeText(text)
-      return
-    } catch {
-      // WebView2 can reject an unfocused/background write; fall through.
-    }
-  }
-  const textarea = document.createElement('textarea')
-  textarea.value = text
-  textarea.style.position = 'fixed'
-  textarea.style.opacity = '0'
-  document.body.appendChild(textarea)
-  textarea.select()
-  document.execCommand('copy')
-  document.body.removeChild(textarea)
 }
 
 function decorate(state: EditorState, folded: Set<number>): DecorationSet {
