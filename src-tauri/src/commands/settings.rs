@@ -72,6 +72,8 @@ mod tests {
             terminal_shell: "wsl -d Ubuntu".to_string(),
             code_indent_width: 4,
             code_indent_char: crate::models::CodeIndentChar::Tab,
+            code_theme: crate::models::CodeTheme::OneDark,
+            code_font_size_px: 16,
         };
         save_settings_to_dir(dir.path(), &original).await.unwrap();
         let loaded = load_settings_from_dir(dir.path()).await.unwrap();
@@ -87,6 +89,8 @@ mod tests {
         assert_eq!(loaded.terminal_shell, "wsl -d Ubuntu");
         assert_eq!(loaded.code_indent_width, 4);
         assert_eq!(loaded.code_indent_char, crate::models::CodeIndentChar::Tab);
+        assert_eq!(loaded.code_theme, crate::models::CodeTheme::OneDark);
+        assert_eq!(loaded.code_font_size_px, 16);
     }
 
     // Detection fills the editor command only when there is nothing to keep.
@@ -182,6 +186,11 @@ mod tests {
         // had, not some other implicit width.
         assert_eq!(loaded.code_indent_width, 2);
         assert_eq!(loaded.code_indent_char, crate::models::CodeIndentChar::Space);
+        // Same guarantee for P11-4: an older settings.json loads into the one
+        // palette/size every code block already had, not some other implicit
+        // theme or a font size that doesn't match what was already on screen.
+        assert_eq!(loaded.code_theme, crate::models::CodeTheme::MaterialOcean);
+        assert_eq!(loaded.code_font_size_px, 13);
     }
 
     #[tokio::test]

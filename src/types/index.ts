@@ -87,6 +87,8 @@ export type PdfImportMode = 'pages' | 'markdown'
 
 export type CodeIndentChar = 'space' | 'tab'
 
+export type CodeTheme = 'material-ocean' | 'one-dark'
+
 export interface AppSettings {
   autosaveDebounceMs: number
   editorMaxWidthPx: number
@@ -101,6 +103,9 @@ export interface AppSettings {
   /** Width of one indent level in a code block. Ignored when `codeIndentChar` is `'tab'`. */
   codeIndentWidth: number
   codeIndentChar: CodeIndentChar
+  codeTheme: CodeTheme
+  /** Independent of the editor's own prose font size. */
+  codeFontSizePx: number
 }
 
 export interface GraphLink {

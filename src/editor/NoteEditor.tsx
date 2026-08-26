@@ -1,5 +1,6 @@
 import { useEditor, EditorContent } from '@tiptap/react'
 import { useEffect, useRef, useState } from 'react'
+import type { CSSProperties } from 'react'
 import { TextSelection } from '@tiptap/pm/state'
 import { confirm, message } from '@tauri-apps/plugin-dialog'
 import { coreExtensions } from './extensions'
@@ -10,6 +11,7 @@ import { EditorStatusBar } from './EditorStatusBar'
 import { BlockHandle } from './extensions/BlockHandle'
 import { EditorToolbar } from './toolbar/EditorToolbar'
 import { useInkStore } from '../store/ink'
+import { useSettingsStore } from '../store/settings'
 
 interface NoteEditorProps {
   content: string
@@ -41,6 +43,8 @@ function buildEditorProps(spellcheck: boolean, language: string) {
 export function NoteEditor({ content, notePath, spellcheck, spellcheckLanguage, onChange }: NoteEditorProps) {
   const isProgrammaticUpdate = useRef(false)
   const [, setEditorVersion] = useState(0)
+  const codeTheme = useSettingsStore((s) => s.settings.codeTheme)
+  const codeFontSizePx = useSettingsStore((s) => s.settings.codeFontSizePx)
 
   const editor = useEditor({
     extensions: coreExtensions,
@@ -152,6 +156,8 @@ export function NoteEditor({ content, notePath, spellcheck, spellcheckLanguage, 
         role="textbox"
         aria-multiline="true"
         className="note-editor"
+        data-code-theme={codeTheme}
+        style={{ '--code-font-size': `${codeFontSizePx}px` } as CSSProperties}
       />
       {editor && <BlockHandle editor={editor} />}
       {editor && <EditorStatusBar editor={editor} />}

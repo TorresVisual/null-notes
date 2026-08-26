@@ -58,6 +58,14 @@
   --text-metadata: 600 11px/1.4 var(--font-sans);
   --text-code: 400 13px/1.5 var(--font-mono);
   --text-empty-state: 400 13px/1.5 var(--font-sans);
+  /* P11-4 — a code block's own font size, set by `NoteEditor.tsx` from the
+     `codeFontSizePx` setting via inline style on `.note-editor`. Deliberately
+     its own standalone variable rather than folded into `--text-code`'s
+     shorthand: a component needs to override just this one property without
+     restating weight/line-height/family. This `:root` value is only the
+     fallback for contexts with no such override (e.g. a screenshot of raw
+     CSS in isolation). */
+  --code-font-size: 13px;
 
   /* Elevation — the three distinct shadow depths in use across popovers,
      modals and the context menu, named so a new surface picks one instead
@@ -999,7 +1007,11 @@ code {
   border-radius: 6px;
   overflow-x: auto;
   margin: 0.8em 0;
-  font-size: 0.88em;
+  /* P11-4: an absolute pixel value, not an `em` relative to prose — the
+     whole point of the setting is that resizing prose text never resizes
+     code, and vice versa. `NoteEditor.tsx` sets the real value inline from
+     `codeFontSizePx`; this is only the fallback. */
+  font-size: var(--code-font-size, 13px);
   line-height: 1.5;
   font-family: var(--font-mono);
 }
@@ -1144,7 +1156,11 @@ code {
 .code-block-copy.copied { color: var(--accent); border-color: var(--accent); }
 .code-block-wrap-toggle.active { color: var(--accent); border-color: var(--accent); background: var(--accent-bg); }
 
-/* lowlight / highlight.js token colours (minimal dark theme) — unchanged, independent of UI accent */
+/* lowlight / highlight.js token colours — "Material Ocean" (P11-4's default
+   `codeTheme`), independent of UI accent. Deliberately unscoped: it's the
+   fallback for every code block, including one rendered before the
+   `data-code-theme` attribute below has a chance to apply, or in any
+   context this file is used outside `NoteEditor.tsx`'s own tree. */
 .hljs-keyword, .hljs-selector-tag, .hljs-built_in { color: #c792ea; }
 .hljs-string, .hljs-attr { color: #c3e88d; }
 .hljs-number, .hljs-literal { color: #f78c6c; }
@@ -1154,6 +1170,28 @@ code {
 .hljs-variable, .hljs-name { color: #f07178; }
 .hljs-meta { color: #89ddff; }
 .hljs-operator { color: #89ddff; }
+
+/* P11-4 — "One Dark" (Atom's palette), the second selectable code theme.
+   Scoped under the attribute `NoteEditor.tsx` sets from `codeTheme`, so
+   this only overrides the Material Ocean default above when explicitly
+   chosen — the attribute-plus-class selector is more specific than the
+   plain class one above regardless of source order. */
+[data-code-theme="one-dark"] .hljs-keyword,
+[data-code-theme="one-dark"] .hljs-selector-tag,
+[data-code-theme="one-dark"] .hljs-built_in { color: #c678dd; }
+[data-code-theme="one-dark"] .hljs-string,
+[data-code-theme="one-dark"] .hljs-attr { color: #98c379; }
+[data-code-theme="one-dark"] .hljs-number,
+[data-code-theme="one-dark"] .hljs-literal { color: #d19a66; }
+[data-code-theme="one-dark"] .hljs-comment { color: #5c6370; font-style: italic; }
+[data-code-theme="one-dark"] .hljs-function,
+[data-code-theme="one-dark"] .hljs-title { color: #61afef; }
+[data-code-theme="one-dark"] .hljs-type,
+[data-code-theme="one-dark"] .hljs-class { color: #e5c07b; }
+[data-code-theme="one-dark"] .hljs-variable,
+[data-code-theme="one-dark"] .hljs-name { color: #e06c75; }
+[data-code-theme="one-dark"] .hljs-meta { color: #56b6c2; }
+[data-code-theme="one-dark"] .hljs-operator { color: #56b6c2; }
 
 /* Links */
 .note-editor a { color: var(--accent); text-decoration: underline; }

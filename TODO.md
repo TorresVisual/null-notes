@@ -617,11 +617,13 @@ Syntax highlighting and manual language selection are the only code-block featur
 >
 > Covered by 7 new indent tests, 13 new fold tests (pure `foldEndIndex`/`splitLines` cases plus DOM integration), 12 new search tests (pure `findMatches` plus DOM integration), and an e2e spec exercising all three against the real compiled app — each sub-feature confirmed passing at least once with a screenshot (search, fold) or a file-content assertion (tab character), all independently, since the well-documented WebView cold-start flake (P11-1/P11-2) meant no single run happened to land all three at once. One real e2e-authoring bug found and fixed along the way: closing the Settings dialog via `Ctrl+,` doesn't return focus to the editor, so the next test's `/` landed nowhere until the spec explicitly refocused first.
 
-- [ ] P11-4 Appearance — **S**
+- [x] P11-4 Appearance — **S** — closes M11
 
-  - [ ] Syntax highlight theme picker (one hardcoded palette today)
+  - [x] Syntax highlight theme picker (one hardcoded palette today)
 
-  - [ ] Adjustable font size for code blocks, independent of the editor's prose size
+  - [x] Adjustable font size for code blocks, independent of the editor's prose size
+
+> Two settings, both app-wide in `settings.json` like every other editor preference: `codeTheme` (`'material-ocean'` | `'one-dark'`) and `codeFontSizePx`. The theme picker works by scoping the second palette under a `data-code-theme="one-dark"` attribute `NoteEditor.tsx` sets from the setting — the existing Material Ocean rules stay unscoped as the fallback (and the default), so the attribute-plus-class selector for One Dark simply outranks them on specificity regardless of source order, no cascade-layer trick needed. Font size stopped being `0.88em` of the editor's own prose size and became a standalone `--code-font-size` custom property set via inline style, independent of prose by construction rather than by convention — the gutter's own width (`--gutter-width`, itself in `em`) scales proportionally along with it, which is a side effect worth knowing about rather than a bug. Covered by 3 new frontend tests (`NoteEditor.test.tsx`, verifying the attribute/CSS-variable wiring itself) plus the Rust settings round-trip/tolerance tests every prior P11 setting also got. Verified end-to-end against the real compiled app — screenshotted, both the color swap and the size change visible in one shot.
 
 - Minimap — **not scheduled**. Note-sized snippets rarely run long enough to need one.
 

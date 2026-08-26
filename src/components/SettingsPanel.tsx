@@ -122,6 +122,42 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
                 )}
               </span>
             </label>
+
+            <label className="settings-row">
+              <span>
+                Code block theme
+                <small>Syntax-highlight color palette.</small>
+              </span>
+              <span className="settings-row-control">
+                <select
+                  value={settings.codeTheme}
+                  onChange={(e) => void update({ codeTheme: e.target.value as 'material-ocean' | 'one-dark' })}
+                >
+                  <option value="material-ocean">Material Ocean</option>
+                  <option value="one-dark">One Dark</option>
+                </select>
+              </span>
+            </label>
+
+            <label className="settings-row">
+              <span>
+                Code block font size
+                <small>Independent of the editor's own text size above.</small>
+              </span>
+              <span className="settings-row-control">
+                <input
+                  type="number"
+                  min={10}
+                  max={24}
+                  step={1}
+                  value={settings.codeFontSizePx}
+                  onChange={(e) =>
+                    void update({ codeFontSizePx: clampNumber(Number(e.target.value), 10, 24) })
+                  }
+                />
+                <span className="settings-unit">px</span>
+              </span>
+            </label>
           </div>
 
           <div className="settings-section">

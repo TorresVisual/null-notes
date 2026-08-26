@@ -11,6 +11,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
   terminalShell: 'powershell',
   codeIndentWidth: 2,
   codeIndentChar: 'space',
+  codeTheme: 'material-ocean',
+  codeFontSizePx: 13,
 }
 
 interface SettingsStore {

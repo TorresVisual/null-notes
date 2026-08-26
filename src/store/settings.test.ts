@@ -19,6 +19,8 @@ describe('useSettingsStore', () => {
       terminalShell: 'wsl -d Ubuntu',
       codeIndentWidth: 4,
       codeIndentChar: 'tab',
+      codeTheme: 'one-dark',
+      codeFontSizePx: 16,
     })
     expect(useSettingsStore.getState().settings).toEqual({
       autosaveDebounceMs: 1200,
@@ -30,6 +32,8 @@ describe('useSettingsStore', () => {
       terminalShell: 'wsl -d Ubuntu',
       codeIndentWidth: 4,
       codeIndentChar: 'tab',
+      codeTheme: 'one-dark',
+      codeFontSizePx: 16,
     })
   })
 })

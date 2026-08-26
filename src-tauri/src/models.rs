@@ -254,6 +254,20 @@ pub enum CodeIndentChar {
     Tab,
 }
 
+/// Which `.hljs-*` color palette a code block renders with (P11-4). Kebab
+/// case so the serialized value matches the CSS `data-code-theme` attribute
+/// value directly, with no translation layer between settings and styling.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "kebab-case")]
+pub enum CodeTheme {
+    /// The one palette every code block already had before this setting
+    /// existed — an older settings.json missing the key must load into
+    /// exactly this, not some other implicit theme.
+    #[default]
+    MaterialOcean,
+    OneDark,
+}
+
 // App-wide preferences, not per-workspace state — lives in the app data dir
 // alongside recent-workspaces.json, not inside any one workspace folder.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -297,6 +311,13 @@ pub struct AppSettings {
     pub code_indent_width: u32,
     #[serde(default)]
     pub code_indent_char: CodeIndentChar,
+    #[serde(default)]
+    pub code_theme: CodeTheme,
+    /// Independent of the editor's own prose font-size setting — a code
+    /// block's `pre` reads this pixel value directly, not an `em` relative
+    /// to prose, which is the whole point of the setting existing.
+    #[serde(default = "default_code_font_size_px")]
+    pub code_font_size_px: u32,
 }
 
 fn default_spellcheck_language() -> String {
@@ -305,6 +326,10 @@ fn default_spellcheck_language() -> String {
 
 fn default_code_indent_width() -> u32 {
     2
+}
+
+fn default_code_font_size_px() -> u32 {
+    13
 }
 
 impl Default for AppSettings {
@@ -319,6 +344,8 @@ impl Default for AppSettings {
             terminal_shell: String::new(),
             code_indent_width: default_code_indent_width(),
             code_indent_char: CodeIndentChar::Space,
+            code_theme: CodeTheme::MaterialOcean,
+            code_font_size_px: default_code_font_size_px(),
         }
     }
 }
