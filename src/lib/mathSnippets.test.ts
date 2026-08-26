@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { activeSlashQuery, applyMathSnippet, matchMathSnippets, MATH_SNIPPETS } from './mathSnippets'
+import { renderMath } from './mathRender'
 
 describe('activeSlashQuery', () => {
   it('finds a slash query at the cursor', () => {
@@ -57,4 +58,18 @@ describe('applyMathSnippet', () => {
     const result = applyMathSnippet('/sq + 1', { start: 0, query: 'sq' }, 3, snippet)
     expect(result.text).toBe('\\sqrt{x} + 1')
   })
+})
+
+// P12-5: `\begin{aligned}`/`\begin{align}` already rendered correctly on
+// their own — this pins that every *snippet's own* skeleton, aligned
+// included, is a working equation the moment it lands, not just a plausible
+// string, in both display and inline contexts (InlineMath's <input> can
+// insert any snippet too).
+describe('every snippet renders without a KaTeX error', () => {
+  for (const snippet of MATH_SNIPPETS) {
+    it(`/${snippet.trigger}`, () => {
+      expect(renderMath(snippet.latex, true).error).toBeNull()
+      expect(renderMath(snippet.latex, false).error).toBeNull()
+    })
+  }
 })

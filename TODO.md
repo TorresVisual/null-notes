@@ -112,7 +112,7 @@ Effort: **S** ≈ hours · **M** ≈ a day or two · **L** ≈ several days.
 | P9 Study & revision | M9 — the app helps me *revise*, not just capture |  |
 | P10 Gated stretch | M10 — in-app AI + code execution | gated |
 | P11 Code block IDE parity | M11 — code blocks feel like a lightweight IDE pane |  |
-| P12 Math authoring polish | M12 — equations are as fast to reference and fix as they are to write |  |
+| P12 Math authoring polish | M12 — equations are as fast to reference and fix as they are to write | ✅ |
 | P13 Editor & ink completion | M13 — footnotes and ink match the rest of the writing surface |  |
 | P14 Diagram templates | M14 — the checklist's diagram types have a guided way to build them |  |
 | P15 Handwriting recognition | M15 — ink-to-LaTeX and drawing search, if ever proven worth it | gated |
@@ -651,7 +651,9 @@ Core authoring (inline/display equations, live preview, click-to-edit, matrices,
 
 > An "Ω" button in both math node types' editing overlays opens a categorized, searchable grid (`src/lib/mathSymbols.ts`), additive to `MathSnippetMenu`. **A real bug caught by writing the interaction test first:** the palette's autofocused search input blurs the field it sits next to, and `InlineMath` still used a naive `onBlur={() => commit(false)}` that would have closed the whole editor the moment the palette opened — generalized P12-2's blur guard into a shared `commitUnlessFocusLeaves` and applied it everywhere a field in either editor can blur. Verified with 7 new tests; full 727-test suite green. Not verified live — same posture as P12-3.
 
-- [ ] P12-5 Aligned-equation snippet — **S**. `\begin{aligned}` already renders; add it to `mathSnippets.ts` for discoverability.
+- [x] P12-5 Aligned-equation snippet — **S**. `\begin{aligned}` already renders; add it to `mathSnippets.ts` for discoverability. **Closes M12 — all five P12 tasks done.**
+
+> `/align` inserts an `aligned` (not `align`) skeleton — the form that actually nests inside this app's own `$`/`$$` fences. A new standing regression test renders every snippet in the table through KaTeX in both display and inline mode. Full 748-test suite green.
 
 ---
 

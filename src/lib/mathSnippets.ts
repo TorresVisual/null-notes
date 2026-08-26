@@ -18,6 +18,10 @@ export const MATH_SNIPPETS: MathSnippet[] = [
   { trigger: 'binom', latex: '\\binom{n}{k}', description: 'Binomial coefficient' },
   { trigger: 'matrix', latex: '\\begin{pmatrix} a & b \\\\ c & d \\end{pmatrix}', description: '2×2 matrix' },
   { trigger: 'cases', latex: '\\begin{cases} a & x < 0 \\\\ b & x \\ge 0 \\end{cases}', description: 'Piecewise (cases)' },
+  // P12-5: `aligned` over `align` — it's the form that renders correctly
+  // nested inside this app's own `$`/`$$` math fences, where `align`'s
+  // top-level-environment assumptions don't hold.
+  { trigger: 'align', latex: '\\begin{aligned} a &= b \\\\ c &= d \\end{aligned}', description: 'Aligned equations' },
   { trigger: 'infty', latex: '\\infty', description: 'Infinity' },
   { trigger: 'in', latex: '\\in', description: 'Element of' },
   { trigger: 'subset', latex: '\\subseteq', description: 'Subset' },
