@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { measureTextItem, pointInTextItem, translateTextItem } from './textBounds'
+import { measureTextItem, pointInTextItem, translateTextItem, reachOfTextItem } from './textBounds'
 import type { TextItem } from './types'
 
 const item: TextItem = { id: 't1', x: 100, y: 100, text: 'hello', color: '#000', size: 20 }
@@ -30,6 +30,21 @@ describe('pointInTextItem', () => {
 
   it('misses a point well past the estimated box', () => {
     expect(pointInTextItem(item, 1000, 1000)).toBe(false)
+  })
+})
+
+describe('reachOfTextItem', () => {
+  it('reaches to the item\'s far corner, not its origin', () => {
+    const bounds = measureTextItem(item)
+    expect(reachOfTextItem(item)).toEqual({ maxX: item.x + bounds.width, maxY: item.y + bounds.height })
+  })
+
+  // A multi-line label's bottom edge can cross a grow margin even when the
+  // (x, y) it was placed at is nowhere near it.
+  it('grows with extra lines even though the origin stays put', () => {
+    const multiline = { ...item, text: 'first\nsecond\nthird' }
+    expect(reachOfTextItem(multiline).maxY).toBeGreaterThan(reachOfTextItem(item).maxY)
+    expect(multiline.x).toBe(item.x)
   })
 })
 

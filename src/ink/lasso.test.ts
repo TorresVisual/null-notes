@@ -8,6 +8,7 @@ import {
   translatePolygon,
   deleteSelection,
   selectionBottom,
+  selectionReach,
   isSelectionEmpty,
   EMPTY_SELECTION,
 } from './lasso'
@@ -183,6 +184,20 @@ describe('selectionBottom', () => {
     }
     expect(selectionBottom(data, { strokeIds: ['a'], shapeIds: [] })).toBe(340)
     expect(selectionBottom(data, { strokeIds: [], shapeIds: ['r1'] })).toBe(500)
+  })
+})
+
+describe('selectionReach', () => {
+  it('reports the furthest x and y the selection reaches, on both axes', () => {
+    const data: InkData = {
+      width: 800,
+      height: 600,
+      strokes: [stroke('a', [[50, 120], [700, 340]])],
+      shapes: [{ ...rect, id: 'r1', x1: 10, x2: 900, y1: 10, y2: 500 }],
+      texts: [],
+    }
+    expect(selectionReach(data, { strokeIds: ['a'], shapeIds: [] })).toEqual({ maxX: 700, maxY: 340 })
+    expect(selectionReach(data, { strokeIds: [], shapeIds: ['r1'] })).toEqual({ maxX: 900, maxY: 500 })
   })
 })
 

@@ -14,14 +14,15 @@ import {
 import type { Ruler, RulerGrab } from './ruler'
 import { drawShapePreview } from './shapePreview'
 import { drawTextItem } from './textRender'
-import { pointInTextItem, translateTextItem } from './textBounds'
+import { pointInTextItem, translateTextItem, reachOfTextItem } from './textBounds'
+import { growCanvas, reachOfPoints } from './growCanvas'
 import { paintOrder } from './paintOrder'
 import {
   EMPTY_SELECTION,
   isSelectionEmpty,
   pointInPolygon,
   selectionIn,
-  selectionBottom,
+  selectionReach,
   translatePolygon,
   translateSelection,
   deleteSelection as removeSelection,
@@ -54,11 +55,6 @@ export interface EditingText {
 const TEXT_DRAG_THRESHOLD = 3
 const DEFAULT_THINNING = 0.5
 const STROKE_OPTIONS = { smoothing: 0.5, streamline: 0.5 }
-
-// A page grows when you write near its bottom edge and never shrinks on its
-// own — reclaiming space has to be deliberate, or growth could drop strokes.
-const GROW_MARGIN = 160
-const PAGE_STEP = 400
 
 const LASSO_COLOR = 'rgba(126, 231, 135, 0.9)'
 
@@ -110,12 +106,6 @@ function drawRuler(ctx: CanvasRenderingContext2D, ruler: Ruler): void {
 interface InkOptions {
   zoom?: number
   autoGrow?: boolean
-}
-
-function grownHeight(height: number, points: Point[], autoGrow: boolean): number {
-  if (!autoGrow) return height
-  const lowest = points.reduce((max, p) => Math.max(max, p.y), 0)
-  return lowest > height - GROW_MARGIN ? height + PAGE_STEP : height
 }
 
 // Pointer Events reports the pen's eraser end as bit 5 of `buttons` (32) for
@@ -364,11 +354,8 @@ export function useInkCanvas(
         color: current.color,
         size: current.size,
       }
-      commit({
-        ...inkData,
-        height: grownHeight(inkData.height, [{ x: current.x, y: current.y, pressure: 0 }], autoGrow),
-        texts: [...inkData.texts, item],
-      })
+      const { width, height } = growCanvas(inkData.width, inkData.height, reachOfTextItem(item), autoGrow)
+      commit({ ...inkData, width, height, texts: [...inkData.texts, item] })
     } else {
       commit({
         ...inkData,
@@ -689,12 +676,9 @@ export function useInkCanvas(
           setHistory((past) => [...past, snapshot])
           setFuture([])
           const item = inkData.texts.find((t) => t.id === textFrom.id)
-          const grown = {
-            ...inkData,
-            height: item
-              ? grownHeight(inkData.height, [{ x: item.x, y: item.y, pressure: 0 }], autoGrow)
-              : inkData.height,
-          }
+          const reach = item ? reachOfTextItem(item) : { maxX: 0, maxY: 0 }
+          const { width, height } = growCanvas(inkData.width, inkData.height, reach, autoGrow)
+          const grown = { ...inkData, width, height }
           setInkData(grown)
           void inkApi.write(svgPath, grown)
         } else {
@@ -712,14 +696,8 @@ export function useInkCanvas(
         if (inkData !== dragged) {
           setHistory((past) => [...past, dragged])
           setFuture([])
-          const grown = {
-            ...inkData,
-            height: grownHeight(
-              inkData.height,
-              [{ x: 0, y: selectionBottom(inkData, selection), pressure: 0 }],
-              autoGrow,
-            ),
-          }
+          const { width, height } = growCanvas(inkData.width, inkData.height, selectionReach(inkData, selection), autoGrow)
+          const grown = { ...inkData, width, height }
           setInkData(grown)
           void inkApi.write(svgPath, grown)
         }
@@ -752,14 +730,11 @@ export function useInkCanvas(
         shapeStart.current = null
         currentStroke.current = []
         const corners = [
-          { x: shape.x1, y: shape.y1, pressure: 0 },
-          { x: shape.x2, y: shape.y2, pressure: 0 },
+          { x: shape.x1, y: shape.y1 },
+          { x: shape.x2, y: shape.y2 },
         ]
-        commit({
-          ...inkData,
-          height: grownHeight(inkData.height, corners, autoGrow),
-          shapes: [...inkData.shapes, shape],
-        })
+        const shapeGrown = growCanvas(inkData.width, inkData.height, reachOfPoints(corners), autoGrow)
+        commit({ ...inkData, width: shapeGrown.width, height: shapeGrown.height, shapes: [...inkData.shapes, shape] })
         return
       }
 
@@ -778,11 +753,8 @@ export function useInkCanvas(
       }
       currentStroke.current = []
       snapping.current = false
-      commit({
-        ...inkData,
-        height: grownHeight(inkData.height, stroke.points, autoGrow),
-        strokes: [...inkData.strokes, stroke],
-      })
+      const strokeGrown = growCanvas(inkData.width, inkData.height, reachOfPoints(stroke.points), autoGrow)
+      commit({ ...inkData, width: strokeGrown.width, height: strokeGrown.height, strokes: [...inkData.strokes, stroke] })
     },
     [
       tool, inkData, color, size, opacity, commit, svgPath, zoom, autoGrow, selection,

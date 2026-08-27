@@ -1,3 +1,4 @@
+import type { Reach } from './growCanvas'
 import type { TextItem } from './types'
 
 export const TEXT_LINE_HEIGHT = 1.2
@@ -35,4 +36,12 @@ export function pointInTextItem(item: TextItem, x: number, y: number): boolean {
 
 export function translateTextItem(item: TextItem, dx: number, dy: number): TextItem {
   return { ...item, x: item.x + dx, y: item.y + dy }
+}
+
+// A text item's far corner, not its origin — a multi-line label's own bottom
+// edge can cross the grow margin even when the (x, y) it was placed at
+// doesn't, which the origin-only reach P13-3 shipped with missed.
+export function reachOfTextItem(item: TextItem): Reach {
+  const bounds = measureTextItem(item)
+  return { maxX: bounds.x + bounds.width, maxY: bounds.y + bounds.height }
 }

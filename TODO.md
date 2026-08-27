@@ -111,11 +111,11 @@ Effort: **S** ≈ hours · **M** ≈ a day or two · **L** ≈ several days.
 | P6 STEM authoring | M6 — fastest place to write maths | ✅ |
 | P7 IDE integration | M7 — notes and code are one workflow | ✅ |
 | P8 Embedded terminal | M8 — `claude` runs against the open note | ✅ |
-| P9 Study & revision | M9 — the app helps me *revise*, not just capture |  |
+| P9 Study & revision | M9 — the app helps me *revise*, not just capture | ✅ |
 | P10 Gated stretch | M10 — in-app AI + code execution | gated |
-| P11 Code block IDE parity | M11 — code blocks feel like a lightweight IDE pane |  |
+| P11 Code block IDE parity | M11 — code blocks feel like a lightweight IDE pane | ✅ |
 | P12 Math authoring polish | M12 — equations are as fast to reference and fix as they are to write | ✅ |
-| P13 Editor & ink completion | M13 — footnotes and ink match the rest of the writing surface |  |
+| P13 Editor & ink completion | M13 — footnotes and ink match the rest of the writing surface | ✅ |
 | P14 Diagram templates | M14 — the checklist's diagram types have a guided way to build them |  |
 | P15 Handwriting recognition | M15 — ink-to-LaTeX and drawing search, if ever proven worth it | gated |
 
@@ -673,7 +673,9 @@ The two remaining "checklist has it, the app doesn't" gaps in the writing surfac
 
 > A new `TextItem` joins `Stroke`/`Shape` in `InkData`, placed/moved/edited via a positioned `<textarea>` overlay over the canvas, gated behind `pointerType === 'pen'` like every other ink tool. Font size is an independent `textSize` store setting rather than a reuse of pen stroke width — the default 2px pen would make an unreadable label, the same reasoning eraser size is already independent for. Editing an item down to empty removes it, the only delete path text has, since neither the lasso nor the eraser reach into `texts`. Verified with 46 new/updated tests including a full create/type/commit/reopen/delete lifecycle against a real mounted `InkCanvas`; full 815-test suite green, typecheck and build clean. Not verified live — same pen-only-gate posture as P13-2.
 
-- [ ] P13-4 True infinite canvas — **M/L, decision first**. Today's canvas auto-grows vertically only, fixed persisted dimensions. Decide bounded-grow-in-every-direction vs. genuinely unbounded before writing code — it changes what an existing `.ink` sidecar's stored dimensions mean.
+- [x] P13-4 True infinite canvas — **M/L, decision first**. Today's canvas auto-grows vertically only, fixed persisted dimensions. Decide bounded-grow-in-every-direction vs. genuinely unbounded before writing code — it changes what an existing `.ink` sidecar's stored dimensions mean.
+
+> **Decision: grow toward the bottom and right only** — neither of the task's own two named options survives analysis. Top/left growth needs every existing coordinate translated and the scroll position compensated in the same instant, or the canvas visibly jumps under the pen; "genuinely unbounded" is the same problem plus a pan/viewport model with no fixed origin. The two directions that stay as cheap as today's bottom-only trick ("just make the box bigger") also cover the entire realistic case — nobody labels a diagram by writing above or left of where they started. Growth logic moved into a new pure `growCanvas.ts`; fixed a real gap surfaced along the way, where P13-3's text growth had only ever checked a label's origin point rather than its measured far corner. Verified with 12 new tests plus the full 206-test ink and 815-test frontend suites; typecheck clean. Not verified live. **M13 reached — all four P13 tasks done.**
 
 ---
 

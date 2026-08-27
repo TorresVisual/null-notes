@@ -1,3 +1,4 @@
+import type { Reach } from './growCanvas'
 import type { InkData, Shape, Stroke } from './types'
 
 export interface LassoPoint {
@@ -105,17 +106,30 @@ export function deleteSelection(data: InkData, selection: Selection): InkData {
   }
 }
 
-// The lowest point the selection reaches, so a drag towards the bottom edge can
-// grow the page instead of pushing ink off it.
-export function selectionBottom(data: InkData, selection: Selection): number {
-  let bottom = 0
+// The furthest point the selection reaches on either axis, so a drag towards
+// the bottom or right edge can grow the page (P13-4) instead of pushing ink
+// off it.
+export function selectionReach(data: InkData, selection: Selection): Reach {
+  let maxX = 0
+  let maxY = 0
   for (const stroke of data.strokes) {
     if (!selection.strokeIds.includes(stroke.id)) continue
-    for (const p of stroke.points) bottom = Math.max(bottom, p.y)
+    for (const p of stroke.points) {
+      maxX = Math.max(maxX, p.x)
+      maxY = Math.max(maxY, p.y)
+    }
   }
   for (const shape of data.shapes) {
     if (!selection.shapeIds.includes(shape.id)) continue
-    bottom = Math.max(bottom, shape.y1, shape.y2)
+    maxX = Math.max(maxX, shape.x1, shape.x2)
+    maxY = Math.max(maxY, shape.y1, shape.y2)
   }
-  return bottom
+  return { maxX, maxY }
+}
+
+// Kept as a thin wrapper: pre-dates P13-4's width growth and is still the
+// simpler call for the one place (`lasso.test.ts`) that only ever cared
+// about the vertical reach.
+export function selectionBottom(data: InkData, selection: Selection): number {
+  return selectionReach(data, selection).maxY
 }
