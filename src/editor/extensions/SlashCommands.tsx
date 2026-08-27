@@ -7,6 +7,7 @@ import { createPortal } from 'react-dom'
 import { message } from '@tauri-apps/plugin-dialog'
 import { inkApi } from '../../lib/ink'
 import { nextTaskLabel } from '../../lib/taskScaffold'
+import { nextFootnoteLabel } from '../../lib/footnotes'
 import { splitIntoTasks, addNextTask, report } from '../splitIntoTasks'
 import type { InkData } from '../../ink/types'
 
@@ -221,6 +222,42 @@ const COMMANDS: Cmd[] = [
     description: 'Horizontal rule',
     run: ({ editor, range }) =>
       editor.chain().focus().deleteRange(range).setHorizontalRule().run(),
+  },
+  {
+    title: 'Footnote',
+    description: 'Numbered footnote reference, appended definition ready to write in',
+    // Two chained transactions, not one: the reference is inserted at the
+    // cursor, then the empty definition is appended at the *document's*
+    // end — a position that only exists to compute once the reference's
+    // own insertion (and the "/footnote" text it replaced) has actually
+    // landed. Never auto-relocated afterward, matching P13-1's own
+    // "round-trips byte-identical to hand-written GFM" DoD: wherever a
+    // footnote definition ends up is where it stays.
+    run: ({ editor, range }) => {
+      const labels: string[] = []
+      editor.state.doc.descendants((node) => {
+        if (node.type.name === 'footnoteReference' || node.type.name === 'footnoteDefinition') {
+          labels.push(node.attrs['label'] as string)
+        }
+        return true
+      })
+      const label = nextFootnoteLabel(labels)
+
+      editor
+        .chain()
+        .focus()
+        .deleteRange(range)
+        .insertContent({ type: 'footnoteReference', attrs: { label } })
+        .run()
+
+      const endPos = editor.state.doc.content.size
+      editor.chain().insertContentAt(endPos, { type: 'footnoteDefinition', attrs: { label } }).run()
+
+      // Word-processor-style: drop the cursor straight into the freshly
+      // appended (empty) definition so it's ready to type immediately.
+      const newEndPos = editor.state.doc.content.size
+      editor.chain().focus().setTextSelection(newEndPos - 1).run()
+    },
   },
   {
     title: 'Ink Block',

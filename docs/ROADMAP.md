@@ -1159,11 +1159,19 @@ Added 2026-08-20 from a second review pass (`notes/Roadmap-Update2.md`). The pas
 
 **Milestone M13:** *The two remaining "checklist has it, the app doesn't" gaps in the writing surface are closed.*
 
-### P13-1 — Footnotes — **M**
+### P13-1 — Footnotes — **M** ✅
 
 - A new TipTap extension for GFM `[^1]` footnote syntax, full `addStorage().markdown.serialize/parse` per the CLAUDE.md rule every custom node follows.
 - **Dependency:** none.
 - **DoD:** a footnote reference and its definition round-trip through save/reload byte-identical to hand-written GFM footnote syntax; renders as a jump-to-note link.
+
+*Done:* two new node types — `FootnoteReference` (inline atom, `[^1]`) and `FootnoteDefinition` (block, `content: 'inline*'`, `[^1]: text`) — each with their own markdown-it rule, following the same self-contained-extension pattern as `BlockMath`/`InlineMath` rather than pulling in a `markdown-it-footnote` dependency. The definition's body is deliberately single-line-only for this first cut (no indented continuation paragraphs) — `state.md.renderInline` is what still gives that one line real nested markdown (bold, links, code spans), the same API `paragraph`'s own block rule uses internally. Clicking a reference scrolls to its definition and back, reusing `CrossRef.ts`'s exact `scrollToBlock`/`cross-ref-target` shape — same-document only, so none of `CrossRef`'s backend-resolution machinery was needed. Typing `[^1]` directly becomes a real reference via an input rule (the same "type it and it becomes real" pattern as `$...$`); the *Footnote* slash command is the one deliberate path that sets up both pieces together — inserts the reference, computes the next unused integer label (`src/lib/footnotes.ts`), appends an empty definition at the document's end, and focuses into it, word-processor-style. Definitions are never auto-relocated — wherever one ends up is where it stays, per the DoD's own "byte-identical" wording.
+
+**Two real, non-obvious bugs found and fixed before shipping, both by writing the round-trip test first:**
+- A schema-level node-vs-mark tie: `Superscript`'s mark rule (`parseHTML: [{ tag: 'sup' }]`) matched an *empty* `<sup data-type="footnote-ref">` at the schema's default priority and silently discarded it as a contentless superscript mark — extension registration order settles node-vs-node ties in this codebase but not a node-vs-mark one. Fixed with an explicit `priority: 100` on the reference's own parse rule.
+- `[^1]: text` is syntactically indistinguishable from a CommonMark link reference definition (`[label]: destination`) whenever the footnote text happens to be a single bare word with no spaces (`[^1]: First.` — but not `[^1]: This is the note.`) — markdown-it's own built-in `reference` block rule runs before `paragraph` and silently swallows exactly that shape, producing no token at all. The first version only registered before `paragraph`; fixed by registering before `reference` itself, which is what actually let it win.
+
+Verified with 17 new tests (`Footnote.test.tsx`, `footnotes.test.ts`) covering the round-trip (plain and idempotent across repeated saves), inline formatting inside a definition, non-numeric labels, multiple co-existing footnotes, jump navigation in both directions (including "jumps to the first reference, not a random one, when a label is used more than once"), and the typed input rule. Full 779-test frontend suite green, typecheck clean. The slash command's own glue code (labeling + insertion) isn't independently unit-tested — no other slash command in this codebase is either; it's covered indirectly through the node-level tests above. **Not verified against a live compiled build** — same posture recorded through P12.
 
 ### P13-2 — Ink pencil tool — **S**
 

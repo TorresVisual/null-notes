@@ -661,7 +661,9 @@ Core authoring (inline/display equations, live preview, click-to-edit, matrices,
 
 The two remaining "checklist has it, the app doesn't" gaps in the writing surface.
 
-- [ ] P13-1 Footnotes — **M**. New extension, GFM `[^1]` syntax, full markdown serialize/parse.
+- [x] P13-1 Footnotes — **M**. New extension, GFM `[^1]` syntax, full markdown serialize/parse.
+
+> Two self-contained node types (`FootnoteReference`, `FootnoteDefinition`), own markdown-it rules — no `markdown-it-footnote` dependency, matching how `BlockMath`/`InlineMath` are built. Clicking a reference jumps to its definition and back, reusing `CrossRef.ts`'s scroll/flash mechanics. Typing `[^1]` becomes a real reference via an input rule; the *Footnote* slash command inserts a reference and appends an empty definition, focused and ready to type. **Two real bugs found by writing the round-trip test first:** an empty `<sup data-type="footnote-ref">` lost a node-vs-mark priority tie against `Superscript`'s bare `sup` rule (fixed with explicit `priority: 100`); and `[^1]: text` collided with CommonMark's own link-reference-definition syntax whenever the text was a single bare word, since markdown-it's built-in `reference` rule runs before `paragraph` and silently swallows that shape (fixed by registering before `reference` itself, not just before `paragraph`). Verified with 17 new tests; full 779-test suite green. Not verified live.
 
 - [ ] P13-2 Ink pencil tool — **S**. A second, harder-edged stroke preset — same "preset, not a new tool" pattern the highlighter already uses.
 

@@ -2754,11 +2754,56 @@ code {
 /* Briefly marks the block a cross-reference jumped to. P12-2 extends this
    to a numbered `BlockMath` — `Equation (3)` resolves to the same
    generic target-highlight styling `Theorem 3.2` (P6-7) already uses. */
-.callout.cross-ref-target, .block-math.cross-ref-target {
+.callout.cross-ref-target, .block-math.cross-ref-target, .footnote-def.cross-ref-target {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
   transition: outline-color 1.2s ease;
 }
+
+/* Footnotes (P13-1) — same visual language as .cross-ref: a reference is a
+   small, clickable jump link, not part of the running prose. */
+.footnote-ref-button {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--accent);
+  font-size: 0.75em;
+  cursor: pointer;
+}
+.footnote-ref-button:hover { text-decoration: underline; }
+
+.footnote-def {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-top: var(--space-xs);
+  padding-top: var(--space-xs);
+  border-top: 1px solid var(--border);
+  font-size: 0.9em;
+  color: var(--text-secondary);
+}
+/* Only the first one in a run of footnotes gets the divider — they read as
+   one block of notes, not N separately-bordered rows. */
+.footnote-def + .footnote-def {
+  margin-top: 2px;
+  padding-top: 0;
+  border-top: none;
+}
+
+.footnote-def-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--accent);
+  cursor: pointer;
+}
+.footnote-def-back:hover { text-decoration: underline; }
+
+.footnote-def-body { flex: 1; }
 
 /* "Open in IDE" (P7-2) — only ever rendered once the path resolves, so
    there is no disabled/missing variant to style here. */

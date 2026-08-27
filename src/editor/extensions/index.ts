@@ -18,6 +18,8 @@ import { InlineMath } from './InlineMath'
 import { BlockMath } from './BlockMath'
 import { MermaidBlock } from './MermaidBlock'
 import { Callout } from './Callout'
+import { FootnoteReference } from './FootnoteReference'
+import { FootnoteDefinition } from './FootnoteDefinition'
 import { WikiLink } from './WikiLink'
 import { CodeLink } from './CodeLink'
 import { CodeBlockOpenInIde } from './CodeBlockOpenInIde'
@@ -161,6 +163,8 @@ export const coreExtensions = [
   BlockMath,
   MermaidBlock,
   Callout,
+  FootnoteReference,
+  FootnoteDefinition,
   WikiLink,
   Tag,
   CodeLink,
