@@ -669,7 +669,9 @@ The two remaining "checklist has it, the app doesn't" gaps in the writing surfac
 
 > One new optional field, `thinning` (perfect-freehand's own pressure-width option), on `Pen`/`Stroke`. The pencil preset (thin, grey, low `thinning`) holds a near-constant width instead of tapering with pressure — the toolbar needed no changes since it's already generic over the pens list. Round-trips through the `.ink` SVG as `data-thinning`, absent (not defaulted) on strokes drawn before this existed. Verified with 6 new tests; full 785-test suite green.
 
-- [ ] P13-3 Ink text tool — **M**. Typed text placed on the ink canvas, distinct from the note's own prose.
+- [x] P13-3 Ink text tool — **M**. Typed text placed on the ink canvas, distinct from the note's own prose.
+
+> A new `TextItem` joins `Stroke`/`Shape` in `InkData`, placed/moved/edited via a positioned `<textarea>` overlay over the canvas, gated behind `pointerType === 'pen'` like every other ink tool. Font size is an independent `textSize` store setting rather than a reuse of pen stroke width — the default 2px pen would make an unreadable label, the same reasoning eraser size is already independent for. Editing an item down to empty removes it, the only delete path text has, since neither the lasso nor the eraser reach into `texts`. Verified with 46 new/updated tests including a full create/type/commit/reopen/delete lifecycle against a real mounted `InkCanvas`; full 815-test suite green, typecheck and build clean. Not verified live — same pen-only-gate posture as P13-2.
 
 - [ ] P13-4 True infinite canvas — **M/L, decision first**. Today's canvas auto-grows vertically only, fixed persisted dimensions. Decide bounded-grow-in-every-direction vs. genuinely unbounded before writing code — it changes what an existing `.ink` sidecar's stored dimensions mean.
 
