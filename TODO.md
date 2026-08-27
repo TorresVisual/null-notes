@@ -116,7 +116,7 @@ Effort: **S** ≈ hours · **M** ≈ a day or two · **L** ≈ several days.
 | P11 Code block IDE parity | M11 — code blocks feel like a lightweight IDE pane | ✅ |
 | P12 Math authoring polish | M12 — equations are as fast to reference and fix as they are to write | ✅ |
 | P13 Editor & ink completion | M13 — footnotes and ink match the rest of the writing surface | ✅ |
-| P14 Diagram templates | M14 — the checklist's diagram types have a guided way to build them |  |
+| P14 Diagram templates | M14 — the checklist's diagram types have a guided way to build them | ✅ |
 | P15 Handwriting recognition | M15 — ink-to-LaTeX and drawing search, if ever proven worth it | gated |
 
 ---
@@ -683,11 +683,15 @@ The two remaining "checklist has it, the app doesn't" gaps in the writing surfac
 
 **Not a Graphviz/TikZ revival** — both stay cut. Guided authoring for the checklist's named diagram types, mostly by scaffolding Mermaid's own grammar rather than a new rendering engine.
 
-- [ ] P14-1 Mermaid template gallery — **S/M**. Starting flowchart/class/state-machine/ER/graph templates — covers UML, class diagrams, state machines, ER diagrams, trees, graphs and flowcharts through Mermaid's existing grammar.
+- [x] P14-1 Mermaid template gallery — **S/M**. Starting flowchart/class/state-machine/ER/graph templates — covers UML, class diagrams, state machines, ER diagrams, trees, graphs and flowcharts through Mermaid's existing grammar.
 
-- [ ] P14-2 CS-structure templates — **M**. Guided binary-tree and linked-list starting points specifically — the two shapes drawn constantly and fiddly in Mermaid's generic graph syntax.
+- [x] P14-2 CS-structure templates — **M**. Guided binary-tree and linked-list starting points specifically — the two shapes drawn constantly and fiddly in Mermaid's generic graph syntax.
 
-- [ ] P14-3 Memory / CPU-register / network diagrams — **M/L, decision first**. No Mermaid grammar covers these. Decide whether a custom box-and-arrow primitive earns its keep before building one — a half-built primitive is worse than the freehand ink that already covers this today.
+> A new `MERMAID_TEMPLATES` table (mirroring `mathSnippets.ts`) replaces the single generic "Mermaid Diagram" slash entry with seven named ones: Flowchart, Graph, Class Diagram, State Machine, ER Diagram, Binary Tree, Linked List — each `/`-reachable and correctly connected on insertion. A standing test parses every template through the real `mermaid` package (`mermaid.parse` — full layout needs `getBBox`, absent in jsdom). Full 834-test suite green, typecheck clean. Not verified live — an e2e spec hit the same driver-timing flake P13-3's own spec recorded this session.
+
+- [x] P14-3 Memory / CPU-register / network diagrams — **M/L, decision first**. No Mermaid grammar covers these. Decide whether a custom box-and-arrow primitive earns its keep before building one — a half-built primitive is worse than the freehand ink that already covers this today.
+
+> **Decision: don't build.** The ink canvas already is a box-and-arrow primitive — `rect`/`line`/`arrow` shapes (P3) plus P13-3's new text labels — just via freehand drawing. A dedicated structured primitive would duplicate that through a second editing paradigm for a narrow gap with no daily-use complaint on record. Moved to ROADMAP.md §4. **M14 reached — all three P14 tasks done.**
 
 ---
 

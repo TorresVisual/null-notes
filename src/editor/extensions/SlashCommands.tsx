@@ -9,6 +9,7 @@ import { inkApi } from '../../lib/ink'
 import { nextTaskLabel } from '../../lib/taskScaffold'
 import { nextFootnoteLabel } from '../../lib/footnotes'
 import { splitIntoTasks, addNextTask, report } from '../splitIntoTasks'
+import { MERMAID_TEMPLATES } from '../../lib/mermaidTemplates'
 import type { InkData } from '../../ink/types'
 
 const INK_WIDTH = 700
@@ -52,17 +53,21 @@ const COMMANDS: Cmd[] = [
     run: ({ editor, range }) =>
       editor.chain().focus().deleteRange(range).setCodeBlock().run(),
   },
-  {
-    title: 'Mermaid Diagram',
-    description: 'Flowchart, sequence, or Gantt diagram',
-    run: ({ editor, range }) =>
+  // P14-1/P14-2: one entry per named diagram type, each scaffolding a
+  // starting point that renders correctly on insertion rather than an empty
+  // fence — `MERMAID_TEMPLATES` is the editable table, this just wires each
+  // row to the slash menu the same way `MATH_SNIPPETS` wires into `/`.
+  ...MERMAID_TEMPLATES.map((template) => ({
+    title: template.title,
+    description: template.description,
+    run: ({ editor, range }: { editor: Editor; range: Range }) =>
       editor
         .chain()
         .focus()
         .deleteRange(range)
-        .insertContent({ type: 'mermaidBlock', attrs: { code: 'graph LR\n    A --> B' } })
+        .insertContent({ type: 'mermaidBlock', attrs: { code: template.code } })
         .run(),
-  },
+  })),
   {
     title: 'Note',
     description: 'Info callout',
