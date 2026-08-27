@@ -1,5 +1,6 @@
 pub mod assets;
 pub mod crossref;
+pub mod diagrams;
 pub mod editor_launch;
 pub mod git;
 pub mod ink;
