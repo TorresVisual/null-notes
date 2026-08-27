@@ -2501,6 +2501,26 @@ code {
   transform: translate(-50%, -50%);
 }
 
+/* Positioned over the canvas at the item's own (x, y) — top baseline, matching
+   `drawTextItem`'s `ctx.textBaseline = 'top'` so the box lines up with where
+   the committed text will actually render. Grows with its own content
+   (`rows` set from the line count) rather than wrapping, since the canvas
+   render never wraps a line either. */
+.ink-text-editor {
+  position: absolute;
+  min-width: 40px;
+  padding: 0;
+  margin: 0;
+  border: 1px dashed var(--accent);
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--bg-base) 70%, transparent);
+  font-family: sans-serif;
+  line-height: 1.2;
+  resize: both;
+  overflow: hidden;
+  white-space: pre;
+}
+
 /* Settings panel */
 .settings-panel {
   background: var(--bg-raised);

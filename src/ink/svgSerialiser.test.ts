@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { strokeToPath, shapeToElement, inkDataToSvg, svgToInkData } from './svgSerialiser'
-import type { Stroke, Shape, InkData } from './types'
+import { strokeToPath, shapeToElement, textItemToElement, inkDataToSvg, svgToInkData } from './svgSerialiser'
+import type { Stroke, Shape, TextItem, InkData } from './types'
 
 const stroke: Stroke = {
   id: 's1',
@@ -20,6 +20,15 @@ const shape: Shape = {
   x1: 10, y1: 10, x2: 100, y2: 80,
   color: '#ff0000',
   size: 2,
+}
+
+const textItem: TextItem = {
+  id: 'txt1',
+  x: 40,
+  y: 60,
+  text: 'hello',
+  color: '#00ff00',
+  size: 18,
 }
 
 describe('strokeToPath', () => {
@@ -58,9 +67,30 @@ describe('shapeToElement', () => {
   })
 })
 
+describe('textItemToElement', () => {
+  it('returns a text element carrying the raw text as a data attribute', () => {
+    const result = textItemToElement(textItem)
+    expect(result).toContain('<text')
+    expect(result).toContain('data-id="txt1"')
+    expect(result).toContain(`data-text="${encodeURIComponent('hello')}"`)
+    expect(result).toContain('fill="#00ff00"')
+  })
+
+  it('emits one tspan per line, stepped down by the line height', () => {
+    const result = textItemToElement({ ...textItem, text: 'first\nsecond' })
+    expect(result).toContain('<tspan x="40" y="78">first</tspan>')
+    expect(result).toContain(`<tspan x="40" y="${60 + 18 + 18 * 1.2}">second</tspan>`)
+  })
+
+  it('escapes XML-significant characters in the visual tspans', () => {
+    const result = textItemToElement({ ...textItem, text: 'a < b & c > d' })
+    expect(result).toContain('a &lt; b &amp; c &gt; d')
+  })
+})
+
 describe('inkDataToSvg / svgToInkData roundtrip', () => {
   it('round-trips stroke and shape data', () => {
-    const data: InkData = { width: 800, height: 600, strokes: [stroke], shapes: [shape] }
+    const data: InkData = { width: 800, height: 600, strokes: [stroke], shapes: [shape], texts: [] }
     const svg = inkDataToSvg(data)
     expect(svg).toContain('<svg')
     expect(svg).toContain('data-width="800"')
@@ -74,7 +104,7 @@ describe('inkDataToSvg / svgToInkData roundtrip', () => {
 
   it('round-trips a highlighter opacity', () => {
     const highlighter: Stroke = { ...stroke, id: 's2', opacity: 0.3 }
-    const data: InkData = { width: 800, height: 600, strokes: [highlighter], shapes: [] }
+    const data: InkData = { width: 800, height: 600, strokes: [highlighter], shapes: [], texts: [] }
 
     const restored = svgToInkData(inkDataToSvg(data))
     expect(restored.strokes[0]?.opacity).toBe(0.3)
@@ -100,7 +130,7 @@ describe('inkDataToSvg / svgToInkData roundtrip', () => {
 
   it('round-trips a pencil stroke\'s low thinning value', () => {
     const pencilStroke: Stroke = { ...stroke, id: 'pencil1', thinning: 0.1 }
-    const data: InkData = { width: 800, height: 600, strokes: [pencilStroke], shapes: [] }
+    const data: InkData = { width: 800, height: 600, strokes: [pencilStroke], shapes: [], texts: [] }
 
     const svg = inkDataToSvg(data)
     expect(svg).toContain('data-thinning="0.1"')
@@ -109,7 +139,7 @@ describe('inkDataToSvg / svgToInkData roundtrip', () => {
 
   it('writes highlighters before ink so they sit underneath', () => {
     const highlighter: Stroke = { ...stroke, id: 'hl', opacity: 0.3 }
-    const data: InkData = { width: 800, height: 600, strokes: [stroke, highlighter], shapes: [] }
+    const data: InkData = { width: 800, height: 600, strokes: [stroke, highlighter], shapes: [], texts: [] }
 
     const svg = inkDataToSvg(data)
     expect(svg.indexOf('data-id="hl"')).toBeLessThan(svg.indexOf('data-id="s1"'))
@@ -117,7 +147,7 @@ describe('inkDataToSvg / svgToInkData roundtrip', () => {
 
   it('round-trips a stroke alongside an arrow without cross-contamination', () => {
     const arrow: Shape = { ...shape, id: 'sh4', kind: 'arrow' }
-    const data: InkData = { width: 800, height: 600, strokes: [stroke], shapes: [arrow] }
+    const data: InkData = { width: 800, height: 600, strokes: [stroke], shapes: [arrow], texts: [] }
     const svg = inkDataToSvg(data)
 
     const restored = svgToInkData(svg)
@@ -126,5 +156,24 @@ describe('inkDataToSvg / svgToInkData roundtrip', () => {
     expect(restored.shapes).toHaveLength(1)
     expect(restored.shapes[0]?.id).toBe('sh4')
     expect(restored.shapes[0]?.kind).toBe('arrow')
+  })
+
+  it('round-trips a text item', () => {
+    const data: InkData = { width: 800, height: 600, strokes: [], shapes: [], texts: [textItem] }
+    const restored = svgToInkData(inkDataToSvg(data))
+    expect(restored.texts).toHaveLength(1)
+    expect(restored.texts[0]).toEqual(textItem)
+  })
+
+  it('round-trips a multi-line text item byte-identical, including the newline', () => {
+    const multiline: TextItem = { ...textItem, id: 'txt2', text: 'first\nsecond' }
+    const data: InkData = { width: 800, height: 600, strokes: [], shapes: [], texts: [multiline] }
+    const restored = svgToInkData(inkDataToSvg(data))
+    expect(restored.texts[0]?.text).toBe('first\nsecond')
+  })
+
+  it('reads a note with no text items at all as an empty array, not undefined', () => {
+    const legacy = `<svg xmlns="http://www.w3.org/2000/svg" data-width="800" data-height="600"></svg>`
+    expect(svgToInkData(legacy).texts).toEqual([])
   })
 })

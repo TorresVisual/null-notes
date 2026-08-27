@@ -2,9 +2,13 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import {
   DEFAULT_PENS,
   DEFAULT_ERASER_SIZE,
+  DEFAULT_TEXT_SIZE,
   clampEraserSize,
+  clampTextSize,
   loadEraserSize,
+  loadTextSize,
   saveEraserSize,
+  saveTextSize,
   parsePens,
   withPen,
 } from './pens'
@@ -85,6 +89,41 @@ describe('clampEraserSize', () => {
   // become an eraser of size NaN.
   it('falls back to the default for a value that is not a number', () => {
     expect(clampEraserSize(Number('nonsense'))).toBe(DEFAULT_ERASER_SIZE)
+  })
+})
+
+describe('loadTextSize', () => {
+  beforeEach(() => localStorage.clear())
+
+  it('gives the default when nothing has been stored', () => {
+    expect(loadTextSize()).toBe(DEFAULT_TEXT_SIZE)
+  })
+
+  it('gives the default for a stored value that is not a size', () => {
+    localStorage.setItem('null-notes.ink.textSize', 'nonsense')
+    expect(loadTextSize()).toBe(DEFAULT_TEXT_SIZE)
+  })
+
+  it('reads back a size that was saved', () => {
+    saveTextSize(32)
+    expect(loadTextSize()).toBe(32)
+  })
+})
+
+describe('clampTextSize', () => {
+  it('leaves a sensible size alone', () => {
+    expect(clampTextSize(24)).toBe(24)
+  })
+
+  // Independent of the pen's own size range: a default 2px pen stroke would
+  // be an unreadable font size if text items just inherited it.
+  it('holds text within a legible range, distinct from the pen size range', () => {
+    expect(clampTextSize(0)).toBe(8)
+    expect(clampTextSize(500)).toBe(96)
+  })
+
+  it('falls back to the default for a value that is not a number', () => {
+    expect(clampTextSize(Number('nonsense'))).toBe(DEFAULT_TEXT_SIZE)
   })
 })
 

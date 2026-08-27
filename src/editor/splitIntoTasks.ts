@@ -30,7 +30,7 @@ export function report(error: unknown): void {
 }
 
 function emptyInk(): InkData {
-  return { width: SOLUTION_INK_WIDTH, height: SOLUTION_INK_HEIGHT, strokes: [], shapes: [] }
+  return { width: SOLUTION_INK_WIDTH, height: SOLUTION_INK_HEIGHT, strokes: [], shapes: [], texts: [] }
 }
 
 function markdownOf(editor: Editor): string {

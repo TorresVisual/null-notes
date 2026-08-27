@@ -90,6 +90,7 @@ describe('erasePoint', () => {
     height: 600,
     strokes: [stroke('a', points(0, 10, 50, 90, 100))],
     shapes: [rect],
+    texts: [],
   }
 
   it('splits strokes in place', () => {
@@ -121,6 +122,7 @@ describe('eraseWholeStrokes', () => {
     height: 600,
     strokes: [stroke('a', points(0, 10, 50, 90, 100)), stroke('b', points(400, 410))],
     shapes: [rect],
+    texts: [],
   }
 
   // The difference from the point eraser: touching the middle takes all of it,
@@ -149,6 +151,7 @@ describe('erase', () => {
     height: 600,
     strokes: [stroke('a', points(0, 10, 50, 90, 100))],
     shapes: [],
+    texts: [],
   }
 
   it('splits in point mode and removes whole in stroke mode', () => {

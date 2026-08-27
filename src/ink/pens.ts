@@ -110,3 +110,26 @@ export function loadEraserSize(): number {
 export function saveEraserSize(size: number): void {
   localStorage.setItem(ERASER_SIZE_KEY, String(clampEraserSize(size)))
 }
+
+// Independent of pen size for the same reason the eraser is: a comfortable
+// stroke width and a legible font size are different scales, and the default
+// pen (2px) would make an unreadably tiny label if text items just inherited
+// it the way shapes inherit pen size for their own line width.
+export const DEFAULT_TEXT_SIZE = 18
+const MIN_TEXT_SIZE = 8
+const MAX_TEXT_SIZE = 96
+const TEXT_SIZE_KEY = 'null-notes.ink.textSize'
+
+export function clampTextSize(size: number): number {
+  if (!Number.isFinite(size)) return DEFAULT_TEXT_SIZE
+  return Math.min(MAX_TEXT_SIZE, Math.max(MIN_TEXT_SIZE, size))
+}
+
+export function loadTextSize(): number {
+  const stored = Number(localStorage.getItem(TEXT_SIZE_KEY))
+  return stored > 0 ? clampTextSize(stored) : DEFAULT_TEXT_SIZE
+}
+
+export function saveTextSize(size: number): void {
+  localStorage.setItem(TEXT_SIZE_KEY, String(clampTextSize(size)))
+}

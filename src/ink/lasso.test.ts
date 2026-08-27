@@ -112,6 +112,7 @@ describe('selectionIn', () => {
     height: 600,
     strokes: [stroke('in', [[10, 10], [20, 20]]), stroke('out', [[500, 500]])],
     shapes: [rect, { ...rect, id: 'r2', x1: 300, x2: 400 }],
+    texts: [],
   }
 
   it('returns only what the loop encloses', () => {
@@ -130,6 +131,7 @@ describe('translateSelection', () => {
     height: 600,
     strokes: [stroke('a', [[10, 10]]), stroke('b', [[10, 10]])],
     shapes: [rect],
+    texts: [],
   }
 
   it('moves the selected stroke and leaves the rest where they were', () => {
@@ -162,6 +164,7 @@ describe('deleteSelection', () => {
       height: 600,
       strokes: [stroke('a', [[1, 1]]), stroke('b', [[2, 2]])],
       shapes: [rect],
+      texts: [],
     }
     const left = deleteSelection(data, { strokeIds: ['a'], shapeIds: ['r1'] })
     expect(left.strokes.map((s) => s.id)).toEqual(['b'])
@@ -176,6 +179,7 @@ describe('selectionBottom', () => {
       height: 600,
       strokes: [stroke('a', [[0, 120], [0, 340]])],
       shapes: [{ ...rect, id: 'r1', y1: 10, y2: 500 }],
+      texts: [],
     }
     expect(selectionBottom(data, { strokeIds: ['a'], shapeIds: [] })).toBe(340)
     expect(selectionBottom(data, { strokeIds: [], shapeIds: ['r1'] })).toBe(500)

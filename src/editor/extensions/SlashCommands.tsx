@@ -14,7 +14,7 @@ import type { InkData } from '../../ink/types'
 const INK_WIDTH = 700
 const INK_HEIGHT = 900
 
-const EMPTY_INK: InkData = { width: INK_WIDTH, height: INK_HEIGHT, strokes: [], shapes: [] }
+const EMPTY_INK: InkData = { width: INK_WIDTH, height: INK_HEIGHT, strokes: [], shapes: [], texts: [] }
 
 interface Cmd {
   title: string

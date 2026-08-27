@@ -6,6 +6,7 @@ import {
   Circle,
   Square,
   MoveUpRight,
+  Type,
   Ruler as RulerIcon,
   Trash2,
   Undo2,
@@ -22,6 +23,7 @@ const TOOLS: { id: Tool; label: string; Icon: typeof PenLine }[] = [
   { id: 'circle', label: 'Circle', Icon: Circle },
   { id: 'rect', label: 'Rectangle', Icon: Square },
   { id: 'arrow', label: 'Arrow', Icon: MoveUpRight },
+  { id: 'text', label: 'Text', Icon: Type },
 ]
 
 // A swatch that scaled 1:1 with pen size would make a 20px highlighter swallow
@@ -47,11 +49,13 @@ export function InkToolGroup() {
   const activePenId = useInkStore((s) => s.activePenId)
   const eraserMode = useInkStore((s) => s.eraserMode)
   const eraserSize = useInkStore((s) => s.eraserSize)
+  const textSize = useInkStore((s) => s.textSize)
   const setTool = useInkStore((s) => s.setTool)
   const selectPen = useInkStore((s) => s.selectPen)
   const updateActivePen = useInkStore((s) => s.updateActivePen)
   const setEraserMode = useInkStore((s) => s.setEraserMode)
   const setEraserSize = useInkStore((s) => s.setEraserSize)
+  const setTextSize = useInkStore((s) => s.setTextSize)
   const { color, size } = activePenOf({ pens, activePenId })
 
   if (!active) return null
@@ -144,6 +148,19 @@ export function InkToolGroup() {
             aria-label="Eraser size"
           />
         </>
+      ) : tool === 'text' ? (
+        // Independent of pen size, the same way eraser size is: a comfortable
+        // stroke width and a legible font size are different scales, and the
+        // default pen (2px) would make an unreadable label if text items just
+        // inherited it the way shapes inherit pen size for their line width.
+        <input
+          type="range"
+          min={8}
+          max={72}
+          value={textSize}
+          onChange={(e) => setTextSize(Number(e.target.value))}
+          aria-label="Text size"
+        />
       ) : (
         <input
           type="range"

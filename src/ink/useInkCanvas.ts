@@ -13,6 +13,8 @@ import {
 } from './ruler'
 import type { Ruler, RulerGrab } from './ruler'
 import { drawShapePreview } from './shapePreview'
+import { drawTextItem } from './textRender'
+import { pointInTextItem, translateTextItem } from './textBounds'
 import { paintOrder } from './paintOrder'
 import {
   EMPTY_SELECTION,
@@ -27,9 +29,29 @@ import {
 import type { LassoPoint, Selection } from './lasso'
 import { useInkStore, activePenOf } from '../store/ink'
 import type { PreviewShape } from './shapePreview'
-import type { InkData, Stroke, Shape, Tool, Point } from './types'
+import type { InkData, Stroke, Shape, TextItem, Tool, Point } from './types'
 
 const SHAPE_TOOLS: Tool[] = ['line', 'circle', 'rect', 'arrow']
+
+// A text item you are actively typing into — held outside `InkData` until it
+// commits, the same way the lasso marquee is a thing you're holding rather
+// than a thing the note contains. Discarding it (Escape) is then just
+// clearing this state: an edited existing item was never mutated in place,
+// and a fresh one was never added.
+export interface EditingText {
+  id: string
+  x: number
+  y: number
+  text: string
+  color: string
+  size: number
+  isNew: boolean
+}
+
+// A tap that drifted a pixel or two while landing should still open the
+// editor, not start a drag — the same "judge intent once" posture the ruler
+// snap decision already uses.
+const TEXT_DRAG_THRESHOLD = 3
 const DEFAULT_THINNING = 0.5
 const STROKE_OPTIONS = { smoothing: 0.5, streamline: 0.5 }
 
@@ -194,18 +216,20 @@ export function useInkCanvas(
   const activePenId = useInkStore((s) => s.activePenId)
   const eraserMode = useInkStore((s) => s.eraserMode)
   const eraserSize = useInkStore((s) => s.eraserSize)
+  const textSize = useInkStore((s) => s.textSize)
   const setToolInStore = useInkStore((s) => s.setTool)
   const selectPenInStore = useInkStore((s) => s.selectPen)
   const updateActivePen = useInkStore((s) => s.updateActivePen)
   const setEraserMode = useInkStore((s) => s.setEraserMode)
   const setEraserSize = useInkStore((s) => s.setEraserSize)
-  const [inkData, setInkData] = useState<InkData>({ width, height, strokes: [], shapes: [] })
+  const [inkData, setInkData] = useState<InkData>({ width, height, strokes: [], shapes: [], texts: [] })
   const [history, setHistory] = useState<InkData[]>([])
   const [future, setFuture] = useState<InkData[]>([])
 
   const [ruler, setRuler] = useState<Ruler | null>(null)
   const [lassoPolygon, setLassoPolygon] = useState<LassoPoint[] | null>(null)
   const [selection, setSelection] = useState<Selection>(EMPTY_SELECTION)
+  const [editingText, setEditingText] = useState<EditingText | null>(null)
 
   const currentStroke = useRef<Point[]>([])
   const shapeStart = useRef<{ x: number; y: number } | null>(null)
@@ -215,6 +239,21 @@ export function useInkCanvas(
   const snapping = useRef(false)
   const dragSnapshot = useRef<InkData | null>(null)
   const dragFrom = useRef<LassoPoint | null>(null)
+  const textDragFrom = useRef<{ id: string; x: number; y: number; moved: boolean } | null>(null)
+  const textDragSnapshot = useRef<InkData | null>(null)
+
+  // Mirrored into refs so an unmount can flush an in-progress edit without a
+  // stale closure — the note-editor's own flush-on-unmount rule (P0-1),
+  // applied here because a typed-but-not-yet-blurred label is exactly the
+  // kind of edit principle #3 says must not vanish silently.
+  const editingTextRef = useRef<EditingText | null>(null)
+  useEffect(() => {
+    editingTextRef.current = editingText
+  }, [editingText])
+  const inkDataRef = useRef(inkData)
+  useEffect(() => {
+    inkDataRef.current = inkData
+  }, [inkData])
 
   // The selected preset *is* the pen — colour, width and opacity all come from
   // it, and the toolbar's colour and size controls edit it in place. That is
@@ -287,6 +326,83 @@ export function useInkCanvas(
     void inkApi.write(svgPath, next)
   }, [history, future, inkData, svgPath])
 
+  const startNewText = useCallback(
+    (x: number, y: number) => {
+      setEditingText({ id: crypto.randomUUID(), x, y, text: '', color, size: textSize, isNew: true })
+    },
+    [color, textSize],
+  )
+
+  const startEditText = useCallback((item: TextItem) => {
+    setEditingText({ id: item.id, x: item.x, y: item.y, text: item.text, color: item.color, size: item.size, isNew: false })
+  }, [])
+
+  const updateEditingText = useCallback((text: string) => {
+    setEditingText((current) => (current ? { ...current, text } : current))
+  }, [])
+
+  // An item edited down to nothing is removed rather than kept as an empty
+  // label — the only delete path text items have, since neither the lasso
+  // nor the eraser reach into `texts` (see `types.ts`).
+  const commitEditingText = useCallback(() => {
+    const current = editingText
+    if (!current) return
+    setEditingText(null)
+    const trimmed = current.text.trim()
+    if (trimmed === '') {
+      if (!current.isNew) {
+        commit({ ...inkData, texts: inkData.texts.filter((t) => t.id !== current.id) })
+      }
+      return
+    }
+    if (current.isNew) {
+      const item: TextItem = {
+        id: current.id,
+        x: current.x,
+        y: current.y,
+        text: current.text,
+        color: current.color,
+        size: current.size,
+      }
+      commit({
+        ...inkData,
+        height: grownHeight(inkData.height, [{ x: current.x, y: current.y, pressure: 0 }], autoGrow),
+        texts: [...inkData.texts, item],
+      })
+    } else {
+      commit({
+        ...inkData,
+        texts: inkData.texts.map((t) => (t.id === current.id ? { ...t, text: current.text } : t)),
+      })
+    }
+  }, [editingText, inkData, commit, autoGrow])
+
+  // Escape discards rather than commits: a fresh item was never added, and an
+  // edited existing one was never mutated until `commitEditingText` runs, so
+  // there is nothing to undo — the pending text simply stops being held.
+  const cancelEditingText = useCallback(() => {
+    setEditingText(null)
+  }, [])
+
+  // Mirrors the note editor's own flush-on-unmount rule (P0-1): a label typed
+  // right before switching notes or closing the block must not vanish just
+  // because nothing blurred it first. Bypasses `commit`'s history/state
+  // plumbing deliberately — the component is gone, only the file write
+  // still matters.
+  useEffect(() => {
+    return () => {
+      const current = editingTextRef.current
+      if (!current) return
+      const trimmed = current.text.trim()
+      if (trimmed === '') return
+      const base = inkDataRef.current
+      const next = current.isNew
+        ? { ...base, texts: [...base.texts, { id: current.id, x: current.x, y: current.y, text: current.text, color: current.color, size: current.size }] }
+        : { ...base, texts: base.texts.map((t) => (t.id === current.id ? { ...t, text: current.text } : t)) }
+      void inkApi.write(svgPath, next)
+    }
+  }, [svgPath])
+
   const redrawCanvas = useCallback(
     (livePoints: Point[], liveShape?: PreviewShape | null, liveLasso?: LassoPoint[] | null) => {
       const canvas = canvasRef.current
@@ -313,6 +429,12 @@ export function useInkCanvas(
       for (const shape of inkData.shapes) {
         drawShapePreview(ctx, shape)
       }
+      // The item being typed renders through the overlay textarea instead —
+      // drawing it here too would show it twice, once live and once stale.
+      for (const item of inkData.texts) {
+        if (editingText?.id === item.id) continue
+        drawTextItem(ctx, item)
+      }
       if (livePoints.length > 1) {
         fillStroke(ctx, livePoints, color, size, opacity, thinning)
       }
@@ -328,7 +450,7 @@ export function useInkCanvas(
         drawRuler(ctx, ruler)
       }
     },
-    [inkData, color, size, opacity, zoom, lassoPolygon, ruler],
+    [inkData, color, size, opacity, zoom, lassoPolygon, ruler, editingText],
   )
 
   useEffect(() => {
@@ -395,6 +517,24 @@ export function useInkCanvas(
         return
       }
 
+      if (activeTool === 'text') {
+        // Finalize whatever was open before deciding what this tap means —
+        // otherwise a click that lands on a second item while the first is
+        // still being typed would hit-test against a page that doesn't yet
+        // reflect it.
+        commitEditingText()
+        const x = e.offsetX / zoom
+        const y = e.offsetY / zoom
+        const hit = [...inkData.texts].reverse().find((t) => pointInTextItem(t, x, y))
+        if (hit) {
+          textDragSnapshot.current = inkData
+          textDragFrom.current = { id: hit.id, x, y, moved: false }
+        } else {
+          startNewText(x, y)
+        }
+        return
+      }
+
       if (activeTool === 'lasso') {
         const x = e.offsetX / zoom
         const y = e.offsetY / zoom
@@ -423,7 +563,10 @@ export function useInkCanvas(
       snapping.current = ruler !== null && shouldSnap(start, ruler)
       currentStroke.current = [start]
     },
-    [tool, inkData, eraseAt, zoom, lassoPolygon, selection, clearSelection, ruler, grabRuler],
+    [
+      tool, inkData, eraseAt, zoom, lassoPolygon, selection, clearSelection, ruler, grabRuler,
+      commitEditingText, startNewText,
+    ],
   )
 
   const handlePointerMove = useCallback(
@@ -439,6 +582,23 @@ export function useInkCanvas(
       if (activeTool === 'eraser') {
         // Only while the tip is actually down — hovering must not erase.
         if (eraseSnapshot.current) eraseAt(e.offsetX / zoom, e.offsetY / zoom)
+        return
+      }
+
+      if (activeTool === 'text') {
+        const from = textDragFrom.current
+        if (!from) return
+        const x = e.offsetX / zoom
+        const y = e.offsetY / zoom
+        const dx = x - from.x
+        const dy = y - from.y
+        if (!from.moved && Math.hypot(dx, dy) < TEXT_DRAG_THRESHOLD) return
+        from.moved = true
+        textDragFrom.current = { ...from, x, y }
+        setInkData((data) => ({
+          ...data,
+          texts: data.texts.map((t) => (t.id === from.id ? translateTextItem(t, dx, dy) : t)),
+        }))
         return
       }
 
@@ -513,6 +673,34 @@ export function useInkCanvas(
         const found = selectionIn(inkData, polygon)
         setSelection(found)
         setLassoPolygon(isSelectionEmpty(found) ? null : polygon)
+        return
+      }
+
+      // A drag is one history entry and one write; a tap that never crossed
+      // the move threshold opens the editor instead — the click/drag split a
+      // pointerdown-time hit-test alone can't make, since nothing has moved
+      // yet when the pen first touches down.
+      const textFrom = textDragFrom.current
+      if (textFrom) {
+        textDragFrom.current = null
+        const snapshot = textDragSnapshot.current
+        textDragSnapshot.current = null
+        if (textFrom.moved && snapshot) {
+          setHistory((past) => [...past, snapshot])
+          setFuture([])
+          const item = inkData.texts.find((t) => t.id === textFrom.id)
+          const grown = {
+            ...inkData,
+            height: item
+              ? grownHeight(inkData.height, [{ x: item.x, y: item.y, pressure: 0 }], autoGrow)
+              : inkData.height,
+          }
+          setInkData(grown)
+          void inkApi.write(svgPath, grown)
+        } else {
+          const item = inkData.texts.find((t) => t.id === textFrom.id)
+          if (item) startEditText(item)
+        }
         return
       }
 
@@ -598,7 +786,7 @@ export function useInkCanvas(
     },
     [
       tool, inkData, color, size, opacity, commit, svgPath, zoom, autoGrow, selection,
-      snappedPoints, releaseRuler,
+      snappedPoints, releaseRuler, startEditText,
     ],
   )
 
@@ -662,5 +850,9 @@ export function useInkCanvas(
     redo,
     canUndo: history.length > 0,
     canRedo: future.length > 0,
+    editingText,
+    updateEditingText,
+    commitEditingText,
+    cancelEditingText,
   }
 }

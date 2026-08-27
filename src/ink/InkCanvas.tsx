@@ -51,6 +51,10 @@ export function InkCanvas({
     redo,
     canUndo,
     canRedo,
+    editingText,
+    updateEditingText,
+    commitEditingText,
+    cancelEditingText,
   } = useInkCanvas(svgPath, width, height, { zoom, autoGrow })
 
   const setActiveCanvas = useInkStore((s) => s.setActiveCanvas)
@@ -210,6 +214,34 @@ export function InkCanvas({
               top: cursorPos.y,
               width: eraserDiameter,
               height: eraserDiameter,
+            }}
+          />
+        )}
+        {editingText && (
+          <textarea
+            key={editingText.id}
+            className="ink-text-editor"
+            autoFocus
+            value={editingText.text}
+            onChange={(e) => updateEditingText(e.target.value)}
+            onBlur={commitEditingText}
+            onPointerDown={(e) => e.stopPropagation()}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') {
+                e.preventDefault()
+                cancelEditingText()
+              } else if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault()
+                e.currentTarget.blur()
+              }
+            }}
+            rows={Math.max(1, editingText.text.split('\n').length)}
+            wrap="off"
+            style={{
+              left: editingText.x * zoom,
+              top: editingText.y * zoom,
+              color: editingText.color,
+              fontSize: editingText.size * zoom,
             }}
           />
         )}

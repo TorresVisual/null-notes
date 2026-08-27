@@ -1,4 +1,4 @@
-export type Tool = 'pen' | 'eraser' | 'lasso' | 'line' | 'circle' | 'rect' | 'arrow'
+export type Tool = 'pen' | 'eraser' | 'lasso' | 'line' | 'circle' | 'rect' | 'arrow' | 'text'
 
 // Two ways to rub out: take only what the eraser passes over, or take the whole
 // stroke it touches. Scratching out a word wants the second; fixing one letter
@@ -51,9 +51,25 @@ export interface Shape {
   size: number
 }
 
+// A typed label, not a stroke — placed at a point rather than drawn along a
+// path. `size` is a font size in px, frozen per item from the toolbar's own
+// (pen-independent) text-size setting at creation time — the same "freeze it
+// per-item" posture P13-2 gave `thinning`, and independent of pen stroke
+// width for the same reason eraser size already is (`ink/pens.ts`): a
+// comfortable line width and a legible font size are different scales.
+export interface TextItem {
+  id: string
+  x: number
+  y: number
+  text: string
+  color: string
+  size: number
+}
+
 export interface InkData {
   width: number
   height: number
   strokes: Stroke[]
   shapes: Shape[]
+  texts: TextItem[]
 }

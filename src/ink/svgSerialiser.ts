@@ -1,6 +1,11 @@
 import { getStroke } from 'perfect-freehand'
 import { paintOrder } from './paintOrder'
-import type { InkData, Stroke, Shape } from './types'
+import { TEXT_LINE_HEIGHT } from './textBounds'
+import type { InkData, Stroke, Shape, TextItem } from './types'
+
+function escapeXmlText(text: string): string {
+  return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+}
 
 function pointsToSvgPath(points: number[][]): string {
   if (points.length === 0) return ''
@@ -63,12 +68,28 @@ export function shapeToElement(shape: Shape): string {
   }
 }
 
+// `data-text` (URI-encoded, like a stroke's own `data-points`) is the source
+// of truth read back on load; the `<tspan>` lines are a best-effort visual
+// approximation for anyone who opens the raw SVG outside the app — the app
+// itself always redraws from the parsed `TextItem`, never from these tspans.
+export function textItemToElement(item: TextItem): string {
+  const lineHeight = item.size * TEXT_LINE_HEIGHT
+  const lines = item.text.split('\n')
+  const tspans = lines
+    .map((line, i) => `<tspan x="${item.x}" y="${item.y + item.size + i * lineHeight}">${escapeXmlText(line)}</tspan>`)
+    .join('')
+  const raw = encodeURIComponent(item.text)
+  return `<text data-id="${item.id}" data-x="${item.x}" data-y="${item.y}" data-color="${item.color}" data-size="${item.size}" data-text="${raw}" fill="${item.color}" font-size="${item.size}" font-family="sans-serif">${tspans}</text>`
+}
+
 export function inkDataToSvg(data: InkData): string {
   const paths = paintOrder(data.strokes).map(strokeToPath).join('\n  ')
   const elements = data.shapes.map(shapeToElement).join('\n  ')
+  const texts = data.texts.map(textItemToElement).join('\n  ')
   return `<svg xmlns="http://www.w3.org/2000/svg" data-width="${data.width}" data-height="${data.height}" width="${data.width}" height="${data.height}" viewBox="0 0 ${data.width} ${data.height}">
   ${paths}
   ${elements}
+  ${texts}
 </svg>`
 }
 
@@ -113,5 +134,17 @@ export function svgToInkData(svg: string): InkData {
     }
   }
 
-  return { width, height, strokes, shapes }
+  const texts: TextItem[] = []
+  for (const el of doc.querySelectorAll('text[data-id]')) {
+    const id = el.getAttribute('data-id') ?? ''
+    const x = Number(el.getAttribute('data-x') ?? 0)
+    const y = Number(el.getAttribute('data-y') ?? 0)
+    const color = el.getAttribute('data-color') ?? '#000000'
+    const size = Number(el.getAttribute('data-size') ?? 18)
+    const raw = el.getAttribute('data-text')
+    const text = raw === null ? '' : decodeURIComponent(raw)
+    texts.push({ id, x, y, color, size, text })
+  }
+
+  return { width, height, strokes, shapes, texts }
 }

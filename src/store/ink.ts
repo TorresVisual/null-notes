@@ -3,14 +3,17 @@ import type { EraserMode, Pen, Tool } from '../ink/types'
 import {
   DEFAULT_PENS,
   clampEraserSize,
+  clampTextSize,
   loadActivePenId,
   loadEraserMode,
   loadEraserSize,
   loadPens,
+  loadTextSize,
   saveActivePenId,
   saveEraserMode,
   saveEraserSize,
   savePens,
+  saveTextSize,
   withPen,
 } from '../ink/pens'
 
@@ -44,6 +47,7 @@ interface InkStore {
   activePenId: string
   eraserMode: EraserMode
   eraserSize: number
+  textSize: number
   activeCanvas: CanvasHandle | null
   activeCanvasId: string | null
   setTool: (tool: Tool) => void
@@ -51,6 +55,7 @@ interface InkStore {
   updateActivePen: (changes: Partial<Pen>) => void
   setEraserMode: (mode: EraserMode) => void
   setEraserSize: (size: number) => void
+  setTextSize: (size: number) => void
   setActiveCanvas: (id: string, handle: CanvasHandle) => void
   clearActiveCanvas: (id: string) => void
 }
@@ -65,6 +70,7 @@ export const useInkStore = create<InkStore>((set, get) => ({
   activePenId: loadActivePenId(loadPens()),
   eraserMode: loadEraserMode(),
   eraserSize: loadEraserSize(),
+  textSize: loadTextSize(),
   activeCanvas: null,
   activeCanvasId: null,
 
@@ -91,6 +97,12 @@ export const useInkStore = create<InkStore>((set, get) => ({
     const clamped = clampEraserSize(size)
     saveEraserSize(clamped)
     set({ eraserSize: clamped })
+  },
+
+  setTextSize: (size) => {
+    const clamped = clampTextSize(size)
+    saveTextSize(clamped)
+    set({ textSize: clamped })
   },
 
   setActiveCanvas: (id, handle) => set({ activeCanvas: handle, activeCanvasId: id }),

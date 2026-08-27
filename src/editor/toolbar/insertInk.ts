@@ -8,7 +8,7 @@ import type { InkData } from '../../ink/types'
 export const INK_WIDTH = 700
 export const INK_HEIGHT = 900
 
-const EMPTY_INK: InkData = { width: INK_WIDTH, height: INK_HEIGHT, strokes: [], shapes: [] }
+const EMPTY_INK: InkData = { width: INK_WIDTH, height: INK_HEIGHT, strokes: [], shapes: [], texts: [] }
 
 // Shared by the toolbar's own "Insert ink canvas" button and the native
 // menu's "Insert Ink Block" item (routed through EditorToolbar's window-event

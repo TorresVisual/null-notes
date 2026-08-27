@@ -10,6 +10,7 @@ function reset() {
     activePenId: DEFAULT_PENS[0].id,
     eraserMode: 'point',
     eraserSize: 12,
+    textSize: 18,
   })
 }
 
@@ -77,6 +78,18 @@ describe('the ink store', () => {
     const clamped = useInkStore.getState().eraserSize
     expect(clamped).toBeLessThan(9999)
     expect(localStorage.getItem('null-notes.ink.eraserSize')).toBe(String(clamped))
+  })
+
+  // Independent of the pen's own size, the same way the eraser's is: a text
+  // item created with the default 2px pen active must not inherit that as an
+  // unreadable font size.
+  it('clamps and persists the text size independently of pen size', () => {
+    useInkStore.getState().setTextSize(9999)
+
+    const clamped = useInkStore.getState().textSize
+    expect(clamped).toBeLessThan(9999)
+    expect(localStorage.getItem('null-notes.ink.textSize')).toBe(String(clamped))
+    expect(activePenOf(useInkStore.getState()).size).not.toBe(clamped)
   })
 })
 
