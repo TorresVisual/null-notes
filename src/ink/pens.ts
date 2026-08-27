@@ -1,13 +1,19 @@
 import type { EraserMode, Pen } from './types'
 
-// Two nibs, two colours, two highlighters — enough to take a lecture without
-// opening a picker. The ink colours suit the near-black page; the highlighters
-// are wide and translucent so they read as a wash, not a stripe.
+// Two nibs, two colours, two highlighters, one pencil — enough to take a
+// lecture without opening a picker. The ink colours suit the near-black
+// page; the highlighters are wide and translucent so they read as a wash,
+// not a stripe. The pencil (P13-2) is thin, graphite-grey, and drawn with a
+// low `thinning` — a near-constant width regardless of pressure, the most
+// recognisable "hard vs soft" difference perfect-freehand actually exposes,
+// so a mechanical-pencil feel comes from one existing pen field rather than
+// a second rendering path.
 export const DEFAULT_PENS: [Pen, ...Pen[]] = [
   { id: 'fine', label: 'Fine', color: '#e6edf3', size: 2, opacity: 1 },
   { id: 'broad', label: 'Broad', color: '#e6edf3', size: 5, opacity: 1 },
   { id: 'red', label: 'Red', color: '#ff7b72', size: 2, opacity: 1 },
   { id: 'blue', label: 'Blue', color: '#79c0ff', size: 2, opacity: 1 },
+  { id: 'pencil', label: 'Pencil', color: '#9da7b3', size: 1.5, opacity: 1, thinning: 0.1 },
   { id: 'highlight-yellow', label: 'Yellow highlighter', color: '#e3b341', size: 20, opacity: 0.3 },
   { id: 'highlight-green', label: 'Green highlighter', color: '#7ee787', size: 20, opacity: 0.3 },
 ]
@@ -20,7 +26,8 @@ function isPen(value: unknown): value is Pen {
     typeof pen.label === 'string' &&
     typeof pen.color === 'string' &&
     typeof pen.size === 'number' &&
-    typeof pen.opacity === 'number'
+    typeof pen.opacity === 'number' &&
+    (pen.thinning === undefined || typeof pen.thinning === 'number')
   )
 }
 

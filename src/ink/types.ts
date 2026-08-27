@@ -17,16 +17,27 @@ export interface Stroke {
   color: string
   size: number
   opacity: number
+  /** perfect-freehand's own `thinning` option, captured from the pen that
+   *  drew it (P13-2) — low values (the pencil preset) hold a near-constant
+   *  width regardless of pressure; `undefined` behaves as 0.5, the one
+   *  value every pen/highlighter drew with before this existed. Per-stroke,
+   *  not read from whichever pen is currently active, so a stroke's own
+   *  look never changes retroactively when presets are edited later. */
+  thinning?: number
 }
 
 // A pen is a saved colour/width/opacity. A highlighter is not a separate tool —
-// it is a pen that is wide and translucent, which is the whole difference.
+// it is a pen that is wide and translucent, which is the whole difference. A
+// pencil (P13-2) is the same idea again: `thinning` alone, pushed low, reads
+// as a harder, more uniform-width line without needing a second rendering
+// path — the same "preset, not a new subsystem" shape.
 export interface Pen {
   id: string
   label: string
   color: string
   size: number
   opacity: number
+  thinning?: number
 }
 
 export interface Shape {

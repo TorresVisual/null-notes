@@ -665,7 +665,9 @@ The two remaining "checklist has it, the app doesn't" gaps in the writing surfac
 
 > Two self-contained node types (`FootnoteReference`, `FootnoteDefinition`), own markdown-it rules — no `markdown-it-footnote` dependency, matching how `BlockMath`/`InlineMath` are built. Clicking a reference jumps to its definition and back, reusing `CrossRef.ts`'s scroll/flash mechanics. Typing `[^1]` becomes a real reference via an input rule; the *Footnote* slash command inserts a reference and appends an empty definition, focused and ready to type. **Two real bugs found by writing the round-trip test first:** an empty `<sup data-type="footnote-ref">` lost a node-vs-mark priority tie against `Superscript`'s bare `sup` rule (fixed with explicit `priority: 100`); and `[^1]: text` collided with CommonMark's own link-reference-definition syntax whenever the text was a single bare word, since markdown-it's built-in `reference` rule runs before `paragraph` and silently swallows that shape (fixed by registering before `reference` itself, not just before `paragraph`). Verified with 17 new tests; full 779-test suite green. Not verified live.
 
-- [ ] P13-2 Ink pencil tool — **S**. A second, harder-edged stroke preset — same "preset, not a new tool" pattern the highlighter already uses.
+- [x] P13-2 Ink pencil tool — **S**. A second, harder-edged stroke preset — same "preset, not a new tool" pattern the highlighter already uses.
+
+> One new optional field, `thinning` (perfect-freehand's own pressure-width option), on `Pen`/`Stroke`. The pencil preset (thin, grey, low `thinning`) holds a near-constant width instead of tapering with pressure — the toolbar needed no changes since it's already generic over the pens list. Round-trips through the `.ink` SVG as `data-thinning`, absent (not defaulted) on strokes drawn before this existed. Verified with 6 new tests; full 785-test suite green.
 
 - [ ] P13-3 Ink text tool — **M**. Typed text placed on the ink canvas, distinct from the note's own prose.
 

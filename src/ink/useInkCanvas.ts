@@ -30,7 +30,8 @@ import type { PreviewShape } from './shapePreview'
 import type { InkData, Stroke, Shape, Tool, Point } from './types'
 
 const SHAPE_TOOLS: Tool[] = ['line', 'circle', 'rect', 'arrow']
-const STROKE_OPTIONS = { thinning: 0.5, smoothing: 0.5, streamline: 0.5 }
+const DEFAULT_THINNING = 0.5
+const STROKE_OPTIONS = { smoothing: 0.5, streamline: 0.5 }
 
 // A page grows when you write near its bottom edge and never shrinks on its
 // own — reclaiming space has to be deliberate, or growth could drop strokes.
@@ -121,10 +122,11 @@ function fillStroke(
   color: string,
   size: number,
   opacity: number,
+  thinning: number = DEFAULT_THINNING,
 ): void {
   const outline = getStroke(
     points.map((p) => [p.x, p.y, p.pressure]),
-    { size, ...STROKE_OPTIONS },
+    { size, thinning, ...STROKE_OPTIONS },
   )
   const first = outline[0]
   if (!first) return
@@ -218,7 +220,7 @@ export function useInkCanvas(
   // it, and the toolbar's colour and size controls edit it in place. That is
   // what makes a pen you configured still be there in tomorrow's lecture.
   const activePen = activePenOf({ pens, activePenId })
-  const { color, size, opacity } = activePen
+  const { color, size, opacity, thinning } = activePen
 
   const setColor = useCallback(
     (next: string) => updateActivePen({ color: next }),
@@ -306,13 +308,13 @@ export function useInkCanvas(
       ctx.clearRect(0, 0, inkData.width, inkData.height)
 
       for (const stroke of paintOrder(inkData.strokes)) {
-        fillStroke(ctx, stroke.points, stroke.color, stroke.size, stroke.opacity)
+        fillStroke(ctx, stroke.points, stroke.color, stroke.size, stroke.opacity, stroke.thinning)
       }
       for (const shape of inkData.shapes) {
         drawShapePreview(ctx, shape)
       }
       if (livePoints.length > 1) {
-        fillStroke(ctx, livePoints, color, size, opacity)
+        fillStroke(ctx, livePoints, color, size, opacity, thinning)
       }
       if (liveShape) {
         drawShapePreview(ctx, liveShape)
@@ -584,6 +586,7 @@ export function useInkCanvas(
         color,
         size,
         opacity,
+        thinning,
       }
       currentStroke.current = []
       snapping.current = false

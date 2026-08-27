@@ -87,6 +87,26 @@ describe('inkDataToSvg / svgToInkData roundtrip', () => {
     expect(svgToInkData(legacy).strokes[0]?.opacity).toBe(1)
   })
 
+  // P13-2: thinning is written for every new stroke, but a stroke drawn
+  // before it existed has no `data-thinning` at all — left `undefined`
+  // (not defaulted here) so a later change to the render-time default
+  // doesn't silently rewrite what an old stroke's own value means.
+  it('reads a stroke written before thinning existed as undefined, not defaulted', () => {
+    const legacy = `<svg xmlns="http://www.w3.org/2000/svg" data-width="800" data-height="600">
+      <path data-id="old" data-points="${encodeURIComponent('[]')}" data-color="#000000" data-size="4" data-opacity="1" d="M 0 0" fill="#000000" />
+    </svg>`
+    expect(svgToInkData(legacy).strokes[0]?.thinning).toBeUndefined()
+  })
+
+  it('round-trips a pencil stroke\'s low thinning value', () => {
+    const pencilStroke: Stroke = { ...stroke, id: 'pencil1', thinning: 0.1 }
+    const data: InkData = { width: 800, height: 600, strokes: [pencilStroke], shapes: [] }
+
+    const svg = inkDataToSvg(data)
+    expect(svg).toContain('data-thinning="0.1"')
+    expect(svgToInkData(svg).strokes[0]?.thinning).toBe(0.1)
+  })
+
   it('writes highlighters before ink so they sit underneath', () => {
     const highlighter: Stroke = { ...stroke, id: 'hl', opacity: 0.3 }
     const data: InkData = { width: 800, height: 600, strokes: [stroke, highlighter], shapes: [] }

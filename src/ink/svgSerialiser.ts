@@ -16,16 +16,17 @@ function pointsToSvgPath(points: number[][]): string {
 }
 
 export function strokeToPath(stroke: Stroke): string {
+  const thinning = stroke.thinning ?? 0.5
   const inputPoints = stroke.points.map((p) => [p.x, p.y, p.pressure])
   const outlinePoints = getStroke(inputPoints, {
     size: stroke.size,
-    thinning: 0.5,
+    thinning,
     smoothing: 0.5,
     streamline: 0.5,
   })
   const d = pointsToSvgPath(outlinePoints)
   const raw = JSON.stringify(stroke.points)
-  return `<path data-id="${stroke.id}" data-points="${encodeURIComponent(raw)}" data-color="${stroke.color}" data-size="${stroke.size}" data-opacity="${stroke.opacity}" d="${d}" fill="${stroke.color}" fill-opacity="${stroke.opacity}" />`
+  return `<path data-id="${stroke.id}" data-points="${encodeURIComponent(raw)}" data-color="${stroke.color}" data-size="${stroke.size}" data-opacity="${stroke.opacity}" data-thinning="${thinning}" d="${d}" fill="${stroke.color}" fill-opacity="${stroke.opacity}" />`
 }
 
 export function shapeToElement(shape: Shape): string {
@@ -85,9 +86,15 @@ export function svgToInkData(svg: string): InkData {
     const color = el.getAttribute('data-color') ?? '#000000'
     const size = Number(el.getAttribute('data-size') ?? 4)
     const opacity = Number(el.getAttribute('data-opacity') ?? 1)
+    // Absent, not defaulted to 0.5 here: a stroke drawn before P13-2 has no
+    // `data-thinning` at all, and leaving it `undefined` (rather than
+    // baking in today's default) is what lets that default change later
+    // without silently rewriting every pre-existing stroke's own value.
+    const thinningAttr = el.getAttribute('data-thinning')
+    const thinning = thinningAttr === null ? undefined : Number(thinningAttr)
     const raw = el.getAttribute('data-points') ?? '[]'
     const points = JSON.parse(decodeURIComponent(raw)) as Stroke['points']
-    strokes.push({ id, points, color, size, opacity })
+    strokes.push({ id, points, color, size, opacity, thinning })
   }
 
   const shapes: Shape[] = []

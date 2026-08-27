@@ -1173,11 +1173,13 @@ Added 2026-08-20 from a second review pass (`notes/Roadmap-Update2.md`). The pas
 
 Verified with 17 new tests (`Footnote.test.tsx`, `footnotes.test.ts`) covering the round-trip (plain and idempotent across repeated saves), inline formatting inside a definition, non-numeric labels, multiple co-existing footnotes, jump navigation in both directions (including "jumps to the first reference, not a random one, when a label is used more than once"), and the typed input rule. Full 779-test frontend suite green, typecheck clean. The slash command's own glue code (labeling + insertion) isn't independently unit-tested — no other slash command in this codebase is either; it's covered indirectly through the node-level tests above. **Not verified against a live compiled build** — same posture recorded through P12.
 
-### P13-2 — Ink pencil tool — **S**
+### P13-2 — Ink pencil tool — **S** ✅
 
 - A second stroke preset distinct from the existing single pen — thinner, harder-edged — following the same "a preset, not a new subsystem" pattern the highlighter already uses (`pens.ts`).
 - **Dependency:** none.
 - **DoD:** a pencil preset is selectable alongside the existing pen presets and produces a visually distinct stroke.
+
+*Done:* `Pen`/`Stroke` gain one new optional field, `thinning` — perfect-freehand's own option controlling how much a stroke's width varies with pressure. The pencil preset (thin, graphite-grey, `thinning: 0.1`) holds a near-constant width regardless of pressure, the most recognisable "hard vs soft" lever the rendering library actually exposes — the same "one existing pen field, not a second rendering path" shape the highlighter (wide + translucent) already established, and `InkToolGroup`'s pen list is generic over `pens`, so the new preset needed no toolbar UI change at all. `thinning` threads through both places a stroke is turned into pixels (the live canvas preview in `useInkCanvas.ts` and the persisted `.ink` SVG in `svgSerialiser.ts`) and round-trips through the sidecar as a new `data-thinning` attribute — absent, not defaulted, on a stroke drawn before this existed, so a later change to the render-time default can't silently reinterpret an old stroke's own look. Verified with 6 new tests (pen-shape validation, `parsePens` accepting/rejecting the new field, SVG round-trip including the legacy-stroke case); full 785-test suite green, typecheck clean. Not verified against a live compiled build.
 
 ### P13-3 — Ink text tool — **M**
 

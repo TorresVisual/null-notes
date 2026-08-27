@@ -96,4 +96,33 @@ describe('DEFAULT_PENS', () => {
       expect(highlighter.size).toBeGreaterThan(10)
     }
   })
+
+  // P13-2: the pencil is thin and drawn with a low `thinning` (a near-
+  // constant width regardless of pressure) rather than a second rendering
+  // path — the same "preset, not a new subsystem" pattern the highlighter
+  // above already follows for wide-and-translucent.
+  it('ships a pencil as a thin, low-thinning pen, not a highlighter', () => {
+    const pencil = DEFAULT_PENS.find((p) => p.id === 'pencil')
+    expect(pencil).toBeDefined()
+    expect(pencil!.opacity).toBe(1)
+    expect(pencil!.size).toBeLessThan(5)
+    expect(pencil!.thinning).toBeLessThan(0.5)
+  })
+})
+
+describe('the thinning field', () => {
+  it('is optional on parsePens for pens saved before P13-2 existed', () => {
+    const legacyPen = { id: 'fine', label: 'Fine', color: '#e6edf3', size: 2, opacity: 1 }
+    expect(parsePens(JSON.stringify([legacyPen]))).toEqual([legacyPen])
+  })
+
+  it('is accepted and preserved when present', () => {
+    const withThinning: Pen = { ...pen, id: 'pencil', thinning: 0.1 }
+    expect(parsePens(JSON.stringify([withThinning]))).toEqual([withThinning])
+  })
+
+  it('rejects a non-numeric thinning value', () => {
+    const bad = { ...pen, thinning: 'thin' }
+    expect(parsePens(JSON.stringify([bad]))).toBeNull()
+  })
 })
