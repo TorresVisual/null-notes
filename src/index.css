@@ -1377,6 +1377,83 @@ code {
   color: var(--text-primary);
 }
 .code-run-stdin:focus-visible { outline: none; box-shadow: var(--focus-ring); border-color: var(--accent); }
+
+/* Note-wide find/replace — pinned to the top of the note via `sticky`
+   (not `.code-search-bar`'s `absolute`), since it needs to stay visible
+   while the whole note scrolls, not just float over one block. */
+.note-find-bar {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: var(--bg-raised);
+  border-bottom: 1px solid var(--border);
+  border-radius: 6px 6px 0 0;
+}
+.note-find-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+}
+.note-find-toggle-replace {
+  padding: 2px 6px;
+  background: var(--bg-hover);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-tertiary);
+  font-size: 11px;
+  cursor: pointer;
+  flex: none;
+}
+.note-find-input, .note-find-replace-input {
+  flex: 1;
+  min-width: 0;
+  padding: 3px 6px;
+  background: var(--bg-hover);
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  color: var(--text-primary);
+  font-size: 12px;
+}
+.note-find-input:focus-visible, .note-find-replace-input:focus-visible { outline: none; box-shadow: var(--focus-ring); border-color: var(--accent); }
+.note-find-count {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  min-width: 3.5em;
+  text-align: right;
+  flex: none;
+}
+.note-find-nav, .note-find-close {
+  padding: 2px 6px;
+  background: var(--bg-hover);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-tertiary);
+  font-size: 12px;
+  cursor: pointer;
+  flex: none;
+}
+.note-find-nav:hover, .note-find-close:hover, .note-find-toggle-replace:hover { color: var(--accent); border-color: var(--accent); }
+.note-find-replace-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 8px 6px;
+}
+.note-find-replace-one, .note-find-replace-all {
+  padding: 3px 10px;
+  background: var(--bg-hover);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-tertiary);
+  font-size: 12px;
+  cursor: pointer;
+  flex: none;
+}
+.note-find-replace-one:hover, .note-find-replace-all:hover { color: var(--accent); border-color: var(--accent); }
+
+.note-find-match { background: var(--accent-bg); border-radius: 2px; }
+.note-find-match-active { background: var(--accent); color: var(--accent-contrast); }
 .code-block-copy.copied { color: var(--accent); border-color: var(--accent); }
 .code-block-wrap-toggle.active { color: var(--accent); border-color: var(--accent); background: var(--accent-bg); }
 
@@ -3560,7 +3637,7 @@ code {
   html, body { background: #fff; height: auto; overflow: visible; }
 
   .sidebar, .tab-bar, .editor-toolbar, .editor-status, .backlinks-panel,
-  .outline-panel, .search-overlay, .code-block-open-in-ide, .code-block-actions, .code-run-panel,
+  .outline-panel, .search-overlay, .code-block-open-in-ide, .code-block-actions, .code-run-panel, .note-find-bar,
   [data-slot="dialog-overlay"], [data-slot="dialog-content"] { display: none !important; }
 
   .layout, .main, .editor-body { display: block; height: auto; }

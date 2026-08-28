@@ -93,8 +93,12 @@ describe('in-block search (P11-3)', () => {
   it('Ctrl+F opens the search bar only when the caret is inside a code block', () => {
     const e = mount(`<p>prose</p>${codeBlock('let x = 1;')}`)
 
+    // In prose, this plugin's own handleKeyDown falls through (returns
+    // false) so FindReplace.ts's note-wide bar can claim it instead (P6
+    // polish backlog) — pressCtrlF still reports true overall, just not
+    // from this plugin, which is what searchBar(e) here actually checks.
     caretIn(e, 'prose')
-    expect(pressCtrlF(e)).toBeFalsy()
+    pressCtrlF(e)
     expect(searchBar(e)).toBeNull()
 
     caretIn(e, 'x')

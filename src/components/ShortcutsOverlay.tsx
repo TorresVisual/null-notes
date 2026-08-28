@@ -23,6 +23,7 @@ const SHORTCUT_GROUPS: ShortcutGroup[] = [
     shortcuts: [
       { keys: 'Ctrl O', label: 'Open workspace' },
       { keys: 'Ctrl K', label: 'Search notes' },
+      { keys: 'Ctrl F', label: 'Find (and replace) in this note' },
       { keys: 'Ctrl P', label: 'Jump to a note by title' },
       { keys: 'Ctrl H', label: 'Home' },
       { keys: 'Ctrl W', label: 'Close tab' },
