@@ -194,7 +194,16 @@ export function BlockHandle({ editor }: BlockHandleProps) {
   const showConvert = singleNode !== null && isConvertibleNode(singleNode)
 
   return (
-    <DragHandle editor={editor} onNodeChange={handleNodeChange} nested={false}>
+    <DragHandle
+      editor={editor}
+      onNodeChange={handleNodeChange}
+      nested={false}
+      // The library's own default ("left-start") top-aligns the handle to
+      // the tracked node's bounding box, which only looks centered for a
+      // node exactly as tall as the grip. Plain "left" centers it on the
+      // cross axis against the node's actual height instead.
+      computePositionConfig={{ placement: 'left' }}
+    >
       <button
         ref={gripRef}
         type="button"
