@@ -318,6 +318,23 @@ pub struct AppSettings {
     /// to prose, which is the whole point of the setting existing.
     #[serde(default = "default_code_font_size_px")]
     pub code_font_size_px: u32,
+    /// Interpreter for `python` code blocks (P10-2). Same detect-on-empty
+    /// shape as `editor_command`. Tokenized and run without a shell — see
+    /// `commands::code_run`.
+    #[serde(default)]
+    pub python_command: String,
+    /// Compiler for `cpp`/`c++`/`c` code blocks (P10-2). MSVC's `cl.exe`
+    /// isn't probed for — see `docs/specs/code-execution-design.md`.
+    #[serde(default)]
+    pub cpp_compiler_command: String,
+    /// Wall-clock seconds before a running code block is killed
+    /// automatically — the only resource limit P10-2 applies.
+    #[serde(default = "default_code_run_timeout_secs")]
+    pub code_run_timeout_secs: u32,
+}
+
+fn default_code_run_timeout_secs() -> u32 {
+    10
 }
 
 fn default_spellcheck_language() -> String {
@@ -346,6 +363,9 @@ impl Default for AppSettings {
             code_indent_char: CodeIndentChar::Space,
             code_theme: CodeTheme::MaterialOcean,
             code_font_size_px: default_code_font_size_px(),
+            python_command: String::new(),
+            cpp_compiler_command: String::new(),
+            code_run_timeout_secs: default_code_run_timeout_secs(),
         }
     }
 }

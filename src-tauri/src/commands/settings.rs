@@ -20,6 +20,12 @@ async fn load_settings_from_dir(dir: &Path) -> anyhow::Result<AppSettings> {
     if settings.terminal_shell.trim().is_empty() {
         settings.terminal_shell = super::terminal::detect_terminal_shell();
     }
+    if settings.python_command.trim().is_empty() {
+        settings.python_command = super::code_run::detect_python_command();
+    }
+    if settings.cpp_compiler_command.trim().is_empty() {
+        settings.cpp_compiler_command = super::code_run::detect_cpp_compiler_command();
+    }
     Ok(settings)
 }
 
@@ -74,6 +80,9 @@ mod tests {
             code_indent_char: crate::models::CodeIndentChar::Tab,
             code_theme: crate::models::CodeTheme::OneDark,
             code_font_size_px: 16,
+            python_command: "python3.11".to_string(),
+            cpp_compiler_command: "clang++".to_string(),
+            code_run_timeout_secs: 30,
         };
         save_settings_to_dir(dir.path(), &original).await.unwrap();
         let loaded = load_settings_from_dir(dir.path()).await.unwrap();
@@ -91,6 +100,9 @@ mod tests {
         assert_eq!(loaded.code_indent_char, crate::models::CodeIndentChar::Tab);
         assert_eq!(loaded.code_theme, crate::models::CodeTheme::OneDark);
         assert_eq!(loaded.code_font_size_px, 16);
+        assert_eq!(loaded.python_command, "python3.11");
+        assert_eq!(loaded.cpp_compiler_command, "clang++");
+        assert_eq!(loaded.code_run_timeout_secs, 30);
     }
 
     // Detection fills the editor command only when there is nothing to keep.
@@ -160,6 +172,58 @@ mod tests {
         assert_eq!(loaded.terminal_shell, "wsl -d Ubuntu");
     }
 
+    #[tokio::test]
+    async fn test_an_empty_python_command_is_filled_in_on_load() {
+        let dir = tempdir().unwrap();
+        tokio::fs::write(
+            dir.path().join(SETTINGS_FILE),
+            r#"{"autosaveDebounceMs":600,"editorMaxWidthPx":800}"#,
+        )
+        .await
+        .unwrap();
+
+        let loaded = load_settings_from_dir(dir.path()).await.unwrap();
+
+        assert!(
+            !loaded.python_command.trim().is_empty(),
+            "got {:?}",
+            loaded.python_command
+        );
+    }
+
+    // A command the user typed is never replaced by detection, same
+    // guarantee P7-4 gives editor_command.
+    #[tokio::test]
+    async fn test_a_configured_python_command_survives_detection() {
+        let dir = tempdir().unwrap();
+        let mut settings = AppSettings::default();
+        settings.python_command = "python3.11".to_string();
+        save_settings_to_dir(dir.path(), &settings).await.unwrap();
+
+        let loaded = load_settings_from_dir(dir.path()).await.unwrap();
+
+        assert_eq!(loaded.python_command, "python3.11");
+    }
+
+    #[tokio::test]
+    async fn test_an_empty_cpp_compiler_command_is_filled_in_on_load() {
+        let dir = tempdir().unwrap();
+        tokio::fs::write(
+            dir.path().join(SETTINGS_FILE),
+            r#"{"autosaveDebounceMs":600,"editorMaxWidthPx":800}"#,
+        )
+        .await
+        .unwrap();
+
+        let loaded = load_settings_from_dir(dir.path()).await.unwrap();
+
+        assert!(
+            !loaded.cpp_compiler_command.trim().is_empty(),
+            "got {:?}",
+            loaded.cpp_compiler_command
+        );
+    }
+
     // A settings.json written before spellcheck existed must still load, or
     // the app comes up with an error instead of the user's preferences.
     #[tokio::test]
@@ -191,6 +255,9 @@ mod tests {
         // theme or a font size that doesn't match what was already on screen.
         assert_eq!(loaded.code_theme, crate::models::CodeTheme::MaterialOcean);
         assert_eq!(loaded.code_font_size_px, 13);
+        // Same guarantee for P10-2: an older settings.json loads with the
+        // one timeout every run has always implicitly had, not 0.
+        assert_eq!(loaded.code_run_timeout_secs, 10);
     }
 
     #[tokio::test]
