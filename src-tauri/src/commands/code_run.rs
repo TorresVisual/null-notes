@@ -63,6 +63,25 @@ fn emit_output(app: &AppHandle, run_id: &str, stream: &str, bytes: &[u8]) {
     );
 }
 
+/// Reports a failure that happens before a process exists to `try_wait` on
+/// (writing the source, spawning the compiler, spawning the interpreter) as
+/// an ordinary stderr line plus an exit event — never as a `Result::Err`
+/// from the command itself. The frontend dispatches its `'start'` meta and
+/// shows a "running" panel the moment the click handler fires, before this
+/// command's own promise settles; a rejected promise would leave that panel
+/// stuck with no terminal state to reach; landing here instead. See
+/// docs/plans/code-execution.md Task 11 (the QA pass that found this).
+fn fail(app: &AppHandle, run_id: &str, message: &str) {
+    emit_output(app, run_id, "stderr", message.as_bytes());
+    let _ = app.emit(
+        "code-run-exit",
+        CodeRunExit {
+            run_id: run_id.to_string(),
+            code: None,
+        },
+    );
+}
+
 /// Reads one stream to EOF, emitting each chunk as it arrives. Two of these
 /// run per process (stdout, stderr) — the same "one thread per pipe" shape
 /// as `terminal.rs`'s single reader thread, doubled because a piped child
@@ -155,17 +174,28 @@ pub fn run_code(
     app: AppHandle,
     state: State<'_, RunState>,
 ) -> Result<(), String> {
-    let dir = tempfile::tempdir().map_err(|e| e.to_string())?;
+    let dir = match tempfile::tempdir() {
+        Ok(dir) => dir,
+        Err(e) => {
+            fail(&app, &run_id, &format!("could not create a temp directory: {e}"));
+            return Ok(());
+        }
+    };
     let dir_path = dir.path().to_path_buf();
 
     let (program, args): (String, Vec<String>) = if is_cpp(&language) {
-        std::fs::write(dir_path.join("main.cpp"), &source).map_err(|e| e.to_string())?;
+        if let Err(e) = std::fs::write(dir_path.join("main.cpp"), &source) {
+            fail(&app, &run_id, &format!("could not write the source file: {e}"));
+            return Ok(());
+        }
         let (compiler, compile_args) = cpp_compile_argv(&cpp_compiler_command, "main.cpp");
-        let compile_output = Command::new(&compiler)
-            .args(&compile_args)
-            .current_dir(&dir_path)
-            .output()
-            .map_err(|e| format!("could not run the configured compiler: {e}"))?;
+        let compile_output = match Command::new(&compiler).args(&compile_args).current_dir(&dir_path).output() {
+            Ok(output) => output,
+            Err(e) => {
+                fail(&app, &run_id, &format!("could not run the configured compiler ({compiler}): {e}"));
+                return Ok(());
+            }
+        };
         if !compile_output.status.success() {
             emit_output(&app, &run_id, "stderr", &compile_output.stderr);
             let _ = app.emit(
@@ -182,30 +212,54 @@ pub fn run_code(
             Vec::new(),
         )
     } else if language == "python" {
-        std::fs::write(dir_path.join("main.py"), &source).map_err(|e| e.to_string())?;
+        if let Err(e) = std::fs::write(dir_path.join("main.py"), &source) {
+            fail(&app, &run_id, &format!("could not write the source file: {e}"));
+            return Ok(());
+        }
         python_argv(&python_command, "main.py")
     } else {
-        return Err(format!("unsupported language: {language}"));
+        fail(&app, &run_id, &format!("unsupported language: {language}"));
+        return Ok(());
     };
 
-    let mut child = Command::new(&program)
+    let mut child = match Command::new(&program)
         .args(&args)
         .current_dir(&dir_path)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
-        .map_err(|e| format!("could not start the process: {e}"))?;
+    {
+        Ok(child) => child,
+        Err(e) => {
+            fail(&app, &run_id, &format!("could not start the process ({program}): {e}"));
+            return Ok(());
+        }
+    };
 
     let stdin = child.stdin.take();
-    let stdout = child.stdout.take().ok_or("no stdout handle")?;
-    let stderr = child.stderr.take().ok_or("no stderr handle")?;
+    let Some(stdout) = child.stdout.take() else {
+        fail(&app, &run_id, "no stdout handle");
+        let _ = child.kill();
+        return Ok(());
+    };
+    let Some(stderr) = child.stderr.take() else {
+        fail(&app, &run_id, "no stderr handle");
+        let _ = child.kill();
+        return Ok(());
+    };
 
     spawn_reader(app.clone(), run_id.clone(), "stdout".to_string(), stdout);
     spawn_reader(app.clone(), run_id.clone(), "stderr".to_string(), stderr);
 
     {
-        let mut guard = state.0.lock().map_err(|e| e.to_string())?;
+        let mut guard = match state.0.lock() {
+            Ok(guard) => guard,
+            Err(e) => {
+                fail(&app, &run_id, &format!("internal error: {e}"));
+                return Ok(());
+            }
+        };
         guard.insert(
             run_id.clone(),
             Run {
