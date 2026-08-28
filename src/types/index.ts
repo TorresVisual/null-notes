@@ -106,6 +106,12 @@ export interface AppSettings {
   codeTheme: CodeTheme
   /** Independent of the editor's own prose font size. */
   codeFontSizePx: number
+  /** Interpreter for `python` code blocks. Empty means "detect on next load." */
+  pythonCommand: string
+  /** Compiler for `cpp`/`c++`/`c` code blocks. MSVC's `cl.exe` isn't detected. */
+  cppCompilerCommand: string
+  /** Wall-clock seconds before a running code block is killed automatically. */
+  codeRunTimeoutSecs: number
 }
 
 export interface GraphLink {

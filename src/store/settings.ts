@@ -13,6 +13,9 @@ export const DEFAULT_SETTINGS: AppSettings = {
   codeIndentChar: 'space',
   codeTheme: 'material-ocean',
   codeFontSizePx: 13,
+  pythonCommand: 'python3',
+  cppCompilerCommand: 'g++',
+  codeRunTimeoutSecs: 10,
 }
 
 interface SettingsStore {

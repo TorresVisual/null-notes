@@ -143,4 +143,19 @@ export const api = {
     close: () =>
       invoke<void>('terminal_close'),
   },
+  codeRun: {
+    run: (
+      runId: string,
+      language: string,
+      source: string,
+      pythonCommand: string,
+      cppCompilerCommand: string,
+      timeoutSecs: number,
+    ) =>
+      invoke<void>('run_code', { runId, language, source, pythonCommand, cppCompilerCommand, timeoutSecs }),
+    sendInput: (runId: string, text: string) =>
+      invoke<void>('send_input', { runId, text }),
+    stop: (runId: string) =>
+      invoke<void>('stop_run', { runId }),
+  },
 }

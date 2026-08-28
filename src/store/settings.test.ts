@@ -21,6 +21,9 @@ describe('useSettingsStore', () => {
       codeIndentChar: 'tab',
       codeTheme: 'one-dark',
       codeFontSizePx: 16,
+      pythonCommand: 'python3.11',
+      cppCompilerCommand: 'clang++',
+      codeRunTimeoutSecs: 30,
     })
     expect(useSettingsStore.getState().settings).toEqual({
       autosaveDebounceMs: 1200,
@@ -34,6 +37,9 @@ describe('useSettingsStore', () => {
       codeIndentChar: 'tab',
       codeTheme: 'one-dark',
       codeFontSizePx: 16,
+      pythonCommand: 'python3.11',
+      cppCompilerCommand: 'clang++',
+      codeRunTimeoutSecs: 30,
     })
   })
 })
