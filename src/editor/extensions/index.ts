@@ -17,6 +17,7 @@ import { PdfPageBlock } from './PdfPageBlock'
 import { InlineMath } from './InlineMath'
 import { BlockMath } from './BlockMath'
 import { MermaidBlock } from './MermaidBlock'
+import { DiagramBlock } from './DiagramBlock'
 import { Callout } from './Callout'
 import { FootnoteReference } from './FootnoteReference'
 import { FootnoteDefinition } from './FootnoteDefinition'
@@ -162,6 +163,7 @@ export const coreExtensions = [
   InlineMath,
   BlockMath,
   MermaidBlock,
+  DiagramBlock,
   Callout,
   FootnoteReference,
   FootnoteDefinition,
