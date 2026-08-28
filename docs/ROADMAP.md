@@ -1411,8 +1411,8 @@ Small, low-effort quality-of-life items collected from two review passes — 202
 
 **Navigation**
 
-- Recently closed tabs (reopen).
-- `Ctrl+Tab` tab switching.
+- ~~Recently closed tabs (reopen).~~ ✅ **Done 2026-08-29** — `Ctrl+Shift+W`, `useWorkspaceStore`'s `closedTabs`/`reopenClosedTab`. Ephemeral (not persisted), same posture as `flashTabPath`.
+- ~~`Ctrl+Tab` tab switching.~~ Already done — `Layout.tsx`'s `next-tab`/`prev-tab` and `KEY_COMMANDS` already wire this up; this entry was stale.
 - Jump back / forward through navigation history — wiki-links, code deep links (P7-1), and cross-references (P6-7) all currently jump one-way with no way back except the tab itself.
 - "Go to definition" for a wiki-link or code deep link under the cursor, without clicking through.
 
