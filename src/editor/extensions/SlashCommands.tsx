@@ -10,6 +10,7 @@ import { nextTaskLabel } from '../../lib/taskScaffold'
 import { nextFootnoteLabel } from '../../lib/footnotes'
 import { splitIntoTasks, addNextTask, report } from '../splitIntoTasks'
 import { MERMAID_TEMPLATES } from '../../lib/mermaidTemplates'
+import { insertDiagram } from '../toolbar/insertDiagram'
 import type { InkData } from '../../ink/types'
 
 const INK_WIDTH = 700
@@ -278,6 +279,16 @@ const COMMANDS: Cmd[] = [
           editor.commands.insertContent({ type: 'inkBlock', attrs: { src: svgPath, width: INK_WIDTH, height: INK_HEIGHT } })
         })
       })
+    },
+  },
+  {
+    title: 'Diagram',
+    description: 'Interactive boxes, arrows and connectors',
+    run: ({ editor, range }) => {
+      const notePath = editor.storage.noteContext.notePath
+      if (!notePath) return
+      editor.chain().focus().deleteRange(range).run()
+      void insertDiagram(editor, notePath).catch(report)
     },
   },
   {

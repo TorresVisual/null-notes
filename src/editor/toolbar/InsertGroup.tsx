@@ -1,7 +1,8 @@
 import { useRef, useState } from 'react'
-import { PenLine, Sigma, Omega, Table, Code, Info } from 'lucide-react'
+import { PenLine, Sigma, Omega, Table, Code, Info, Shapes } from 'lucide-react'
 import type { Editor } from '@tiptap/core'
 import { insertInk } from './insertInk'
+import { insertDiagram } from './insertDiagram'
 import { report } from '../splitIntoTasks'
 import { SymbolPalette } from '../extensions/SymbolPalette'
 import { focusLeftMathEditingSurface } from '../../lib/mathEditorFocus'
@@ -44,6 +45,10 @@ export function InsertGroup({ editor, notePath }: InsertGroupProps) {
       <button className="toolbar-button" aria-label="Insert ink canvas" title="Insert ink canvas"
         onClick={() => void insertInk(editor, notePath).catch(report)}>
         <PenLine size={15} />
+      </button>
+      <button className="toolbar-button" aria-label="Insert diagram" title="Insert diagram"
+        onClick={() => void insertDiagram(editor, notePath).catch(report)}>
+        <Shapes size={15} />
       </button>
       <button className="toolbar-button" aria-label="Insert equation" title="Insert equation"
         onClick={() => editor.chain().focus().insertContent({ type: 'blockMath', attrs: { latex: '' } }).run()}>
