@@ -1,6 +1,59 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest'
 import { applyCodeRunMeta, decodeBase64Text } from './CodeBlockRun'
 import type { RunEntry } from './CodeBlockRun'
+
+vi.mock('../../lib/tauri', () => ({
+  api: { codeRun: { run: vi.fn(), sendInput: vi.fn(), stop: vi.fn() } },
+}))
+vi.mock('../../store/codeRunConfirm', () => ({
+  useCodeRunConfirmStore: { getState: () => ({ confirmNote: vi.fn().mockResolvedValue(true) }) },
+}))
+vi.mock('@tauri-apps/api/event', () => ({
+  listen: vi.fn().mockResolvedValue(() => {}),
+}))
+
+const { Editor } = await import('@tiptap/core')
+const { coreExtensions } = await import('./index')
+
+let editor: InstanceType<typeof Editor> | null = null
+
+function mount(content: string) {
+  const element = document.createElement('div')
+  document.body.appendChild(element)
+  editor = new Editor({ element, extensions: coreExtensions, content })
+  return editor
+}
+
+function codeBlock(language: string, text = 'print(1)'): string {
+  return `<pre><code class="language-${language}">${text}</code></pre>`
+}
+
+beforeEach(() => {
+  vi.clearAllMocks()
+})
+
+afterEach(() => {
+  editor?.destroy()
+  editor = null
+  document.body.innerHTML = ''
+})
+
+describe('CodeBlockRun panel visibility', () => {
+  it('shows a Run button on a python code block', () => {
+    mount(codeBlock('python'))
+    expect(editor?.view.dom.querySelector('.code-run-run')).not.toBeNull()
+  })
+
+  it('shows a Run button on a cpp code block', () => {
+    mount(codeBlock('cpp', 'int main(){}'))
+    expect(editor?.view.dom.querySelector('.code-run-run')).not.toBeNull()
+  })
+
+  it('does not show a Run button on an unsupported language', () => {
+    mount(codeBlock('rust', 'fn main() {}'))
+    expect(editor?.view.dom.querySelector('.code-run-run')).toBeNull()
+  })
+})
 
 describe('decodeBase64Text', () => {
   it('round-trips plain ASCII', () => {

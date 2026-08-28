@@ -26,6 +26,7 @@ import { CodeLink } from './CodeLink'
 import { CodeBlockOpenInIde } from './CodeBlockOpenInIde'
 import { CodeBlockToolbar } from './CodeBlockToolbar'
 import { CodeBlockSearch } from './CodeBlockSearch'
+import { CodeBlockRun } from './CodeBlockRun'
 import { CrossRef } from './CrossRef'
 import { Tag } from './Tag'
 import { NoteContext } from './NoteContext'
@@ -173,6 +174,7 @@ export const coreExtensions = [
   CodeBlockOpenInIde,
   CodeBlockToolbar,
   CodeBlockSearch,
+  CodeBlockRun,
   CrossRef,
   NoteContext,
   SlashCommands,
