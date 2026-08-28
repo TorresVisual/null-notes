@@ -232,6 +232,58 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
                 />
               </span>
             </label>
+
+            <label className="settings-row">
+              <span>
+                Python command
+                <small>
+                  Runs a <code>python</code> code block&apos;s Run button. No shell, no sandbox — same trust
+                  level as typing it into the terminal. Detected on first load.
+                </small>
+              </span>
+              <span className="settings-row-control">
+                <input
+                  type="text"
+                  className="settings-text settings-text-wide"
+                  value={settings.pythonCommand}
+                  onChange={(e) => void update({ pythonCommand: e.target.value })}
+                />
+              </span>
+            </label>
+
+            <label className="settings-row">
+              <span>
+                C++ compiler command
+                <small>
+                  Compiles a <code>cpp</code> code block before running it. MSVC (<code>cl.exe</code>) isn&apos;t
+                  detected. Detected on first load.
+                </small>
+              </span>
+              <span className="settings-row-control">
+                <input
+                  type="text"
+                  className="settings-text settings-text-wide"
+                  value={settings.cppCompilerCommand}
+                  onChange={(e) => void update({ cppCompilerCommand: e.target.value })}
+                />
+              </span>
+            </label>
+
+            <label className="settings-row">
+              <span>
+                Run timeout (seconds)
+                <small>A running code block is killed automatically after this many seconds.</small>
+              </span>
+              <span className="settings-row-control">
+                <input
+                  type="number"
+                  min={1}
+                  className="settings-text"
+                  value={settings.codeRunTimeoutSecs}
+                  onChange={(e) => void update({ codeRunTimeoutSecs: Number(e.target.value) || 1 })}
+                />
+              </span>
+            </label>
           </div>
 
           {(workspacePath && repoMode === null) || repoMode ? (
