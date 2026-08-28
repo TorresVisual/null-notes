@@ -58,7 +58,7 @@ Both command fields are tokenized the same whitespace-split way as `editor_comma
 ## Confirmation & lifecycle
 
 - **Per-note, per-session, in-memory only.** A Zustand set of note paths that have been confirmed this session — nothing written to `settings.json`, the note file, or `index.db`. Restarting the app clears it, so every session re-asks the first time a note tries to run something. This deliberately adds no new persisted state, consistent with the "derived-not-authoritative" rule for anything that isn't note content.
-- The confirm dialog is the existing in-app `PromptDialog`-style modal (`window.confirm` is already gone from this codebase per the TODO.md pass that replaced it), not a native dialog.
+- The confirm dialog is `confirm()` from `@tauri-apps/plugin-dialog` — the native-dialog replacement for `window.confirm` this codebase already uses everywhere a yes/no confirmation is needed (`TreeNode.tsx`, `NoteHistoryPanel.tsx`, `SettingsPanel.tsx`). `PromptDialog` is a different component, reserved for free-text input (`window.prompt`'s replacement) — not the right fit here.
 - **Never automatic.** No run is triggered by opening a note, by the watcher picking up an external change, by a Git pull, or by a PDF import — only a direct click on a block's Run button, after which the confirmation gate (if not already passed this session) fires before anything spawns.
 - Closing the output panel (or the note) while a run is active kills it via `stop_run`, the same "actually closing kills the process" rule P8's terminal already follows for the app window closing.
 
@@ -71,8 +71,8 @@ Both command fields are tokenized the same whitespace-split way as `editor_comma
 
 ## Testing
 
-- Rust unit tests, shaped like `editor_launch.rs`'s (no real interpreter/compiler needed): temp-file writing, argv construction (confirming no shell involvement and no note-derived path/argument), timeout-kill logic, stdin-write plumbing against a mock child.
-- A `#[ignore]`d integration test that actually shells out to `python`/`g++` when present locally (manual verification), matching the PDF pipeline's `dump.rs` precedent for "no guaranteed toolchain in CI."
+- Rust unit tests, shaped like `editor_launch.rs`'s (no real interpreter/compiler needed): argv construction (confirming no shell involvement and no note-derived path/argument), toolchain-agnostic pure helpers, timeout-decision logic.
+- The `run_code`/`send_input`/`stop_run` command handlers themselves are **not unit tested** — they need a real OS process and a real Tauri `AppHandle`, the same category `terminal.rs`'s PTY spawn/IO path already is in this codebase (its own design doc: *"isn't realistically unit-testable in this environment... manually QA'd"*). Verified via `cargo build`/`cargo clippy` plus a manual QA checklist, not an `#[ignore]`d integration test.
 - Frontend: Run-button visibility per language, output panel streaming/rendering, confirm-dialog gating (shows once per note per session, not on the second run) — unit tests. The full run-and-see-output loop against a real compiled app is manual/e2e, subject to this project's already-documented WebView cold-start flake.
 
 **DoD:**
