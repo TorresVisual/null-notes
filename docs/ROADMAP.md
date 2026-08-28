@@ -1060,10 +1060,14 @@ Added 2026-08-20 from a second review pass (`notes/Roadmap-Update2.md`). The pas
 - An in-app assistant that reads/edits the active `.md` (summarize, explain, generate practice problems, tidy notes). Design it as an *optional* layer over the file — the note stays plain `.md`, and the app remains fully usable with the feature off.
 - **Gate:** requires M0 (safe writes) and a settled save-state machine so AI edits go through the same conflict-safe path as human edits. **Also gated on P8 proving insufficient** — if the terminal covers the need, this may never need building at all.
 
-### P10-2 — In-editor code execution (Python / C++) — **L**
+### P10-2 — In-editor code execution (Python / C++) — **L** ✅
 
 - Run fenced code blocks and show output inline. Real sandboxing, toolchain detection, and security review required before this is more than a toy.
 - **Gate:** significant security surface; do not start without a dedicated design+security pass.
+
+**Decision (2026-08-29): no real sandbox, friction and visibility instead.** The design+security pass this gate required concluded that containment (Docker or a WASM runtime) either adds a large, fragile dependency this personal Windows app has none of, or can't run real coursework code needing `pip`/library support — while the user already has unsandboxed execution today via P8's terminal. The mitigation is deliberate friction: never auto-run (not on note open, sync, or PDF import — only an explicit click), a native per-note-per-session confirmation, no shell ever, and a fresh temp directory per run. Full reasoning in `docs/specs/code-execution-design.md`; implementation in `docs/plans/code-execution.md`.
+
+Manual QA (Task 11 of the plan) found and fixed a real bug: every setup failure (missing interpreter/compiler, temp-dir/write errors) used `?` to reject the command's promise, which the frontend's fire-and-forget invoke never handled — the panel got stuck showing "running" forever. Every failure now emits a stderr line plus an exit event instead, so the panel always reaches a terminal state. QA also surfaced a permanent e2e-harness gap, not specific to this feature: `@tauri-apps/plugin-dialog`'s `confirm()` is a genuine native OS dialog outside WebView2's own JS-dialog hooks, so this project's WebDriver harness cannot reach or dismiss it (recorded in `.claude/skills/e2e-verify/SKILL.md`). Verified instead with a temporary, uncommitted bypass of the confirm gate against a real Python interpreter (timeout-kill, Stop, and output all correct) and a missing C++ compiler (fails gracefully). MSVC/`cl.exe` and real sandboxing stay out of scope for v1.
 
 ---
 

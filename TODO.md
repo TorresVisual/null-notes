@@ -579,7 +579,7 @@ The only phase not from the brief. Everything before it is *capture*; this is *r
 
 Do not let these influence P0–P9 design.
 
-- [ ] **P10-2 In-editor code execution** (Python / C++) — **L**. Gated on a dedicated design + security pass.
+- [x] **P10-2 In-editor code execution** (Python / C++) — **L**. Gated on a dedicated design + security pass. **Design:** `docs/specs/code-execution-design.md`. **Plan:** `docs/plans/code-execution.md`. No sandbox — friction and visibility instead (never auto-run, per-note-per-session confirm dialog, no shell, fresh temp dir per run, wall-clock timeout). A real bug was found and fixed during manual QA: every setup failure (missing interpreter/compiler, temp-dir/write errors) used to reject the command's promise, which the frontend never handled — the run panel got stuck showing "running" forever with no visible error. Every failure now emits a stderr line plus an exit event instead. **Not fully e2e-verified:** `@tauri-apps/plugin-dialog`'s `confirm()` is a genuine native OS dialog outside WebView2's own JS-dialog hooks, so this project's WebDriver-based e2e harness cannot reach or dismiss it (see `.claude/skills/e2e-verify/SKILL.md`'s Known gotchas) — verified instead with a temporary, uncommitted bypass of the confirm gate: a real Python interpreter (timeout-kill, Stop, and printed output all correct) and a missing C++ compiler (fails gracefully, no crash, no stuck panel). MSVC/`cl.exe` and real sandboxing remain explicitly out of scope for v1.
 
 ---
 

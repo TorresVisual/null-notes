@@ -148,3 +148,15 @@ look at it or describe what's in it.
 - If a run hangs at launch rather than failing fast, check the
   installed Edge version against the downloaded `msedgedriver` first —
   a mismatch tends to fail silently rather than with a clear error.
+- **`@tauri-apps/plugin-dialog`'s `confirm()`/`message()` are not
+  reachable at all** — confirmed while verifying P10-2 (see
+  `docs/plans/code-execution.md` Task 11). Unlike `window.confirm`,
+  these invoke a genuine native OS dialog outside WebView2's own
+  JS-dialog hooks, so `browser.getAlertText()`/`acceptAlert()`
+  (which only intercept the browser engine's *own* dialogs) reliably
+  return "no such alert" — polling never finds it. Any flow gated by
+  one of these (delete confirmations, P10-2's per-note run
+  confirmation, etc.) currently cannot be driven end-to-end by this
+  harness; a spec that reaches one will hang until its own
+  `waitUntil` timeout. There is no known workaround short of adding a
+  test-only bypass to the app itself.
