@@ -20,7 +20,13 @@ interface DiagramBlockAttrs {
 }
 
 function DiagramBlockView({ node }: ReactNodeViewProps) {
-  const { jsonSrc, svgSrc, width, height } = node.attrs as unknown as DiagramBlockAttrs
+  // width/height are stored (see DiagramBlockAttrs below) but intentionally
+  // not applied here — the preview sizes itself to the actual exported SVG's
+  // own dimensions (see .diagram-block-preview svg's max-width/height:auto
+  // in index.css), the same way MermaidBlock's rendered SVG does. A diagram
+  // whose drawn content is much smaller than the block's nominal box used to
+  // force a large empty region below the visible shapes.
+  const { jsonSrc, svgSrc } = node.attrs as unknown as DiagramBlockAttrs
   const [svg, setSvg] = useState('')
   const [editing, setEditing] = useState(false)
 
@@ -55,7 +61,7 @@ function DiagramBlockView({ node }: ReactNodeViewProps) {
   if (!jsonSrc) return <NodeViewWrapper className="diagram-block" />
 
   return (
-    <NodeViewWrapper className="diagram-block" style={{ width, height }}>
+    <NodeViewWrapper className="diagram-block">
       <div className="diagram-block-preview" dangerouslySetInnerHTML={{ __html: svg || '<svg></svg>' }} />
       <button type="button" className="diagram-block-edit" aria-label="Edit diagram" onClick={() => setEditing(true)}>
         Edit

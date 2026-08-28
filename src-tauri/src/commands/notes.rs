@@ -335,7 +335,7 @@ const EXCLUDED_DIRS: [&str; 4] = ["node_modules", "target", "dist", "build"];
 /// pasted images. They travel with the notes (see the storage boundary) but
 /// they are not folders the user made, and listing them in the tree offers a
 /// place to file a note that nothing should ever file a note in.
-const SIDECAR_SUFFIXES: [&str; 3] = [".ink", ".pdf", ".assets"];
+const SIDECAR_SUFFIXES: [&str; 4] = [".ink", ".pdf", ".assets", ".diagrams"];
 
 /// The workspace folder templates live in (P6-3). Excluded from the ordinary
 /// scan for the same reason as the sidecar suffixes above: a template is
@@ -1307,11 +1307,17 @@ mod tests {
         }
     }
 
-    // Sidecars hold a note's own ink, PDF pages and images. Listing them in
-    // the tree offers a folder to file notes into that nothing should.
+    // Sidecars hold a note's own ink, PDF pages, images and diagrams.
+    // Listing them in the tree offers a folder to file notes into that
+    // nothing should.
     #[test]
     fn test_sidecar_dirs_are_not_scanned() {
-        for name in ["Lecture 7.ink", "Lecture 7.pdf", "Lecture 7.assets"] {
+        for name in [
+            "Lecture 7.ink",
+            "Lecture 7.pdf",
+            "Lecture 7.assets",
+            "Lecture 7.diagrams",
+        ] {
             assert!(is_excluded_dir(name), "{name} should be skipped");
         }
     }

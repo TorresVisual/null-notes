@@ -2,10 +2,11 @@ import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Excalidraw, exportToSvg } from '@excalidraw/excalidraw'
 import '@excalidraw/excalidraw/index.css'
-import type { ExcalidrawImperativeAPI, AppState, BinaryFiles } from '@excalidraw/excalidraw/types'
+import type { ExcalidrawImperativeAPI, BinaryFiles } from '@excalidraw/excalidraw/types'
 import type { ExcalidrawElement } from '@excalidraw/excalidraw/element/types'
 import { diagramApi } from '../../lib/diagram'
 import { report } from '../splitIntoTasks'
+import { toPersistedAppState, sanitizePersistedAppState, type PersistedAppState } from './diagramAppState'
 
 interface DiagramEditorOverlayProps {
   jsonSrc: string
@@ -15,13 +16,16 @@ interface DiagramEditorOverlayProps {
 
 interface StoredScene {
   elements?: ExcalidrawElement[]
-  appState?: Partial<AppState>
+  // Not typed as PersistedAppState here on purpose — this is what a file on
+  // disk actually claims to contain, which sanitizePersistedAppState below
+  // does not take on faith (see its own comment for why).
+  appState?: unknown
   files?: BinaryFiles
 }
 
 interface Scene {
   elements: ExcalidrawElement[]
-  appState: Partial<AppState>
+  appState: PersistedAppState
   files: BinaryFiles
 }
 
@@ -36,7 +40,11 @@ export function DiagramEditorOverlay({ jsonSrc, svgSrc, onClose }: DiagramEditor
       .then((json) => {
         if (cancelled) return
         const parsed = JSON.parse(json) as StoredScene
-        setScene({ elements: parsed.elements ?? [], appState: parsed.appState ?? {}, files: parsed.files ?? {} })
+        setScene({
+          elements: parsed.elements ?? [],
+          appState: sanitizePersistedAppState(parsed.appState),
+          files: parsed.files ?? {},
+        })
       })
       .catch(() => {
         if (!cancelled) setScene({ elements: [], appState: {}, files: {} })
@@ -59,9 +67,12 @@ export function DiagramEditorOverlay({ jsonSrc, svgSrc, onClose }: DiagramEditor
       version: 2,
       source: 'null-notes',
       elements,
-      appState,
+      appState: toPersistedAppState(appState),
       files,
     })
+    // exportToSvg gets the live appState (Map-typed collaborators intact)
+    // directly from the API, not the persisted subset above — it never
+    // goes through JSON, so it isn't affected by the same corruption.
     const svgEl = await exportToSvg({ elements, appState, files })
     const svg = svgEl.outerHTML
     try {
