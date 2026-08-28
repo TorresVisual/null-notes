@@ -185,6 +185,7 @@ pub fn run() {
             app.manage(pool);
             app.manage(commands::watcher::WatcherState::default());
             app.manage(commands::terminal::PtyState::default());
+            app.manage(commands::code_run::RunState::default());
             app.manage(commands::workspace::InitialWorkspace(initial_workspace));
 
             // WebView2 claims some of our menu accelerators for its own browser-chrome
@@ -257,6 +258,9 @@ pub fn run() {
             commands::terminal::terminal_write,
             commands::terminal::terminal_resize,
             commands::terminal::terminal_close,
+            commands::code_run::run_code,
+            commands::code_run::send_input,
+            commands::code_run::stop_run,
             commands::notes::rename_folder,
             commands::notes::delete_folder,
             commands::notes::move_note,
