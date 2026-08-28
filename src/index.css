@@ -1331,6 +1331,52 @@ code {
 
 .code-search-match { background: var(--accent-bg); border-radius: 2px; }
 .code-search-match-active { background: var(--accent); color: var(--accent-contrast); }
+
+/* P10-2 code execution — a plain block below the code fence, not an
+   overlay like the search bar, since output is meant to stay visible
+   alongside the code rather than covering it. */
+.code-run-panel {
+  display: block;
+  margin: 4px 0 14px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+.code-run-run, .code-run-stop, .code-run-close {
+  padding: 3px 10px;
+  background: var(--bg-hover);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-tertiary);
+  cursor: pointer;
+}
+.code-run-run:hover, .code-run-stop:hover, .code-run-close:hover { color: var(--accent); border-color: var(--accent); }
+.code-run-stop { color: var(--danger); border-color: var(--danger); }
+.code-run-stop:hover { color: var(--danger); border-color: var(--danger); background: color-mix(in srgb, var(--danger) 15%, transparent); }
+.code-run-output {
+  margin: 6px 0 0;
+  padding: 8px 10px;
+  max-height: 240px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-primary);
+}
+.code-run-stdin-row { margin-top: 6px; }
+.code-run-stdin {
+  width: 100%;
+  box-sizing: border-box;
+  font-family: inherit;
+  font-size: inherit;
+  padding: 4px 8px;
+  background: var(--bg-hover);
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  color: var(--text-primary);
+}
+.code-run-stdin:focus-visible { outline: none; box-shadow: var(--focus-ring); border-color: var(--accent); }
 .code-block-copy.copied { color: var(--accent); border-color: var(--accent); }
 .code-block-wrap-toggle.active { color: var(--accent); border-color: var(--accent); background: var(--accent-bg); }
 
@@ -3514,7 +3560,7 @@ code {
   html, body { background: #fff; height: auto; overflow: visible; }
 
   .sidebar, .tab-bar, .editor-toolbar, .editor-status, .backlinks-panel,
-  .outline-panel, .search-overlay, .code-block-open-in-ide, .code-block-actions,
+  .outline-panel, .search-overlay, .code-block-open-in-ide, .code-block-actions, .code-run-panel,
   [data-slot="dialog-overlay"], [data-slot="dialog-content"] { display: none !important; }
 
   .layout, .main, .editor-body { display: block; height: auto; }
