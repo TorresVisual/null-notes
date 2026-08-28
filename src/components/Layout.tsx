@@ -50,6 +50,7 @@ export function Layout() {
   const setActiveTab = useWorkspaceStore((s) => s.setActiveTab)
   const openTabs = useWorkspaceStore((s) => s.openTabs)
   const closeTab = useWorkspaceStore((s) => s.closeTab)
+  const reopenClosedTab = useWorkspaceStore((s) => s.reopenClosedTab)
   const workspacePath = useWorkspaceStore((s) => s.path)
   const notes = useNotesStore((s) => s.notes)
   const currentNote = notes.find((n) => n.path === activeTab)
@@ -198,6 +199,9 @@ export function Layout() {
         case 'close-tab':
           if (activeTab) closeTab(activeTab)
           break
+        case 'reopen-closed-tab':
+          reopenClosedTab()
+          break
         case 'next-tab':
         case 'prev-tab': {
           if (openTabs.length < 2 || !activeTab) break
@@ -215,6 +219,7 @@ export function Layout() {
       openTabs,
       setActiveTab,
       closeTab,
+      reopenClosedTab,
       createNote,
       createFolder,
       createCanvasNote,
@@ -276,6 +281,7 @@ export function Layout() {
       ',': 'settings',
       h: 'home',
       w: 'close-tab',
+      'shift+w': 'reopen-closed-tab',
       Tab: 'next-tab',
       'shift+Tab': 'prev-tab',
     }

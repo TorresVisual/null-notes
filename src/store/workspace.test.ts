@@ -6,6 +6,7 @@ const reset = () =>
     path: null,
     openTabs: [],
     activeTab: null,
+    closedTabs: [],
     expandedFolders: [],
     selectedFolder: null,
     folderError: null,
@@ -47,6 +48,43 @@ describe('useWorkspaceStore', () => {
     useWorkspaceStore.getState().openTab('/ws/a.md')
     useWorkspaceStore.getState().closeTab('/ws/a.md')
     expect(useWorkspaceStore.getState().activeTab).toBeNull()
+  })
+
+  it('closeTab pushes the closed path onto closedTabs', () => {
+    useWorkspaceStore.getState().openTab('/ws/a.md')
+    useWorkspaceStore.getState().closeTab('/ws/a.md')
+    expect(useWorkspaceStore.getState().closedTabs).toEqual(['/ws/a.md'])
+  })
+
+  it('reopenClosedTab reopens the most recently closed tab and removes it from the stack', () => {
+    useWorkspaceStore.getState().openTab('/ws/a.md')
+    useWorkspaceStore.getState().openTab('/ws/b.md')
+    useWorkspaceStore.getState().closeTab('/ws/a.md')
+    useWorkspaceStore.getState().closeTab('/ws/b.md')
+
+    useWorkspaceStore.getState().reopenClosedTab()
+
+    expect(useWorkspaceStore.getState().openTabs).toContain('/ws/b.md')
+    expect(useWorkspaceStore.getState().activeTab).toBe('/ws/b.md')
+    expect(useWorkspaceStore.getState().closedTabs).toEqual(['/ws/a.md'])
+  })
+
+  it('reopenClosedTab is a no-op when nothing has been closed', () => {
+    useWorkspaceStore.getState().openTab('/ws/a.md')
+    useWorkspaceStore.getState().reopenClosedTab()
+    expect(useWorkspaceStore.getState().openTabs).toEqual(['/ws/a.md'])
+    expect(useWorkspaceStore.getState().activeTab).toBe('/ws/a.md')
+  })
+
+  it('closedTabs is capped at 10 entries, dropping the oldest', () => {
+    for (let i = 0; i < 11; i += 1) {
+      useWorkspaceStore.getState().openTab(`/ws/${i}.md`)
+      useWorkspaceStore.getState().closeTab(`/ws/${i}.md`)
+    }
+    const closed = useWorkspaceStore.getState().closedTabs
+    expect(closed).toHaveLength(10)
+    expect(closed).not.toContain('/ws/0.md')
+    expect(closed[closed.length - 1]).toBe('/ws/10.md')
   })
 
   it('setActiveTab accepts null to clear the active tab without closing any open tab', () => {
@@ -132,6 +170,7 @@ describe('useWorkspaceStore', () => {
 
   it('resetForNewWorkspace clears all per-workspace UI state', () => {
     useWorkspaceStore.getState().openTab('/ws/a.md')
+    useWorkspaceStore.getState().closeTab('/ws/a.md')
     useWorkspaceStore.getState().toggleFolder('/ws/A')
     useWorkspaceStore.getState().setSelectedFolder('/ws/A')
     useWorkspaceStore.getState().setFolderError('some error')
@@ -141,6 +180,7 @@ describe('useWorkspaceStore', () => {
 
     expect(useWorkspaceStore.getState().openTabs).toEqual([])
     expect(useWorkspaceStore.getState().activeTab).toBeNull()
+    expect(useWorkspaceStore.getState().closedTabs).toEqual([])
     expect(useWorkspaceStore.getState().expandedFolders).toEqual([])
     expect(useWorkspaceStore.getState().selectedFolder).toBeNull()
     expect(useWorkspaceStore.getState().folderError).toBeNull()

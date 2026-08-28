@@ -15,15 +15,26 @@ const DEFAULT_GIT_CONFIG: GitWorkspaceConfig = {
   allowCodeRepoPush: false,
 }
 
+// A LIFO stack of just-closed note paths, capped the same way as recent
+// searches — "reopen closed tab" needing to scroll past ten stale entries
+// isn't a real workflow.
+const CLOSED_TABS_CAP = 10
+
 interface WorkspaceStore {
   path: string | null
   openTabs: string[]
   activeTab: string | null
+  // Ephemeral, session-only — not part of WorkspaceState's saved fields
+  // (openTabs/expandedFolders/etc.), the same posture as flashTabPath.
+  // Only closeTab pushes here; closeTabsUnder (a folder deleted/renamed)
+  // does not, since there's nothing to usefully "undo" back into.
+  closedTabs: string[]
   expandedFolders: string[]
   selectedFolder: string | null
   setPath: (path: string) => void
   openTab: (notePath: string) => void
   closeTab: (notePath: string) => void
+  reopenClosedTab: () => void
   setActiveTab: (notePath: string | null) => void
   toggleFolder: (folderPath: string) => void
   expandFolder: (folderPath: string) => void
@@ -79,6 +90,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   path: null,
   openTabs: [],
   activeTab: null,
+  closedTabs: [],
   expandedFolders: [],
   selectedFolder: null,
   folderError: null,
@@ -106,11 +118,20 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   },
 
   closeTab: (notePath) => {
-    const { openTabs, activeTab } = get()
+    const { openTabs, activeTab, closedTabs } = get()
     const next = openTabs.filter((p) => p !== notePath)
     const newActive =
       activeTab === notePath ? (next[next.length - 1] ?? null) : activeTab
-    set({ openTabs: next, activeTab: newActive })
+    const nextClosed = [...closedTabs, notePath].slice(-CLOSED_TABS_CAP)
+    set({ openTabs: next, activeTab: newActive, closedTabs: nextClosed })
+  },
+
+  reopenClosedTab: () => {
+    const { closedTabs } = get()
+    const notePath = closedTabs[closedTabs.length - 1]
+    if (!notePath) return
+    set({ closedTabs: closedTabs.slice(0, -1) })
+    get().openTab(notePath)
   },
 
   setActiveTab: (notePath) => set({ activeTab: notePath }),
@@ -183,6 +204,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
     set({
       openTabs: [],
       activeTab: null,
+      closedTabs: [],
       expandedFolders: [],
       selectedFolder: null,
       folderError: null,
