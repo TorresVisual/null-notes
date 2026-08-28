@@ -3704,6 +3704,22 @@ code {
 
 .block-handle-menu-item:hover { background: var(--bg-hover); }
 .block-handle-menu-item.danger { color: var(--danger); }
+.block-handle-menu-item:disabled { color: var(--text-tertiary); cursor: default; }
+.block-handle-menu-item:disabled:hover { background: transparent; }
+.block-handle-menu-item-indent { padding-left: calc(var(--space-sm) + 13px + var(--space-sm)); }
+
+.block-handle-menu-label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: 6px var(--space-sm) 2px;
+  margin-top: 2px;
+  border-top: 1px solid var(--border);
+  color: var(--text-tertiary);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
 
 .note-editor .ProseMirror-selectednode,
 .note-editor .ProseMirror-selectednoderange {
