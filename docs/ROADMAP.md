@@ -1402,7 +1402,7 @@ Small, low-effort quality-of-life items collected from two review passes — 202
 
 **Editor**
 
-- Find/replace within a note.
+- ~~Find/replace within a note.~~ ✅ **Done 2026-08-29** — `Ctrl+F` outside a code block, `src/editor/extensions/FindReplace.ts`. A sibling of the existing in-block find (`CodeBlockSearch.ts`), not a replacement for it; code blocks keep their own. Equations aren't reachable (LaTeX lives in a node attribute, not ProseMirror text).
 - Focus mode / zen mode — hide chrome, dim everything but the active block.
 - Drag to reorder blocks; duplicate block; move block up/down; convert block type — all "block handle" affordances, natural extensions of the existing `BlockHandle` extension once one of them is actually built.
 
