@@ -28,7 +28,7 @@
 
 - [x] The ctrl e shortcut doesnt work
 
-- [ ] Total links and history should be collapsed by default
+- [ ] links and history at the bottom of notes should be collapsed by default
 
 - [ ] Use the built git feature to sync workspaces to other machines
 
@@ -63,6 +63,10 @@
 - [ ] fix top toolbar
 
 - [ ] reorder open tabs
+
+- [ ] editing larger notes is extremely laggy
+
+- [ ] when we select what do we want to copy?
 
 Feature checklist. **The [roadmap](docs/ROADMAP.md) holds the reasoning and the Definitions of Done; this file holds the boxes.** If the two disagree, the roadmap wins. Gaps found against this checklist (audited 2026-08-26) are tracked as **P11–P15** below.
 
@@ -791,7 +795,7 @@ Do not let this influence P0–P14 design. Bundles the two checklist items needi
 - [x] "Terminal Precision" design system
 
 </details>
----
+\---
 
 ## Not doing
 
