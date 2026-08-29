@@ -28,7 +28,7 @@
 
 - [x] The ctrl e shortcut doesnt work
 
-- [ ] links and history at the bottom of notes should be collapsed by default
+- [x] links and history at the bottom of notes should be collapsed by default
 
 - [ ] Use the built git feature to sync workspaces to other machines
 

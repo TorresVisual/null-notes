@@ -13,7 +13,7 @@ export function BacklinksPanel({ notePath, noteTitle }: BacklinksPanelProps) {
   const workspacePath = useWorkspaceStore((s) => s.path)
   const openTab = useWorkspaceStore((s) => s.openTab)
   const [backlinks, setBacklinks] = useState<BacklinkEntry[]>([])
-  const [collapsed, setCollapsed] = useState(false)
+  const [collapsed, setCollapsed] = useState(true)
 
   useEffect(() => {
     if (!workspacePath) return

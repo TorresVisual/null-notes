@@ -15,7 +15,7 @@ interface NoteHistoryPanelProps {
 export function NoteHistoryPanel({ notePath, saveState, onRestore }: NoteHistoryPanelProps) {
   const workspacePath = useWorkspaceStore((s) => s.path)
   const [entries, setEntries] = useState<NoteHistoryEntry[]>([])
-  const [collapsed, setCollapsed] = useState(false)
+  const [collapsed, setCollapsed] = useState(true)
   const [selected, setSelected] = useState<NoteHistoryEntry | null>(null)
   const [preview, setPreview] = useState<string | null>(null)
   const [listError, setListError] = useState<string | null>(null)

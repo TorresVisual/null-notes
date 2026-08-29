@@ -30,20 +30,37 @@ afterEach(() => {
   vi.clearAllMocks()
 })
 
+async function expand(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(await screen.findByRole('button', { name: /History/ }))
+}
+
 describe('NoteHistoryPanel', () => {
-  it('shows an empty state when the note has no history', async () => {
+  it('starts collapsed', async () => {
+    listNoteHistory.mockResolvedValue([{ sha: 'a', timestampMs: 1000, message: 'notes: update Todo' }])
+
     render(<NoteHistoryPanel notePath="/ws/Todo.md" saveState="clean" onRestore={vi.fn()} />)
+
+    await waitFor(() => expect(listNoteHistory).toHaveBeenCalled())
+    expect(screen.queryByText('notes: update Todo')).not.toBeInTheDocument()
+  })
+
+  it('shows an empty state when the note has no history', async () => {
+    const user = userEvent.setup()
+    render(<NoteHistoryPanel notePath="/ws/Todo.md" saveState="clean" onRestore={vi.fn()} />)
+    await expand(user)
 
     expect(await screen.findByText(/No history yet/)).toBeInTheDocument()
   })
 
   it('lists commits newest first with timestamp and message', async () => {
+    const user = userEvent.setup()
     listNoteHistory.mockResolvedValue([
       { sha: 'b', timestampMs: 2000, message: 'notes: update Todo' },
       { sha: 'a', timestampMs: 1000, message: 'notes: update Todo' },
     ])
 
     render(<NoteHistoryPanel notePath="/ws/Todo.md" saveState="clean" onRestore={vi.fn()} />)
+    await expand(user)
 
     const items = await screen.findAllByText('notes: update Todo')
     expect(items).toHaveLength(2)
@@ -55,6 +72,7 @@ describe('NoteHistoryPanel', () => {
     readNoteAtCommit.mockResolvedValue('# Todo\n\n- old content\n')
 
     render(<NoteHistoryPanel notePath="/ws/Todo.md" saveState="clean" onRestore={vi.fn()} />)
+    await expand(user)
 
     await user.click(await screen.findByText('notes: update Todo'))
 
@@ -69,6 +87,7 @@ describe('NoteHistoryPanel', () => {
     readNoteAtCommit.mockResolvedValue('# Todo\n\n- old content\n')
 
     render(<NoteHistoryPanel notePath="/ws/Todo.md" saveState="clean" onRestore={onRestore} />)
+    await expand(user)
 
     await user.click(await screen.findByText('notes: update Todo'))
     await user.click(await screen.findByRole('button', { name: /Restore this version/ }))
@@ -85,6 +104,7 @@ describe('NoteHistoryPanel', () => {
     readNoteAtCommit.mockResolvedValue('# Todo\n\n- old content\n')
 
     render(<NoteHistoryPanel notePath="/ws/Todo.md" saveState="dirty" onRestore={onRestore} />)
+    await expand(user)
 
     await user.click(await screen.findByText('notes: update Todo'))
     await user.click(await screen.findByRole('button', { name: /Restore this version/ }))
@@ -102,6 +122,7 @@ describe('NoteHistoryPanel', () => {
     readNoteAtCommit.mockResolvedValue('# Todo\n\n- old content\n')
 
     render(<NoteHistoryPanel notePath="/ws/Todo.md" saveState="dirty" onRestore={onRestore} />)
+    await expand(user)
 
     await user.click(await screen.findByText('notes: update Todo'))
     await user.click(await screen.findByRole('button', { name: /Restore this version/ }))
@@ -111,9 +132,11 @@ describe('NoteHistoryPanel', () => {
   })
 
   it("shows an inline error when the history fetch fails, without blocking the rest of the note", async () => {
+    const user = userEvent.setup()
     listNoteHistory.mockRejectedValue(new Error('git log failed'))
 
     render(<NoteHistoryPanel notePath="/ws/Todo.md" saveState="clean" onRestore={vi.fn()} />)
+    await expand(user)
 
     expect(await screen.findByText(/Couldn't load history/)).toBeInTheDocument()
   })
@@ -124,6 +147,7 @@ describe('NoteHistoryPanel', () => {
     const user = userEvent.setup()
 
     render(<NoteHistoryPanel notePath="/ws/Todo.md" saveState="clean" onRestore={vi.fn()} />)
+    await expand(user)
 
     await user.click(await screen.findByText('notes: update Todo'))
 
