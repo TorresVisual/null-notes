@@ -1773,6 +1773,12 @@ code {
 .wiki-link-missing { color: var(--text-tertiary); text-decoration: underline dotted var(--border-strong); }
 .wiki-link-missing:hover { color: var(--text-secondary); background: var(--bg-hover); }
 
+/* "Go to definition" preview — the shadcn/Radix TooltipContent this reuses
+   is tuned for a short single-line label (`inline-flex`, centered items);
+   an unlayered rule here outranks its Tailwind utility classes regardless
+   of source order (see CLAUDE.md's shadcn/Tailwind cascade note). */
+.wiki-link-preview { display: block; white-space: normal; text-align: left; max-width: 280px; }
+
 /* Shared style for every sidebar nav row (Home, Search, Settings, and the
    secondary-feature icon row below it) — named for what it is, not for
    which row happened to use it first. */

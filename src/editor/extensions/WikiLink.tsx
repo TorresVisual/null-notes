@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Node } from '@tiptap/core'
 import { ReactNodeViewRenderer, NodeViewWrapper } from '@tiptap/react'
 import type { ReactNodeViewProps } from '@tiptap/react'
@@ -5,6 +6,9 @@ import { useNotesStore } from '../../store/notes'
 import { useWorkspaceStore } from '../../store/workspace'
 import { useCreateNote } from '../../hooks/useCreateNote'
 import { recordJumpFromHere } from '../../lib/navigationHistory'
+import { excerptForPreview } from '../../lib/notePreview'
+import { api } from '../../lib/tauri'
+import { Tooltip, TooltipContent, TooltipTrigger } from '../../components/ui/tooltip'
 
 interface WikiLinkAttrs {
   title: string
@@ -15,6 +19,10 @@ function WikiLinkView({ node }: ReactNodeViewProps) {
   const notes = useNotesStore((s) => s.notes)
   const openTab = useWorkspaceStore((s) => s.openTab)
   const createNote = useCreateNote()
+  // "Go to definition" without clicking through: a short excerpt of the
+  // target note's own content, fetched lazily on hover rather than for
+  // every link on mount — most links on screen are never hovered.
+  const [preview, setPreview] = useState<string | null>(null)
 
   const target = notes.find((n) => n.title.toLowerCase() === title.toLowerCase())
 
@@ -29,16 +37,45 @@ function WikiLinkView({ node }: ReactNodeViewProps) {
     void createNote(title)
   }
 
-  return (
+  const link = (
     <NodeViewWrapper
       as="span"
       className={`wiki-link${target ? '' : ' wiki-link-missing'}`}
       onClick={handleClick}
-      title={target ? target.path : `Create note "${title}"`}
       spellCheck={false}
     >
       {title}
     </NodeViewWrapper>
+  )
+
+  if (!target) {
+    return (
+      <NodeViewWrapper
+        as="span"
+        className="wiki-link wiki-link-missing"
+        onClick={handleClick}
+        title={`Create note "${title}"`}
+        spellCheck={false}
+      >
+        {title}
+      </NodeViewWrapper>
+    )
+  }
+
+  function handleOpenChange(open: boolean) {
+    // TS doesn't carry the outer `if (!target) return`'s narrowing into a
+    // nested function's body (a closure could in principle run after
+    // control flow no longer guarantees it), so it's re-checked here even
+    // though this branch is unreachable with target undefined at runtime.
+    if (!open || !target || preview !== null) return
+    void api.notes.open(target.path).then((content) => setPreview(excerptForPreview(content)))
+  }
+
+  return (
+    <Tooltip onOpenChange={handleOpenChange}>
+      <TooltipTrigger asChild>{link}</TooltipTrigger>
+      <TooltipContent className="wiki-link-preview">{preview || target.path}</TooltipContent>
+    </Tooltip>
   )
 }
 
