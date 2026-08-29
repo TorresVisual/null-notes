@@ -235,6 +235,7 @@ pub fn run() {
             commands::notes::grade_card,
             commands::notes::list_due_cards,
             commands::notes::backlinks_for,
+            commands::notes::backlinks_for_with_context,
             commands::notes::graph_links,
             commands::notes::graph_tags,
             commands::notes::create_folder,

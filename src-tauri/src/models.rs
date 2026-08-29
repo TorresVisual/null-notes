@@ -10,6 +10,20 @@ pub struct NoteMetadata {
     pub updated_at: i64,
 }
 
+/// A backlink plus the line it was found on, for the backlinks panel's
+/// context snippet — `db::notes::backlinks_for` alone only gives the linking
+/// note's own metadata, not where in it the link sits. `snippet` is `None`
+/// rather than an error when the file can't be read (deleted since the last
+/// scan, a permissions hiccup) — the panel still shows the note, just
+/// without a preview line, the same "prefer a miss" posture as every other
+/// resolver in this codebase.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BacklinkEntry {
+    pub note: NoteMetadata,
+    pub snippet: Option<String>,
+}
+
 /// A `.md` file under a workspace's `templates/` folder (P6-3). `name` is the
 /// filename stem, not derived from the file's own heading — a template's
 /// first line is typically a placeholder like `{{course}}`, not a title.

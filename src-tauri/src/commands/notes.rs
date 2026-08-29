@@ -1,7 +1,7 @@
 use crate::db::{self, DbPool};
 use crate::models::{
-    CardKind, DueCard, ExtractedCard, ExtractedFormula, ExtractedTask, GraphLink, GraphTag,
-    NoteMetadata, OpenTask, SearchResult, WorkspaceTree,
+    BacklinkEntry, CardKind, DueCard, ExtractedCard, ExtractedFormula, ExtractedTask, GraphLink,
+    GraphTag, NoteMetadata, OpenTask, SearchResult, WorkspaceTree,
 };
 use crate::sm2;
 use regex::Regex;
@@ -102,6 +102,29 @@ pub fn extract_links(content: &str) -> Vec<String> {
         }
     }
     links
+}
+
+/// Longest a backlink snippet is shown at before truncating with `…` — long
+/// enough to read as a sentence fragment, short enough that one backlink
+/// entry never dominates the panel.
+const BACKLINK_SNIPPET_MAX_CHARS: usize = 160;
+
+/// The first line in `content` that links to `title` (case-insensitive,
+/// matching how `backlinks_for`'s own SQL comparison works), trimmed and
+/// truncated — or `None` if no such line exists. A line-based, not
+/// character-offset-based, snippet: the whole surrounding sentence reads
+/// more usefully than a fixed window of characters centered on the link.
+pub fn extract_backlink_snippet(content: &str, title: &str) -> Option<String> {
+    let pattern = format!(r"(?i)\[\[\s*{}\s*\]\]", regex::escape(title));
+    let re = Regex::new(&pattern).ok()?;
+    let line = content.lines().find(|line| re.is_match(line))?;
+    let trimmed = line.trim();
+    if trimmed.chars().count() > BACKLINK_SNIPPET_MAX_CHARS {
+        let truncated: String = trimmed.chars().take(BACKLINK_SNIPPET_MAX_CHARS).collect();
+        Some(format!("{truncated}…"))
+    } else {
+        Some(trimmed.to_string())
+    }
 }
 
 // Line-based rather than `strip_code`-then-regex like `extract_tags`: removing
@@ -913,6 +936,40 @@ pub async fn backlinks_for(
     db: State<'_, DbPool>,
 ) -> Result<Vec<NoteMetadata>, String> {
     db::notes::backlinks_for(&db, &workspace, &title)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// `db::notes::backlinks_for` alone only has each linking note's metadata,
+/// not where in it the link sits, so this reads each note's own file to
+/// find that line. A file that fails to read (deleted since the last scan)
+/// still contributes its note with `snippet: None`, rather than dropping
+/// the whole entry or failing the request — the same "prefer a miss" call
+/// as everywhere else that resolves note-derived content against disk.
+async fn backlinks_with_context(
+    pool: &DbPool,
+    workspace: &str,
+    title: &str,
+) -> anyhow::Result<Vec<BacklinkEntry>> {
+    let notes = db::notes::backlinks_for(pool, workspace, title).await?;
+    let mut entries = Vec::with_capacity(notes.len());
+    for note in notes {
+        let snippet = tokio::fs::read_to_string(&note.path)
+            .await
+            .ok()
+            .and_then(|content| extract_backlink_snippet(&content, title));
+        entries.push(BacklinkEntry { note, snippet });
+    }
+    Ok(entries)
+}
+
+#[tauri::command]
+pub async fn backlinks_for_with_context(
+    workspace: String,
+    title: String,
+    db: State<'_, DbPool>,
+) -> Result<Vec<BacklinkEntry>, String> {
+    backlinks_with_context(&db, &workspace, &title)
         .await
         .map_err(|e| e.to_string())
 }
@@ -1869,6 +1926,92 @@ mod save_tests {
             .await
             .unwrap();
         assert_eq!(backlinks.len(), 1);
+    }
+
+    #[test]
+    fn test_extract_backlink_snippet_finds_the_linking_line() {
+        let content = "# Dijkstra\nShortest paths with [[Big O Notation]] bounds.\nMore text.";
+        assert_eq!(
+            extract_backlink_snippet(content, "Big O Notation"),
+            Some("Shortest paths with [[Big O Notation]] bounds.".to_string())
+        );
+    }
+
+    #[test]
+    fn test_extract_backlink_snippet_matches_case_insensitively() {
+        let content = "See [[big o notation]] here.";
+        assert_eq!(
+            extract_backlink_snippet(content, "Big O Notation"),
+            Some("See [[big o notation]] here.".to_string())
+        );
+    }
+
+    #[test]
+    fn test_extract_backlink_snippet_is_none_when_the_link_is_absent() {
+        let content = "No link here at all.";
+        assert_eq!(extract_backlink_snippet(content, "Big O Notation"), None);
+    }
+
+    #[test]
+    fn test_extract_backlink_snippet_truncates_a_long_line() {
+        let padding = "x".repeat(200);
+        let content = format!("{padding} [[Big O Notation]] {padding}");
+        let snippet = extract_backlink_snippet(&content, "Big O Notation").unwrap();
+        assert!(snippet.chars().count() <= 161, "got {} chars", snippet.chars().count());
+        assert!(snippet.ends_with('…'));
+    }
+
+    #[tokio::test]
+    async fn test_backlinks_with_context_reads_the_snippet_from_disk() {
+        let pool = DbPool::connect("sqlite::memory:").await.unwrap();
+        run_migrations(&pool).await.unwrap();
+        let tmp = tempdir().unwrap();
+        let ws = tmp.path().to_string_lossy().into_owned();
+        let note_path = tmp.path().join("dijkstra.md");
+        let content = "# Dijkstra\nShortest paths with [[Big O Notation]] bounds.";
+        std::fs::write(&note_path, content).unwrap();
+
+        index_note_at(&note_path.to_string_lossy(), &ws, content, &pool)
+            .await
+            .unwrap();
+
+        let entries = backlinks_with_context(&pool, &ws, "Big O Notation")
+            .await
+            .unwrap();
+
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].note.title, "Dijkstra");
+        assert_eq!(
+            entries[0].snippet.as_deref(),
+            Some("Shortest paths with [[Big O Notation]] bounds.")
+        );
+    }
+
+    #[tokio::test]
+    async fn test_backlinks_with_context_snippet_is_none_when_the_file_is_gone() {
+        let pool = DbPool::connect("sqlite::memory:").await.unwrap();
+        run_migrations(&pool).await.unwrap();
+        let tmp = tempdir().unwrap();
+        let ws = tmp.path().to_string_lossy().into_owned();
+        let missing_path = tmp.path().join("gone.md");
+        std::fs::write(&missing_path, "Links to [[Big O Notation]].").unwrap();
+
+        index_note_at(
+            &missing_path.to_string_lossy(),
+            &ws,
+            "Links to [[Big O Notation]].",
+            &pool,
+        )
+        .await
+        .unwrap();
+        std::fs::remove_file(&missing_path).unwrap();
+
+        let entries = backlinks_with_context(&pool, &ws, "Big O Notation")
+            .await
+            .unwrap();
+
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].snippet, None);
     }
 
     #[tokio::test]
