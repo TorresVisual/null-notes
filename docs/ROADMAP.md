@@ -1414,7 +1414,7 @@ Small, low-effort quality-of-life items collected from two review passes — 202
 - ~~Recently closed tabs (reopen).~~ ✅ **Done 2026-08-29** — `Ctrl+Shift+W`, `useWorkspaceStore`'s `closedTabs`/`reopenClosedTab`. Ephemeral (not persisted), same posture as `flashTabPath`.
 - ~~`Ctrl+Tab` tab switching.~~ Already done — `Layout.tsx`'s `next-tab`/`prev-tab` and `KEY_COMMANDS` already wire this up; this entry was stale.
 - ~~Jump back / forward through navigation history — wiki-links, code deep links (P7-1), and cross-references (P6-7) all currently jump one-way with no way back except the tab itself.~~ ✅ **Done 2026-08-29**, scoped to wiki-links and cross-references — `Alt+Left`/`Alt+Right`, `src/lib/navigationHistory.ts`. Code deep links stay out of scope: they hand off to an external editor, so there's nothing in-app to jump back from. Manual tab switching doesn't push history either — it's already its own deliberate navigation, not something to "undo."
-- "Go to definition" for a wiki-link or code deep link under the cursor, without clicking through.
+- ~~"Go to definition" for a wiki-link or code deep link under the cursor, without clicking through.~~ ✅ **Done 2026-08-29**, scoped to wiki-links — hovering shows a preview excerpt via the existing shadcn/Radix `Tooltip`. Cross-references and code deep links stay click-through: both are decoration-based (not a React component like `WikiLinkView`), so previewing them would mean a second UI mechanism built from scratch rather than reusing this one.
 
 **Backlinks**
 
