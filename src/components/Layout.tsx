@@ -42,6 +42,7 @@ import { useGitConfig } from '../hooks/useGitConfig'
 import { useGitAutoCommit } from '../hooks/useGitAutoCommit'
 import { promptText } from '../store/promptDialog'
 import { api } from '../lib/tauri'
+import { goBack, goForward } from '../lib/navigationHistory'
 
 type ViewMode = 'wysiwyg' | 'raw'
 
@@ -257,6 +258,26 @@ export function Layout() {
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [openOverlay])
+
+  // Alt+Left/Right for link-driven navigation history (wiki-links,
+  // cross-references — see lib/navigationHistory.ts). No native editing
+  // meaning to collide with, so no editable-target guard is needed, unlike
+  // the `?` listener above. The main Ctrl/Meta shortcut map above explicitly
+  // excludes Alt combos, so this can't collide with it either.
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (!e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return
+      if (e.key === 'ArrowLeft') {
+        e.preventDefault()
+        goBack()
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault()
+        goForward()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
 
   // Every CmdOrCtrl accelerator shown in `build_menu` (src-tauri/src/lib.rs)
   // needs this to actually fire on Windows — see the comment on `runCommand`.

@@ -24,6 +24,8 @@ const SHORTCUT_GROUPS: ShortcutGroup[] = [
       { keys: 'Ctrl O', label: 'Open workspace' },
       { keys: 'Ctrl K', label: 'Search notes' },
       { keys: 'Ctrl F', label: 'Find (and replace) in this note' },
+      { keys: 'Alt ←', label: 'Back (undo a wiki-link / cross-reference jump)' },
+      { keys: 'Alt →', label: 'Forward' },
       { keys: 'Ctrl P', label: 'Jump to a note by title' },
       { keys: 'Ctrl H', label: 'Home' },
       { keys: 'Ctrl W', label: 'Close tab' },

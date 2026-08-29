@@ -4,6 +4,7 @@ import { api } from '../lib/tauri'
 import { useWorkspaceStore } from '../store/workspace'
 import { useNotesStore } from '../store/notes'
 import { useGitAutoPull } from './useGitAutoPull'
+import { clearNavigationHistory } from '../lib/navigationHistory'
 
 export async function refreshTree(): Promise<void> {
   const path = useWorkspaceStore.getState().path
@@ -57,6 +58,7 @@ export function useWorkspace() {
 
       await saveSession()
       resetForNewWorkspace()
+      clearNavigationHistory()
 
       setPath(selected)
       await api.workspace.watch(selected)

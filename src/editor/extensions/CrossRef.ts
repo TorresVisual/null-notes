@@ -5,6 +5,7 @@ import type { EditorState } from '@tiptap/pm/state'
 import { findCrossRefs, type CrossRef as CrossRefMatch } from '../../lib/crossRefs'
 import { useWorkspaceStore } from '../../store/workspace'
 import { api } from '../../lib/tauri'
+import { recordJumpFromHere } from '../../lib/navigationHistory'
 
 /**
  * P6-7: makes `Theorem 3.2` in note text clickable, jumping to whichever
@@ -153,6 +154,7 @@ export const CrossRef = Extension.create({
             const number = el.getAttribute('data-number')
             if (!path || !calloutType || !number) return
 
+            recordJumpFromHere()
             useWorkspaceStore.getState().openTab(path)
             scrollToBlock(calloutType, number)
           }
