@@ -43,6 +43,7 @@ import { useGitAutoCommit } from '../hooks/useGitAutoCommit'
 import { promptText } from '../store/promptDialog'
 import { api } from '../lib/tauri'
 import { goBack, goForward } from '../lib/navigationHistory'
+import { useFocusModeStore } from '../store/focusMode'
 
 type ViewMode = 'wysiwyg' | 'raw'
 
@@ -52,6 +53,8 @@ export function Layout() {
   const openTabs = useWorkspaceStore((s) => s.openTabs)
   const closeTab = useWorkspaceStore((s) => s.closeTab)
   const reopenClosedTab = useWorkspaceStore((s) => s.reopenClosedTab)
+  const focusMode = useFocusModeStore((s) => s.enabled)
+  const toggleFocusMode = useFocusModeStore((s) => s.toggle)
   const workspacePath = useWorkspaceStore((s) => s.path)
   const notes = useNotesStore((s) => s.notes)
   const currentNote = notes.find((n) => n.path === activeTab)
@@ -203,6 +206,9 @@ export function Layout() {
         case 'reopen-closed-tab':
           reopenClosedTab()
           break
+        case 'toggle-focus-mode':
+          toggleFocusMode()
+          break
         case 'next-tab':
         case 'prev-tab': {
           if (openTabs.length < 2 || !activeTab) break
@@ -221,6 +227,7 @@ export function Layout() {
       setActiveTab,
       closeTab,
       reopenClosedTab,
+      toggleFocusMode,
       createNote,
       createFolder,
       createCanvasNote,
@@ -303,6 +310,7 @@ export function Layout() {
       h: 'home',
       w: 'close-tab',
       'shift+w': 'reopen-closed-tab',
+      'shift+f': 'toggle-focus-mode',
       Tab: 'next-tab',
       'shift+Tab': 'prev-tab',
     }
@@ -348,19 +356,21 @@ export function Layout() {
       {activeOverlay === 'task' && <TaskView onClose={closeOverlay} />}
       {activeOverlay === 'review' && <ReviewSession onClose={closeOverlay} />}
       {activeOverlay === 'formulaSheet' && <FormulaSheetPrompt onClose={closeOverlay} />}
-      <Sidebar
-        onSearchOpen={() => openOverlay('search')}
-        onSettingsOpen={() => openOverlay('settings')}
-        onTemplateOpen={() => openOverlay('template')}
-        onGraphOpen={() => openOverlay('graph')}
-        onTaskOpen={() => openOverlay('task')}
-        onReviewOpen={() => openOverlay('review')}
-        onFormulaSheetOpen={() => openOverlay('formulaSheet')}
-        onTerminalToggle={() => {
-          setTerminalMounted(true)
-          setTerminalOpen((o) => !o)
-        }}
-      />
+      {!focusMode && (
+        <Sidebar
+          onSearchOpen={() => openOverlay('search')}
+          onSettingsOpen={() => openOverlay('settings')}
+          onTemplateOpen={() => openOverlay('template')}
+          onGraphOpen={() => openOverlay('graph')}
+          onTaskOpen={() => openOverlay('task')}
+          onReviewOpen={() => openOverlay('review')}
+          onFormulaSheetOpen={() => openOverlay('formulaSheet')}
+          onTerminalToggle={() => {
+            setTerminalMounted(true)
+            setTerminalOpen((o) => !o)
+          }}
+        />
+      )}
       <div className="main">
         <TabBar
           viewMode={viewMode}

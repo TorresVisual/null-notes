@@ -28,6 +28,7 @@ import { CodeBlockToolbar } from './CodeBlockToolbar'
 import { CodeBlockSearch } from './CodeBlockSearch'
 import { CodeBlockRun } from './CodeBlockRun'
 import { FindReplace } from './FindReplace'
+import { FocusMode } from './FocusMode'
 import { CrossRef } from './CrossRef'
 import { Tag } from './Tag'
 import { NoteContext } from './NoteContext'
@@ -177,6 +178,7 @@ export const coreExtensions = [
   CodeBlockSearch,
   CodeBlockRun,
   FindReplace,
+  FocusMode,
   CrossRef,
   NoteContext,
   SlashCommands,

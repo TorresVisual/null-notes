@@ -1454,6 +1454,9 @@ code {
 
 .note-find-match { background: var(--accent-bg); border-radius: 2px; }
 .note-find-match-active { background: var(--accent); color: var(--accent-contrast); }
+
+/* Focus mode (Ctrl+Shift+F) — every top-level block but the active one. */
+.focus-mode-dim { opacity: 0.35; transition: opacity 0.15s ease; }
 .code-block-copy.copied { color: var(--accent); border-color: var(--accent); }
 .code-block-wrap-toggle.active { color: var(--accent); border-color: var(--accent); background: var(--accent-bg); }
 
