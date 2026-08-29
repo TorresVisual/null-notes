@@ -2325,13 +2325,22 @@ code {
   text-align: left;
   background: none;
   border: none;
-  color: var(--accent);
   cursor: pointer;
-  padding: 3px 0;
-  font-size: 13px;
+  padding: 4px 0;
 }
 
-.backlink-item:hover { text-decoration: underline; }
+.backlink-title { display: block; color: var(--accent); font-size: 13px; }
+.backlink-item:hover .backlink-title { text-decoration: underline; }
+
+.backlink-snippet {
+  display: block;
+  color: var(--text-tertiary);
+  font-size: 12px;
+  margin-top: 1px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 
 .note-history-panel {
   margin-top: var(--space-md);

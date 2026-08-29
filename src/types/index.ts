@@ -11,6 +11,11 @@ export interface WorkspaceTree {
   folders: string[]
 }
 
+export interface BacklinkEntry {
+  note: NoteMetadata
+  snippet: string | null
+}
+
 export interface SearchResult {
   path: string
   title: string

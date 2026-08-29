@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { ChevronRight, ChevronDown } from 'lucide-react'
 import { useWorkspaceStore } from '../store/workspace'
 import { api } from '../lib/tauri'
-import type { NoteMetadata } from '../types'
+import type { BacklinkEntry } from '../types'
 
 interface BacklinksPanelProps {
   notePath: string
@@ -12,12 +12,12 @@ interface BacklinksPanelProps {
 export function BacklinksPanel({ notePath, noteTitle }: BacklinksPanelProps) {
   const workspacePath = useWorkspaceStore((s) => s.path)
   const openTab = useWorkspaceStore((s) => s.openTab)
-  const [backlinks, setBacklinks] = useState<NoteMetadata[]>([])
+  const [backlinks, setBacklinks] = useState<BacklinkEntry[]>([])
   const [collapsed, setCollapsed] = useState(false)
 
   useEffect(() => {
     if (!workspacePath) return
-    api.notes.backlinksFor(workspacePath, noteTitle).then(setBacklinks)
+    api.notes.backlinksForWithContext(workspacePath, noteTitle).then(setBacklinks)
     // notePath is included so switching between two notes that happen to
     // share a title still triggers a fresh fetch.
   }, [workspacePath, notePath, noteTitle])
@@ -37,10 +37,11 @@ export function BacklinksPanel({ notePath, noteTitle }: BacklinksPanelProps) {
           </p>
         ) : (
           <ul className="backlinks-list">
-            {backlinks.map((note) => (
+            {backlinks.map(({ note, snippet }) => (
               <li key={note.path}>
                 <button className="backlink-item" onClick={() => openTab(note.path)}>
-                  {note.title}
+                  <span className="backlink-title">{note.title}</span>
+                  {snippet && <span className="backlink-snippet">{snippet}</span>}
                 </button>
               </li>
             ))}

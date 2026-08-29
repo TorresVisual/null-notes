@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core'
-import type { NoteMetadata, WorkspaceState, WorkspaceTree, SearchResult, AppSettings, GraphLink, GraphTag, RepoMode, CommitOutcome, PushOutcome, PullOutcome, RepoInitOutcome, TemplateMetadata, CrossRefTarget, OpenTask, DueCard, Grade, NoteHistoryEntry } from '../types'
+import type { NoteMetadata, WorkspaceState, WorkspaceTree, SearchResult, AppSettings, GraphLink, GraphTag, RepoMode, CommitOutcome, PushOutcome, PullOutcome, RepoInitOutcome, TemplateMetadata, CrossRefTarget, OpenTask, DueCard, Grade, NoteHistoryEntry, BacklinkEntry } from '../types'
 import type { PdfPage, PdfMarkdownImport } from '../pdf/types'
 
 export const api = {
@@ -35,6 +35,8 @@ export const api = {
       invoke<NoteMetadata[]>('notes_with_tag', { workspace, tag }),
     backlinksFor: (workspace: string, title: string) =>
       invoke<NoteMetadata[]>('backlinks_for', { workspace, title }),
+    backlinksForWithContext: (workspace: string, title: string) =>
+      invoke<BacklinkEntry[]>('backlinks_for_with_context', { workspace, title }),
     createFolder: (parent: string, name: string) =>
       invoke<string>('create_folder', { parent, name }),
     splitIntoTasks: (markdown: string) =>

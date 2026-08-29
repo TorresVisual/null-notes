@@ -38,6 +38,7 @@ vi.mock('../lib/tauri', () => ({
       listOpenTasks: vi.fn().mockResolvedValue([]),
       listDueCards: vi.fn().mockResolvedValue([]),
       backlinksFor: vi.fn().mockResolvedValue([]),
+      backlinksForWithContext: vi.fn().mockResolvedValue([]),
     },
     git: {
       listNoteHistory: vi.fn().mockResolvedValue([]),
