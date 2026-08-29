@@ -1418,7 +1418,7 @@ Small, low-effort quality-of-life items collected from two review passes — 202
 
 **Backlinks**
 
-- Context snippets in the backlinks panel — the surrounding line or block, not just the linking note's title.
+- ~~Context snippets in the backlinks panel — the surrounding line or block, not just the linking note's title.~~ ✅ **Done 2026-08-29** — `backlinks_for_with_context` reads each linking note's own file and extracts the line containing the `[[Title]]` link (case-insensitive, truncated at 160 chars). `snippet: null` (title shown alone) when the file can't be read, rather than dropping the entry or failing the request.
 
 **Moved to Phase 9.5 (2026-08-20):** empty states (P9.5-5), save-failure and other error copy (P9.5-6), and the consistency audit (P9.5-3) were briefly listed here, then scheduled as real tasks once the maintainer chose to build the whole productization/polish pass rather than leave it unphased. See Phase 9.5.
 
