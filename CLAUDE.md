@@ -62,8 +62,8 @@ Use `tokio` for all async. Long-running operations (OCR, PDF render) run in `tok
 - Avoid unnecessary `.clone()` — pass references where possible
 - Derive `Debug` on all structs
 - Keep Tauri commands thin: parse input, delegate to a domain module, return result
-- No clippy warnings — `.github/workflows/ci.yml` enforces this on push (`cargo clippy -- -D warnings`). Not required to run locally before every commit, but do it for fast feedback when you want it
-- Formatting is auto-fixed, not just checked — CI runs `cargo fmt` on push and pushes a `style: cargo fmt` commit back if anything changed. Never hand-fix formatting churn; let CI do it
+- No clippy warnings — `.github/workflows/ci.yml` checks this (`cargo clippy -- -D warnings`), but only on `pull_request` or manual `workflow_dispatch`, not on push. This repo commits straight to `main`, so a bad push isn't caught automatically — run `cargo clippy -- -D warnings` locally before pushing
+- Formatting is checked, not auto-fixed, on that same trigger (`cargo fmt --check`). The auto-fix-and-commit step lives in the separate `format.yml` workflow, which is manual-dispatch only — it does not run on push. Run `cargo fmt` locally before pushing rather than relying on CI to catch or fix it
 
 ---
 
@@ -223,6 +223,8 @@ Spellcheck is one editor-wide setting on the ProseMirror root; non-prose nodes (
 
 Key handling that must run *before* the keymap plugins (and so before StarterKit's `ListKeymap`) lives in `NoteEditor`'s `editorProps`, not in an extension — ProseMirror checks direct props first. Any test of key behaviour has to mount with those same `editorProps`, or it exercises an editor the app never builds.
 
+A node backed by `ReactNodeViewRenderer` (wiki-links, and anything else that needs real React inside the editor, e.g. hover previews) only renders its React content when the test mounts through `useEditor`/`EditorContent` — a bare `new Editor()` only shows the static `renderHTML` fallback.
+
 `@tiptap/core` and `@tiptap/pm` are pinned via `overrides` in `package.json`. Without them `starter-kit` pulls a second copy of core and every `Editor`/`Node` type becomes nominally distinct — typecheck fails with unreadable errors far from the cause.
 
 ---
@@ -263,3 +265,15 @@ npm run tauri build          # package installer
 # End-to-end (drives the real compiled app — see .claude/skills/e2e-verify/)
 npm run test:e2e             # rebuilds via `tauri build --debug`, then runs e2e/specs/
 ```
+
+---
+
+## Agent skills
+
+### Issue tracker
+
+Issues are tracked manually as checkbox items in `TODO.md` at the repo root — no GitHub Issues, no per-ticket files. See `docs/agents/issue-tracker.md`.
+
+### Domain docs
+
+Single-context layout — `CONTEXT.md` and `docs/adr/` at the repo root, created lazily when needed. See `docs/agents/domain.md`.
