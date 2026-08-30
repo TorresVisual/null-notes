@@ -3,7 +3,7 @@
 //! module implements: friction and visibility (never auto-run, per-note
 //! confirmation) instead of containment.
 
-use super::editor_launch::tokenize;
+use super::editor_launch::{is_on_path, tokenize};
 use base64::Engine;
 use serde::Serialize;
 use std::collections::HashMap;
@@ -308,17 +308,10 @@ pub fn is_cpp(language: &str) -> bool {
     matches!(language, "cpp" | "c++" | "c")
 }
 
-/// Probes `PATH` for `python3` then `python`, same `where`/`which` pattern
-/// as `editor_launch::detect_editor_command`.
+/// Probes `PATH` for `python3` then `python`.
 pub fn detect_python_command() -> String {
     for candidate in ["python3", "python"] {
-        let probe = if cfg!(windows) { "where" } else { "which" };
-        let found = std::process::Command::new(probe)
-            .arg(candidate)
-            .output()
-            .map(|out| out.status.success())
-            .unwrap_or(false);
-        if found {
+        if is_on_path(candidate) {
             return candidate.to_string();
         }
     }
@@ -330,13 +323,7 @@ pub fn detect_python_command() -> String {
 /// Command Prompt — a distinct problem, not probed for here.
 pub fn detect_cpp_compiler_command() -> String {
     for candidate in ["g++", "clang++"] {
-        let probe = if cfg!(windows) { "where" } else { "which" };
-        let found = std::process::Command::new(probe)
-            .arg(candidate)
-            .output()
-            .map(|out| out.status.success())
-            .unwrap_or(false);
-        if found {
+        if is_on_path(candidate) {
             return candidate.to_string();
         }
     }

@@ -33,7 +33,7 @@ function emptyInk(): InkData {
   return { width: SOLUTION_INK_WIDTH, height: SOLUTION_INK_HEIGHT, strokes: [], shapes: [], texts: [] }
 }
 
-function markdownOf(editor: Editor): string {
+export function markdownOf(editor: Editor): string {
   const storage = editor.storage as unknown as { markdown: { getMarkdown: () => string } }
   return storage.markdown.getMarkdown()
 }

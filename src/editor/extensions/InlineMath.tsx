@@ -3,6 +3,7 @@ import { ReactNodeViewRenderer, NodeViewWrapper } from '@tiptap/react'
 import type { ReactNodeViewProps } from '@tiptap/react'
 import { useEffect, useId, useRef, useState } from 'react'
 import { renderMath } from '../../lib/mathRender'
+import { encodeAttr } from '../../lib/htmlAttr'
 import { commitUnlessFocusLeaves } from '../../lib/mathEditorFocus'
 import { insertSymbolAt } from '../../lib/mathSymbols'
 import { useMathSnippetMenu } from '../../hooks/useMathSnippetMenu'
@@ -306,6 +307,3 @@ export const InlineMath = Node.create({
   },
 })
 
-function encodeAttr(str: string): string {
-  return str.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-}

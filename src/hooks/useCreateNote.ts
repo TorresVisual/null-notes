@@ -8,6 +8,11 @@ import type { NoteMetadata } from '../types'
 // Returns null when there is no workspace or the write failed — a failure is
 // reported through the workspace error banner rather than thrown, since both
 // call sites (sidebar button, unresolved wiki-link) are fire-and-forget clicks.
+//
+// `content` distinguishes a plain create (synthesized "# {title}" heading,
+// the default) from useCreateNoteFromTemplate's caller-supplied body — only
+// the plain path flashes the new tab and expands its folder, since a template
+// insert already has the user's attention on the dialog that triggered it.
 export function useCreateNote() {
   const addNote = useNotesStore((s) => s.addNote)
   const workspacePath = useWorkspaceStore((s) => s.path)
@@ -19,19 +24,24 @@ export function useCreateNote() {
   const inFlight = useRef(false)
 
   return useCallback(
-    async (title: string): Promise<NoteMetadata | null> => {
+    async (title: string, content?: string): Promise<NoteMetadata | null> => {
       if (!workspacePath || inFlight.current) return null
       inFlight.current = true
       try {
         const folder = selectedFolder ?? workspacePath
-        const meta = await api.notes.create(workspacePath, folder, title)
+        const meta =
+          content === undefined
+            ? await api.notes.create(workspacePath, folder, title)
+            : await api.templates.createNote(workspacePath, folder, title, content)
         addNote(meta)
         openTab(meta.path)
-        setFlashTabPath(meta.path)
-        // A collapsed target folder (freshly created, or re-collapsed while
-        // still selected) would otherwise hide the note the instant it's
-        // created — there'd be nothing on screen to show for the action.
-        expandFolder(folder)
+        if (content === undefined) {
+          setFlashTabPath(meta.path)
+          // A collapsed target folder (freshly created, or re-collapsed while
+          // still selected) would otherwise hide the note the instant it's
+          // created — there'd be nothing on screen to show for the action.
+          expandFolder(folder)
+        }
         setFolderError(null)
         return meta
       } catch (e) {

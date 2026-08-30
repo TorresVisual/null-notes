@@ -7,7 +7,6 @@ import {
   translateSelection,
   translatePolygon,
   deleteSelection,
-  selectionBottom,
   selectionReach,
   isSelectionEmpty,
   EMPTY_SELECTION,
@@ -170,20 +169,6 @@ describe('deleteSelection', () => {
     const left = deleteSelection(data, { strokeIds: ['a'], shapeIds: ['r1'] })
     expect(left.strokes.map((s) => s.id)).toEqual(['b'])
     expect(left.shapes).toHaveLength(0)
-  })
-})
-
-describe('selectionBottom', () => {
-  it('reports the lowest point the selection reaches', () => {
-    const data: InkData = {
-      width: 800,
-      height: 600,
-      strokes: [stroke('a', [[0, 120], [0, 340]])],
-      shapes: [{ ...rect, id: 'r1', y1: 10, y2: 500 }],
-      texts: [],
-    }
-    expect(selectionBottom(data, { strokeIds: ['a'], shapeIds: [] })).toBe(340)
-    expect(selectionBottom(data, { strokeIds: [], shapeIds: ['r1'] })).toBe(500)
   })
 })
 

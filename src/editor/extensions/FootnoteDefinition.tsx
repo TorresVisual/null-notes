@@ -2,6 +2,7 @@ import { Node } from '@tiptap/core'
 import { ReactNodeViewRenderer, NodeViewWrapper, NodeViewContent } from '@tiptap/react'
 import type { ReactNodeViewProps } from '@tiptap/react'
 import { CornerUpLeft } from 'lucide-react'
+import { encodeAttr } from '../../lib/htmlAttr'
 
 interface FootnoteDefinitionAttrs {
   label: string
@@ -165,6 +166,3 @@ export const FootnoteDefinition = Node.create({
   },
 })
 
-function encodeAttr(str: string): string {
-  return str.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-}

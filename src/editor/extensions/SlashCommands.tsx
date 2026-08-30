@@ -8,7 +8,7 @@ import { message } from '@tauri-apps/plugin-dialog'
 import { inkApi } from '../../lib/ink'
 import { nextTaskLabel } from '../../lib/taskScaffold'
 import { nextFootnoteLabel } from '../../lib/footnotes'
-import { splitIntoTasks, addNextTask, report } from '../splitIntoTasks'
+import { splitIntoTasks, addNextTask, report, markdownOf } from '../splitIntoTasks'
 import { MERMAID_TEMPLATES } from '../../lib/mermaidTemplates'
 import { insertDiagram } from '../toolbar/insertDiagram'
 import type { InkData } from '../../ink/types'
@@ -24,10 +24,48 @@ interface Cmd {
   run: (params: { editor: Editor; range: Range }) => void
 }
 
-function getMarkdown(editor: Editor): string {
-  const storage = editor.storage as unknown as { markdown: { getMarkdown: () => string } }
-  return storage.markdown.getMarkdown()
+interface CalloutType {
+  title: string
+  description: string
+  calloutType: string
+  numbered?: boolean
 }
+
+function calloutCommand({ title, description, calloutType, numbered }: CalloutType): Cmd {
+  return {
+    title,
+    description,
+    run: ({ editor, range }) =>
+      editor
+        .chain()
+        .focus()
+        .deleteRange(range)
+        .insertContent({
+          type: 'callout',
+          attrs: numbered ? { calloutType, title: '', number: '' } : { calloutType, title: '' },
+          content: [{ type: 'paragraph' }],
+        })
+        .run(),
+  }
+}
+
+const CALLOUT_TYPES: CalloutType[] = [
+  { title: 'Note', description: 'Info callout', calloutType: 'note' },
+  { title: 'Warning', description: 'Warning callout', calloutType: 'warning' },
+  { title: 'Tip', description: 'Tip callout', calloutType: 'tip' },
+  { title: 'Danger', description: 'Danger callout', calloutType: 'danger' },
+  { title: 'Theorem', description: 'Numbered theorem block', calloutType: 'theorem', numbered: true },
+  { title: 'Lemma', description: 'Numbered lemma block', calloutType: 'lemma', numbered: true },
+  { title: 'Corollary', description: 'Numbered corollary block', calloutType: 'corollary', numbered: true },
+  { title: 'Proof', description: 'Proof block', calloutType: 'proof', numbered: true },
+  { title: 'Definition', description: 'Numbered definition block', calloutType: 'definition', numbered: true },
+  { title: 'Example', description: 'Numbered example block', calloutType: 'example', numbered: true },
+]
+
+const TRAILING_CALLOUT_TYPES: CalloutType[] = [
+  { title: 'Info', description: 'Info callout', calloutType: 'info' },
+  { title: 'Important', description: 'Important callout', calloutType: 'important' },
+]
 
 const COMMANDS: Cmd[] = [
   {
@@ -69,116 +107,7 @@ const COMMANDS: Cmd[] = [
         .insertContent({ type: 'mermaidBlock', attrs: { code: template.code } })
         .run(),
   })),
-  {
-    title: 'Note',
-    description: 'Info callout',
-    run: ({ editor, range }) =>
-      editor
-        .chain()
-        .focus()
-        .deleteRange(range)
-        .insertContent({ type: 'callout', attrs: { calloutType: 'note', title: '' }, content: [{ type: 'paragraph' }] })
-        .run(),
-  },
-  {
-    title: 'Warning',
-    description: 'Warning callout',
-    run: ({ editor, range }) =>
-      editor
-        .chain()
-        .focus()
-        .deleteRange(range)
-        .insertContent({ type: 'callout', attrs: { calloutType: 'warning', title: '' }, content: [{ type: 'paragraph' }] })
-        .run(),
-  },
-  {
-    title: 'Tip',
-    description: 'Tip callout',
-    run: ({ editor, range }) =>
-      editor
-        .chain()
-        .focus()
-        .deleteRange(range)
-        .insertContent({ type: 'callout', attrs: { calloutType: 'tip', title: '' }, content: [{ type: 'paragraph' }] })
-        .run(),
-  },
-  {
-    title: 'Danger',
-    description: 'Danger callout',
-    run: ({ editor, range }) =>
-      editor
-        .chain()
-        .focus()
-        .deleteRange(range)
-        .insertContent({ type: 'callout', attrs: { calloutType: 'danger', title: '' }, content: [{ type: 'paragraph' }] })
-        .run(),
-  },
-  {
-    title: 'Theorem',
-    description: 'Numbered theorem block',
-    run: ({ editor, range }) =>
-      editor
-        .chain()
-        .focus()
-        .deleteRange(range)
-        .insertContent({ type: 'callout', attrs: { calloutType: 'theorem', title: '', number: '' }, content: [{ type: 'paragraph' }] })
-        .run(),
-  },
-  {
-    title: 'Lemma',
-    description: 'Numbered lemma block',
-    run: ({ editor, range }) =>
-      editor
-        .chain()
-        .focus()
-        .deleteRange(range)
-        .insertContent({ type: 'callout', attrs: { calloutType: 'lemma', title: '', number: '' }, content: [{ type: 'paragraph' }] })
-        .run(),
-  },
-  {
-    title: 'Corollary',
-    description: 'Numbered corollary block',
-    run: ({ editor, range }) =>
-      editor
-        .chain()
-        .focus()
-        .deleteRange(range)
-        .insertContent({ type: 'callout', attrs: { calloutType: 'corollary', title: '', number: '' }, content: [{ type: 'paragraph' }] })
-        .run(),
-  },
-  {
-    title: 'Proof',
-    description: 'Proof block',
-    run: ({ editor, range }) =>
-      editor
-        .chain()
-        .focus()
-        .deleteRange(range)
-        .insertContent({ type: 'callout', attrs: { calloutType: 'proof', title: '', number: '' }, content: [{ type: 'paragraph' }] })
-        .run(),
-  },
-  {
-    title: 'Definition',
-    description: 'Numbered definition block',
-    run: ({ editor, range }) =>
-      editor
-        .chain()
-        .focus()
-        .deleteRange(range)
-        .insertContent({ type: 'callout', attrs: { calloutType: 'definition', title: '', number: '' }, content: [{ type: 'paragraph' }] })
-        .run(),
-  },
-  {
-    title: 'Example',
-    description: 'Numbered example block',
-    run: ({ editor, range }) =>
-      editor
-        .chain()
-        .focus()
-        .deleteRange(range)
-        .insertContent({ type: 'callout', attrs: { calloutType: 'example', title: '', number: '' }, content: [{ type: 'paragraph' }] })
-        .run(),
-  },
+  ...CALLOUT_TYPES.map(calloutCommand),
   {
     title: 'Algorithm Block',
     description: 'Complexity / Pseudocode / Implementation / References',
@@ -334,7 +263,7 @@ const COMMANDS: Cmd[] = [
     // Built as nodes rather than Markdown so the heading text is exactly what
     // `nextTaskLabel` will read back on the following invocation.
     run: ({ editor, range }) => {
-      const label = nextTaskLabel(getMarkdown(editor))
+      const label = nextTaskLabel(markdownOf(editor))
       editor.chain().focus().deleteRange(range).run()
       void addNextTask(editor, label).catch(report)
     },
@@ -345,28 +274,7 @@ const COMMANDS: Cmd[] = [
     run: ({ editor, range }) =>
       editor.chain().focus().deleteRange(range).insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run(),
   },
-  {
-    title: 'Info',
-    description: 'Info callout',
-    run: ({ editor, range }) =>
-      editor
-        .chain()
-        .focus()
-        .deleteRange(range)
-        .insertContent({ type: 'callout', attrs: { calloutType: 'info', title: '' }, content: [{ type: 'paragraph' }] })
-        .run(),
-  },
-  {
-    title: 'Important',
-    description: 'Important callout',
-    run: ({ editor, range }) =>
-      editor
-        .chain()
-        .focus()
-        .deleteRange(range)
-        .insertContent({ type: 'callout', attrs: { calloutType: 'important', title: '' }, content: [{ type: 'paragraph' }] })
-        .run(),
-  },
+  ...TRAILING_CALLOUT_TYPES.map(calloutCommand),
 ]
 
 // ── Menu component ────────────────────────────────────────────────────────────

@@ -24,16 +24,6 @@ function alignAttrs() {
   }
 }
 
-function alignParseRules(tags: string[]) {
-  return tags.map((tag) => ({
-    tag,
-    getAttrs: (el: HTMLElement) => {
-      const align = el.getAttribute('align') || el.style.textAlign || null
-      return { textAlign: ALIGN_VALUES.includes(align as TextAlign) ? align : null }
-    },
-  }))
-}
-
 export const TextAlignment = Extension.create({
   name: 'textAlignment',
 
@@ -44,10 +34,5 @@ export const TextAlignment = Extension.create({
         attributes: alignAttrs(),
       },
     ]
-  },
-
-  // Parse <center> as a paragraph with align:center
-  addExtensions() {
-    return []
   },
 })

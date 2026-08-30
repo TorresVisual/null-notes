@@ -5,7 +5,8 @@ const splitIntoTasks = vi.fn<(editor: unknown) => Promise<'split' | 'no-structur
 splitIntoTasks.mockResolvedValue('split')
 const addNextTask = vi.fn<(editor: unknown, label: string) => Promise<void>>()
 addNextTask.mockResolvedValue(undefined)
-vi.mock('../splitIntoTasks', () => ({
+vi.mock('../splitIntoTasks', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../splitIntoTasks')>()),
   splitIntoTasks: (editor: unknown) => splitIntoTasks(editor),
   addNextTask: (editor: unknown, label: string) => addNextTask(editor, label),
   report: () => {},

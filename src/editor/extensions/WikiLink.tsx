@@ -8,6 +8,7 @@ import { useCreateNote } from '../../hooks/useCreateNote'
 import { recordJumpFromHere } from '../../lib/navigationHistory'
 import { excerptForPreview } from '../../lib/notePreview'
 import { api } from '../../lib/tauri'
+import { encodeAttr } from '../../lib/htmlAttr'
 import { Tooltip, TooltipContent, TooltipTrigger } from '../../components/ui/tooltip'
 
 interface WikiLinkAttrs {
@@ -42,6 +43,7 @@ function WikiLinkView({ node }: ReactNodeViewProps) {
       as="span"
       className={`wiki-link${target ? '' : ' wiki-link-missing'}`}
       onClick={handleClick}
+      title={target ? undefined : `Create note "${title}"`}
       spellCheck={false}
     >
       {title}
@@ -49,17 +51,7 @@ function WikiLinkView({ node }: ReactNodeViewProps) {
   )
 
   if (!target) {
-    return (
-      <NodeViewWrapper
-        as="span"
-        className="wiki-link wiki-link-missing"
-        onClick={handleClick}
-        title={`Create note "${title}"`}
-        spellCheck={false}
-      >
-        {title}
-      </NodeViewWrapper>
-    )
+    return link
   }
 
   function handleOpenChange(open: boolean) {
@@ -162,6 +154,3 @@ export const WikiLink = Node.create({
   },
 })
 
-function encodeAttr(str: string): string {
-  return str.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-}

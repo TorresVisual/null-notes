@@ -88,21 +88,25 @@ pub fn build_command(
     Ok((program.clone(), filled))
 }
 
-/// The first known editor present on `PATH`, or the VS Code default.
+/// Whether `candidate` resolves on `PATH`.
 ///
 /// Probed with the platform's own lookup rather than by walking `PATH`
 /// ourselves — `where`/`which` know about `PATHEXT` on Windows, and getting
 /// that subtly wrong would mean silently defaulting on a machine that has the
-/// editor installed.
+/// binary installed.
+pub fn is_on_path(candidate: &str) -> bool {
+    let probe = if cfg!(windows) { "where" } else { "which" };
+    std::process::Command::new(probe)
+        .arg(candidate)
+        .output()
+        .map(|out| out.status.success())
+        .unwrap_or(false)
+}
+
+/// The first known editor present on `PATH`, or the VS Code default.
 pub fn detect_editor_command() -> String {
     for (program, template) in KNOWN_EDITORS {
-        let probe = if cfg!(windows) { "where" } else { "which" };
-        let found = std::process::Command::new(probe)
-            .arg(program)
-            .output()
-            .map(|out| out.status.success())
-            .unwrap_or(false);
-        if found {
+        if is_on_path(program) {
             return template.to_string();
         }
     }

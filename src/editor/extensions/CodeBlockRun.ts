@@ -124,44 +124,15 @@ function runPanel(pos: number): HTMLElement {
   panel.className = 'code-run-panel'
   panel.contentEditable = 'false'
   panel.setAttribute('data-code-run-pos', String(pos))
-
-  const run = document.createElement('button')
-  run.type = 'button'
-  run.className = 'code-run-run'
-  run.dataset['action'] = 'run'
-  run.textContent = 'Run'
-  panel.appendChild(run)
-
-  const stop = document.createElement('button')
-  stop.type = 'button'
-  stop.className = 'code-run-stop'
-  stop.dataset['action'] = 'stop'
-  stop.textContent = 'Stop'
-  stop.hidden = true
-  panel.appendChild(stop)
-
-  const close = document.createElement('button')
-  close.type = 'button'
-  close.className = 'code-run-close'
-  close.dataset['action'] = 'close'
-  close.textContent = 'Dismiss'
-  close.hidden = true
-  panel.appendChild(close)
-
-  const output = document.createElement('pre')
-  output.className = 'code-run-output'
-  output.hidden = true
-  panel.appendChild(output)
-
-  const stdinRow = document.createElement('div')
-  stdinRow.className = 'code-run-stdin-row'
-  stdinRow.hidden = true
-  const stdinInput = document.createElement('input')
-  stdinInput.type = 'text'
-  stdinInput.className = 'code-run-stdin'
-  stdinInput.placeholder = 'stdin…'
-  stdinRow.appendChild(stdinInput)
-  panel.appendChild(stdinRow)
+  panel.innerHTML = `
+    <button type="button" class="code-run-run" data-action="run">Run</button>
+    <button type="button" class="code-run-stop" data-action="stop" hidden>Stop</button>
+    <button type="button" class="code-run-close" data-action="close" hidden>Dismiss</button>
+    <pre class="code-run-output" hidden></pre>
+    <div class="code-run-stdin-row" hidden>
+      <input type="text" class="code-run-stdin" placeholder="stdin…">
+    </div>
+  `
 
   return panel
 }

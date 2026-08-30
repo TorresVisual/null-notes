@@ -107,73 +107,23 @@ function findBar(): HTMLElement {
   const bar = document.createElement('div')
   bar.className = 'note-find-bar'
   bar.contentEditable = 'false'
+  bar.innerHTML = `
+    <div class="note-find-row">
+      <button type="button" class="note-find-toggle-replace" title="Toggle replace">▾</button>
+      <input type="text" class="note-find-input" placeholder="Find in note">
+      <span class="note-find-count"></span>
+      <button type="button" class="note-find-nav" title="Previous match (Shift+Enter)">↑</button>
+      <button type="button" class="note-find-nav" title="Next match (Enter)">↓</button>
+      <button type="button" class="note-find-close" title="Close (Esc)">×</button>
+    </div>
+    <div class="note-find-replace-row" hidden>
+      <input type="text" class="note-find-replace-input" placeholder="Replace with">
+      <button type="button" class="note-find-replace-one">Replace</button>
+      <button type="button" class="note-find-replace-all">Replace all</button>
+    </div>
+  `
 
-  const row = document.createElement('div')
-  row.className = 'note-find-row'
-  bar.appendChild(row)
-
-  const toggle = document.createElement('button')
-  toggle.type = 'button'
-  toggle.className = 'note-find-toggle-replace'
-  toggle.title = 'Toggle replace'
-  toggle.textContent = '▾'
-  row.appendChild(toggle)
-
-  const input = document.createElement('input')
-  input.type = 'text'
-  input.className = 'note-find-input'
-  input.placeholder = 'Find in note'
-  row.appendChild(input)
-
-  const count = document.createElement('span')
-  count.className = 'note-find-count'
-  row.appendChild(count)
-
-  const prev = document.createElement('button')
-  prev.type = 'button'
-  prev.className = 'note-find-nav'
-  prev.textContent = '↑'
-  prev.title = 'Previous match (Shift+Enter)'
-  row.appendChild(prev)
-
-  const next = document.createElement('button')
-  next.type = 'button'
-  next.className = 'note-find-nav'
-  next.textContent = '↓'
-  next.title = 'Next match (Enter)'
-  row.appendChild(next)
-
-  const close = document.createElement('button')
-  close.type = 'button'
-  close.className = 'note-find-close'
-  close.textContent = '×'
-  close.title = 'Close (Esc)'
-  row.appendChild(close)
-
-  const replaceRow = document.createElement('div')
-  replaceRow.className = 'note-find-replace-row'
-  replaceRow.hidden = true
-  bar.appendChild(replaceRow)
-
-  const replaceInput = document.createElement('input')
-  replaceInput.type = 'text'
-  replaceInput.className = 'note-find-replace-input'
-  replaceInput.placeholder = 'Replace with'
-  replaceRow.appendChild(replaceInput)
-
-  const replaceOneBtn = document.createElement('button')
-  replaceOneBtn.type = 'button'
-  replaceOneBtn.className = 'note-find-replace-one'
-  replaceOneBtn.textContent = 'Replace'
-  replaceRow.appendChild(replaceOneBtn)
-
-  const replaceAllBtn = document.createElement('button')
-  replaceAllBtn.type = 'button'
-  replaceAllBtn.className = 'note-find-replace-all'
-  replaceAllBtn.textContent = 'Replace all'
-  replaceRow.appendChild(replaceAllBtn)
-
-  requestAnimationFrame(() => input.focus())
+  requestAnimationFrame(() => bar.querySelector<HTMLInputElement>('.note-find-input')?.focus())
 
   return bar
 }

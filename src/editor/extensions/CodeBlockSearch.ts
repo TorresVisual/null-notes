@@ -89,37 +89,19 @@ function searchBar(view: EditorView): HTMLElement {
   const bar = document.createElement('div')
   bar.className = 'code-search-bar'
   bar.contentEditable = 'false'
+  bar.innerHTML = `
+    <input type="text" class="code-search-input" placeholder="Find in block">
+    <span class="code-search-count"></span>
+    <button type="button" class="code-search-nav" title="Previous match (Shift+Enter)">↑</button>
+    <button type="button" class="code-search-nav" title="Next match (Enter)">↓</button>
+    <button type="button" class="code-search-close" title="Close (Esc)">×</button>
+  `
 
-  const input = document.createElement('input')
-  input.type = 'text'
-  input.className = 'code-search-input'
-  input.placeholder = 'Find in block'
-  bar.appendChild(input)
-
-  const count = document.createElement('span')
-  count.className = 'code-search-count'
-  bar.appendChild(count)
-
-  const prev = document.createElement('button')
-  prev.type = 'button'
-  prev.className = 'code-search-nav'
-  prev.textContent = '↑'
-  prev.title = 'Previous match (Shift+Enter)'
-  bar.appendChild(prev)
-
-  const next = document.createElement('button')
-  next.type = 'button'
-  next.className = 'code-search-nav'
-  next.textContent = '↓'
-  next.title = 'Next match (Enter)'
-  bar.appendChild(next)
-
-  const close = document.createElement('button')
-  close.type = 'button'
-  close.className = 'code-search-close'
-  close.textContent = '×'
-  close.title = 'Close (Esc)'
-  bar.appendChild(close)
+  const input = bar.querySelector<HTMLInputElement>('.code-search-input')!
+  const navButtons = bar.querySelectorAll<HTMLButtonElement>('.code-search-nav')
+  const prev = navButtons[0]!
+  const next = navButtons[1]!
+  const close = bar.querySelector<HTMLButtonElement>('.code-search-close')!
 
   const dispatchMeta = (meta: SearchMeta) => view.dispatch(view.state.tr.setMeta(codeBlockSearchKey, meta))
 

@@ -126,10 +126,3 @@ export function selectionReach(data: InkData, selection: Selection): Reach {
   }
   return { maxX, maxY }
 }
-
-// Kept as a thin wrapper: pre-dates P13-4's width growth and is still the
-// simpler call for the one place (`lasso.test.ts`) that only ever cared
-// about the vertical reach.
-export function selectionBottom(data: InkData, selection: Selection): number {
-  return selectionReach(data, selection).maxY
-}

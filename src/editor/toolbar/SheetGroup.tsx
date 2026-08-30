@@ -1,16 +1,11 @@
 import { SplitSquareVertical, Plus } from 'lucide-react'
 import type { Editor } from '@tiptap/core'
 import { message } from '@tauri-apps/plugin-dialog'
-import { splitIntoTasks, addNextTask, report } from '../splitIntoTasks'
+import { splitIntoTasks, addNextTask, report, markdownOf } from '../splitIntoTasks'
 import { nextTaskLabel } from '../../lib/taskScaffold'
 
 interface SheetGroupProps {
   editor: Editor
-}
-
-function markdownOf(editor: Editor): string {
-  const storage = editor.storage as unknown as { markdown: { getMarkdown: () => string } }
-  return storage.markdown.getMarkdown()
 }
 
 export function SheetGroup({ editor }: SheetGroupProps) {

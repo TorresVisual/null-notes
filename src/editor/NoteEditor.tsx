@@ -6,7 +6,7 @@ import { confirm, message } from '@tauri-apps/plugin-dialog'
 import { coreExtensions } from './extensions'
 import { rememberPosition, recallPosition } from '../lib/notePositions'
 import { handleEditorKeyDown, handleEditorTextInput } from './extensions/CodeBlockEditor'
-import { splitIntoTasks, report } from './splitIntoTasks'
+import { splitIntoTasks, report, markdownOf } from './splitIntoTasks'
 import { EditorStatusBar } from './EditorStatusBar'
 import { BlockHandle } from './extensions/BlockHandle'
 import { EditorToolbar } from './toolbar/EditorToolbar'
@@ -19,14 +19,6 @@ interface NoteEditorProps {
   spellcheck: boolean
   spellcheckLanguage: string
   onChange: (markdown: string) => void
-}
-
-interface MarkdownStorage {
-  getMarkdown: () => string
-}
-
-function getMarkdown(storage: unknown): string {
-  return ((storage as Record<string, unknown>)['markdown'] as MarkdownStorage).getMarkdown()
 }
 
 // `lang` is the only thing that tells the WebView which dictionary to check
@@ -52,7 +44,7 @@ export function NoteEditor({ content, notePath, spellcheck, spellcheckLanguage, 
     editorProps: buildEditorProps(spellcheck, spellcheckLanguage),
     onUpdate({ editor }) {
       if (isProgrammaticUpdate.current) return
-      onChange(getMarkdown(editor.storage))
+      onChange(markdownOf(editor))
     },
   })
 
@@ -66,7 +58,7 @@ export function NoteEditor({ content, notePath, spellcheck, spellcheckLanguage, 
 
   useEffect(() => {
     if (!editor) return
-    const current = getMarkdown(editor.storage)
+    const current = markdownOf(editor)
     if (content !== current) {
       isProgrammaticUpdate.current = true
       editor.commands.setContent(content)
@@ -137,7 +129,7 @@ export function NoteEditor({ content, notePath, spellcheck, spellcheckLanguage, 
           await message('No exercise structure found in this note — nothing was changed.')
           return
         }
-        onChange(getMarkdown(editor.storage))
+        onChange(markdownOf(editor))
       } catch (error) {
         report(error)
       }

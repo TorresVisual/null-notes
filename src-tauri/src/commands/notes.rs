@@ -801,29 +801,7 @@ pub async fn delete_note(path: String, db: State<'_, DbPool>) -> Result<(), Stri
     let ink_dir = path.trim_end_matches(".md").to_string() + ".ink";
     let _ = tokio::fs::remove_dir_all(&ink_dir).await;
 
-    db::notes::remove_note(&db, &path)
-        .await
-        .map_err(|e| e.to_string())?;
-
-    db::notes::remove_from_fts(&db, &path)
-        .await
-        .map_err(|e| e.to_string())?;
-
-    db::notes::set_tags(&db, &path, &[])
-        .await
-        .map_err(|e| e.to_string())?;
-
-    db::notes::set_links(&db, &path, &[])
-        .await
-        .map_err(|e| e.to_string())?;
-
-    db::notes::set_tasks(&db, &path, &[])
-        .await
-        .map_err(|e| e.to_string())?;
-
-    db::notes::set_cards(&db, &path, &[])
-        .await
-        .map_err(|e| e.to_string())
+    forget_note(&path, &db).await.map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -1020,13 +998,7 @@ fn note_filename(title: &str) -> String {
 // one. Creating over an existing file would silently destroy it, so refuse and
 // let the caller report the collision.
 async fn create_note_file(folder: &str, title: &str) -> anyhow::Result<PathBuf> {
-    let filename = note_filename(title);
-    let path = Path::new(folder).join(&filename);
-    if tokio::fs::try_exists(&path).await? {
-        anyhow::bail!("a note named \"{filename}\" already exists here");
-    }
-    write_atomic(&path, &format!("# {title}\n")).await?;
-    Ok(path)
+    create_note_file_with_content(folder, title, &format!("# {title}\n")).await
 }
 
 /// Rewrites a note into `## Task N` / `### Solution` pairs, on request.

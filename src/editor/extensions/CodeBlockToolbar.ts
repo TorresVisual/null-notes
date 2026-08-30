@@ -154,23 +154,10 @@ function blockActions(pos: number, wrap: boolean): HTMLElement {
   container.className = 'code-block-actions'
   container.contentEditable = 'false'
   container.setAttribute('data-pos', String(pos))
-
-  const copy = document.createElement('button')
-  copy.type = 'button'
-  copy.className = 'code-block-copy'
-  copy.dataset['action'] = 'copy'
-  copy.title = 'Copy code'
-  copy.textContent = 'Copy'
-  container.appendChild(copy)
-
-  const wrapToggle = document.createElement('button')
-  wrapToggle.type = 'button'
-  wrapToggle.className = `code-block-wrap-toggle${wrap ? ' active' : ''}`
-  wrapToggle.dataset['action'] = 'wrap'
-  wrapToggle.setAttribute('aria-pressed', wrap ? 'true' : 'false')
-  wrapToggle.title = wrap ? 'Disable word wrap' : 'Enable word wrap'
-  wrapToggle.textContent = 'Wrap'
-  container.appendChild(wrapToggle)
+  container.innerHTML = `
+    <button type="button" class="code-block-copy" data-action="copy" title="Copy code">Copy</button>
+    <button type="button" class="code-block-wrap-toggle${wrap ? ' active' : ''}" data-action="wrap" aria-pressed="${wrap}" title="${wrap ? 'Disable word wrap' : 'Enable word wrap'}">Wrap</button>
+  `
 
   return container
 }

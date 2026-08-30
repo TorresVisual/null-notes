@@ -8,7 +8,7 @@
 //! already use for binary data over Tauri events/commands. Design:
 //! `docs/specs/terminal-pane-design.md`.
 
-use super::editor_launch::tokenize;
+use super::editor_launch::{is_on_path, tokenize};
 
 /// Splits a shell template into a program and its arguments — no placeholder
 /// substitution, unlike `editor_launch::build_command`, because a shell needs
@@ -20,17 +20,11 @@ pub fn parse_shell(template: &str) -> Result<(String, Vec<String>), String> {
 }
 
 /// The shell to spawn when no setting has been chosen: probes for `pwsh`
-/// then `powershell` on Windows (mirroring `editor_launch::detect_editor_command`'s
-/// `where`-based probe), or `$SHELL` (falling back to `bash`) elsewhere.
+/// then `powershell` on Windows, or `$SHELL` (falling back to `bash`) elsewhere.
 pub fn detect_terminal_shell() -> String {
     if cfg!(windows) {
         for candidate in ["pwsh", "powershell"] {
-            let found = std::process::Command::new("where")
-                .arg(candidate)
-                .output()
-                .map(|out| out.status.success())
-                .unwrap_or(false);
-            if found {
+            if is_on_path(candidate) {
                 return candidate.to_string();
             }
         }

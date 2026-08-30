@@ -2,6 +2,7 @@ import { Node, mergeAttributes } from '@tiptap/core'
 import { ReactNodeViewRenderer, NodeViewWrapper } from '@tiptap/react'
 import type { ReactNodeViewProps } from '@tiptap/react'
 import { useWorkspaceStore } from '../../store/workspace'
+import { encodeAttr } from '../../lib/htmlAttr'
 
 interface TagAttrs {
   name: string
@@ -112,6 +113,3 @@ export const Tag = Node.create({
   },
 })
 
-function encodeAttr(str: string): string {
-  return str.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-}

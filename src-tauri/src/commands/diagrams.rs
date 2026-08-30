@@ -1,12 +1,7 @@
-use std::path::Path;
+use super::sidecar_dir_for;
 
 fn diagrams_dir_for(note_path: &str) -> String {
-    let p = Path::new(note_path);
-    let stem = p.file_stem().unwrap_or_default().to_string_lossy();
-    let dir = p.parent().unwrap_or(Path::new("."));
-    dir.join(format!("{}.diagrams", stem))
-        .to_string_lossy()
-        .into_owned()
+    sidecar_dir_for(note_path, "diagrams")
 }
 
 #[tauri::command]
