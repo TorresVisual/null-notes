@@ -60,6 +60,7 @@ fn build_menu(handle: &tauri::AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
             )?,
             &PredefinedMenuItem::separator(handle)?,
             &MenuItem::with_id(handle, "export-pdf", "Export to PDF…", true, None::<&str>)?,
+            &MenuItem::with_id(handle, "print", "Print…", true, None::<&str>)?,
             &PredefinedMenuItem::separator(handle)?,
             &MenuItem::with_id(handle, "settings", "Settings…", true, Some("CmdOrCtrl+,"))?,
             &PredefinedMenuItem::separator(handle)?,
@@ -286,6 +287,9 @@ pub fn run() {
             commands::assets::write_note_asset,
             commands::assets::read_note_asset,
             commands::window::confirm_close,
+            commands::printing::list_printers,
+            commands::printing::export_pdf,
+            commands::printing::print_document,
         ])
         .run(tauri::generate_context!())
         .expect("error running app");

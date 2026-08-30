@@ -7,6 +7,7 @@ pub mod git;
 pub mod ink;
 pub mod notes;
 pub mod pdf;
+pub mod printing;
 pub mod settings;
 pub mod terminal;
 pub mod watcher;
