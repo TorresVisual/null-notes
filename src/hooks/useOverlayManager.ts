@@ -10,6 +10,8 @@ export type OverlayKind =
   | 'task'
   | 'review'
   | 'formulaSheet'
+  | 'exportPdf'
+  | 'print'
 
 /**
  * One overlay open at a time, by construction: opening a new one always

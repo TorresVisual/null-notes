@@ -156,3 +156,8 @@ export interface DueCard {
   back: string
   position: number
 }
+
+export interface PrinterInfo {
+  name: string
+  isDefault: boolean
+}

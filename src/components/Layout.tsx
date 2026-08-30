@@ -22,6 +22,8 @@ import { TaskView } from './TaskView'
 import { ReviewSession } from './ReviewSession'
 import { HomeView } from './HomeView'
 import { FormulaSheetPrompt } from './FormulaSheetPrompt'
+import { ExportPdfDialog } from './ExportPdfDialog'
+import { PrintDialog } from './PrintDialog'
 import { TerminalPane } from './TerminalPane'
 import { ToastStack } from './ToastStack'
 import { useWorkspaceStore } from '../store/workspace'
@@ -167,15 +169,16 @@ export function Layout() {
           break
         case 'export-pdf':
           if (!activeTab) break
-          // The print stylesheet only styles the rendered view; printing raw
-          // markdown text wouldn't match the editor, so switch first and let
-          // that render before the OS print dialog captures the page.
-          if (viewMode === 'raw') {
-            setViewMode('wysiwyg')
-            requestAnimationFrame(() => window.print())
-          } else {
-            window.print()
-          }
+          // The print stylesheet only styles the rendered view — switch
+          // before the dialog opens so it's already correct by the time
+          // the user clicks Export.
+          setViewMode('wysiwyg')
+          openOverlay('exportPdf')
+          break
+        case 'print':
+          if (!activeTab) break
+          setViewMode('wysiwyg')
+          openOverlay('print')
           break
         case 'shortcuts-help':
           openOverlay('shortcuts')
@@ -356,6 +359,10 @@ export function Layout() {
       {activeOverlay === 'task' && <TaskView onClose={closeOverlay} />}
       {activeOverlay === 'review' && <ReviewSession onClose={closeOverlay} />}
       {activeOverlay === 'formulaSheet' && <FormulaSheetPrompt onClose={closeOverlay} />}
+      {activeOverlay === 'exportPdf' && currentNote && (
+        <ExportPdfDialog noteTitle={currentNote.title} onClose={closeOverlay} />
+      )}
+      {activeOverlay === 'print' && <PrintDialog onClose={closeOverlay} />}
       {!focusMode && (
         <Sidebar
           onSearchOpen={() => openOverlay('search')}

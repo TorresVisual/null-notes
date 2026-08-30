@@ -3613,6 +3613,31 @@ code {
   gap: var(--space-sm);
 }
 
+.print-options-checkbox {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.print-dialog-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.print-dialog-row select {
+  padding: 8px 10px;
+  background: var(--bg-sunken);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-size: 14px;
+}
+
 /* Export to PDF (File > Export to PDF, or the OS print dialog directly)
    leans on the WebView's own print pipeline rather than a custom renderer —
    math, Mermaid, ink and code all print exactly as they're already shown on
@@ -3662,9 +3687,10 @@ code {
   .editor-scroll { overflow: visible; height: auto; }
   .editor-pane { max-width: none; margin: 0; padding: 0; }
 
-  .note-editor h1, .note-editor h2, .note-editor h3 { break-after: avoid; }
+  .note-editor h1, .note-editor h2, .note-editor h3, .note-editor h4, .note-editor h5, .note-editor h6 { break-after: avoid; }
   .note-editor pre, .pdf-page-block, .ink-block-wrapper, .note-editor table,
-  .note-image, .callout, .details-wrapper {
+  .note-image, .callout, .details-wrapper, .block-math, .mermaid-block,
+  .diagram-block-preview {
     break-inside: avoid;
   }
 

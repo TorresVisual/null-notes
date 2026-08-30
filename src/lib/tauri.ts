@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core'
-import type { NoteMetadata, WorkspaceState, WorkspaceTree, SearchResult, AppSettings, GraphLink, GraphTag, RepoMode, CommitOutcome, PushOutcome, PullOutcome, RepoInitOutcome, TemplateMetadata, CrossRefTarget, OpenTask, DueCard, Grade, NoteHistoryEntry, BacklinkEntry } from '../types'
+import type { NoteMetadata, WorkspaceState, WorkspaceTree, SearchResult, AppSettings, GraphLink, GraphTag, RepoMode, CommitOutcome, PushOutcome, PullOutcome, RepoInitOutcome, TemplateMetadata, CrossRefTarget, OpenTask, DueCard, Grade, NoteHistoryEntry, BacklinkEntry, PrinterInfo } from '../types'
 import type { PdfPage, PdfMarkdownImport } from '../pdf/types'
 
 export const api = {
@@ -159,5 +159,13 @@ export const api = {
       invoke<void>('send_input', { runId, text }),
     stop: (runId: string) =>
       invoke<void>('stop_run', { runId }),
+  },
+  printing: {
+    listPrinters: () =>
+      invoke<PrinterInfo[]>('list_printers'),
+    exportPdf: (path: string, includeHeaderFooter: boolean) =>
+      invoke<void>('export_pdf', { path, includeHeaderFooter }),
+    printDocument: (printerName: string, includeHeaderFooter: boolean) =>
+      invoke<void>('print_document', { printerName, includeHeaderFooter }),
   },
 }
