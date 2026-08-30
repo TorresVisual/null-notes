@@ -78,7 +78,7 @@
 
 *2026-08-13 revision, kept for context — see* `specs/roadmap-revision-design.md`*: the two weeks before that went almost entirely into PDF pipeline refinement, which the roadmap had no boundary for; that revision added one (§Phase 4, "Pipeline completion criteria"), recorded the app's actual identity and two closed questions (§1), and replaced the execution order in §6 — phase numbers are identity, not order. Ruled fractions landed, freezing the pipeline (§Phase 4, P4-2e); all three open bugs were triaged (two fixed, one didn't reproduce); P4-3 closed M4.*
 
-*Previously, 2026-07-30: M0–M3 all reached — P2-3 closed M2; P4-1 + P4-2 done — PDF→Markdown converts from the embedded text layer with no OCR, and equations are rebuilt as LaTeX rather than mangled into text; re-scoped against* `notes/Plan.md`*; Phases 5 "Versioned Workspaces" and 9 "Study & Revision" added — the first features that go beyond the original brief*.**Audience of this doc:** the maintainer (solo dev). **Product audience:** you — a personal, offline, daily-driver note app for CS coursework. This is **not** aimed at public distribution yet, which deliberately pushes packaging, cross-platform, auto-update, branding, and onboarding *down* the priority list. Correctness, data integrity, and the editor/ink/PDF workflow come first.
+*Previously, 2026-07-30: M0–M3 all reached — P2-3 closed M2; P4-1 + P4-2 done — PDF→Markdown converts from the embedded text layer with no OCR, and equations are rebuilt as LaTeX rather than mangled into text; re-scoped against* `docs/brief.md`*; Phases 5 "Versioned Workspaces" and 9 "Study & Revision" added — the first features that go beyond the original brief*.**Audience of this doc:** the maintainer (solo dev). **Product audience:** you — a personal, offline, daily-driver note app for CS coursework. This is **not** aimed at public distribution yet, which deliberately pushes packaging, cross-platform, auto-update, branding, and onboarding *down* the priority list. Correctness, data integrity, and the editor/ink/PDF workflow come first.
 
 ---
 
@@ -188,9 +188,9 @@ The editor and ink subsystems are the mature heart of the app. **They do not nee
 7. **App identity is boilerplate.** `productName: "tauri-app"`, `identifier: com.moritz.tauri-app`, default 800×600 window, template README (`tauri.conf.json`, `README.md`). Cosmetic for personal use, but trivially fixable and currently makes the app feel unfinished. — **✅ fixed, P1-5**, except the app icon, which is still Tauri's default (needs an asset, not a code change).
 8. **No settings/preferences surface** and **no native app menu** — every capability lives behind an in-app button or a single hardcoded shortcut (`Ctrl+K`). — **✅ fixed, P2-1 + P2-2.**
 
-### Capability gap vs. the original brief (`notes/Plan.md`)
+### Capability gap vs. the original brief (`docs/brief.md`)
 
-M0–M3 cleared the *reliability* backlog, so the question is no longer "is it safe?" but "is it the app the brief describes?" Auditing `notes/Plan.md` line by line against the code, the answer is: the **editing core is complete**, and three of the brief's pillars were never on this roadmap at all.
+M0–M3 cleared the *reliability* backlog, so the question is no longer "is it safe?" but "is it the app the brief describes?" Auditing `docs/brief.md` line by line against the code, the answer is: the **editing core is complete**, and three of the brief's pillars were never on this roadmap at all.
 
 | Brief capability | State | Where it lands |
 | --- | --- | --- |
@@ -243,7 +243,7 @@ Given "personal daily driver," priority = `(daily-use value) × (risk of data lo
 
 Priority within the new phases follows the same formula (**daily value × friction ÷ effort**), which is why P6 (many small wins on infra that already exists) outranks P7 (a whole new integration surface) despite P7 being the more distinctive feature.
 
-**Why P9 exists (2026-07-29).** Every other phase traces to `notes/Plan.md`. P9 does not, and was added because reviewing the brief exposed a gap in the brief itself: **it is a capture roadmap.** Everything — editing, ink, PDF import, links, graph — helps get material *into* the app. Nothing helps a student get it back *out* at exam time, which is when a study tool either earns its keep or doesn't. It sits at P9 rather than earlier because capture has to be excellent before revision has anything worth revising.
+**Why P9 exists (2026-07-29).** Every other phase traces to `docs/brief.md`. P9 does not, and was added because reviewing the brief exposed a gap in the brief itself: **it is a capture roadmap.** Everything — editing, ink, PDF import, links, graph — helps get material *into* the app. Nothing helps a student get it back *out* at exam time, which is when a study tool either earns its keep or doesn't. It sits at P9 rather than earlier because capture has to be excellent before revision has anything worth revising.
 
 **Why P9.5 exists (2026-08-20).** A second review pass proposed a productization/polish batch that was first challenged as work a single-user tool doesn't need (§4). The maintainer said otherwise: wanting the app to feel finished is a real preference regardless of who else ever sees it, which the "enjoyment and learning are legitimate terms" line above already covers — this table just hadn't given that preference its own row yet. It sits after P9 because it polishes surfaces P9 still has to build first.
 
@@ -901,7 +901,7 @@ The brief's actual AI ask is *"a terminal in which I can do* `claude` *and work 
 
 **Milestone M9 reached (2026-08-20):** *At exam time the app is where I revise, not just where my notes happen to live.*
 
-The one phase not derived from `notes/Plan.md`. Everything before it is capture; this is retrieval. Ordered cheapest-first, because P9-1 is small enough to ship in a sitting and P9-3 needs a decision made before any code.
+The one phase not derived from `docs/brief.md`. Everything before it is capture; this is retrieval. Ordered cheapest-first, because P9-1 is small enough to ship in a sitting and P9-3 needs a decision made before any code.
 
 **Architectural rule for this whole phase:** study state is **data**, not index. Principle #1 says deleting `index.db` loses nothing — so nothing here may keep its only copy in SQLite. The established pattern applies exactly: source of truth in the `.md`, a derived table in `index.db` rebuilt by the same reindex path that already carries `note_tags` and `note_links`.
 
