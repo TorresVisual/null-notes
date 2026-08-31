@@ -1,21 +1,37 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { X } from 'lucide-react'
 import { save } from '@tauri-apps/plugin-dialog'
 import { api } from '../lib/tauri'
 import { showToast } from '../store/toast'
+import { usePrintPreview } from '../hooks/usePrintPreview'
 import { Dialog, DialogContent, DialogTitle } from './ui/dialog'
 
 interface ExportPdfDialogProps {
   noteTitle: string
+  contentEl: HTMLElement | null
   onClose: () => void
 }
 
-export function ExportPdfDialog({ noteTitle, onClose }: ExportPdfDialogProps) {
-  const [includeHeaderFooter, setIncludeHeaderFooter] = useState(false)
+export function ExportPdfDialog({ noteTitle, contentEl, onClose }: ExportPdfDialogProps) {
+  const {
+    containerRef,
+    showPageNumber,
+    setShowPageNumber,
+    showTitle,
+    setShowTitle,
+    showDate,
+    setShowDate,
+    isRendering,
+    error,
+  } = usePrintPreview(contentEl, noteTitle)
   const [isExporting, setIsExporting] = useState(false)
 
+  useEffect(() => {
+    if (error) showToast(error)
+  }, [error])
+
   async function chooseAndExport() {
-    if (isExporting) return
+    if (isExporting || isRendering) return
     const path = await save({
       defaultPath: `${noteTitle}.pdf`,
       filters: [{ name: 'PDF', extensions: ['pdf'] }],
@@ -23,7 +39,7 @@ export function ExportPdfDialog({ noteTitle, onClose }: ExportPdfDialogProps) {
     if (!path) return
     setIsExporting(true)
     try {
-      await api.printing.exportPdf(path, includeHeaderFooter)
+      await api.printing.exportPdf(path)
       showToast(`Exported "${noteTitle}.pdf"`)
       onClose()
     } catch (e) {
@@ -35,7 +51,7 @@ export function ExportPdfDialog({ noteTitle, onClose }: ExportPdfDialogProps) {
 
   return (
     <Dialog open onOpenChange={(next) => !next && onClose()}>
-      <DialogContent className="formula-sheet-prompt export-pdf-dialog" showCloseButton={false}>
+      <DialogContent className="formula-sheet-prompt print-preview-dialog" showCloseButton={false}>
         <div className="settings-panel-header">
           <DialogTitle asChild>
             <h2>Export to PDF</h2>
@@ -44,17 +60,32 @@ export function ExportPdfDialog({ noteTitle, onClose }: ExportPdfDialogProps) {
             <X size={16} />
           </button>
         </div>
-        <label className="print-options-checkbox">
-          <input
-            type="checkbox"
-            checked={includeHeaderFooter}
-            onChange={(e) => setIncludeHeaderFooter(e.target.checked)}
-          />
-          Include page numbers, date, and title
-        </label>
+        <div className="print-preview-checkboxes">
+          <label className="print-options-checkbox">
+            <input
+              type="checkbox"
+              checked={showPageNumber}
+              onChange={(e) => setShowPageNumber(e.target.checked)}
+            />
+            Page numbers
+          </label>
+          <label className="print-options-checkbox">
+            <input type="checkbox" checked={showTitle} onChange={(e) => setShowTitle(e.target.checked)} />
+            Title
+          </label>
+          <label className="print-options-checkbox">
+            <input type="checkbox" checked={showDate} onChange={(e) => setShowDate(e.target.checked)} />
+            Date
+          </label>
+        </div>
+        <div className="print-preview-pages" ref={containerRef} />
         <div className="formula-sheet-prompt-actions">
           <button className="dialog-action" onClick={onClose}>Cancel</button>
-          <button className="dialog-action-primary" onClick={() => void chooseAndExport()} disabled={isExporting}>
+          <button
+            className="dialog-action-primary"
+            onClick={() => void chooseAndExport()}
+            disabled={isExporting || isRendering}
+          >
             {isExporting ? 'Exporting…' : 'Choose Location & Export…'}
           </button>
         </div>

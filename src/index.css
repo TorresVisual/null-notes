@@ -3638,6 +3638,25 @@ code {
   font-size: 14px;
 }
 
+.print-preview-dialog {
+  width: min(900px, calc(100vw - 80px));
+  max-height: 85vh;
+}
+
+.print-preview-checkboxes {
+  display: flex;
+  gap: var(--space-lg);
+}
+
+.print-preview-pages {
+  overflow: auto;
+  max-height: 60vh;
+  background: var(--bg-sunken);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: var(--space-md);
+}
+
 /* Export to PDF (File > Export to PDF, or the OS print dialog directly)
    leans on the WebView's own print pipeline rather than a custom renderer —
    math, Mermaid, ink and code all print exactly as they're already shown on
