@@ -68,6 +68,16 @@
 
 - [ ] when we select what do we want to copy?
 
+- [ ] Close Workspace
+
+- [ ] Recent workspaces in right click menu
+
+- [ ] Reorder task function invoked manually (apple notes has it by default but im not sure if i like it automatically) but the point is to reorder marked tasks to the bottom which would focus the next tasks at the top
+
+
+
+---
+
 Feature checklist. **The [roadmap](docs/ROADMAP.md) holds the reasoning and the Definitions of Done; this file holds the boxes.** If the two disagree, the roadmap wins. Gaps found against this checklist (audited 2026-08-26) are tracked as **P11–P15** below.
 
 Effort: **S** ≈ hours · **M** ≈ a day or two · **L** ≈ several days.
