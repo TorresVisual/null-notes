@@ -2,18 +2,31 @@ import { useEffect, useState } from 'react'
 import { X } from 'lucide-react'
 import { api } from '../lib/tauri'
 import { showToast } from '../store/toast'
+import { usePrintPreview } from '../hooks/usePrintPreview'
 import { Dialog, DialogContent, DialogTitle } from './ui/dialog'
 import type { PrinterInfo } from '../types'
 
 interface PrintDialogProps {
+  noteTitle: string
+  contentEl: HTMLElement | null
   onClose: () => void
 }
 
-export function PrintDialog({ onClose }: PrintDialogProps) {
+export function PrintDialog({ noteTitle, contentEl, onClose }: PrintDialogProps) {
   const [printers, setPrinters] = useState<PrinterInfo[]>([])
   const [selected, setSelected] = useState('')
-  const [includeHeaderFooter, setIncludeHeaderFooter] = useState(false)
   const [isPrinting, setIsPrinting] = useState(false)
+  const {
+    containerRef,
+    showPageNumber,
+    setShowPageNumber,
+    showTitle,
+    setShowTitle,
+    showDate,
+    setShowDate,
+    isRendering,
+    error,
+  } = usePrintPreview(contentEl, noteTitle)
 
   useEffect(() => {
     void api.printing.listPrinters().then((list) => {
@@ -22,11 +35,15 @@ export function PrintDialog({ onClose }: PrintDialogProps) {
     })
   }, [])
 
+  useEffect(() => {
+    if (error) showToast(error)
+  }, [error])
+
   async function print() {
-    if (isPrinting || !selected) return
+    if (isPrinting || isRendering || !selected) return
     setIsPrinting(true)
     try {
-      await api.printing.printDocument(selected, includeHeaderFooter)
+      await api.printing.printDocument(selected)
       showToast('Sent to printer')
       onClose()
     } catch (e) {
@@ -38,7 +55,7 @@ export function PrintDialog({ onClose }: PrintDialogProps) {
 
   return (
     <Dialog open onOpenChange={(next) => !next && onClose()}>
-      <DialogContent className="formula-sheet-prompt print-dialog" showCloseButton={false}>
+      <DialogContent className="formula-sheet-prompt print-preview-dialog" showCloseButton={false}>
         <div className="settings-panel-header">
           <DialogTitle asChild>
             <h2>Print</h2>
@@ -56,17 +73,32 @@ export function PrintDialog({ onClose }: PrintDialogProps) {
             ))}
           </select>
         </label>
-        <label className="print-options-checkbox">
-          <input
-            type="checkbox"
-            checked={includeHeaderFooter}
-            onChange={(e) => setIncludeHeaderFooter(e.target.checked)}
-          />
-          Include page numbers, date, and title
-        </label>
+        <div className="print-preview-checkboxes">
+          <label className="print-options-checkbox">
+            <input
+              type="checkbox"
+              checked={showPageNumber}
+              onChange={(e) => setShowPageNumber(e.target.checked)}
+            />
+            Page numbers
+          </label>
+          <label className="print-options-checkbox">
+            <input type="checkbox" checked={showTitle} onChange={(e) => setShowTitle(e.target.checked)} />
+            Title
+          </label>
+          <label className="print-options-checkbox">
+            <input type="checkbox" checked={showDate} onChange={(e) => setShowDate(e.target.checked)} />
+            Date
+          </label>
+        </div>
+        <div className="print-preview-pages" ref={containerRef} />
         <div className="formula-sheet-prompt-actions">
           <button className="dialog-action" onClick={onClose}>Cancel</button>
-          <button className="dialog-action-primary" onClick={() => void print()} disabled={isPrinting || !selected}>
+          <button
+            className="dialog-action-primary"
+            onClick={() => void print()}
+            disabled={isPrinting || isRendering || !selected}
+          >
             {isPrinting ? 'Printing…' : 'Print'}
           </button>
         </div>
