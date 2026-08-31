@@ -38,11 +38,15 @@
 
 - [x] Better printing — Export to PDF and Print are now separate File menu items, each a small dialog ending in a silent WebView2 call (`PrintToPdf`/`Print`, never `ShowPrintUI`). One checkbox ("Include page numbers, date, and title") controls WebView2's all-or-nothing header/footer bundle. Fixed two real pagination gaps (`h4`-`h6` and block-math/diagrams could split across a page). **Design:** `docs/specs/better-printing-design.md`. **Plan:** `docs/plans/better-printing.md`.
 
+margins on left and right + overlay issues
+preview is the frontend not the actual converted note
+none of the checkmarks work
+
+dom.js:727 Uncaught TypeError: Cannot read properties of null (reading 'nextSibling')
+
 - [ ] Better Home screen
 
 - [ ] Left sidebar needs a design update
-
-- [ ] Recent workspaces
 
 - [ ] Better window title with what workspace / file is open
 
@@ -69,6 +73,8 @@
 - [ ] when we select what do we want to copy?
 
 - [ ] Close Workspace
+
+- [ ] Recent workspaces
 
 - [ ] Recent workspaces in right click menu
 
