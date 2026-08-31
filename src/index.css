@@ -3700,7 +3700,9 @@ code {
 
   .sidebar, .tab-bar, .editor-toolbar, .editor-status, .backlinks-panel,
   .outline-panel, .search-overlay, .code-block-open-in-ide, .code-block-actions, .code-run-panel, .note-find-bar,
-  [data-slot="dialog-overlay"], [data-slot="dialog-content"] { display: none !important; }
+  [data-slot="dialog-overlay"] { display: none !important; }
+  [data-slot="dialog-content"]:not(:has(.print-preview-pages)) { display: none !important; }
+  [data-slot="dialog-content"]:has(.print-preview-pages) > *:not(.print-preview-pages) { display: none !important; }
 
   .layout, .main, .editor-body { display: block; height: auto; }
   .editor-scroll { overflow: visible; height: auto; }
