@@ -103,7 +103,6 @@ pub fn list_printers() -> Result<Vec<PrinterInfo>, String> {
 #[cfg(windows)]
 fn build_print_settings(
     core_webview: &webview2_com::Microsoft::Web::WebView2::Win32::ICoreWebView2,
-    include_header_footer: bool,
     printer_name: Option<&str>,
 ) -> windows::core::Result<webview2_com::Microsoft::Web::WebView2::Win32::ICoreWebView2PrintSettings>
 {
@@ -117,7 +116,20 @@ fn build_print_settings(
         let settings = environment
             .cast::<ICoreWebView2Environment6>()?
             .CreatePrintSettings()?;
-        settings.SetShouldPrintHeaderAndFooter(include_header_footer)?;
+        // Paged.js renders its own running headers/footers now (see
+        // docs/specs/better-printing-design.md) — WebView2's native,
+        // all-or-nothing bundle stays off unconditionally.
+        settings.SetShouldPrintHeaderAndFooter(false)?;
+        // Fixed Letter size with zero WebView2-side margin so a Paged.js
+        // page (which sets its own `@page { size: letter; margin: 1in }`)
+        // maps to exactly one physical page — Paged.js's margin is the
+        // only margin in effect.
+        settings.SetPageWidth(8.5)?;
+        settings.SetPageHeight(11.0)?;
+        settings.SetMarginTop(0.0)?;
+        settings.SetMarginBottom(0.0)?;
+        settings.SetMarginLeft(0.0)?;
+        settings.SetMarginRight(0.0)?;
         if let Some(name) = printer_name {
             settings
                 .cast::<ICoreWebView2PrintSettings2>()?
@@ -155,11 +167,7 @@ fn run_on_main_webview<T: Send + 'static>(
 }
 
 #[cfg(windows)]
-fn export_pdf_sync(
-    app: &tauri::AppHandle,
-    path: String,
-    include_header_footer: bool,
-) -> Result<(), String> {
+fn export_pdf_sync(app: &tauri::AppHandle, path: String) -> Result<(), String> {
     use tauri::Manager;
     use webview2_com::Microsoft::Web::WebView2::Win32::ICoreWebView2_7;
     use webview2_com::PrintToPdfCompletedHandler;
@@ -169,8 +177,7 @@ fn export_pdf_sync(
         .get_webview_window("main")
         .ok_or("main window not found")?;
     run_on_main_webview(&webview, move |core_webview| unsafe {
-        let settings = build_print_settings(&core_webview, include_header_footer, None)
-            .map_err(|e| e.to_string())?;
+        let settings = build_print_settings(&core_webview, None).map_err(|e| e.to_string())?;
         let core_webview_7 = core_webview
             .cast::<ICoreWebView2_7>()
             .map_err(|e| e.to_string())?;
@@ -198,14 +205,10 @@ fn export_pdf_sync(
 }
 
 #[tauri::command]
-pub async fn export_pdf(
-    app: tauri::AppHandle,
-    path: String,
-    include_header_footer: bool,
-) -> Result<(), String> {
+pub async fn export_pdf(app: tauri::AppHandle, path: String) -> Result<(), String> {
     #[cfg(windows)]
     {
-        tokio::task::spawn_blocking(move || export_pdf_sync(&app, path, include_header_footer))
+        tokio::task::spawn_blocking(move || export_pdf_sync(&app, path))
             .await
             .map_err(|e| e.to_string())?
     }
@@ -216,11 +219,7 @@ pub async fn export_pdf(
 }
 
 #[cfg(windows)]
-fn print_document_sync(
-    app: &tauri::AppHandle,
-    printer_name: String,
-    include_header_footer: bool,
-) -> Result<(), String> {
+fn print_document_sync(app: &tauri::AppHandle, printer_name: String) -> Result<(), String> {
     use tauri::Manager;
     use webview2_com::Microsoft::Web::WebView2::Win32::{
         ICoreWebView2_16, COREWEBVIEW2_PRINT_STATUS, COREWEBVIEW2_PRINT_STATUS_SUCCEEDED,
@@ -233,8 +232,7 @@ fn print_document_sync(
         .ok_or("main window not found")?;
     run_on_main_webview(&webview, move |core_webview| unsafe {
         let settings =
-            build_print_settings(&core_webview, include_header_footer, Some(&printer_name))
-                .map_err(|e| e.to_string())?;
+            build_print_settings(&core_webview, Some(&printer_name)).map_err(|e| e.to_string())?;
         let core_webview_16 = core_webview
             .cast::<ICoreWebView2_16>()
             .map_err(|e| e.to_string())?;
@@ -263,18 +261,12 @@ fn print_document_sync(
 }
 
 #[tauri::command]
-pub async fn print_document(
-    app: tauri::AppHandle,
-    printer_name: String,
-    include_header_footer: bool,
-) -> Result<(), String> {
+pub async fn print_document(app: tauri::AppHandle, printer_name: String) -> Result<(), String> {
     #[cfg(windows)]
     {
-        tokio::task::spawn_blocking(move || {
-            print_document_sync(&app, printer_name, include_header_footer)
-        })
-        .await
-        .map_err(|e| e.to_string())?
+        tokio::task::spawn_blocking(move || print_document_sync(&app, printer_name))
+            .await
+            .map_err(|e| e.to_string())?
     }
     #[cfg(not(windows))]
     {
