@@ -163,9 +163,9 @@ export const api = {
   printing: {
     listPrinters: () =>
       invoke<PrinterInfo[]>('list_printers'),
-    exportPdf: (path: string, includeHeaderFooter: boolean) =>
-      invoke<void>('export_pdf', { path, includeHeaderFooter }),
-    printDocument: (printerName: string, includeHeaderFooter: boolean) =>
-      invoke<void>('print_document', { printerName, includeHeaderFooter }),
+    exportPdf: (path: string) =>
+      invoke<void>('export_pdf', { path }),
+    printDocument: (printerName: string) =>
+      invoke<void>('print_document', { printerName }),
   },
 }

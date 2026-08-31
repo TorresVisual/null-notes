@@ -335,7 +335,7 @@ import { Previewer } from 'pagedjs'
 import { buildPageCss, formatPrintDate } from '../lib/printPreviewCss'
 
 interface UsePrintPreviewResult {
-  containerRef: RefObject<HTMLDivElement>
+  containerRef: RefObject<HTMLDivElement | null>
   showPageNumber: boolean
   setShowPageNumber: (value: boolean) => void
   showTitle: boolean
