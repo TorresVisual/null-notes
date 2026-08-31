@@ -1929,7 +1929,11 @@ mod save_tests {
         let padding = "x".repeat(200);
         let content = format!("{padding} [[Big O Notation]] {padding}");
         let snippet = extract_backlink_snippet(&content, "Big O Notation").unwrap();
-        assert!(snippet.chars().count() <= 161, "got {} chars", snippet.chars().count());
+        assert!(
+            snippet.chars().count() <= 161,
+            "got {} chars",
+            snippet.chars().count()
+        );
         assert!(snippet.ends_with('…'));
     }
 

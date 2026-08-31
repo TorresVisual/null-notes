@@ -86,7 +86,12 @@ fn fail(app: &AppHandle, run_id: &str, message: &str) {
 /// run per process (stdout, stderr) — the same "one thread per pipe" shape
 /// as `terminal.rs`'s single reader thread, doubled because a piped child
 /// (unlike a PTY) keeps stdout and stderr as genuinely separate streams.
-fn spawn_reader<R: Read + Send + 'static>(app: AppHandle, run_id: String, stream: String, mut reader: R) {
+fn spawn_reader<R: Read + Send + 'static>(
+    app: AppHandle,
+    run_id: String,
+    stream: String,
+    mut reader: R,
+) {
     std::thread::spawn(move || {
         let mut buf = [0u8; 4096];
         loop {
@@ -111,8 +116,12 @@ fn spawn_supervisor(app: AppHandle, run_id: String, timeout_secs: u64) {
         loop {
             std::thread::sleep(Duration::from_millis(100));
             let state = app.state::<RunState>();
-            let Ok(mut guard) = state.0.lock() else { return };
-            let Some(run) = guard.get_mut(&run_id) else { return };
+            let Ok(mut guard) = state.0.lock() else {
+                return;
+            };
+            let Some(run) = guard.get_mut(&run_id) else {
+                return;
+            };
 
             match run.child.try_wait() {
                 Ok(Some(status)) => {
@@ -177,7 +186,11 @@ pub fn run_code(
     let dir = match tempfile::tempdir() {
         Ok(dir) => dir,
         Err(e) => {
-            fail(&app, &run_id, &format!("could not create a temp directory: {e}"));
+            fail(
+                &app,
+                &run_id,
+                &format!("could not create a temp directory: {e}"),
+            );
             return Ok(());
         }
     };
@@ -185,14 +198,26 @@ pub fn run_code(
 
     let (program, args): (String, Vec<String>) = if is_cpp(&language) {
         if let Err(e) = std::fs::write(dir_path.join("main.cpp"), &source) {
-            fail(&app, &run_id, &format!("could not write the source file: {e}"));
+            fail(
+                &app,
+                &run_id,
+                &format!("could not write the source file: {e}"),
+            );
             return Ok(());
         }
         let (compiler, compile_args) = cpp_compile_argv(&cpp_compiler_command, "main.cpp");
-        let compile_output = match Command::new(&compiler).args(&compile_args).current_dir(&dir_path).output() {
+        let compile_output = match Command::new(&compiler)
+            .args(&compile_args)
+            .current_dir(&dir_path)
+            .output()
+        {
             Ok(output) => output,
             Err(e) => {
-                fail(&app, &run_id, &format!("could not run the configured compiler ({compiler}): {e}"));
+                fail(
+                    &app,
+                    &run_id,
+                    &format!("could not run the configured compiler ({compiler}): {e}"),
+                );
                 return Ok(());
             }
         };
@@ -208,12 +233,19 @@ pub fn run_code(
             return Ok(());
         }
         (
-            dir_path.join(cpp_binary_name()).to_string_lossy().into_owned(),
+            dir_path
+                .join(cpp_binary_name())
+                .to_string_lossy()
+                .into_owned(),
             Vec::new(),
         )
     } else if language == "python" {
         if let Err(e) = std::fs::write(dir_path.join("main.py"), &source) {
-            fail(&app, &run_id, &format!("could not write the source file: {e}"));
+            fail(
+                &app,
+                &run_id,
+                &format!("could not write the source file: {e}"),
+            );
             return Ok(());
         }
         python_argv(&python_command, "main.py")
@@ -232,7 +264,11 @@ pub fn run_code(
     {
         Ok(child) => child,
         Err(e) => {
-            fail(&app, &run_id, &format!("could not start the process ({program}): {e}"));
+            fail(
+                &app,
+                &run_id,
+                &format!("could not start the process ({program}): {e}"),
+            );
             return Ok(());
         }
     };
@@ -283,7 +319,9 @@ pub fn send_input(run_id: String, text: String, state: State<'_, RunState>) -> R
     let mut guard = state.0.lock().map_err(|e| e.to_string())?;
     let run = guard.get_mut(&run_id).ok_or("no such run")?;
     let stdin = run.stdin.as_mut().ok_or("this run has no stdin")?;
-    stdin.write_all(text.as_bytes()).map_err(|e| e.to_string())?;
+    stdin
+        .write_all(text.as_bytes())
+        .map_err(|e| e.to_string())?;
     stdin.write_all(b"\n").map_err(|e| e.to_string())?;
     stdin.flush().map_err(|e| e.to_string())
 }

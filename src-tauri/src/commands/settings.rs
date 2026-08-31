@@ -249,7 +249,10 @@ mod tests {
         // existed must load as the 2-space behavior every code block already
         // had, not some other implicit width.
         assert_eq!(loaded.code_indent_width, 2);
-        assert_eq!(loaded.code_indent_char, crate::models::CodeIndentChar::Space);
+        assert_eq!(
+            loaded.code_indent_char,
+            crate::models::CodeIndentChar::Space
+        );
         // Same guarantee for P11-4: an older settings.json loads into the one
         // palette/size every code block already had, not some other implicit
         // theme or a font size that doesn't match what was already on screen.
