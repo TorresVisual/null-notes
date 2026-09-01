@@ -273,6 +273,31 @@ fn parse_sr_comment(line: &str) -> Option<(String, f64, i64, i64, Option<sm2::Gr
     Some((due, ease, interval, reps, grade))
 }
 
+// The schedule comment sits either directly after a card's content (a note
+// never round-tripped through the editor, or one just graded by
+// `grade_card_line` itself) or one blank line below it (round-tripped through
+// the editor at least once — prosemirror-markdown puts a blank line between
+// a taskList/paragraph and the differently-typed comment block that follows
+// it, the same rule `mc_options_start` already documents for the
+// question→options boundary). Preferring whichever position actually holds a
+// parseable comment — rather than blindly skipping one line the way
+// `mc_options_start` does — is what keeps a re-grade from inserting a
+// duplicate instead of replacing the comment that is already there.
+fn sr_comment_idx(lines: &[&str], after: usize) -> usize {
+    if lines.get(after).and_then(|l| parse_sr_comment(l)).is_some() {
+        return after;
+    }
+    if lines.get(after).is_some_and(|l| l.trim().is_empty())
+        && lines
+            .get(after + 1)
+            .and_then(|l| parse_sr_comment(l))
+            .is_some()
+    {
+        return after + 1;
+    }
+    after
+}
+
 fn checkbox_re() -> Regex {
     Regex::new(r"^\s*-\s\[([ xX])\]\s+(.+)$").expect("static checkbox regex")
 }
@@ -435,8 +460,9 @@ pub fn extract_cards(content: &str) -> Vec<ExtractedCard> {
         if is_mc_question_line(trimmed) {
             let option_count = mc_block_option_count(&lines, i);
             if let Some((front, options, correct)) = parse_mc_block(&lines, i) {
+                let comment_idx = sr_comment_idx(&lines, i + 1 + option_count);
                 let (due, ease, interval, reps, grade) = lines
-                    .get(i + 1 + option_count)
+                    .get(comment_idx)
                     .and_then(|l| parse_sr_comment(l))
                     .map(|(d, e, iv, r, g)| (Some(d), Some(e), Some(iv), Some(r), g))
                     .unwrap_or((None, None, None, None, None));
@@ -466,8 +492,9 @@ pub fn extract_cards(content: &str) -> Vec<ExtractedCard> {
             }
         };
 
+        let comment_idx = sr_comment_idx(&lines, i + 1);
         let (due, ease, interval, reps, grade) = lines
-            .get(i + 1)
+            .get(comment_idx)
             .and_then(|l| parse_sr_comment(l))
             .map(|(d, e, iv, r, g)| (Some(d), Some(e), Some(iv), Some(r), g))
             .unwrap_or((None, None, None, None, None));
@@ -801,16 +828,16 @@ pub fn grade_card_line(
     let idx = usize::try_from(position).ok()?;
     let trimmed = lines.get(idx)?.trim().to_string();
 
+    let borrowed: Vec<&str> = lines.iter().map(String::as_str).collect();
     let comment_idx = if is_mc_question_line(&trimmed) {
-        let borrowed: Vec<&str> = lines.iter().map(String::as_str).collect();
         let option_count = mc_block_option_count(&borrowed, idx);
         if option_count == 0 {
             return None;
         }
-        idx + 1 + option_count
+        sr_comment_idx(&borrowed, idx + 1 + option_count)
     } else {
         classify_card_line(&trimmed)?;
-        idx + 1
+        sr_comment_idx(&borrowed, idx + 1)
     };
 
     let current = lines
@@ -1910,6 +1937,23 @@ mod tests {
     }
 
     #[test]
+    fn test_extract_cards_reads_a_qa_schedule_comment_separated_by_a_blank_line() {
+        let content =
+            "Q :: A\n\n<!-- sr due=2026-08-21 ease=2.50 interval=1 reps=1 grade=good -->\n";
+        let cards = extract_cards(content);
+        assert_eq!(cards.len(), 1);
+        assert_eq!(cards[0].due.as_deref(), Some("2026-08-21"));
+    }
+
+    #[test]
+    fn test_extract_cards_mc_block_reads_its_sr_comment_separated_by_a_blank_line() {
+        let content = "Q ::\n- [ ] a\n- [x] b\n\n<!-- sr due=2026-08-21 ease=2.50 interval=1 reps=1 grade=good -->\n";
+        let cards = extract_cards(content);
+        assert_eq!(cards.len(), 1);
+        assert_eq!(cards[0].due.as_deref(), Some("2026-08-21"));
+    }
+
+    #[test]
     fn test_extract_cards_a_blank_line_with_no_options_after_is_not_an_mc_block() {
         let content = "Question ::\n\nJust a paragraph, not an option list.\n";
         assert!(extract_cards(content).is_empty());
@@ -2095,6 +2139,39 @@ mod tests {
         )
         .unwrap();
         assert!(out.contains("grade=hard"));
+    }
+
+    #[test]
+    fn test_grade_card_line_updates_an_mc_comment_separated_by_a_blank_line_in_place() {
+        // prosemirror-markdown inserts a blank line between the option list
+        // and the differently-typed srState comment block on every editor
+        // round-trip (I3) — a re-grade must find and replace that comment,
+        // not treat the blank line as "no comment" and insert a duplicate.
+        let content = "Q ::\n- [ ] a\n- [x] b\n\n<!-- sr due=2026-08-20 ease=2.50 interval=1 reps=1 grade=good -->\n";
+        let out = grade_card_line(
+            content,
+            0,
+            sm2::Grade::Easy,
+            chrono::NaiveDate::from_ymd_opt(2026, 8, 21).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(out.matches("<!-- sr ").count(), 1);
+        assert!(out.contains("grade=easy"));
+    }
+
+    #[test]
+    fn test_grade_card_line_updates_a_qa_comment_separated_by_a_blank_line_in_place() {
+        let content =
+            "Q :: A\n\n<!-- sr due=2026-08-20 ease=2.50 interval=1 reps=1 grade=good -->\n";
+        let out = grade_card_line(
+            content,
+            0,
+            sm2::Grade::Easy,
+            chrono::NaiveDate::from_ymd_opt(2026, 8, 21).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(out.matches("<!-- sr ").count(), 1);
+        assert!(out.contains("grade=easy"));
     }
 
     #[test]

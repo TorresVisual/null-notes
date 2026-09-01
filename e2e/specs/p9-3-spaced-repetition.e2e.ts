@@ -139,7 +139,7 @@ describe('P9-3: spaced repetition', () => {
     )
     const content = readFileSync(notePath, 'utf-8')
     expect(content).toMatch(
-      /What is Big-O of binary search\? :: O\(log n\)\n<!-- sr due=\d{4}-\d{2}-\d{2} ease=2\.50 interval=1 reps=1 -->/,
+      /What is Big-O of binary search\? :: O\(log n\)\n<!-- sr due=\d{4}-\d{2}-\d{2} ease=2\.50 interval=1 reps=1(?: grade=\S+)? -->/,
     )
   })
 

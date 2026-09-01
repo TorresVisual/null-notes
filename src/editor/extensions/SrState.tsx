@@ -5,6 +5,7 @@ interface SrStateAttrs {
   ease: string
   interval: string
   reps: string
+  grade: string
 }
 
 // A card's SM-2 schedule (P9-3), stored in the note as a plain
@@ -32,6 +33,7 @@ export const SrState = Node.create({
       ease: { default: '' },
       interval: { default: '' },
       reps: { default: '' },
+      grade: { default: '' },
     }
   },
 
@@ -44,6 +46,7 @@ export const SrState = Node.create({
           ease: (el as HTMLElement).getAttribute('data-ease') ?? '',
           interval: (el as HTMLElement).getAttribute('data-interval') ?? '',
           reps: (el as HTMLElement).getAttribute('data-reps') ?? '',
+          grade: (el as HTMLElement).getAttribute('data-grade') ?? '',
         }),
       },
     ]
@@ -59,6 +62,7 @@ export const SrState = Node.create({
         'data-ease': attrs.ease,
         'data-interval': attrs.interval,
         'data-reps': attrs.reps,
+        'data-grade': attrs.grade,
         style: 'display:none',
         contenteditable: 'false',
       },
@@ -72,9 +76,10 @@ export const SrState = Node.create({
           state: { write: (s: string) => void; ensureNewLine: () => void; closeBlock: (n: unknown) => void },
           node: { attrs: SrStateAttrs },
         ) {
-          const { due, ease, interval, reps } = node.attrs
+          const { due, ease, interval, reps, grade } = node.attrs
           state.ensureNewLine()
-          state.write(`<!-- sr due=${due} ease=${ease} interval=${interval} reps=${reps} -->`)
+          const gradePart = grade ? ` grade=${grade}` : ''
+          state.write(`<!-- sr due=${due} ease=${ease} interval=${interval} reps=${reps}${gradePart} -->`)
           state.closeBlock(node)
         },
         parse: {
@@ -86,7 +91,7 @@ export const SrState = Node.create({
               toReplace.push(n as Comment)
               n = walker.nextNode()
             }
-            const pattern = /^sr\s+due=(\S+)\s+ease=(\S+)\s+interval=(\S+)\s+reps=(\S+)$/
+            const pattern = /^sr\s+due=(\S+)\s+ease=(\S+)\s+interval=(\S+)\s+reps=(\S+)(?:\s+grade=(\S+))?$/
             for (const comment of toReplace) {
               const match = pattern.exec(comment.data.trim())
               if (!match) continue
@@ -96,6 +101,7 @@ export const SrState = Node.create({
               div.setAttribute('data-ease', match[2]!)
               div.setAttribute('data-interval', match[3]!)
               div.setAttribute('data-reps', match[4]!)
+              div.setAttribute('data-grade', match[5] ?? '')
               comment.replaceWith(div)
             }
           },

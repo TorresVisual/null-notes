@@ -41,6 +41,29 @@ describe('SrState node (P9-3)', () => {
     expect(getComputedStyle(el as Element).display).toBe('none')
   })
 
+  it('round-trips a 5-field schedule comment with a trailing grade unchanged', () => {
+    const md = 'What is Big-O of binary search? :: O(log n)\n<!-- sr due=2026-08-21 ease=2.50 interval=1 reps=1 grade=good -->'
+    const e = mount(md)
+    expect(getMarkdown(e)).toContain(
+      '<!-- sr due=2026-08-21 ease=2.50 interval=1 reps=1 grade=good -->',
+    )
+  })
+
+  // (I3) prosemirror-markdown inserts a blank line between the option
+  // taskList and the differently-typed srState comment that follows it —
+  // the same boundary rule `mc_options_start` already documents for the
+  // question→options side. Confirmed here rather than assumed: the comment
+  // survives intact (no loss, no duplication), just shifted one line down.
+  // `sr_comment_idx` (src-tauri/src/commands/notes.rs) is what makes the
+  // Rust side tolerate that shift on both read and re-grade.
+  it('round-trips a schedule comment following an MC option list, tolerating the blank line prosemirror-markdown inserts', () => {
+    const md = 'Q ::\n- [ ] a\n- [x] b\n<!-- sr due=2026-08-21 ease=2.50 interval=1 reps=1 grade=good -->'
+    const e = mount(md)
+    const out = getMarkdown(e)
+    expect(out).toContain('- [x] b\n\n<!-- sr due=2026-08-21 ease=2.50 interval=1 reps=1 grade=good -->')
+    expect(out.match(/<!-- sr /g)?.length).toBe(1)
+  })
+
   it('leaves a note with no schedule comment completely unaffected', () => {
     const md = 'Just an ordinary note with no cards.'
     const e = mount(md)

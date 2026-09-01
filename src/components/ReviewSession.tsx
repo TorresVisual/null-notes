@@ -19,17 +19,21 @@ export function ReviewSession({ onClose }: ReviewSessionProps) {
   const workspacePath = useWorkspaceStore((s) => s.path)
   const [queue, setQueue] = useState<DueCard[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [revealed, setRevealed] = useState(false)
   const [picked, setPicked] = useState<Set<number>>(new Set())
   const [mcResult, setMcResult] = useState<number[] | null>(null)
+  const [mcSubmitting, setMcSubmitting] = useState(false)
 
   useEffect(() => {
     if (!workspacePath) return
     setIsLoading(true)
-    api.notes.listDueCards(workspacePath).then((cards) => {
-      setQueue(cards)
-      setIsLoading(false)
-    })
+    setError(null)
+    api.notes
+      .listDueCards(workspacePath)
+      .then((cards) => setQueue(cards))
+      .catch((e: unknown) => setError(`Couldn't load the review queue: ${String(e)}`))
+      .finally(() => setIsLoading(false))
   }, [workspacePath])
 
   const current = queue[0]
@@ -78,9 +82,18 @@ export function ReviewSession({ onClose }: ReviewSessionProps) {
 
   function submitMc() {
     if (!workspacePath || !current) return
+    setMcSubmitting(true)
     void api.notes
       .gradeMcCard(current.notePath, current.position, Array.from(picked), workspacePath)
       .then((result) => setMcResult(result.correct))
+      .catch(() => {
+        // Same reasoning as grade(): the note may have been deleted outside
+        // the app, or another card in it graded first and shifted this
+        // card's position — refetch so a ghost card can't get stuck
+        // un-gradeable forever.
+        refetch()
+      })
+      .finally(() => setMcSubmitting(false))
   }
 
   function optionClass(i: number): string {
@@ -104,6 +117,8 @@ export function ReviewSession({ onClose }: ReviewSessionProps) {
         </div>
         {isLoading ? (
           <p className="status">Loading…</p>
+        ) : error ? (
+          <p className="empty-state">{error}</p>
         ) : !current ? (
           <p className="empty-state">All done for today.</p>
         ) : (
@@ -129,7 +144,11 @@ export function ReviewSession({ onClose }: ReviewSessionProps) {
                   ))}
                 </ul>
                 {mcResult === null ? (
-                  <button className="review-card-reveal" disabled={picked.size === 0} onClick={submitMc}>
+                  <button
+                    className="review-card-reveal"
+                    disabled={picked.size === 0 || mcSubmitting}
+                    onClick={submitMc}
+                  >
                     Submit
                   </button>
                 ) : (
