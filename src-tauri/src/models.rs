@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use crate::sm2;
 
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 #[serde(rename_all = "camelCase")]
@@ -204,12 +205,14 @@ pub struct OpenTask {
     pub position: i64,
 }
 
-/// Which of the two card-authoring forms a line matched (P9-3): a
-/// `front :: back` line, or a line containing one or more `{{cloze}}` spans.
+/// Which of the three card-authoring forms a line matched (P9-3): a
+/// `front :: back` line, a line containing one or more `{{cloze}}` spans,
+/// or a multiple-choice block.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CardKind {
     Qa,
     Cloze,
+    Mc,
 }
 
 /// A review card extracted from a note's raw markdown (P9-3), mirroring how
@@ -229,11 +232,18 @@ pub struct ExtractedCard {
     pub ease: Option<f64>,
     pub interval: Option<i64>,
     pub reps: Option<i64>,
+    pub grade: Option<sm2::Grade>,
+    /// MC option text, in source order. Empty for `Qa`/`Cloze`.
+    pub options: Vec<String>,
+    /// 0-based indices of the `[x]` lines. Empty for `Qa`/`Cloze`. Never
+    /// persisted to the DB and never sent to the frontend for a due card —
+    /// see `DueCard`.
+    pub correct: Vec<usize>,
 }
 
 /// One due (or new) review card joined with the note it lives in, for the
-/// review session (P9-3). Mirrors `OpenTask`'s shape exactly.
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+/// review session (P9-3).
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DueCard {
     pub note_path: String,
@@ -242,6 +252,34 @@ pub struct DueCard {
     pub front: String,
     pub back: String,
     pub position: i64,
+    /// MC option text, in source order. Empty for `qa`/`cloze`. The
+    /// answer (`correct`) is deliberately absent — resolved server-side at
+    /// grading time against a fresh read of the note.
+    pub options: Vec<String>,
+}
+
+/// One card for the deck view (browse-all, not just due) — mirrors
+/// `DueCard` plus scheduling/tag fields a due-queue card doesn't need.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CardSummary {
+    pub note_path: String,
+    pub note_title: String,
+    pub kind: String,
+    pub front: String,
+    pub back: String,
+    pub position: i64,
+    pub due: String,
+    pub interval: i64,
+    pub tags: Vec<String>,
+}
+
+/// What `grade_mc_card` hands back so the frontend can highlight the right
+/// options without having been told the answer up front.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct McGradeResult {
+    pub correct: Vec<usize>,
 }
 
 /// How an imported PDF becomes a note: page images to write alongside, or the
