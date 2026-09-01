@@ -304,7 +304,11 @@ fn mc_block_option_count(lines: &[&str], start: usize) -> usize {
 // that merely looks card-shaped).
 fn parse_mc_block(lines: &[&str], start: usize) -> Option<(String, Vec<String>, Vec<usize>)> {
     let re = checkbox_re();
-    let front = lines[start].trim().trim_end_matches("::").trim().to_string();
+    let front = lines[start]
+        .trim()
+        .trim_end_matches("::")
+        .trim()
+        .to_string();
     let mut options = Vec::new();
     let mut correct = Vec::new();
     let mut j = start + 1;
