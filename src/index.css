@@ -3495,6 +3495,28 @@ code {
 .review-card-option-incorrect label { border-color: var(--danger); color: var(--danger); }
 .review-card-option-missed label { border-color: var(--warning, #d29922); }
 
+.deck-view-stats {
+  display: flex;
+  gap: var(--space-lg);
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+
+.deck-view-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+}
+
+.deck-view-tag {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
 /* Workspace dashboard (P9-4) — an inline main-pane view, not a modal
    overlay, since it replaces the empty-state slot rather than sitting
    on top of a note. */

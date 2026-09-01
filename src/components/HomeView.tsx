@@ -24,10 +24,11 @@ function relativeTime(ms: number): string {
 interface HomeViewProps {
   onOpenTaskView: () => void
   onOpenReview: () => void
+  onOpenDeckView: () => void
   onOpenSettings: () => void
 }
 
-export function HomeView({ onOpenTaskView, onOpenReview, onOpenSettings }: HomeViewProps) {
+export function HomeView({ onOpenTaskView, onOpenReview, onOpenDeckView, onOpenSettings }: HomeViewProps) {
   const openTabs = useWorkspaceStore((s) => s.openTabs)
   const setActiveTab = useWorkspaceStore((s) => s.setActiveTab)
   const openTab = useWorkspaceStore((s) => s.openTab)
@@ -141,6 +142,9 @@ export function HomeView({ onOpenTaskView, onOpenReview, onOpenSettings }: HomeV
             <p className="home-count">{dueCards.length} due</p>
             <button className="home-view-all" onClick={onOpenReview}>
               Start review
+            </button>
+            <button className="home-view-all" onClick={onOpenDeckView}>
+              Browse all cards
             </button>
           </>
         )}

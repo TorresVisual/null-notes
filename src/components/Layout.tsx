@@ -20,6 +20,7 @@ import { PromptDialog } from './PromptDialog'
 import { TemplateDialog } from './TemplateDialog'
 import { GraphView } from './GraphView'
 import { TaskView } from './TaskView'
+import { DeckView } from './DeckView'
 import { ReviewSession } from './ReviewSession'
 import { HomeView } from './HomeView'
 import { FormulaSheetPrompt } from './FormulaSheetPrompt'
@@ -197,6 +198,9 @@ export function Layout() {
         case 'review':
           if (workspacePath) openOverlay('review')
           break
+        case 'deck-view':
+          if (workspacePath) openOverlay('deck')
+          break
         case 'generate-formula-sheet':
           if (workspacePath) openOverlay('formulaSheet')
           break
@@ -371,6 +375,7 @@ export function Layout() {
       {activeOverlay === 'graph' && <GraphView onClose={closeOverlay} />}
       {activeOverlay === 'task' && <TaskView onClose={closeOverlay} />}
       {activeOverlay === 'review' && <ReviewSession onClose={closeOverlay} />}
+      {activeOverlay === 'deck' && <DeckView onClose={closeOverlay} />}
       {activeOverlay === 'formulaSheet' && <FormulaSheetPrompt onClose={closeOverlay} />}
       {activeOverlay === 'exportPdf' && currentNote && (
         <ExportPdfDialog noteTitle={currentNote.title} contentRef={editorPaneRef} onClose={closeOverlay} />
@@ -473,6 +478,7 @@ export function Layout() {
                 <HomeView
                   onOpenTaskView={() => openOverlay('task')}
                   onOpenReview={() => openOverlay('review')}
+                  onOpenDeckView={() => openOverlay('deck')}
                   onOpenSettings={() => openOverlay('settings')}
                 />
               )}

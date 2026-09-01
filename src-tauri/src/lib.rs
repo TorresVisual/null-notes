@@ -141,6 +141,13 @@ fn build_menu(handle: &tauri::AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
                 Some("CmdOrCtrl+Shift+K"),
             )?,
             &MenuItem::with_id(handle, "review", "Review", true, Some("CmdOrCtrl+Shift+R"))?,
+            &MenuItem::with_id(
+                handle,
+                "deck-view",
+                "Browse All Cards",
+                true,
+                Some("CmdOrCtrl+Shift+D"),
+            )?,
             &PredefinedMenuItem::separator(handle)?,
             &MenuItem::with_id(
                 handle,
