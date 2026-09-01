@@ -326,6 +326,7 @@ export function Layout() {
       'shift+o': 'toggle-outline',
       'shift+k': 'task-view',
       'shift+r': 'review',
+      'shift+d': 'deck-view',
       ',': 'settings',
       h: 'home',
       w: 'close-tab',
