@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import type { RefObject } from 'react'
 import { X } from 'lucide-react'
 import { api } from '../lib/tauri'
 import { showToast } from '../store/toast'
@@ -8,11 +9,11 @@ import type { PrinterInfo } from '../types'
 
 interface PrintDialogProps {
   noteTitle: string
-  contentEl: HTMLElement | null
+  contentRef: RefObject<HTMLElement | null>
   onClose: () => void
 }
 
-export function PrintDialog({ noteTitle, contentEl, onClose }: PrintDialogProps) {
+export function PrintDialog({ noteTitle, contentRef, onClose }: PrintDialogProps) {
   const [printers, setPrinters] = useState<PrinterInfo[]>([])
   const [selected, setSelected] = useState('')
   const [isPrinting, setIsPrinting] = useState(false)
@@ -26,7 +27,7 @@ export function PrintDialog({ noteTitle, contentEl, onClose }: PrintDialogProps)
     setShowDate,
     isRendering,
     error,
-  } = usePrintPreview(contentEl, noteTitle)
+  } = usePrintPreview(contentRef, noteTitle)
 
   useEffect(() => {
     void api.printing.listPrinters().then((list) => {

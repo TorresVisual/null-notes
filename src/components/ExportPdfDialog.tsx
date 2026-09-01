@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import type { RefObject } from 'react'
 import { X } from 'lucide-react'
 import { save } from '@tauri-apps/plugin-dialog'
 import { api } from '../lib/tauri'
@@ -8,11 +9,11 @@ import { Dialog, DialogContent, DialogTitle } from './ui/dialog'
 
 interface ExportPdfDialogProps {
   noteTitle: string
-  contentEl: HTMLElement | null
+  contentRef: RefObject<HTMLElement | null>
   onClose: () => void
 }
 
-export function ExportPdfDialog({ noteTitle, contentEl, onClose }: ExportPdfDialogProps) {
+export function ExportPdfDialog({ noteTitle, contentRef, onClose }: ExportPdfDialogProps) {
   const {
     containerRef,
     showPageNumber,
@@ -23,7 +24,7 @@ export function ExportPdfDialog({ noteTitle, contentEl, onClose }: ExportPdfDial
     setShowDate,
     isRendering,
     error,
-  } = usePrintPreview(contentEl, noteTitle)
+  } = usePrintPreview(contentRef, noteTitle)
   const [isExporting, setIsExporting] = useState(false)
 
   useEffect(() => {

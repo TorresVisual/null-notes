@@ -52,7 +52,7 @@ describe('ExportPdfDialog', () => {
   it('exports to the chosen path', async () => {
     const user = userEvent.setup()
     const onClose = vi.fn()
-    render(<ExportPdfDialog noteTitle="Lecture 7" contentEl={null} onClose={onClose} />)
+    render(<ExportPdfDialog noteTitle="Lecture 7" contentRef={{ current: null }} onClose={onClose} />)
 
     await user.click(screen.getByRole('button', { name: /Choose Location & Export/ }))
 
@@ -65,7 +65,7 @@ describe('ExportPdfDialog', () => {
     const setShowPageNumber = vi.fn()
     previewHook.mockReturnValue(makePreviewResult({ setShowPageNumber }))
     const user = userEvent.setup()
-    render(<ExportPdfDialog noteTitle="Lecture 7" contentEl={null} onClose={vi.fn()} />)
+    render(<ExportPdfDialog noteTitle="Lecture 7" contentRef={{ current: null }} onClose={vi.fn()} />)
 
     const checkboxes = screen.getAllByRole('checkbox')
     expect(checkboxes).toHaveLength(3)
@@ -77,7 +77,7 @@ describe('ExportPdfDialog', () => {
   it('does nothing when the save dialog is cancelled', async () => {
     saveDialog.mockResolvedValue(null)
     const user = userEvent.setup()
-    render(<ExportPdfDialog noteTitle="Lecture 7" contentEl={null} onClose={vi.fn()} />)
+    render(<ExportPdfDialog noteTitle="Lecture 7" contentRef={{ current: null }} onClose={vi.fn()} />)
 
     await user.click(screen.getByRole('button', { name: /Choose Location & Export/ }))
 
@@ -86,14 +86,14 @@ describe('ExportPdfDialog', () => {
 
   it('disables Export while the preview is rendering', () => {
     previewHook.mockReturnValue(makePreviewResult({ isRendering: true }))
-    render(<ExportPdfDialog noteTitle="Lecture 7" contentEl={null} onClose={vi.fn()} />)
+    render(<ExportPdfDialog noteTitle="Lecture 7" contentRef={{ current: null }} onClose={vi.fn()} />)
 
     expect(screen.getByRole('button', { name: /Choose Location & Export/ })).toBeDisabled()
   })
 
   it('toasts a preview error', () => {
     previewHook.mockReturnValue(makePreviewResult({ error: 'paged.js exploded' }))
-    render(<ExportPdfDialog noteTitle="Lecture 7" contentEl={null} onClose={vi.fn()} />)
+    render(<ExportPdfDialog noteTitle="Lecture 7" contentRef={{ current: null }} onClose={vi.fn()} />)
 
     expect(showToast).toHaveBeenCalledWith('paged.js exploded')
   })
@@ -101,7 +101,7 @@ describe('ExportPdfDialog', () => {
   it('toasts the error message on export failure and re-enables the button', async () => {
     exportPdf.mockRejectedValue(new Error('printer offline'))
     const user = userEvent.setup()
-    render(<ExportPdfDialog noteTitle="Lecture 7" contentEl={null} onClose={vi.fn()} />)
+    render(<ExportPdfDialog noteTitle="Lecture 7" contentRef={{ current: null }} onClose={vi.fn()} />)
 
     await user.click(screen.getByRole('button', { name: /Choose Location & Export/ }))
 

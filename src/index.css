@@ -3657,6 +3657,49 @@ code {
   padding: var(--space-md);
 }
 
+/* Paged.js gives `.pagedjs_page` no visual styling of its own, and
+   usePrintPreview clones `.editor-pane` verbatim — without a forced light
+   palette and a real page look here, the on-screen preview just inherits
+   the live (possibly dark) theme and reads as a copy of the editor rather
+   than a print preview. Unscoped from `@media print` (unlike the palette
+   swap below) because this has to look right before the user ever prints. */
+.print-preview-pages {
+  --bg-base: #ffffff;
+  --bg-raised: #ffffff;
+  --bg-sunken: #f5f5f5;
+  --bg-hover: #f0f0f0;
+  --border: #d8d8d8;
+  --border-strong: #b8b8b8;
+  --text-primary: #111111;
+  --text-secondary: #3a3a3a;
+  --text-tertiary: #666666;
+  --text-disabled: #999999;
+  --accent: #1a7f37;
+  --accent-hover: #1a7f37;
+  --accent-bg: rgba(26, 127, 55, 0.08);
+  --accent-bg-hover: rgba(26, 127, 55, 0.08);
+  --accent-contrast: #ffffff;
+  --danger: #b3261e;
+}
+
+.print-preview-pages .editor-toolbar,
+.print-preview-pages .editor-status,
+.print-preview-pages .backlinks-panel,
+.print-preview-pages .outline-panel,
+.print-preview-pages .search-overlay,
+.print-preview-pages .code-block-open-in-ide,
+.print-preview-pages .code-block-actions,
+.print-preview-pages .code-run-panel,
+.print-preview-pages .note-find-bar {
+  display: none !important;
+}
+
+.print-preview-pages .pagedjs_page {
+  background: #fff;
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.35);
+  margin: 0 auto 16px;
+}
+
 /* Export to PDF (File > Export to PDF, or the OS print dialog directly)
    leans on the WebView's own print pipeline rather than a custom renderer —
    math, Mermaid, ink and code all print exactly as they're already shown on
@@ -3698,15 +3741,48 @@ code {
 
   html, body { background: #fff; height: auto; overflow: visible; }
 
-  .sidebar, .tab-bar, .editor-toolbar, .editor-status, .backlinks-panel,
-  .outline-panel, .search-overlay, .code-block-open-in-ide, .code-block-actions, .code-run-panel, .note-find-bar,
-  [data-slot="dialog-overlay"] { display: none !important; }
+  /* Printing only ever goes through Export to PDF / Print now, both of
+     which render a Paged.js clone into `.print-preview-pages` (its own
+     chrome-hiding rules above apply here too, print or not) inside a
+     dialog portaled to document.body — the live `.layout` behind it never
+     needs to print and, left visible, bleeds its full-bleed, unpaginated
+     content in behind/around the real paginated pages. */
+  .layout, [data-slot="dialog-overlay"] { display: none !important; }
   [data-slot="dialog-content"]:not(:has(.print-preview-pages)) { display: none !important; }
   [data-slot="dialog-content"]:has(.print-preview-pages) > *:not(.print-preview-pages) { display: none !important; }
 
-  .layout, .main, .editor-body { display: block; height: auto; }
-  .editor-scroll { overflow: visible; height: auto; }
-  .editor-pane { max-width: none; margin: 0; padding: 0; }
+  /* The dialog shell (fixed/centered/width-capped/padded) and the
+     scrollable preview pane (bordered, backgrounded, clipped to 60vh) are
+     screen-only chrome around the Paged.js page boxes — left unreset here,
+     they add their own margins around, and clip, the real printed pages. */
+  [data-slot="dialog-content"]:has(.print-preview-pages) {
+    position: static;
+    inset: auto;
+    transform: none;
+    width: auto;
+    max-width: none;
+    max-height: none;
+    padding: 0;
+    margin: 0;
+    border: none;
+    box-shadow: none;
+    background: transparent;
+  }
+  .print-preview-pages {
+    overflow: visible;
+    max-height: none;
+    padding: 0;
+    border: none;
+    background: transparent;
+  }
+  /* The on-screen drop-shadow/inter-page gap (index.css above) makes the
+     preview read as a stack of pages — printed verbatim it leaves a
+     shadowed inset card on each physical page instead of a full-bleed one
+     and throws off Paged.js's 1:1 page-to-page mapping. */
+  .print-preview-pages .pagedjs_page {
+    box-shadow: none;
+    margin: 0;
+  }
 
   .note-editor h1, .note-editor h2, .note-editor h3, .note-editor h4, .note-editor h5, .note-editor h6 { break-after: avoid; }
   .note-editor pre, .pdf-page-block, .ink-block-wrapper, .note-editor table,

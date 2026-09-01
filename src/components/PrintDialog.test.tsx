@@ -49,14 +49,14 @@ afterEach(() => {
 
 describe('PrintDialog', () => {
   it('preselects the default printer', async () => {
-    render(<PrintDialog noteTitle="Lecture 7" contentEl={null} onClose={vi.fn()} />)
+    render(<PrintDialog noteTitle="Lecture 7" contentRef={{ current: null }} onClose={vi.fn()} />)
     expect(await screen.findByRole('combobox')).toHaveValue('Microsoft Print to PDF')
   })
 
   it('prints the preselected printer', async () => {
     const user = userEvent.setup()
     const onClose = vi.fn()
-    render(<PrintDialog noteTitle="Lecture 7" contentEl={null} onClose={onClose} />)
+    render(<PrintDialog noteTitle="Lecture 7" contentRef={{ current: null }} onClose={onClose} />)
 
     await screen.findByRole('combobox')
     await user.click(screen.getByRole('button', { name: 'Print' }))
@@ -66,7 +66,7 @@ describe('PrintDialog', () => {
   })
 
   it('renders three independent checkboxes', async () => {
-    render(<PrintDialog noteTitle="Lecture 7" contentEl={null} onClose={vi.fn()} />)
+    render(<PrintDialog noteTitle="Lecture 7" contentRef={{ current: null }} onClose={vi.fn()} />)
     await screen.findByRole('combobox')
     expect(screen.getAllByRole('checkbox')).toHaveLength(3)
   })
@@ -74,7 +74,7 @@ describe('PrintDialog', () => {
   it('toasts the error message on print failure', async () => {
     printDocument.mockRejectedValue(new Error('printer offline'))
     const user = userEvent.setup()
-    render(<PrintDialog noteTitle="Lecture 7" contentEl={null} onClose={vi.fn()} />)
+    render(<PrintDialog noteTitle="Lecture 7" contentRef={{ current: null }} onClose={vi.fn()} />)
 
     await screen.findByRole('combobox')
     await user.click(screen.getByRole('button', { name: 'Print' }))
@@ -84,14 +84,14 @@ describe('PrintDialog', () => {
 
   it('disables Print while the preview is rendering, even with a printer selected', async () => {
     previewHook.mockReturnValue(makePreviewResult({ isRendering: true }))
-    render(<PrintDialog noteTitle="Lecture 7" contentEl={null} onClose={vi.fn()} />)
+    render(<PrintDialog noteTitle="Lecture 7" contentRef={{ current: null }} onClose={vi.fn()} />)
 
     expect(await screen.findByRole('button', { name: 'Print' })).toBeDisabled()
   })
 
   it('disables Print when no printers are found', async () => {
     listPrinters.mockResolvedValue([])
-    render(<PrintDialog noteTitle="Lecture 7" contentEl={null} onClose={vi.fn()} />)
+    render(<PrintDialog noteTitle="Lecture 7" contentRef={{ current: null }} onClose={vi.fn()} />)
 
     expect(await screen.findByRole('button', { name: 'Print' })).toBeDisabled()
   })

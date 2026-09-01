@@ -50,6 +50,8 @@ dom.js:727 Uncaught TypeError: Cannot read properties of null (reading 'nextSibl
 
 - [ ] Better window title with what workspace / file is open
 
+- [ ] Custom Titlebar (no windows default)
+
 - [ ] Recent searches only works current session
 
 - [ ] ![image.png](TODO.assets/image-1787696238603.png)![image.png](TODO.assets/image-1787696268102.png)This modal needs to be fixed

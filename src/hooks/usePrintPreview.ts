@@ -3,6 +3,17 @@ import type { RefObject } from 'react'
 import { Previewer } from 'pagedjs'
 import { buildPageCss, formatPrintDate } from '../lib/printPreviewCss'
 
+/** Paged.js keeps a placeholder copy of the top-level node's own tag/class
+ *  around while it splits content across pages. Left as `.editor-pane`,
+ *  that placeholder inherits its screen-only `max-width`/`margin: 0
+ *  auto`/padding, which — measured against Paged.js's internal multi-column
+ *  layout rather than one page — blows its width out to several page-widths
+ *  and corrupts the pagination. The class does nothing useful once Paged.js
+ *  owns layout, so it's dropped from the clone before handing it off. */
+function stripScreenClasses(el: HTMLElement): void {
+  el.removeAttribute('class')
+}
+
 interface UsePrintPreviewResult {
   containerRef: RefObject<HTMLDivElement | null>
   showPageNumber: boolean
@@ -20,21 +31,57 @@ interface UsePrintPreviewResult {
 const RERENDER_DEBOUNCE_MS = 250
 
 /**
- * Clones `contentEl` and paginates it through Paged.js into whatever
- * element `containerRef` is attached to, re-running whenever a checkbox
- * or the content changes. See docs/specs/better-printing-design.md's
+ * Clones `contentRef.current` and paginates it through Paged.js into
+ * whatever element `containerRef` is attached to, re-running whenever a
+ * checkbox or the content changes. See docs/specs/better-printing-design.md's
  * "Real pagination via Paged.js" for why this replaces WebView2's native
  * (all-or-nothing) header/footer.
+ *
+ * Takes the ref itself, not `.current`, and reads it inside the effect
+ * rather than as a dependency: `Layout.tsx` opens this dialog in the same
+ * state update that switches from raw to wysyiwyg view, which (re)mounts
+ * `.editor-pane` in that same commit. A `.current` value read during that
+ * render (e.g. passed down as a prop) would still be last render's stale
+ * value — refs only update *during* commit, not before. Reading it inside
+ * this effect, which runs after commit, always sees the freshly mounted node.
  */
-export function usePrintPreview(contentEl: HTMLElement | null, noteTitle: string): UsePrintPreviewResult {
+export function usePrintPreview(
+  contentRef: RefObject<HTMLElement | null>,
+  noteTitle: string,
+): UsePrintPreviewResult {
   const containerRef = useRef<HTMLDivElement>(null)
   const [showPageNumber, setShowPageNumber] = useState(false)
   const [showTitle, setShowTitle] = useState(false)
   const [showDate, setShowDate] = useState(false)
   const [isRendering, setIsRendering] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [contentVersion, setContentVersion] = useState(0)
+
+  // The dialog can mount before everything inside `.editor-pane` has
+  // finished painting (a diagram, ink canvas, or code block that renders
+  // in async) — the render effect below only reruns on checkbox/title
+  // changes, so a first pass that catches incomplete content would
+  // otherwise never retry. This bumps `contentVersion` (debounced, same
+  // as a checkbox toggle) whenever the observed content actually changes.
+  useEffect(() => {
+    const contentEl = contentRef.current
+    if (!contentEl) return
+
+    let timer: ReturnType<typeof setTimeout>
+    const observer = new MutationObserver(() => {
+      clearTimeout(timer)
+      timer = setTimeout(() => setContentVersion((v) => v + 1), RERENDER_DEBOUNCE_MS)
+    })
+    observer.observe(contentEl, { childList: true, subtree: true, attributes: true, characterData: true })
+
+    return () => {
+      clearTimeout(timer)
+      observer.disconnect()
+    }
+  }, [contentRef])
 
   useEffect(() => {
+    const contentEl = contentRef.current
     const container = containerRef.current
     if (!contentEl || !container) return
 
@@ -54,6 +101,7 @@ export function usePrintPreview(contentEl: HTMLElement | null, noteTitle: string
     const timer = setTimeout(() => {
       container.innerHTML = ''
       const clone = contentEl.cloneNode(true) as HTMLElement
+      stripScreenClasses(clone)
       new Previewer()
         .preview(clone, [], container)
         .then(() => {
@@ -71,7 +119,7 @@ export function usePrintPreview(contentEl: HTMLElement | null, noteTitle: string
       clearTimeout(timer)
       document.head.removeChild(styleEl)
     }
-  }, [contentEl, showPageNumber, showTitle, showDate, noteTitle])
+  }, [contentRef, showPageNumber, showTitle, showDate, noteTitle, contentVersion])
 
   return {
     containerRef,

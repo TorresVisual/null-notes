@@ -360,10 +360,10 @@ export function Layout() {
       {activeOverlay === 'review' && <ReviewSession onClose={closeOverlay} />}
       {activeOverlay === 'formulaSheet' && <FormulaSheetPrompt onClose={closeOverlay} />}
       {activeOverlay === 'exportPdf' && currentNote && (
-        <ExportPdfDialog noteTitle={currentNote.title} contentEl={editorPaneRef.current} onClose={closeOverlay} />
+        <ExportPdfDialog noteTitle={currentNote.title} contentRef={editorPaneRef} onClose={closeOverlay} />
       )}
       {activeOverlay === 'print' && currentNote && (
-        <PrintDialog noteTitle={currentNote.title} contentEl={editorPaneRef.current} onClose={closeOverlay} />
+        <PrintDialog noteTitle={currentNote.title} contentRef={editorPaneRef} onClose={closeOverlay} />
       )}
       {!focusMode && (
         <Sidebar

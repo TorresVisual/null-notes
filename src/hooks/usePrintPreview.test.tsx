@@ -1,3 +1,4 @@
+import { useRef } from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, cleanup, act, waitFor } from '@testing-library/react'
 import { usePrintPreview } from './usePrintPreview'
@@ -26,13 +27,18 @@ interface HarnessProps {
 // needs to be attached during commit, before the hook's own effect runs,
 // exactly like a real consumer (ExportPdfDialog/PrintDialog) does.
 function Harness({ contentEl, noteTitle, onResult }: HarnessProps) {
-  const result = usePrintPreview(contentEl, noteTitle)
+  // Mirrors how Layout.tsx hands down `editorPaneRef` itself (not
+  // `.current`) — usePrintPreview reads `.current` inside its own effect.
+  const contentRef = useRef(contentEl)
+  contentRef.current = contentEl
+  const result = usePrintPreview(contentRef, noteTitle)
   onResult(result)
   return <div ref={result.containerRef} />
 }
 
 function makeContentEl(): HTMLElement {
   const el = document.createElement('div')
+  el.className = 'editor-pane'
   el.textContent = 'Note content'
   return el
 }
@@ -60,6 +66,14 @@ describe('usePrintPreview', () => {
 
     await waitFor(() => expect(previewMock).toHaveBeenCalledTimes(1))
     expect(previewMock).toHaveBeenCalledWith(expect.any(Node), [], expect.any(HTMLDivElement))
+  })
+
+  it('strips the clone\'s class so .editor-pane\'s screen-only sizing CSS never reaches Paged.js', async () => {
+    render(<Harness contentEl={makeContentEl()} noteTitle="Lecture 7" onResult={() => {}} />)
+
+    await waitFor(() => expect(previewMock).toHaveBeenCalledTimes(1))
+    const [clonedContent] = previewMock.mock.calls[0] as [HTMLElement, string[], HTMLDivElement]
+    expect(clonedContent.hasAttribute('class')).toBe(false)
   })
 
   it('re-renders with page-number CSS when showPageNumber is toggled on', async () => {
