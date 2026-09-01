@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
+import type { Editor, Range } from '@tiptap/core'
 import { listen } from '@tauri-apps/api/event'
 import { Loader2 } from 'lucide-react'
 import { Sidebar } from './Sidebar'
@@ -24,6 +25,7 @@ import { HomeView } from './HomeView'
 import { FormulaSheetPrompt } from './FormulaSheetPrompt'
 import { ExportPdfDialog } from './ExportPdfDialog'
 import { PrintDialog } from './PrintDialog'
+import { FlashcardTypeDialog } from './FlashcardTypeDialog'
 import { TerminalPane } from './TerminalPane'
 import { ToastStack } from './ToastStack'
 import { useWorkspaceStore } from '../store/workspace'
@@ -91,6 +93,9 @@ export function Layout() {
   const editorPaneRef = useRef<HTMLDivElement>(null)
   const [terminalMounted, setTerminalMounted] = useState(false)
   const [terminalOpen, setTerminalOpen] = useState(false)
+  const [pendingFlashcardInsert, setPendingFlashcardInsert] = useState<
+    { editor: Editor; range: Range } | null
+  >(null)
   const settings = useSettingsStore((s) => s.settings)
   const setSettings = useSettingsStore((s) => s.setSettings)
   const scrollRef = useScrollRestoration(activeTab, isLoading)
@@ -239,6 +244,14 @@ export function Layout() {
     ],
   )
 
+  const handleFlashcardCommand = useCallback(
+    (editor: Editor, range: Range) => {
+      setPendingFlashcardInsert({ editor, range })
+      openOverlay('flashcard')
+    },
+    [openOverlay],
+  )
+
   useEffect(() => {
     const unlisten = listen<string>('menu-action', (event) => void runCommand(event.payload))
     return () => void unlisten.then((off) => off())
@@ -365,6 +378,20 @@ export function Layout() {
       {activeOverlay === 'print' && currentNote && (
         <PrintDialog noteTitle={currentNote.title} contentRef={editorPaneRef} onClose={closeOverlay} />
       )}
+      {activeOverlay === 'flashcard' && pendingFlashcardInsert && (
+        <FlashcardTypeDialog
+          onPick={(stub) => {
+            const { editor, range } = pendingFlashcardInsert
+            editor.chain().focus().deleteRange(range).insertContent(stub).run()
+            setPendingFlashcardInsert(null)
+            closeOverlay()
+          }}
+          onClose={() => {
+            setPendingFlashcardInsert(null)
+            closeOverlay()
+          }}
+        />
+      )}
       {!focusMode && (
         <Sidebar
           onSearchOpen={() => openOverlay('search')}
@@ -425,6 +452,7 @@ export function Layout() {
                   spellcheck={settings.spellcheck}
                   spellcheckLanguage={settings.spellcheckLanguage}
                   onChange={(md) => void save(md)}
+                  onFlashcardCommand={handleFlashcardCommand}
                 />
               )}
               {!isLoading && activeTab && viewMode === 'raw' && (

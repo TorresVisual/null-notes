@@ -32,6 +32,7 @@ describe('an ink canvas mounted inside a real NoteEditor', () => {
         spellcheck={false}
         spellcheckLanguage="en"
         onChange={() => {}}
+        onFlashcardCommand={() => {}}
       />,
     )
 

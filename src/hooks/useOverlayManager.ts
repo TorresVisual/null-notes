@@ -12,6 +12,8 @@ export type OverlayKind =
   | 'formulaSheet'
   | 'exportPdf'
   | 'print'
+  | 'flashcard'
+  | 'deck'
 
 /**
  * One overlay open at a time, by construction: opening a new one always

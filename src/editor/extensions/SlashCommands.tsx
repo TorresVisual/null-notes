@@ -211,6 +211,13 @@ const COMMANDS: Cmd[] = [
     },
   },
   {
+    title: 'Flashcard',
+    description: 'Q&A, cloze, or multiple-choice review card',
+    run: ({ editor, range }) => {
+      editor.storage.noteContext.openFlashcardDialog?.(editor, range)
+    },
+  },
+  {
     title: 'Diagram',
     description: 'Interactive boxes, arrows and connectors',
     run: ({ editor, range }) => {

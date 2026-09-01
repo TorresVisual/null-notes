@@ -1,6 +1,7 @@
 import { useEditor, EditorContent } from '@tiptap/react'
 import { useEffect, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
+import type { Editor, Range } from '@tiptap/core'
 import { TextSelection } from '@tiptap/pm/state'
 import { confirm, message } from '@tauri-apps/plugin-dialog'
 import { coreExtensions } from './extensions'
@@ -19,6 +20,7 @@ interface NoteEditorProps {
   spellcheck: boolean
   spellcheckLanguage: string
   onChange: (markdown: string) => void
+  onFlashcardCommand: (editor: Editor, range: Range) => void
 }
 
 // `lang` is the only thing that tells the WebView which dictionary to check
@@ -32,7 +34,14 @@ function buildEditorProps(spellcheck: boolean, language: string) {
   }
 }
 
-export function NoteEditor({ content, notePath, spellcheck, spellcheckLanguage, onChange }: NoteEditorProps) {
+export function NoteEditor({
+  content,
+  notePath,
+  spellcheck,
+  spellcheckLanguage,
+  onChange,
+  onFlashcardCommand,
+}: NoteEditorProps) {
   const isProgrammaticUpdate = useRef(false)
   const [, setEditorVersion] = useState(0)
   const codeTheme = useSettingsStore((s) => s.settings.codeTheme)
@@ -69,7 +78,8 @@ export function NoteEditor({ content, notePath, spellcheck, spellcheckLanguage, 
   useEffect(() => {
     if (!editor) return
     editor.storage.noteContext.notePath = notePath
-  }, [editor, notePath])
+    editor.storage.noteContext.openFlashcardDialog = onFlashcardCommand
+  }, [editor, notePath, onFlashcardCommand])
 
   // Recording on selectionUpdate rather than on unmount: the editor is already
   // destroyed by the time an unmount cleanup could read its state.

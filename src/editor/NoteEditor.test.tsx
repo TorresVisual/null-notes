@@ -11,7 +11,14 @@ afterEach(() => {
 describe('NoteEditor code-block theme/font-size wiring (P11-4)', () => {
   it('sets data-code-theme from the settings store, defaulting to material-ocean', () => {
     const { container } = render(
-      <NoteEditor content="" notePath="/note.md" spellcheck={false} spellcheckLanguage="en" onChange={() => {}} />,
+      <NoteEditor
+        content=""
+        notePath="/note.md"
+        spellcheck={false}
+        spellcheckLanguage="en"
+        onChange={() => {}}
+        onFlashcardCommand={() => {}}
+      />,
     )
     expect(container.querySelector('.note-editor')?.getAttribute('data-code-theme')).toBe('material-ocean')
   })
@@ -20,7 +27,14 @@ describe('NoteEditor code-block theme/font-size wiring (P11-4)', () => {
     useSettingsStore.setState((s) => ({ settings: { ...s.settings, codeTheme: 'one-dark' } }))
 
     const { container } = render(
-      <NoteEditor content="" notePath="/note.md" spellcheck={false} spellcheckLanguage="en" onChange={() => {}} />,
+      <NoteEditor
+        content=""
+        notePath="/note.md"
+        spellcheck={false}
+        spellcheckLanguage="en"
+        onChange={() => {}}
+        onFlashcardCommand={() => {}}
+      />,
     )
 
     expect(container.querySelector('.note-editor')?.getAttribute('data-code-theme')).toBe('one-dark')
@@ -30,7 +44,14 @@ describe('NoteEditor code-block theme/font-size wiring (P11-4)', () => {
     useSettingsStore.setState((s) => ({ settings: { ...s.settings, codeFontSizePx: 18 } }))
 
     const { container } = render(
-      <NoteEditor content="" notePath="/note.md" spellcheck={false} spellcheckLanguage="en" onChange={() => {}} />,
+      <NoteEditor
+        content=""
+        notePath="/note.md"
+        spellcheck={false}
+        spellcheckLanguage="en"
+        onChange={() => {}}
+        onFlashcardCommand={() => {}}
+      />,
     )
 
     const el = container.querySelector('.note-editor') as HTMLElement

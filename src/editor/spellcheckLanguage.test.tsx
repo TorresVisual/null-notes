@@ -18,7 +18,14 @@ function editorRoot(container: HTMLElement): HTMLElement {
 describe('the editor tells the WebView which dictionary to use', () => {
   it('puts the configured language on the rich editor', async () => {
     const { container } = render(
-      <NoteEditor content="Rechtschreibung" notePath="/ws/a.md" spellcheck spellcheckLanguage="de" onChange={() => {}} />,
+      <NoteEditor
+        content="Rechtschreibung"
+        notePath="/ws/a.md"
+        spellcheck
+        spellcheckLanguage="de"
+        onChange={() => {}}
+        onFlashcardCommand={() => {}}
+      />,
     )
 
     await waitFor(() => expect(editorRoot(container).getAttribute('lang')).toBe('de'))
@@ -29,13 +36,27 @@ describe('the editor tells the WebView which dictionary to use', () => {
   // changed setting has to go through setOptions to survive the next keystroke.
   it('follows the setting when it changes, without remounting', async () => {
     const { container, rerender } = render(
-      <NoteEditor content="Rechtschreibung" notePath="/ws/a.md" spellcheck spellcheckLanguage="de" onChange={() => {}} />,
+      <NoteEditor
+        content="Rechtschreibung"
+        notePath="/ws/a.md"
+        spellcheck
+        spellcheckLanguage="de"
+        onChange={() => {}}
+        onFlashcardCommand={() => {}}
+      />,
     )
     await waitFor(() => expect(editorRoot(container).getAttribute('lang')).toBe('de'))
     const before = editorRoot(container)
 
     rerender(
-      <NoteEditor content="Rechtschreibung" notePath="/ws/a.md" spellcheck spellcheckLanguage="en-GB" onChange={() => {}} />,
+      <NoteEditor
+        content="Rechtschreibung"
+        notePath="/ws/a.md"
+        spellcheck
+        spellcheckLanguage="en-GB"
+        onChange={() => {}}
+        onFlashcardCommand={() => {}}
+      />,
     )
 
     await waitFor(() => expect(editorRoot(container).getAttribute('lang')).toBe('en-GB'))

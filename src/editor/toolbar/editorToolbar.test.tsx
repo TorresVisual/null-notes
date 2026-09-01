@@ -142,6 +142,7 @@ describe('the editor toolbar', () => {
         spellcheck={false}
         spellcheckLanguage="en"
         onChange={() => {}}
+        onFlashcardCommand={() => {}}
       />,
     )
     const pmEl = editorRoot(container)
@@ -168,6 +169,7 @@ describe('the editor toolbar', () => {
         spellcheck={false}
         spellcheckLanguage="en"
         onChange={() => {}}
+        onFlashcardCommand={() => {}}
       />,
     )
     const pmEl = editorRoot(container)
@@ -204,6 +206,7 @@ describe('the editor toolbar', () => {
         spellcheck={false}
         spellcheckLanguage="en"
         onChange={() => {}}
+        onFlashcardCommand={() => {}}
       />,
     )
     const pmEl = editorRoot(container)
