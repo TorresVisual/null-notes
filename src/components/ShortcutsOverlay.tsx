@@ -50,6 +50,7 @@ const SHORTCUT_GROUPS: ShortcutGroup[] = [
     shortcuts: [
       { keys: 'Ctrl Shift K', label: 'Tasks' },
       { keys: 'Ctrl Shift R', label: 'Review' },
+      { keys: 'Ctrl Shift D', label: 'All Cards' },
     ],
   },
   {

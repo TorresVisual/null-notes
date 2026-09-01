@@ -22,15 +22,18 @@ export function DeckView({ onClose }: DeckViewProps) {
   const openTab = useWorkspaceStore((s) => s.openTab)
   const [cards, setCards] = useState<CardSummary[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [activeTags, setActiveTags] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     if (!workspacePath) return
     setIsLoading(true)
-    api.notes.listAllCards(workspacePath).then((c) => {
-      setCards(c)
-      setIsLoading(false)
-    })
+    setError(null)
+    api.notes
+      .listAllCards(workspacePath)
+      .then((c) => setCards(c))
+      .catch((e: unknown) => setError(`Couldn't load cards: ${String(e)}`))
+      .finally(() => setIsLoading(false))
   }, [workspacePath])
 
   const allTags = useMemo(
@@ -78,6 +81,8 @@ export function DeckView({ onClose }: DeckViewProps) {
         </div>
         {isLoading ? (
           <p className="status">Loading…</p>
+        ) : error ? (
+          <p className="empty-state">{error}</p>
         ) : cards.length === 0 ? (
           <p className="empty-state">No flashcards in this workspace yet.</p>
         ) : (

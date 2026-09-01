@@ -143,11 +143,11 @@ export function HomeView({ onOpenTaskView, onOpenReview, onOpenDeckView, onOpenS
             <button className="home-view-all" onClick={onOpenReview}>
               Start review
             </button>
-            <button className="home-view-all" onClick={onOpenDeckView}>
-              Browse all cards
-            </button>
           </>
         )}
+        <button className="home-view-all" onClick={onOpenDeckView}>
+          Browse all cards
+        </button>
       </section>
       <section className="home-section home-section--git">
         <h2><GitBranch size={14} /> Git</h2>
