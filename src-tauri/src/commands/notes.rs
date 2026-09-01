@@ -1,7 +1,7 @@
 use crate::db::{self, DbPool};
 use crate::models::{
     BacklinkEntry, CardKind, DueCard, ExtractedCard, ExtractedFormula, ExtractedTask, GraphLink,
-    GraphTag, NoteMetadata, OpenTask, SearchResult, WorkspaceTree,
+    GraphTag, McGradeResult, NoteMetadata, OpenTask, SearchResult, WorkspaceTree,
 };
 use crate::sm2;
 use regex::Regex;
@@ -824,6 +824,24 @@ pub fn grade_card_line(
     Some(rewritten)
 }
 
+// A card can outlive its note in the index: nothing purges a workspace
+// scan's stale rows (see scan_workspace), so a note deleted outside the
+// app (Explorer, a git pull) leaves its review_cards row queued forever.
+// Reads are the one place that naturally discovers this, so clean up right
+// here rather than guessing from a directory snapshot elsewhere. Shared by
+// every grading path (grade_card_at, grade_mc_card_at) so this cleanup is
+// written once, not duplicated per caller.
+async fn read_note_or_forget(path: &str, db: &DbPool) -> anyhow::Result<String> {
+    match tokio::fs::read_to_string(path).await {
+        Ok(content) => Ok(content),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+            forget_note(path, db).await?;
+            anyhow::bail!("note no longer exists on disk; removed from review queue");
+        }
+        Err(e) => Err(e.into()),
+    }
+}
+
 async fn grade_card_at(
     path: &str,
     position: i64,
@@ -831,25 +849,51 @@ async fn grade_card_at(
     workspace: &str,
     db: &DbPool,
 ) -> anyhow::Result<()> {
-    // A card can outlive its note in the index: nothing purges a workspace
-    // scan's stale rows (see scan_workspace), so a note deleted outside the
-    // app (Explorer, a git pull) leaves its review_cards row queued forever.
-    // Reads are the one place that naturally discovers this, so clean up
-    // right here rather than guessing from a directory snapshot elsewhere.
-    let content = match tokio::fs::read_to_string(path).await {
-        Ok(content) => content,
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-            forget_note(path, db).await?;
-            anyhow::bail!("note no longer exists on disk; removed from review queue");
-        }
-        Err(e) => return Err(e.into()),
-    };
+    let content = read_note_or_forget(path, db).await?;
     let today = chrono::Utc::now().date_naive();
     let new_content = grade_card_line(&content, position, grade, today)
         .ok_or_else(|| anyhow::anyhow!("no card at line {position} in {path}"))?;
     write_atomic(Path::new(path), &new_content).await?;
     index_note_at(path, workspace, &new_content, db).await?;
     Ok(())
+}
+
+async fn grade_mc_card_at(
+    path: &str,
+    position: i64,
+    picked: &[usize],
+    workspace: &str,
+    db: &DbPool,
+) -> anyhow::Result<McGradeResult> {
+    let content = read_note_or_forget(path, db).await?;
+    let lines: Vec<&str> = content.lines().collect();
+    let idx = usize::try_from(position)?;
+    let trimmed = lines
+        .get(idx)
+        .ok_or_else(|| anyhow::anyhow!("no card at line {position} in {path}"))?
+        .trim();
+    if !is_mc_question_line(trimmed) {
+        anyhow::bail!("line {position} in {path} is not a multiple-choice card");
+    }
+    let (_, _, correct) = parse_mc_block(&lines, idx)
+        .ok_or_else(|| anyhow::anyhow!("no multiple-choice card at line {position} in {path}"))?;
+
+    let mut picked_sorted = picked.to_vec();
+    picked_sorted.sort_unstable();
+    let mut correct_sorted = correct.clone();
+    correct_sorted.sort_unstable();
+    let is_correct = picked_sorted == correct_sorted;
+
+    let option_count = mc_block_option_count(&lines, idx);
+    let last_grade = lines
+        .get(idx + 1 + option_count)
+        .and_then(|l| parse_sr_comment(l))
+        .and_then(|(_, _, _, _, grade)| grade);
+    let resolved = sm2::mc_auto_grade(last_grade, is_correct);
+
+    grade_card_at(path, position, resolved, workspace, db).await?;
+
+    Ok(McGradeResult { correct })
 }
 
 // Wiki-links resolve by title case-insensitively (`backlinks_for`), and
@@ -1051,6 +1095,19 @@ pub async fn grade_card(
     db: State<'_, DbPool>,
 ) -> Result<(), String> {
     grade_card_at(&path, position, grade, &workspace, &db)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn grade_mc_card(
+    path: String,
+    position: i64,
+    picked: Vec<usize>,
+    workspace: String,
+    db: State<'_, DbPool>,
+) -> Result<McGradeResult, String> {
+    grade_mc_card_at(&path, position, &picked, &workspace, &db)
         .await
         .map_err(|e| e.to_string())
 }
@@ -2306,6 +2363,105 @@ mod save_tests {
             .unwrap();
 
         let result = grade_card_at("/ws/gone.md", 0, sm2::Grade::Good, "/ws", &pool).await;
+
+        assert!(result.is_err());
+        let due = db::notes::due_cards(&pool, "/ws", "9999-12-31")
+            .await
+            .unwrap();
+        assert!(due.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_grade_mc_card_at_correct_pick_reports_the_answer_and_advances_grade() {
+        let pool = DbPool::connect("sqlite::memory:").await.unwrap();
+        run_migrations(&pool).await.unwrap();
+        let tmp = tempdir().unwrap();
+        let path = tmp.path().join("a.md");
+        std::fs::write(&path, "Q ::\n- [ ] a\n- [x] b\n").unwrap();
+        let path_str = path.to_string_lossy().into_owned();
+        let ws = tmp.path().to_string_lossy().into_owned();
+        index_note_at(
+            &path_str,
+            &ws,
+            &std::fs::read_to_string(&path).unwrap(),
+            &pool,
+        )
+        .await
+        .unwrap();
+
+        let result = grade_mc_card_at(&path_str, 0, &[1], &ws, &pool)
+            .await
+            .unwrap();
+
+        assert_eq!(result.correct, vec![1]);
+        let rewritten = std::fs::read_to_string(&path).unwrap();
+        assert!(rewritten.contains("grade=good")); // no prior grade -> Hard baseline -> correct -> Good
+    }
+
+    #[tokio::test]
+    async fn test_grade_mc_card_at_partial_multi_select_pick_is_still_wrong() {
+        let pool = DbPool::connect("sqlite::memory:").await.unwrap();
+        run_migrations(&pool).await.unwrap();
+        let tmp = tempdir().unwrap();
+        let path = tmp.path().join("a.md");
+        std::fs::write(&path, "Q ::\n- [x] a\n- [x] b\n- [ ] c\n").unwrap();
+        let path_str = path.to_string_lossy().into_owned();
+        let ws = tmp.path().to_string_lossy().into_owned();
+        index_note_at(
+            &path_str,
+            &ws,
+            &std::fs::read_to_string(&path).unwrap(),
+            &pool,
+        )
+        .await
+        .unwrap();
+
+        let result = grade_mc_card_at(&path_str, 0, &[0], &ws, &pool)
+            .await
+            .unwrap();
+
+        assert_eq!(result.correct, vec![0, 1]);
+        let rewritten = std::fs::read_to_string(&path).unwrap();
+        assert!(rewritten.contains("grade=again")); // no prior grade -> Hard baseline -> incorrect -> Again
+    }
+
+    #[tokio::test]
+    async fn test_grade_mc_card_at_reordered_picks_still_match() {
+        let pool = DbPool::connect("sqlite::memory:").await.unwrap();
+        run_migrations(&pool).await.unwrap();
+        let tmp = tempdir().unwrap();
+        let path = tmp.path().join("a.md");
+        std::fs::write(&path, "Q ::\n- [x] a\n- [x] b\n- [ ] c\n").unwrap();
+        let path_str = path.to_string_lossy().into_owned();
+        let ws = tmp.path().to_string_lossy().into_owned();
+        index_note_at(
+            &path_str,
+            &ws,
+            &std::fs::read_to_string(&path).unwrap(),
+            &pool,
+        )
+        .await
+        .unwrap();
+
+        let result = grade_mc_card_at(&path_str, 0, &[1, 0], &ws, &pool)
+            .await
+            .unwrap();
+
+        assert!(std::fs::read_to_string(&path)
+            .unwrap()
+            .contains("grade=good"));
+        assert_eq!(result.correct, vec![0, 1]);
+    }
+
+    #[tokio::test]
+    async fn test_grade_mc_card_at_missing_note_purges_its_stale_card() {
+        let pool = DbPool::connect("sqlite::memory:").await.unwrap();
+        run_migrations(&pool).await.unwrap();
+        index_note_at("/ws/gone.md", "/ws", "Q ::\n- [x] a\n", &pool)
+            .await
+            .unwrap();
+
+        let result = grade_mc_card_at("/ws/gone.md", 0, &[0], "/ws", &pool).await;
 
         assert!(result.is_err());
         let due = db::notes::due_cards(&pool, "/ws", "9999-12-31")

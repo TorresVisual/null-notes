@@ -234,6 +234,7 @@ pub fn run() {
             commands::notes::list_open_tasks,
             commands::notes::toggle_task,
             commands::notes::grade_card,
+            commands::notes::grade_mc_card,
             commands::notes::list_due_cards,
             commands::notes::backlinks_for,
             commands::notes::backlinks_for_with_context,
