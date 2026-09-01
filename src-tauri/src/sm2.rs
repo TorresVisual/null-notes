@@ -23,11 +23,12 @@ impl Default for CardState {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
+#[repr(i32)]
 pub enum Grade {
-    Again,
-    Hard,
-    Good,
-    Easy,
+    Again = 0,
+    Hard = 1,
+    Good = 2,
+    Easy = 3,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -36,6 +37,26 @@ pub struct Scheduled {
     pub interval: i64,
     pub reps: i64,
     pub due: NaiveDate,
+}
+
+impl Grade {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Grade::Again => "again",
+            Grade::Hard => "hard",
+            Grade::Good => "good",
+            Grade::Easy => "easy",
+        }
+    }
+
+    fn from_rung(rung: i32) -> Grade {
+        match rung {
+            0 => Grade::Again,
+            1 => Grade::Hard,
+            2 => Grade::Good,
+            _ => Grade::Easy,
+        }
+    }
 }
 
 const MIN_EASE: f64 = 1.3;
@@ -95,6 +116,17 @@ pub fn next_state(state: CardState, grade: Grade, today: NaiveDate) -> Scheduled
             }
         }
     }
+}
+
+/// MC grading moves one rung of the four SM-2 grades per attempt instead of
+/// asking the reviewer to self-assess. A card with no prior grade starts at
+/// the `Hard` baseline, so a first correct pick lands on `Good` and a first
+/// miss lands on `Again` — matching what a manual first grade would produce
+/// today.
+pub fn mc_auto_grade(last_grade: Option<Grade>, correct: bool) -> Grade {
+    let rung = last_grade.map_or(1, |g| g as i32); // Hard=1 baseline
+    let next = if correct { rung + 1 } else { rung - 1 };
+    Grade::from_rung(next.clamp(0, 3))
 }
 
 /// Today's date as an ISO `YYYY-MM-DD` string — day granularity throughout,
@@ -213,5 +245,43 @@ mod tests {
         assert_eq!(t.len(), 10);
         assert_eq!(t.chars().nth(4), Some('-'));
         assert_eq!(t.chars().nth(7), Some('-'));
+    }
+
+    #[test]
+    fn test_mc_auto_grade_new_card_correct_lands_on_good() {
+        assert_eq!(mc_auto_grade(None, true), Grade::Good);
+    }
+
+    #[test]
+    fn test_mc_auto_grade_new_card_incorrect_lands_on_again() {
+        assert_eq!(mc_auto_grade(None, false), Grade::Again);
+    }
+
+    #[test]
+    fn test_mc_auto_grade_moves_one_rung_up_on_correct() {
+        assert_eq!(mc_auto_grade(Some(Grade::Good), true), Grade::Easy);
+    }
+
+    #[test]
+    fn test_mc_auto_grade_moves_one_rung_down_on_incorrect() {
+        assert_eq!(mc_auto_grade(Some(Grade::Good), false), Grade::Hard);
+    }
+
+    #[test]
+    fn test_mc_auto_grade_caps_at_easy() {
+        assert_eq!(mc_auto_grade(Some(Grade::Easy), true), Grade::Easy);
+    }
+
+    #[test]
+    fn test_mc_auto_grade_floors_at_again() {
+        assert_eq!(mc_auto_grade(Some(Grade::Again), false), Grade::Again);
+    }
+
+    #[test]
+    fn test_grade_as_str_round_trips_the_serde_names() {
+        assert_eq!(Grade::Again.as_str(), "again");
+        assert_eq!(Grade::Hard.as_str(), "hard");
+        assert_eq!(Grade::Good.as_str(), "good");
+        assert_eq!(Grade::Easy.as_str(), "easy");
     }
 }
