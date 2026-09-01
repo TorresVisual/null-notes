@@ -76,6 +76,16 @@ export const CONVERT_TARGET_LABELS: Record<ConvertTarget, string> = {
 
 const CONVERTIBLE_NODE_TYPE_NAMES = new Set(['paragraph', 'heading', 'bulletList', 'orderedList', 'taskList', 'blockquote'])
 
+// Module-level, not inline in JSX: DragHandle re-registers its ProseMirror
+// plugin whenever this object's reference changes, and BlockHandle re-renders
+// on every editor transaction (it reads editor.state directly). An inline
+// literal here was a fresh object every keystroke, so the plugin was being
+// torn down and rebuilt continuously — collateral damage included aborting
+// any other plugin's in-flight async work (e.g. SlashCommands' suggestion
+// menu, which never got to show its items because its fetch kept getting
+// cancelled mid-flight).
+const DRAG_HANDLE_POSITION_CONFIG = { placement: 'left' } as const
+
 /** Whether "Turn into" should offer anything for this node at all — a
  *  generic type-swap only makes sense for plain text-block types, never
  *  for code blocks, tables, images, ink, diagrams, math, or callouts. */
@@ -202,7 +212,7 @@ export function BlockHandle({ editor }: BlockHandleProps) {
       // the tracked node's bounding box, which only looks centered for a
       // node exactly as tall as the grip. Plain "left" centers it on the
       // cross axis against the node's actual height instead.
-      computePositionConfig={{ placement: 'left' }}
+      computePositionConfig={DRAG_HANDLE_POSITION_CONFIG}
     >
       <button
         ref={gripRef}
