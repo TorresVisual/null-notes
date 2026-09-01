@@ -98,6 +98,27 @@ const TaskBracketFix = Extension.create({
   },
 })
 
+// tiptap-markdown's own MarkdownSerializer never forwards `tightLists`
+// (set below in Markdown.configure) to prosemirror-markdown's serializer
+// state — the option is silently dropped, so every task list round-trips
+// loose: a blank line before the first item and between every pair of
+// items, even for a plain single-line checklist nobody meant to space out.
+// That's not just cosmetic — an MC flashcard's `- [ ] wrong` / `- [x] right`
+// options are read off disk as contiguous lines, so a loose list silently
+// stops parsing as a card. `renderList` (prosemirror-markdown) falls back to
+// the dropped option only when the node itself has no `tight` attr; giving
+// the node an explicit one bypasses the gap entirely.
+const TaskListTight = TaskList.extend({
+  addAttributes() {
+    return {
+      tight: {
+        default: true,
+        rendered: false,
+      },
+    }
+  },
+})
+
 function isInsideListItem($from: ResolvedPos): boolean {
   for (let depth = $from.depth; depth > 0; depth--) {
     if ($from.node(depth).type.name === 'listItem') return true
@@ -150,7 +171,7 @@ export const coreExtensions = [
   TableHeader,
   TableCell,
   TableControls,
-  TaskList,
+  TaskListTight,
   TaskItemInLists.configure({ nested: true }),
   Link.configure({ openOnClick: false, autolink: true }),
   Markdown.configure({

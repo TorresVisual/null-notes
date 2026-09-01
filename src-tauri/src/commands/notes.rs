@@ -286,16 +286,38 @@ fn is_mc_question_line(trimmed: &str) -> bool {
         .is_match(trimmed)
 }
 
-// How many contiguous checkbox lines follow a bare-`::` question line at
-// `start`, purely structural — used to skip past a block regardless of
-// whether it turns out to have a marked correct answer.
+// The line right after a typed `Question ::` is blank whenever the note was
+// saved by this app's own editor: prosemirror-markdown always puts a blank
+// line between a paragraph and a differently-typed block that follows it —
+// a fixed boundary rule, not the "loose list" setting `TaskListTight`
+// (editor/extensions/index.ts) already closes, which only covers spacing
+// *between* a list's own items. Skip at most one such line before looking
+// for the first option, so a block typed through the real editor still
+// parses; a genuinely unrelated line right after the question (no options
+// at all) is unaffected since the scan below still finds nothing there.
+fn mc_options_start(lines: &[&str], start: usize) -> usize {
+    if lines.get(start + 1).is_some_and(|l| l.trim().is_empty()) {
+        start + 2
+    } else {
+        start + 1
+    }
+}
+
+// How many lines separate a bare-`::` question line at `start` from the end
+// of its option block — used to skip past the block regardless of whether
+// it turns out to have a marked correct answer.
 fn mc_block_option_count(lines: &[&str], start: usize) -> usize {
     let re = checkbox_re();
-    let mut j = start + 1;
+    let first = mc_options_start(lines, start);
+    let mut j = first;
     while j < lines.len() && re.is_match(lines[j]) {
         j += 1;
     }
-    j - start - 1
+    if j == first {
+        0
+    } else {
+        j - start - 1
+    }
 }
 
 // Returns (front, options, correct-indices) only if at least one option is
@@ -311,7 +333,7 @@ fn parse_mc_block(lines: &[&str], start: usize) -> Option<(String, Vec<String>, 
         .to_string();
     let mut options = Vec::new();
     let mut correct = Vec::new();
-    let mut j = start + 1;
+    let mut j = mc_options_start(lines, start);
     while j < lines.len() {
         let caps = match re.captures(lines[j]) {
             Some(c) => c,
@@ -1862,6 +1884,37 @@ mod tests {
         assert_eq!(extract_tasks(content).len(), 2);
     }
 
+    // prosemirror-markdown always puts a blank line between a paragraph and
+    // the differently-typed block that follows it, so a card typed through
+    // the real editor saves as "Question ::\n\n- [ ] wrong\n- [x] right" —
+    // one blank line after the question, options themselves tight (see
+    // TaskListTight, editor/extensions/index.ts). extract_cards has to read
+    // that shape, not just the hand-written tight fixtures above.
+    #[test]
+    fn test_extract_cards_parses_an_mc_block_with_a_blank_line_after_the_question() {
+        let content = "Question ::\n\n- [ ] wrong\n- [x] right\n";
+        let cards = extract_cards(content);
+        assert_eq!(cards.len(), 1);
+        assert_eq!(cards[0].kind, CardKind::Mc);
+        assert_eq!(cards[0].front, "Question");
+        assert_eq!(cards[0].options, vec!["wrong", "right"]);
+        assert_eq!(cards[0].correct, vec![1]);
+    }
+
+    #[test]
+    fn test_extract_cards_mc_block_with_a_blank_line_still_reads_its_sr_comment() {
+        let content = "Question ::\n\n- [ ] wrong\n- [x] right\n<!-- sr due=2026-08-21 ease=2.50 interval=1 reps=1 grade=good -->\n";
+        let cards = extract_cards(content);
+        assert_eq!(cards.len(), 1);
+        assert_eq!(cards[0].due.as_deref(), Some("2026-08-21"));
+    }
+
+    #[test]
+    fn test_extract_cards_a_blank_line_with_no_options_after_is_not_an_mc_block() {
+        let content = "Question ::\n\nJust a paragraph, not an option list.\n";
+        assert!(extract_cards(content).is_empty());
+    }
+
     #[test]
     fn test_extract_formulas_reads_a_one_liner() {
         let formulas = extract_formulas("intro\n\n$$e^{i\\pi} + 1 = 0$$\n\nmore text");
@@ -2410,6 +2463,36 @@ mod save_tests {
         assert_eq!(result.correct, vec![1]);
         let rewritten = std::fs::read_to_string(&path).unwrap();
         assert!(rewritten.contains("grade=good")); // no prior grade -> Hard baseline -> correct -> Good
+    }
+
+    #[tokio::test]
+    async fn test_grade_mc_card_at_grades_a_note_saved_with_the_editors_blank_line() {
+        let pool = DbPool::connect("sqlite::memory:").await.unwrap();
+        run_migrations(&pool).await.unwrap();
+        let tmp = tempdir().unwrap();
+        let path = tmp.path().join("a.md");
+        std::fs::write(&path, "Question ::\n\n- [ ] wrong\n- [x] right\n").unwrap();
+        let path_str = path.to_string_lossy().into_owned();
+        let ws = tmp.path().to_string_lossy().into_owned();
+        index_note_at(
+            &path_str,
+            &ws,
+            &std::fs::read_to_string(&path).unwrap(),
+            &pool,
+        )
+        .await
+        .unwrap();
+
+        let result = grade_mc_card_at(&path_str, 0, &[0], &ws, &pool)
+            .await
+            .unwrap();
+
+        assert_eq!(result.correct, vec![1]);
+        let rewritten = std::fs::read_to_string(&path).unwrap();
+        // The comment lands right after the last option line — no dangling
+        // blank line carried over from the editor's paragraph/list boundary.
+        assert!(rewritten.contains("- [x] right\n<!-- sr due="));
+        assert!(rewritten.contains("grade=again")); // picked wrong -> Hard baseline -> Again
     }
 
     #[tokio::test]
