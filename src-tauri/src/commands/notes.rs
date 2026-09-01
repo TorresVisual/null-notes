@@ -137,6 +137,7 @@ pub fn extract_tasks(content: &str) -> Vec<ExtractedTask> {
         Ok(re) => re,
         Err(_) => return Vec::new(),
     };
+    let mc_positions = mc_option_line_positions(content);
     let mut in_fence = false;
     let mut tasks = Vec::new();
     for (i, line) in content.lines().enumerate() {
@@ -145,6 +146,9 @@ pub fn extract_tasks(content: &str) -> Vec<ExtractedTask> {
             continue;
         }
         if in_fence {
+            continue;
+        }
+        if mc_positions.contains(&i) {
             continue;
         }
         if let Some(caps) = re.captures(line) {
@@ -247,9 +251,9 @@ pub fn extract_formulas(content: &str) -> Vec<ExtractedFormula> {
 // A schedule comment is never itself a card, even though it starts a fresh
 // line right after one — checked first so the loop below never has to
 // special-case it.
-fn parse_sr_comment(line: &str) -> Option<(String, f64, i64, i64)> {
+fn parse_sr_comment(line: &str) -> Option<(String, f64, i64, i64, Option<sm2::Grade>)> {
     let re = match Regex::new(
-        r"^<!--\s+sr\s+due=(\S+)\s+ease=(\S+)\s+interval=(\S+)\s+reps=(\S+)\s+-->$",
+        r"^<!--\s+sr\s+due=(\S+)\s+ease=(\S+)\s+interval=(\S+)\s+reps=(\S+)(?:\s+grade=(\S+))?\s+-->$",
     ) {
         Ok(re) => re,
         Err(_) => return None,
@@ -259,7 +263,99 @@ fn parse_sr_comment(line: &str) -> Option<(String, f64, i64, i64)> {
     let ease = caps[2].parse::<f64>().ok()?;
     let interval = caps[3].parse::<i64>().ok()?;
     let reps = caps[4].parse::<i64>().ok()?;
-    Some((due, ease, interval, reps))
+    let grade = caps.get(5).and_then(|m| match m.as_str() {
+        "again" => Some(sm2::Grade::Again),
+        "hard" => Some(sm2::Grade::Hard),
+        "good" => Some(sm2::Grade::Good),
+        "easy" => Some(sm2::Grade::Easy),
+        _ => None,
+    });
+    Some((due, ease, interval, reps, grade))
+}
+
+fn checkbox_re() -> Regex {
+    Regex::new(r"^\s*-\s\[([ xX])\]\s+(.+)$").expect("static checkbox regex")
+}
+
+// A bare "Question ::" with nothing after the "::" is the MC marker. Q::A
+// always has content after it (`qa_re` in classify_card_line requires
+// `\s(.+)$`), so this can never misfire on a real Q::A line.
+fn is_mc_question_line(trimmed: &str) -> bool {
+    Regex::new(r"^.+\s::$")
+        .expect("static MC question regex")
+        .is_match(trimmed)
+}
+
+// How many contiguous checkbox lines follow a bare-`::` question line at
+// `start`, purely structural — used to skip past a block regardless of
+// whether it turns out to have a marked correct answer.
+fn mc_block_option_count(lines: &[&str], start: usize) -> usize {
+    let re = checkbox_re();
+    let mut j = start + 1;
+    while j < lines.len() && re.is_match(lines[j]) {
+        j += 1;
+    }
+    j - start - 1
+}
+
+// Returns (front, options, correct-indices) only if at least one option is
+// marked `[x]` — an MC block with no correct answer marked isn't gradeable,
+// so it isn't a card (mirrors `classify_card_line` returning `None` for text
+// that merely looks card-shaped).
+fn parse_mc_block(lines: &[&str], start: usize) -> Option<(String, Vec<String>, Vec<usize>)> {
+    let re = checkbox_re();
+    let front = lines[start].trim().trim_end_matches("::").trim().to_string();
+    let mut options = Vec::new();
+    let mut correct = Vec::new();
+    let mut j = start + 1;
+    while j < lines.len() {
+        let caps = match re.captures(lines[j]) {
+            Some(c) => c,
+            None => break,
+        };
+        if caps[1].eq_ignore_ascii_case("x") {
+            correct.push(options.len());
+        }
+        options.push(caps[2].trim().to_string());
+        j += 1;
+    }
+    if correct.is_empty() {
+        None
+    } else {
+        Some((front, options, correct))
+    }
+}
+
+// Shared by extract_cards and extract_tasks so the two can never disagree
+// about which lines are MC syntax: extract_tasks skips every line in this
+// set (they'd otherwise leak into the Tasks view as fake to-dos, since
+// `- [ ]`/`- [x]` is also extract_tasks's own pattern); extract_cards is the
+// only consumer that treats them as content.
+fn mc_option_line_positions(content: &str) -> HashSet<usize> {
+    let lines: Vec<&str> = content.lines().collect();
+    let mut in_fence = false;
+    let mut positions = HashSet::new();
+    let mut i = 0;
+    while i < lines.len() {
+        let trimmed = lines[i].trim();
+        if trimmed.starts_with("```") {
+            in_fence = !in_fence;
+            i += 1;
+            continue;
+        }
+        if in_fence {
+            i += 1;
+            continue;
+        }
+        if is_mc_question_line(trimmed) {
+            let count = mc_block_option_count(&lines, i);
+            positions.extend((i + 1)..=(i + count));
+            i += 1 + count;
+            continue;
+        }
+        i += 1;
+    }
+    positions
 }
 
 // Q::A checked first; a line matching both forms (rare — a "::" pair inside
@@ -296,28 +392,59 @@ pub fn extract_cards(content: &str) -> Vec<ExtractedCard> {
     let lines: Vec<&str> = content.lines().collect();
     let mut in_fence = false;
     let mut cards = Vec::new();
+    let mut i = 0;
 
-    for (i, line) in lines.iter().enumerate() {
-        let trimmed = line.trim();
+    while i < lines.len() {
+        let trimmed = lines[i].trim();
         if trimmed.starts_with("```") {
             in_fence = !in_fence;
+            i += 1;
             continue;
         }
         if in_fence {
+            i += 1;
+            continue;
+        }
+
+        if is_mc_question_line(trimmed) {
+            let option_count = mc_block_option_count(&lines, i);
+            if let Some((front, options, correct)) = parse_mc_block(&lines, i) {
+                let (due, ease, interval, reps, grade) = lines
+                    .get(i + 1 + option_count)
+                    .and_then(|l| parse_sr_comment(l))
+                    .map(|(d, e, iv, r, g)| (Some(d), Some(e), Some(iv), Some(r), g))
+                    .unwrap_or((None, None, None, None, None));
+                cards.push(ExtractedCard {
+                    kind: CardKind::Mc,
+                    front,
+                    back: String::new(),
+                    position: i as i64,
+                    due,
+                    ease,
+                    interval,
+                    reps,
+                    grade,
+                    options,
+                    correct,
+                });
+            }
+            i += 1 + option_count;
             continue;
         }
 
         let (kind, front, back) = match classify_card_line(trimmed) {
             Some(c) => c,
-            None => continue,
+            None => {
+                i += 1;
+                continue;
+            }
         };
 
-        let (due, ease, interval, reps) = match lines.get(i + 1).and_then(|l| parse_sr_comment(l)) {
-            Some((due, ease, interval, reps)) => {
-                (Some(due), Some(ease), Some(interval), Some(reps))
-            }
-            None => (None, None, None, None),
-        };
+        let (due, ease, interval, reps, grade) = lines
+            .get(i + 1)
+            .and_then(|l| parse_sr_comment(l))
+            .map(|(d, e, iv, r, g)| (Some(d), Some(e), Some(iv), Some(r), g))
+            .unwrap_or((None, None, None, None, None));
 
         cards.push(ExtractedCard {
             kind,
@@ -328,7 +455,11 @@ pub fn extract_cards(content: &str) -> Vec<ExtractedCard> {
             ease,
             interval,
             reps,
+            grade,
+            options: Vec::new(),
+            correct: Vec::new(),
         });
+        i += 1;
     }
 
     cards
@@ -648,7 +779,7 @@ pub fn grade_card_line(
     let current = lines
         .get(idx + 1)
         .and_then(|l| parse_sr_comment(l))
-        .map(|(_, ease, interval, reps)| sm2::CardState {
+        .map(|(_, ease, interval, reps, _)| sm2::CardState {
             ease,
             interval,
             reps,
@@ -685,7 +816,19 @@ async fn grade_card_at(
     workspace: &str,
     db: &DbPool,
 ) -> anyhow::Result<()> {
-    let content = tokio::fs::read_to_string(path).await?;
+    // A card can outlive its note in the index: nothing purges a workspace
+    // scan's stale rows (see scan_workspace), so a note deleted outside the
+    // app (Explorer, a git pull) leaves its review_cards row queued forever.
+    // Reads are the one place that naturally discovers this, so clean up
+    // right here rather than guessing from a directory snapshot elsewhere.
+    let content = match tokio::fs::read_to_string(path).await {
+        Ok(content) => content,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+            forget_note(path, db).await?;
+            anyhow::bail!("note no longer exists on disk; removed from review queue");
+        }
+        Err(e) => return Err(e.into()),
+    };
     let today = chrono::Utc::now().date_naive();
     let new_content = grade_card_line(&content, position, grade, today)
         .ok_or_else(|| anyhow::anyhow!("no card at line {position} in {path}"))?;
@@ -1575,6 +1718,65 @@ mod tests {
     }
 
     #[test]
+    fn test_extract_cards_parses_a_single_select_mc_block() {
+        let content = "What is 2+2? ::\n- [ ] 3\n- [x] 4\n- [ ] 5\n";
+        let cards = extract_cards(content);
+        assert_eq!(cards.len(), 1);
+        assert_eq!(cards[0].kind, CardKind::Mc);
+        assert_eq!(cards[0].front, "What is 2+2?");
+        assert_eq!(cards[0].options, vec!["3", "4", "5"]);
+        assert_eq!(cards[0].correct, vec![1]);
+        assert_eq!(cards[0].position, 0);
+    }
+
+    #[test]
+    fn test_extract_cards_parses_a_multi_select_mc_block() {
+        let content = "Which are primes? ::\n- [x] 2\n- [ ] 4\n- [x] 3\n";
+        let cards = extract_cards(content);
+        assert_eq!(cards.len(), 1);
+        assert_eq!(cards[0].correct, vec![0, 2]);
+    }
+
+    #[test]
+    fn test_extract_cards_skips_an_mc_block_with_no_correct_option() {
+        let content = "Bad question ::\n- [ ] a\n- [ ] b\n";
+        assert!(extract_cards(content).is_empty());
+    }
+
+    #[test]
+    fn test_extract_cards_mc_block_reads_its_sr_comment() {
+        let content =
+            "Q ::\n- [x] a\n<!-- sr due=2026-08-21 ease=2.50 interval=1 reps=1 grade=good -->\n";
+        let cards = extract_cards(content);
+        assert_eq!(cards[0].due.as_deref(), Some("2026-08-21"));
+        assert_eq!(cards[0].grade, Some(sm2::Grade::Good));
+    }
+
+    #[test]
+    fn test_extract_cards_qa_and_cloze_still_work_alongside_mc() {
+        let content = "Q :: A\nText with {{gap}}.\nMC ::\n- [x] only\n";
+        let cards = extract_cards(content);
+        assert_eq!(cards.len(), 3);
+        assert_eq!(cards[0].kind, CardKind::Qa);
+        assert_eq!(cards[1].kind, CardKind::Cloze);
+        assert_eq!(cards[2].kind, CardKind::Mc);
+    }
+
+    #[test]
+    fn test_extract_tasks_excludes_mc_option_lines() {
+        let content = "Q ::\n- [ ] a\n- [x] b\n\n- [ ] a real task\n";
+        let tasks = extract_tasks(content);
+        assert_eq!(tasks.len(), 1);
+        assert_eq!(tasks[0].text, "a real task");
+    }
+
+    #[test]
+    fn test_extract_tasks_still_finds_tasks_when_no_mc_block_present() {
+        let content = "- [ ] plain task\n- [x] done task\n";
+        assert_eq!(extract_tasks(content).len(), 2);
+    }
+
+    #[test]
     fn test_extract_formulas_reads_a_one_liner() {
         let formulas = extract_formulas("intro\n\n$$e^{i\\pi} + 1 = 0$$\n\nmore text");
         assert_eq!(formulas.len(), 1);
@@ -2014,6 +2216,28 @@ mod save_tests {
             .unwrap();
         forget_note("/ws/a.md", &pool).await.unwrap();
 
+        let due = db::notes::due_cards(&pool, "/ws", "9999-12-31")
+            .await
+            .unwrap();
+        assert!(due.is_empty());
+    }
+
+    // A note deleted outside the app (Explorer, a git pull) leaves its
+    // review_cards row indexed forever — nothing purges a stale scan row —
+    // so grading it hits a missing file. Regression for the "grade button
+    // does nothing" report: the read failure must clean up the ghost card
+    // rather than leaving it stuck un-gradeable.
+    #[tokio::test]
+    async fn test_grade_card_at_missing_note_purges_its_stale_card() {
+        let pool = DbPool::connect("sqlite::memory:").await.unwrap();
+        run_migrations(&pool).await.unwrap();
+        index_note_at("/ws/gone.md", "/ws", "Q :: A\n", &pool)
+            .await
+            .unwrap();
+
+        let result = grade_card_at("/ws/gone.md", 0, sm2::Grade::Good, "/ws", &pool).await;
+
+        assert!(result.is_err());
         let due = db::notes::due_cards(&pool, "/ws", "9999-12-31")
             .await
             .unwrap();
