@@ -155,6 +155,23 @@ export interface DueCard {
   front: string
   back: string
   position: number
+  options: string[]
+}
+
+export interface McGradeResult {
+  correct: number[]
+}
+
+export interface CardSummary {
+  notePath: string
+  noteTitle: string
+  kind: string
+  front: string
+  back: string
+  position: number
+  due: string
+  interval: number
+  tags: string[]
 }
 
 export interface PrinterInfo {

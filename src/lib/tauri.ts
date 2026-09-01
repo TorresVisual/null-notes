@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core'
-import type { NoteMetadata, WorkspaceState, WorkspaceTree, SearchResult, AppSettings, GraphLink, GraphTag, RepoMode, CommitOutcome, PushOutcome, PullOutcome, RepoInitOutcome, TemplateMetadata, CrossRefTarget, OpenTask, DueCard, Grade, NoteHistoryEntry, BacklinkEntry, PrinterInfo } from '../types'
+import type { NoteMetadata, WorkspaceState, WorkspaceTree, SearchResult, AppSettings, GraphLink, GraphTag, RepoMode, CommitOutcome, PushOutcome, PullOutcome, RepoInitOutcome, TemplateMetadata, CrossRefTarget, OpenTask, DueCard, Grade, NoteHistoryEntry, BacklinkEntry, PrinterInfo, McGradeResult, CardSummary } from '../types'
 import type { PdfPage, PdfMarkdownImport } from '../pdf/types'
 
 export const api = {
@@ -67,6 +67,10 @@ export const api = {
       invoke<DueCard[]>('list_due_cards', { workspace }),
     gradeCard: (path: string, position: number, grade: Grade, workspace: string) =>
       invoke<void>('grade_card', { path, position, grade, workspace }),
+    gradeMcCard: (path: string, position: number, picked: number[], workspace: string) =>
+      invoke<McGradeResult>('grade_mc_card', { path, position, picked, workspace }),
+    listAllCards: (workspace: string) =>
+      invoke<CardSummary[]>('list_all_cards', { workspace }),
   },
   templates: {
     list: (workspace: string) =>
