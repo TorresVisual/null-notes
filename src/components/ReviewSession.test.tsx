@@ -10,14 +10,25 @@ vi.mock('../lib/tauri', () => ({
     notes: {
       listDueCards: vi.fn(),
       gradeCard: vi.fn(),
+      gradeMcCard: vi.fn(),
     },
   },
 }))
 
 const cards: DueCard[] = [
-  { notePath: '/ws/a.md', noteTitle: 'A', kind: 'qa', front: 'Q1', back: 'A1', position: 0 },
-  { notePath: '/ws/b.md', noteTitle: 'B', kind: 'cloze', front: 'Q2 [...]', back: 'Q2 full', position: 3 },
+  { notePath: '/ws/a.md', noteTitle: 'A', kind: 'qa', front: 'Q1', back: 'A1', position: 0, options: [] },
+  { notePath: '/ws/b.md', noteTitle: 'B', kind: 'cloze', front: 'Q2 [...]', back: 'Q2 full', position: 3, options: [] },
 ]
+
+const mcCard: DueCard = {
+  notePath: '/ws/c.md',
+  noteTitle: 'C',
+  kind: 'mc',
+  front: 'What is 2+2?',
+  back: '',
+  position: 0,
+  options: ['3', '4', '5'],
+}
 
 beforeEach(() => {
   useWorkspaceStore.setState({ path: '/ws' })
@@ -70,6 +81,49 @@ describe('ReviewSession', () => {
   it('shows "all done" once the queue is empty', async () => {
     vi.mocked(api.notes.listDueCards).mockResolvedValue([])
     render(<ReviewSession onClose={vi.fn()} />)
+    await waitFor(() => expect(screen.getByText(/all done/i)).toBeInTheDocument())
+  })
+})
+
+describe('ReviewSession — multiple choice', () => {
+  beforeEach(() => {
+    useWorkspaceStore.setState({ path: '/ws' })
+    vi.mocked(api.notes.listDueCards).mockResolvedValue([mcCard])
+  })
+
+  it('renders options as checkboxes with Submit disabled until a pick', async () => {
+    render(<ReviewSession onClose={vi.fn()} />)
+    await waitFor(() => screen.getByText('What is 2+2?'))
+    expect(screen.getByText('Submit')).toBeDisabled()
+    fireEvent.click(screen.getByLabelText('4'))
+    expect(screen.getByText('Submit')).not.toBeDisabled()
+  })
+
+  it('submits picked options and highlights correct/incorrect after grading', async () => {
+    vi.mocked(api.notes.gradeMcCard).mockResolvedValue({ correct: [1] })
+    render(<ReviewSession onClose={vi.fn()} />)
+    await waitFor(() => screen.getByText('What is 2+2?'))
+    fireEvent.click(screen.getByLabelText('3'))
+    fireEvent.click(screen.getByText('Submit'))
+
+    await waitFor(() => expect(api.notes.gradeMcCard).toHaveBeenCalledWith('/ws/c.md', 0, [0], '/ws'))
+    expect(screen.getByLabelText('3').closest('li')).toHaveClass('review-card-option-incorrect')
+    expect(screen.getByLabelText('4').closest('li')).toHaveClass('review-card-option-missed')
+    expect(screen.getByText('Next')).toBeInTheDocument()
+    expect(screen.getByLabelText('3')).toBeDisabled()
+  })
+
+  it('Next re-fetches the due queue', async () => {
+    vi.mocked(api.notes.gradeMcCard).mockResolvedValue({ correct: [1] })
+    let refetched = false
+    vi.mocked(api.notes.listDueCards).mockImplementation(async () => (refetched ? [] : [mcCard]))
+    render(<ReviewSession onClose={vi.fn()} />)
+    await waitFor(() => screen.getByText('What is 2+2?'))
+    fireEvent.click(screen.getByLabelText('4'))
+    fireEvent.click(screen.getByText('Submit'))
+    await waitFor(() => screen.getByText('Next'))
+    refetched = true
+    fireEvent.click(screen.getByText('Next'))
     await waitFor(() => expect(screen.getByText(/all done/i)).toBeInTheDocument())
   })
 })

@@ -3470,6 +3470,31 @@ code {
 
 .review-card-grade:hover { border-color: var(--accent); color: var(--accent); }
 
+.review-card-options {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.review-card-option label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: 6px 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  font-size: 13px;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.review-card-option-correct label { border-color: var(--success, #3fb950); color: var(--success, #3fb950); }
+.review-card-option-incorrect label { border-color: var(--danger); color: var(--danger); }
+.review-card-option-missed label { border-color: var(--warning, #d29922); }
+
 /* Workspace dashboard (P9-4) — an inline main-pane view, not a modal
    overlay, since it replaces the empty-state slot rather than sitting
    on top of a note. */

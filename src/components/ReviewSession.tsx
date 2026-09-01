@@ -20,6 +20,8 @@ export function ReviewSession({ onClose }: ReviewSessionProps) {
   const [queue, setQueue] = useState<DueCard[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [revealed, setRevealed] = useState(false)
+  const [picked, setPicked] = useState<Set<number>>(new Set())
+  const [mcResult, setMcResult] = useState<number[] | null>(null)
 
   useEffect(() => {
     if (!workspacePath) return
@@ -32,6 +34,22 @@ export function ReviewSession({ onClose }: ReviewSessionProps) {
 
   const current = queue[0]
 
+  // Resets per-card UI state whenever the front card changes — including
+  // right after grading, since a new due-queue fetch always produces a new
+  // `current` object even if the same note comes up again.
+  useEffect(() => {
+    setPicked(new Set())
+    setMcResult(null)
+  }, [current?.notePath, current?.position])
+
+  function refetch() {
+    if (!workspacePath) return
+    api.notes.listDueCards(workspacePath).then((cards) => {
+      setQueue(cards)
+      setRevealed(false)
+    })
+  }
+
   // Grades the front card, then re-fetches the whole due queue — unlike
   // `TaskView.toggle`'s "drop it from local state" shortcut, a card's
   // position is a line number, and grading writes a schedule-comment line
@@ -40,12 +58,39 @@ export function ReviewSession({ onClose }: ReviewSessionProps) {
   // no longer be trusted after any grade — only a fresh read reflects it.
   function grade(g: Grade) {
     if (!workspacePath || !current) return
-    void api.notes.gradeCard(current.notePath, current.position, g, workspacePath).then(() =>
-      api.notes.listDueCards(workspacePath).then((cards) => {
-        setQueue(cards)
-        setRevealed(false)
-      }),
-    )
+    // Grading can fail if the note was deleted outside the app (the backend
+    // then drops its stale queue entry on its own) — refetch regardless so a
+    // ghost card can't get stuck un-gradeable forever.
+    void api.notes
+      .gradeCard(current.notePath, current.position, g, workspacePath)
+      .catch(() => {})
+      .then(refetch)
+  }
+
+  function togglePick(i: number) {
+    setPicked((prev) => {
+      const next = new Set(prev)
+      if (next.has(i)) next.delete(i)
+      else next.add(i)
+      return next
+    })
+  }
+
+  function submitMc() {
+    if (!workspacePath || !current) return
+    void api.notes
+      .gradeMcCard(current.notePath, current.position, Array.from(picked), workspacePath)
+      .then((result) => setMcResult(result.correct))
+  }
+
+  function optionClass(i: number): string {
+    if (!mcResult) return ''
+    const isPicked = picked.has(i)
+    const isCorrect = mcResult.includes(i)
+    if (isPicked && isCorrect) return ' review-card-option-correct'
+    if (isPicked && !isCorrect) return ' review-card-option-incorrect'
+    if (!isPicked && isCorrect) return ' review-card-option-missed'
+    return ''
   }
 
   return (
@@ -65,7 +110,35 @@ export function ReviewSession({ onClose }: ReviewSessionProps) {
           <div className="review-card">
             <p className="review-card-note">{current.noteTitle}</p>
             <p className="review-card-front">{current.front}</p>
-            {revealed ? (
+            {current.kind === 'mc' ? (
+              <>
+                <ul className="review-card-options">
+                  {current.options.map((opt, i) => (
+                    <li key={i} className={`review-card-option${optionClass(i)}`}>
+                      <label>
+                        <input
+                          type="checkbox"
+                          checked={picked.has(i)}
+                          disabled={mcResult !== null}
+                          onChange={() => togglePick(i)}
+                          aria-label={opt}
+                        />
+                        {opt}
+                      </label>
+                    </li>
+                  ))}
+                </ul>
+                {mcResult === null ? (
+                  <button className="review-card-reveal" disabled={picked.size === 0} onClick={submitMc}>
+                    Submit
+                  </button>
+                ) : (
+                  <button className="review-card-reveal" onClick={refetch}>
+                    Next
+                  </button>
+                )}
+              </>
+            ) : revealed ? (
               <>
                 <p className="review-card-back">{current.back}</p>
                 <div className="review-card-grades">
