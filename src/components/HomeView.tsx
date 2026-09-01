@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { History, Clock, ListTodo, GraduationCap, GitBranch } from 'lucide-react'
 import { useWorkspaceStore } from '../store/workspace'
 import { useNotesStore } from '../store/notes'
 import { api } from '../lib/tauri'
@@ -9,6 +10,15 @@ const SECTION_CAP = 5
 
 function tabLabel(path: string): string {
   return path.split(/[\\/]/).pop()?.replace('.md', '') ?? path
+}
+
+function relativeTime(ms: number): string {
+  const diffMin = Math.round((Date.now() - ms) / 60_000)
+  if (diffMin < 1) return 'just now'
+  if (diffMin < 60) return `${diffMin}m ago`
+  const diffHr = Math.round(diffMin / 60)
+  if (diffHr < 24) return `${diffHr}h ago`
+  return `${Math.round(diffHr / 24)}d ago`
 }
 
 interface HomeViewProps {
@@ -67,8 +77,8 @@ export function HomeView({ onOpenTaskView, onOpenReview, onOpenSettings }: HomeV
         {buildHomeSummary({ taskCount: tasks.length, dueCount: dueCards.length, gitStatus })}
       </p>
       <div className="home-view-grid">
-      <section className="home-section">
-        <h2>Continue</h2>
+      <section className="home-section home-section--primary">
+        <h2><History size={14} /> Continue</h2>
         {continueItems.length === 0 ? (
           <p className="home-empty">No open notes.</p>
         ) : (
@@ -83,8 +93,8 @@ export function HomeView({ onOpenTaskView, onOpenReview, onOpenSettings }: HomeV
           </ul>
         )}
       </section>
-      <section className="home-section">
-        <h2>Recent</h2>
+      <section className="home-section home-section--primary">
+        <h2><Clock size={14} /> Recent</h2>
         {recentItems.length === 0 ? (
           <p className="home-empty">No notes yet.</p>
         ) : (
@@ -92,7 +102,8 @@ export function HomeView({ onOpenTaskView, onOpenReview, onOpenSettings }: HomeV
             {recentItems.map((note) => (
               <li key={note.path}>
                 <button className="home-section-item" onClick={() => openTab(note.path)}>
-                  {note.title}
+                  <span className="home-section-item-label">{note.title}</span>
+                  <span className="home-section-item-meta">{relativeTime(note.updatedAt)}</span>
                 </button>
               </li>
             ))}
@@ -100,7 +111,7 @@ export function HomeView({ onOpenTaskView, onOpenReview, onOpenSettings }: HomeV
         )}
       </section>
       <section className="home-section">
-        <h2>Tasks</h2>
+        <h2><ListTodo size={14} /> Tasks</h2>
         {tasks.length === 0 ? (
           <p className="home-empty">No open tasks.</p>
         ) : (
@@ -122,7 +133,7 @@ export function HomeView({ onOpenTaskView, onOpenReview, onOpenSettings }: HomeV
         )}
       </section>
       <section className="home-section">
-        <h2>Study</h2>
+        <h2><GraduationCap size={14} /> Study</h2>
         {dueCards.length === 0 ? (
           <p className="home-empty">Nothing due.</p>
         ) : (
@@ -134,8 +145,8 @@ export function HomeView({ onOpenTaskView, onOpenReview, onOpenSettings }: HomeV
           </>
         )}
       </section>
-      <section className="home-section home-section--wide">
-        <h2>Git</h2>
+      <section className="home-section home-section--git">
+        <h2><GitBranch size={14} /> Git</h2>
         {gitStatus ? (
           <p className="home-status">{gitStatus}</p>
         ) : (
