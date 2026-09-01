@@ -774,10 +774,21 @@ pub fn grade_card_line(
     let mut lines: Vec<String> = content.lines().map(str::to_string).collect();
     let idx = usize::try_from(position).ok()?;
     let trimmed = lines.get(idx)?.trim().to_string();
-    classify_card_line(&trimmed)?;
+
+    let comment_idx = if is_mc_question_line(&trimmed) {
+        let borrowed: Vec<&str> = lines.iter().map(String::as_str).collect();
+        let option_count = mc_block_option_count(&borrowed, idx);
+        if option_count == 0 {
+            return None;
+        }
+        idx + 1 + option_count
+    } else {
+        classify_card_line(&trimmed)?;
+        idx + 1
+    };
 
     let current = lines
-        .get(idx + 1)
+        .get(comment_idx)
         .and_then(|l| parse_sr_comment(l))
         .map(|(_, ease, interval, reps, _)| sm2::CardState {
             ease,
@@ -788,18 +799,22 @@ pub fn grade_card_line(
 
     let next = sm2::next_state(current, grade, today);
     let comment = format!(
-        "<!-- sr due={} ease={:.2} interval={} reps={} -->",
-        next.due, next.ease, next.interval, next.reps
+        "<!-- sr due={} ease={:.2} interval={} reps={} grade={} -->",
+        next.due,
+        next.ease,
+        next.interval,
+        next.reps,
+        grade.as_str()
     );
 
     let has_comment_line = lines
-        .get(idx + 1)
+        .get(comment_idx)
         .map(|l| parse_sr_comment(l).is_some())
         .unwrap_or(false);
     if has_comment_line {
-        lines[idx + 1] = comment;
+        lines[comment_idx] = comment;
     } else {
-        lines.insert(idx + 1, comment);
+        lines.insert(comment_idx, comment);
     }
 
     let mut rewritten = lines.join("\n");
@@ -1881,7 +1896,7 @@ mod tests {
         let result = grade_card_line("Q :: A\n", 0, sm2::Grade::Good, grade_today()).unwrap();
         assert_eq!(
             result,
-            "Q :: A\n<!-- sr due=2026-08-21 ease=2.50 interval=1 reps=1 -->\n"
+            "Q :: A\n<!-- sr due=2026-08-21 ease=2.50 interval=1 reps=1 grade=good -->\n"
         );
     }
 
@@ -1891,7 +1906,7 @@ mod tests {
         let result = grade_card_line(content, 0, sm2::Grade::Good, grade_today()).unwrap();
         assert_eq!(
             result,
-            "Q :: A\n<!-- sr due=2026-09-04 ease=2.50 interval=15 reps=3 -->\n"
+            "Q :: A\n<!-- sr due=2026-09-04 ease=2.50 interval=15 reps=3 grade=good -->\n"
         );
     }
 
@@ -1913,6 +1928,61 @@ mod tests {
         let result = grade_card_line(content, 0, sm2::Grade::Good, grade_today()).unwrap();
         assert!(result.contains("Q2 :: A2"));
         assert!(result.contains("Q1 :: A1\n<!-- sr"));
+    }
+
+    #[test]
+    fn test_grade_card_line_places_the_comment_after_an_mc_blocks_options() {
+        let content = "Q ::\n- [ ] a\n- [x] b\n";
+        let out = grade_card_line(
+            content,
+            0,
+            sm2::Grade::Good,
+            chrono::NaiveDate::from_ymd_opt(2026, 8, 20).unwrap(),
+        )
+        .unwrap();
+        let lines: Vec<&str> = out.lines().collect();
+        assert_eq!(lines.len(), 4);
+        assert!(lines[3].starts_with("<!-- sr "));
+        assert!(lines[3].contains("grade=good"));
+    }
+
+    #[test]
+    fn test_grade_card_line_updates_an_existing_mc_comment_in_place() {
+        let content = "Q ::\n- [ ] a\n- [x] b\n<!-- sr due=2026-08-20 ease=2.50 interval=1 reps=1 grade=good -->\n";
+        let out = grade_card_line(
+            content,
+            0,
+            sm2::Grade::Easy,
+            chrono::NaiveDate::from_ymd_opt(2026, 8, 21).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(out.lines().count(), 4);
+        assert!(out.contains("grade=easy"));
+    }
+
+    #[test]
+    fn test_grade_card_line_writes_grade_field_for_plain_qa_too() {
+        let content = "Q :: A\n";
+        let out = grade_card_line(
+            content,
+            0,
+            sm2::Grade::Hard,
+            chrono::NaiveDate::from_ymd_opt(2026, 8, 20).unwrap(),
+        )
+        .unwrap();
+        assert!(out.contains("grade=hard"));
+    }
+
+    #[test]
+    fn test_grade_card_line_rejects_an_mc_question_with_no_option_lines() {
+        let content = "Q ::\nsome unrelated paragraph\n";
+        assert!(grade_card_line(
+            content,
+            0,
+            sm2::Grade::Good,
+            chrono::NaiveDate::from_ymd_opt(2026, 8, 20).unwrap()
+        )
+        .is_none());
     }
 
     #[tokio::test]
