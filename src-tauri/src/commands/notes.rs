@@ -1,7 +1,7 @@
 use crate::db::{self, DbPool};
 use crate::models::{
-    BacklinkEntry, CardKind, DueCard, ExtractedCard, ExtractedFormula, ExtractedTask, GraphLink,
-    GraphTag, McGradeResult, NoteMetadata, OpenTask, SearchResult, WorkspaceTree,
+    BacklinkEntry, CardKind, CardSummary, DueCard, ExtractedCard, ExtractedFormula, ExtractedTask,
+    GraphLink, GraphTag, McGradeResult, NoteMetadata, OpenTask, SearchResult, WorkspaceTree,
 };
 use crate::sm2;
 use regex::Regex;
@@ -1118,6 +1118,16 @@ pub async fn list_due_cards(
     db: State<'_, DbPool>,
 ) -> Result<Vec<DueCard>, String> {
     db::notes::due_cards(&db, &workspace, &sm2::today())
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn list_all_cards(
+    workspace: String,
+    db: State<'_, DbPool>,
+) -> Result<Vec<CardSummary>, String> {
+    db::notes::list_all_cards(&db, &workspace)
         .await
         .map_err(|e| e.to_string())
 }

@@ -1,5 +1,6 @@
 use crate::models::{
-    CardKind, DueCard, ExtractedCard, ExtractedTask, NoteMetadata, OpenTask, SearchResult,
+    CardKind, CardSummary, DueCard, ExtractedCard, ExtractedTask, NoteMetadata, OpenTask,
+    SearchResult,
 };
 use crate::sm2;
 use anyhow::Result;
@@ -316,14 +317,21 @@ pub async fn set_cards(pool: &SqlitePool, note_path: &str, cards: &[ExtractedCar
         let kind = match card.kind {
             CardKind::Qa => "qa",
             CardKind::Cloze => "cloze",
+            CardKind::Mc => "mc",
         };
         let due = card.due.clone().unwrap_or_else(sm2::today);
         let ease = card.ease.unwrap_or(2.5);
         let interval = card.interval.unwrap_or(0);
         let reps = card.reps.unwrap_or(0);
+        let grade = card.grade.map(sm2::Grade::as_str);
+        let options = if card.options.is_empty() {
+            None
+        } else {
+            Some(serde_json::to_string(&card.options)?)
+        };
         sqlx::query(
-            "INSERT INTO review_cards (note_path, kind, front, back, position, due, ease, interval, reps)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO review_cards (note_path, kind, front, back, position, due, ease, interval, reps, options, grade)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         )
         .bind(note_path)
         .bind(kind)
@@ -334,15 +342,28 @@ pub async fn set_cards(pool: &SqlitePool, note_path: &str, cards: &[ExtractedCar
         .bind(ease)
         .bind(interval)
         .bind(reps)
+        .bind(options)
+        .bind(grade)
         .execute(pool)
         .await?;
     }
     Ok(())
 }
 
+#[derive(sqlx::FromRow)]
+struct DueCardRow {
+    note_path: String,
+    note_title: String,
+    kind: String,
+    front: String,
+    back: String,
+    position: i64,
+    options: Option<String>,
+}
+
 pub async fn due_cards(pool: &SqlitePool, workspace: &str, today: &str) -> Result<Vec<DueCard>> {
-    let rows = sqlx::query_as::<_, DueCard>(
-        "SELECT rc.note_path, n.title as note_title, rc.kind, rc.front, rc.back, rc.position
+    let rows = sqlx::query_as::<_, DueCardRow>(
+        "SELECT rc.note_path, n.title as note_title, rc.kind, rc.front, rc.back, rc.position, rc.options
          FROM review_cards rc
          JOIN notes n ON n.path = rc.note_path
          WHERE n.workspace = ? AND rc.due <= ?
@@ -352,7 +373,72 @@ pub async fn due_cards(pool: &SqlitePool, workspace: &str, today: &str) -> Resul
     .bind(today)
     .fetch_all(pool)
     .await?;
-    Ok(rows)
+
+    let mut cards = Vec::with_capacity(rows.len());
+    for r in rows {
+        let options = match r.options {
+            Some(json) => serde_json::from_str(&json)?,
+            None => Vec::new(),
+        };
+        cards.push(DueCard {
+            note_path: r.note_path,
+            note_title: r.note_title,
+            kind: r.kind,
+            front: r.front,
+            back: r.back,
+            position: r.position,
+            options,
+        });
+    }
+    Ok(cards)
+}
+
+#[derive(sqlx::FromRow)]
+struct CardSummaryRow {
+    note_path: String,
+    note_title: String,
+    kind: String,
+    front: String,
+    back: String,
+    position: i64,
+    due: String,
+    interval: i64,
+    tags: Option<String>,
+}
+
+pub async fn list_all_cards(pool: &SqlitePool, workspace: &str) -> Result<Vec<CardSummary>> {
+    let rows = sqlx::query_as::<_, CardSummaryRow>(
+        "SELECT rc.note_path, n.title as note_title, rc.kind, rc.front, rc.back,
+                rc.position, rc.due, rc.interval,
+                GROUP_CONCAT(DISTINCT nt.tag) as tags
+         FROM review_cards rc
+         JOIN notes n ON n.path = rc.note_path
+         LEFT JOIN note_tags nt ON nt.note_path = rc.note_path
+         WHERE n.workspace = ?
+         GROUP BY rc.note_path, rc.position
+         ORDER BY n.title COLLATE NOCASE, rc.position",
+    )
+    .bind(workspace)
+    .fetch_all(pool)
+    .await?;
+
+    Ok(rows
+        .into_iter()
+        .map(|r| CardSummary {
+            note_path: r.note_path,
+            note_title: r.note_title,
+            kind: r.kind,
+            front: r.front,
+            back: r.back,
+            position: r.position,
+            due: r.due,
+            interval: r.interval,
+            tags: r
+                .tags
+                .map(|t| t.split(',').map(String::from).collect())
+                .unwrap_or_default(),
+        })
+        .collect())
 }
 
 pub async fn list_tags(pool: &SqlitePool, workspace: &str) -> Result<Vec<String>> {
@@ -1248,6 +1334,9 @@ mod tests {
             ease: None,
             interval: None,
             reps: None,
+            grade: None,
+            options: Vec::new(),
+            correct: Vec::new(),
         }
     }
 
@@ -1387,5 +1476,118 @@ mod tests {
                 ("/ws/b.md".to_string(), "cs101".to_string()),
             ]
         );
+    }
+
+    #[tokio::test]
+    async fn test_set_cards_persists_mc_options_and_serves_them_via_due_cards() {
+        let pool = make_pool().await;
+        index_note(
+            &pool,
+            &NoteMetadata {
+                id: "1".into(),
+                title: "N".into(),
+                path: "/ws/a.md".into(),
+                workspace: "/ws".into(),
+                updated_at: 0,
+            },
+        )
+        .await
+        .unwrap();
+        let cards = vec![ExtractedCard {
+            kind: CardKind::Mc,
+            front: "Q".into(),
+            back: String::new(),
+            position: 0,
+            due: None,
+            ease: None,
+            interval: None,
+            reps: None,
+            grade: None,
+            options: vec!["a".into(), "b".into()],
+            correct: vec![1],
+        }];
+        set_cards(&pool, "/ws/a.md", &cards).await.unwrap();
+
+        let due = due_cards(&pool, "/ws", "9999-12-31").await.unwrap();
+        assert_eq!(due.len(), 1);
+        assert_eq!(due[0].kind, "mc");
+        assert_eq!(due[0].options, vec!["a", "b"]);
+    }
+
+    #[tokio::test]
+    async fn test_due_cards_qa_card_has_empty_options() {
+        let pool = make_pool().await;
+        index_note(
+            &pool,
+            &NoteMetadata {
+                id: "1".into(),
+                title: "N".into(),
+                path: "/ws/a.md".into(),
+                workspace: "/ws".into(),
+                updated_at: 0,
+            },
+        )
+        .await
+        .unwrap();
+        let cards = vec![ExtractedCard {
+            kind: CardKind::Qa,
+            front: "Q".into(),
+            back: "A".into(),
+            position: 0,
+            due: None,
+            ease: None,
+            interval: None,
+            reps: None,
+            grade: None,
+            options: Vec::new(),
+            correct: Vec::new(),
+        }];
+        set_cards(&pool, "/ws/a.md", &cards).await.unwrap();
+
+        let due = due_cards(&pool, "/ws", "9999-12-31").await.unwrap();
+        assert!(due[0].options.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_list_all_cards_includes_cards_regardless_of_due_date_with_tags() {
+        let pool = make_pool().await;
+        index_note(
+            &pool,
+            &NoteMetadata {
+                id: "1".into(),
+                title: "N".into(),
+                path: "/ws/a.md".into(),
+                workspace: "/ws".into(),
+                updated_at: 0,
+            },
+        )
+        .await
+        .unwrap();
+        set_tags(&pool, "/ws/a.md", &["cs".into(), "algo".into()])
+            .await
+            .unwrap();
+        let cards = vec![ExtractedCard {
+            kind: CardKind::Qa,
+            front: "Q".into(),
+            back: "A".into(),
+            position: 0,
+            due: Some("2099-01-01".into()), // far future — would never show in due_cards
+            ease: Some(2.5),
+            interval: Some(30),
+            reps: Some(2),
+            grade: Some(sm2::Grade::Good),
+            options: Vec::new(),
+            correct: Vec::new(),
+        }];
+        set_cards(&pool, "/ws/a.md", &cards).await.unwrap();
+
+        let all = list_all_cards(&pool, "/ws").await.unwrap();
+
+        assert_eq!(all.len(), 1);
+        assert_eq!(all[0].due, "2099-01-01");
+        assert_eq!(all[0].interval, 30);
+        let mut tags = all[0].tags.clone();
+        tags.sort();
+        assert_eq!(tags, vec!["algo", "cs"]);
     }
 }
