@@ -3517,6 +3517,29 @@ code {
   cursor: pointer;
 }
 
+.deck-view-categories {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+}
+
+.deck-view-category {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 2px 6px;
+}
+
+.deck-view-category-cram {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  cursor: pointer;
+}
+
 /* Workspace dashboard (P9-4) — an inline main-pane view, not a modal
    overlay, since it replaces the empty-state slot rather than sitting
    on top of a note. */

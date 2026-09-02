@@ -7,6 +7,7 @@ import type { CardSummary } from '../types'
 
 interface DeckViewProps {
   onClose: () => void
+  onOpenCram: (streak: number) => void
 }
 
 // The conventional SRS "graduated" threshold — a display bucket only, not a
@@ -17,7 +18,7 @@ function isDueToday(due: string): boolean {
   return due <= new Date().toISOString().slice(0, 10)
 }
 
-export function DeckView({ onClose }: DeckViewProps) {
+export function DeckView({ onClose, onOpenCram }: DeckViewProps) {
   const workspacePath = useWorkspaceStore((s) => s.path)
   const openTab = useWorkspaceStore((s) => s.openTab)
   const [cards, setCards] = useState<CardSummary[]>([])
@@ -50,6 +51,15 @@ export function DeckView({ onClose }: DeckViewProps) {
   )
 
   const groups = useMemo(() => groupCardsByNote(filtered), [filtered])
+  const categories = useMemo(() => {
+    const counts = new Map<number, number>()
+    for (const c of filtered) {
+      counts.set(c.streak, (counts.get(c.streak) ?? 0) + 1)
+    }
+    return Array.from(counts.entries())
+      .sort(([a], [b]) => a - b)
+      .map(([streak, count]) => ({ streak, count }))
+  }, [filtered])
   const dueCount = useMemo(() => cards.filter((c) => isDueToday(c.due)).length, [cards])
   const masteredCount = useMemo(
     () => cards.filter((c) => c.interval >= MASTERED_INTERVAL_DAYS).length,
@@ -107,6 +117,18 @@ export function DeckView({ onClose }: DeckViewProps) {
                 ))}
               </div>
             )}
+            {categories.length > 0 && (
+              <div className="deck-view-categories">
+                {categories.map(({ streak, count }) => (
+                  <div key={streak} className="deck-view-category">
+                    <span>{streak === 0 ? 'New' : `Category ${streak}`} ({count})</span>
+                    <button className="deck-view-category-cram" onClick={() => onOpenCram(streak)}>
+                      Cram
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
             <div className="task-view-list">
               {groups.map((group) => (
                 <div key={group.notePath} className="task-view-group">
@@ -116,7 +138,9 @@ export function DeckView({ onClose }: DeckViewProps) {
                   <ul>
                     {group.cards.map((c) => (
                       <li key={c.position} className="task-view-item">
-                        <span className="task-view-item-text">{c.front}</span>
+                        <button className="task-view-item-text" onClick={() => openNote(group.notePath)}>
+                          {c.front}
+                        </button>
                       </li>
                     ))}
                   </ul>
