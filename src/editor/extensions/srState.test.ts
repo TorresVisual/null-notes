@@ -64,6 +64,14 @@ describe('SrState node (P9-3)', () => {
     expect(out.match(/<!-- sr /g)?.length).toBe(1)
   })
 
+  it('round-trips a 6-field schedule comment with a trailing streak unchanged', () => {
+    const md = 'What is Big-O of binary search? :: O(log n)\n<!-- sr due=2026-08-21 ease=2.50 interval=1 reps=1 grade=good streak=1 -->'
+    const e = mount(md)
+    expect(getMarkdown(e)).toContain(
+      '<!-- sr due=2026-08-21 ease=2.50 interval=1 reps=1 grade=good streak=1 -->',
+    )
+  })
+
   it('leaves a note with no schedule comment completely unaffected', () => {
     const md = 'Just an ordinary note with no cards.'
     const e = mount(md)
