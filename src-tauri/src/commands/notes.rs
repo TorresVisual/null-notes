@@ -464,7 +464,7 @@ pub fn extract_cards(content: &str) -> Vec<ExtractedCard> {
             let option_count = mc_block_option_count(&lines, i);
             if let Some((front, options, correct)) = parse_mc_block(&lines, i) {
                 let comment_idx = sr_comment_idx(&lines, i + 1 + option_count);
-                let (due, ease, interval, reps, grade, _streak) = lines
+                let (due, ease, interval, reps, grade, streak) = lines
                     .get(comment_idx)
                     .and_then(|l| parse_sr_comment(l))
                     .map(|(d, e, iv, r, g, s)| (Some(d), Some(e), Some(iv), Some(r), g, s))
@@ -479,6 +479,7 @@ pub fn extract_cards(content: &str) -> Vec<ExtractedCard> {
                     interval,
                     reps,
                     grade,
+                    streak,
                     options,
                     correct,
                 });
@@ -496,7 +497,7 @@ pub fn extract_cards(content: &str) -> Vec<ExtractedCard> {
         };
 
         let comment_idx = sr_comment_idx(&lines, i + 1);
-        let (due, ease, interval, reps, grade, _streak) = lines
+        let (due, ease, interval, reps, grade, streak) = lines
             .get(comment_idx)
             .and_then(|l| parse_sr_comment(l))
             .map(|(d, e, iv, r, g, s)| (Some(d), Some(e), Some(iv), Some(r), g, s))
@@ -512,6 +513,7 @@ pub fn extract_cards(content: &str) -> Vec<ExtractedCard> {
             interval,
             reps,
             grade,
+            streak,
             options: Vec::new(),
             correct: Vec::new(),
         });

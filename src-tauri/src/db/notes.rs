@@ -324,14 +324,15 @@ pub async fn set_cards(pool: &SqlitePool, note_path: &str, cards: &[ExtractedCar
         let interval = card.interval.unwrap_or(0);
         let reps = card.reps.unwrap_or(0);
         let grade = card.grade.map(sm2::Grade::as_str);
+        let streak = card.streak.unwrap_or(0);
         let options = if card.options.is_empty() {
             None
         } else {
             Some(serde_json::to_string(&card.options)?)
         };
         sqlx::query(
-            "INSERT INTO review_cards (note_path, kind, front, back, position, due, ease, interval, reps, options, grade)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO review_cards (note_path, kind, front, back, position, due, ease, interval, reps, options, grade, streak)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         )
         .bind(note_path)
         .bind(kind)
@@ -344,6 +345,7 @@ pub async fn set_cards(pool: &SqlitePool, note_path: &str, cards: &[ExtractedCar
         .bind(reps)
         .bind(options)
         .bind(grade)
+        .bind(streak)
         .execute(pool)
         .await?;
     }
@@ -359,11 +361,12 @@ struct DueCardRow {
     back: String,
     position: i64,
     options: Option<String>,
+    streak: i64,
 }
 
 pub async fn due_cards(pool: &SqlitePool, workspace: &str, today: &str) -> Result<Vec<DueCard>> {
     let rows = sqlx::query_as::<_, DueCardRow>(
-        "SELECT rc.note_path, n.title as note_title, rc.kind, rc.front, rc.back, rc.position, rc.options
+        "SELECT rc.note_path, n.title as note_title, rc.kind, rc.front, rc.back, rc.position, rc.options, rc.streak
          FROM review_cards rc
          JOIN notes n ON n.path = rc.note_path
          WHERE n.workspace = ? AND rc.due <= ?
@@ -388,6 +391,7 @@ pub async fn due_cards(pool: &SqlitePool, workspace: &str, today: &str) -> Resul
             back: r.back,
             position: r.position,
             options,
+            streak: r.streak,
         });
     }
     Ok(cards)
@@ -403,13 +407,14 @@ struct CardSummaryRow {
     position: i64,
     due: String,
     interval: i64,
+    streak: i64,
     tags: Option<String>,
 }
 
 pub async fn list_all_cards(pool: &SqlitePool, workspace: &str) -> Result<Vec<CardSummary>> {
     let rows = sqlx::query_as::<_, CardSummaryRow>(
         "SELECT rc.note_path, n.title as note_title, rc.kind, rc.front, rc.back,
-                rc.position, rc.due, rc.interval,
+                rc.position, rc.due, rc.interval, rc.streak,
                 GROUP_CONCAT(DISTINCT nt.tag) as tags
          FROM review_cards rc
          JOIN notes n ON n.path = rc.note_path
@@ -433,6 +438,7 @@ pub async fn list_all_cards(pool: &SqlitePool, workspace: &str) -> Result<Vec<Ca
             position: r.position,
             due: r.due,
             interval: r.interval,
+            streak: r.streak,
             tags: r
                 .tags
                 .map(|t| t.split(',').map(String::from).collect())
@@ -1335,6 +1341,7 @@ mod tests {
             interval: None,
             reps: None,
             grade: None,
+            streak: None,
             options: Vec::new(),
             correct: Vec::new(),
         }
@@ -1503,6 +1510,7 @@ mod tests {
             interval: None,
             reps: None,
             grade: None,
+            streak: None,
             options: vec!["a".into(), "b".into()],
             correct: vec![1],
         }];
@@ -1539,6 +1547,7 @@ mod tests {
             interval: None,
             reps: None,
             grade: None,
+            streak: None,
             options: Vec::new(),
             correct: Vec::new(),
         }];
@@ -1546,6 +1555,41 @@ mod tests {
 
         let due = due_cards(&pool, "/ws", "9999-12-31").await.unwrap();
         assert!(due[0].options.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_set_cards_defaults_streak_to_zero_when_absent_and_persists_a_given_value() {
+        let pool = make_pool().await;
+        index_note(&pool, &note("a", "A", "/ws/a.md", "/ws"))
+            .await
+            .unwrap();
+        let mut with_streak = card(CardKind::Qa, "Q1", "A1", 0);
+        with_streak.streak = Some(3);
+        let mut without_streak = card(CardKind::Qa, "Q2", "A2", 1);
+        without_streak.streak = None;
+        set_cards(&pool, "/ws/a.md", &[with_streak, without_streak])
+            .await
+            .unwrap();
+
+        let all = list_all_cards(&pool, "/ws").await.unwrap();
+        let q1 = all.iter().find(|c| c.front == "Q1").unwrap();
+        let q2 = all.iter().find(|c| c.front == "Q2").unwrap();
+        assert_eq!(q1.streak, 3);
+        assert_eq!(q2.streak, 0);
+    }
+
+    #[tokio::test]
+    async fn test_due_cards_includes_streak() {
+        let pool = make_pool().await;
+        index_note(&pool, &note("a", "A", "/ws/a.md", "/ws"))
+            .await
+            .unwrap();
+        let mut c = card(CardKind::Qa, "Q1", "A1", 0);
+        c.streak = Some(2);
+        set_cards(&pool, "/ws/a.md", &[c]).await.unwrap();
+
+        let due = due_cards(&pool, "/ws", &sm2::today()).await.unwrap();
+        assert_eq!(due[0].streak, 2);
     }
 
     #[tokio::test]
@@ -1576,6 +1620,7 @@ mod tests {
             interval: Some(30),
             reps: Some(2),
             grade: Some(sm2::Grade::Good),
+            streak: None,
             options: Vec::new(),
             correct: Vec::new(),
         }];

@@ -233,6 +233,7 @@ pub struct ExtractedCard {
     pub interval: Option<i64>,
     pub reps: Option<i64>,
     pub grade: Option<sm2::Grade>,
+    pub streak: Option<i64>,
     /// MC option text, in source order. Empty for `Qa`/`Cloze`.
     pub options: Vec<String>,
     /// 0-based indices of the `[x]` lines. Empty for `Qa`/`Cloze`. Never
@@ -256,6 +257,7 @@ pub struct DueCard {
     /// answer (`correct`) is deliberately absent — resolved server-side at
     /// grading time against a fresh read of the note.
     pub options: Vec<String>,
+    pub streak: i64,
 }
 
 /// One card for the deck view (browse-all, not just due) — mirrors
@@ -271,6 +273,7 @@ pub struct CardSummary {
     pub position: i64,
     pub due: String,
     pub interval: i64,
+    pub streak: i64,
     pub tags: Vec<String>,
 }
 
