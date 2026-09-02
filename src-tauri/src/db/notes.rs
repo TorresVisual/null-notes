@@ -397,6 +397,43 @@ pub async fn due_cards(pool: &SqlitePool, workspace: &str, today: &str) -> Resul
     Ok(cards)
 }
 
+pub async fn list_cards_by_category(
+    pool: &SqlitePool,
+    workspace: &str,
+    streak: i64,
+) -> Result<Vec<DueCard>> {
+    let rows = sqlx::query_as::<_, DueCardRow>(
+        "SELECT rc.note_path, n.title as note_title, rc.kind, rc.front, rc.back, rc.position, rc.options, rc.streak
+         FROM review_cards rc
+         JOIN notes n ON n.path = rc.note_path
+         WHERE n.workspace = ? AND rc.streak = ?
+         ORDER BY n.title COLLATE NOCASE, rc.position",
+    )
+    .bind(workspace)
+    .bind(streak)
+    .fetch_all(pool)
+    .await?;
+
+    let mut cards = Vec::with_capacity(rows.len());
+    for r in rows {
+        let options = match r.options {
+            Some(json) => serde_json::from_str(&json)?,
+            None => Vec::new(),
+        };
+        cards.push(DueCard {
+            note_path: r.note_path,
+            note_title: r.note_title,
+            kind: r.kind,
+            front: r.front,
+            back: r.back,
+            position: r.position,
+            options,
+            streak: r.streak,
+        });
+    }
+    Ok(cards)
+}
+
 #[derive(sqlx::FromRow)]
 struct CardSummaryRow {
     note_path: String,
@@ -1590,6 +1627,27 @@ mod tests {
 
         let due = due_cards(&pool, "/ws", &sm2::today()).await.unwrap();
         assert_eq!(due[0].streak, 2);
+    }
+
+    #[tokio::test]
+    async fn test_list_cards_by_category_filters_by_streak_and_excludes_others() {
+        let pool = make_pool().await;
+        index_note(&pool, &note("a", "A", "/ws/a.md", "/ws"))
+            .await
+            .unwrap();
+
+        let mut streak_two = card(CardKind::Qa, "in category", "back", 0);
+        streak_two.streak = Some(2);
+        streak_two.due = Some("2099-01-01".to_string()); // far future — proves due-date is ignored
+        let mut streak_zero = card(CardKind::Qa, "not in category", "back", 1);
+        streak_zero.streak = Some(0);
+        set_cards(&pool, "/ws/a.md", &[streak_two, streak_zero])
+            .await
+            .unwrap();
+
+        let category = list_cards_by_category(&pool, "/ws", 2).await.unwrap();
+        assert_eq!(category.len(), 1);
+        assert_eq!(category[0].front, "in category");
     }
 
     #[tokio::test]

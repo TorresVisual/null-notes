@@ -244,6 +244,7 @@ pub fn run() {
             commands::notes::grade_mc_card,
             commands::notes::list_due_cards,
             commands::notes::list_all_cards,
+            commands::notes::list_cram_cards,
             commands::notes::backlinks_for,
             commands::notes::backlinks_for_with_context,
             commands::notes::graph_links,

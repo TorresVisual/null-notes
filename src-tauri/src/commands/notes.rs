@@ -248,12 +248,13 @@ pub fn extract_formulas(content: &str) -> Vec<ExtractedFormula> {
     formulas
 }
 
+// due, ease, interval, reps, grade, streak
+type SrComment = (String, f64, i64, i64, Option<sm2::Grade>, Option<i64>);
+
 // A schedule comment is never itself a card, even though it starts a fresh
 // line right after one — checked first so the loop below never has to
 // special-case it.
-fn parse_sr_comment(
-    line: &str,
-) -> Option<(String, f64, i64, i64, Option<sm2::Grade>, Option<i64>)> {
+fn parse_sr_comment(line: &str) -> Option<SrComment> {
     let re = match Regex::new(
         r"^<!--\s+sr\s+due=(\S+)\s+ease=(\S+)\s+interval=(\S+)\s+reps=(\S+)(?:\s+grade=(\S+))?(?:\s+streak=(\S+))?\s+-->$",
     ) {
@@ -1198,6 +1199,17 @@ pub async fn list_all_cards(
 }
 
 #[tauri::command]
+pub async fn list_cram_cards(
+    workspace: String,
+    streak: i64,
+    db: State<'_, DbPool>,
+) -> Result<Vec<DueCard>, String> {
+    db::notes::list_cards_by_category(&db, &workspace, streak)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub async fn backlinks_for(
     workspace: String,
     title: String,
@@ -2099,21 +2111,24 @@ mod tests {
 
     #[test]
     fn test_grade_card_line_streak_increments_on_consecutive_good_grades() {
-        let content = "Q :: A\n<!-- sr due=2026-08-20 ease=2.50 interval=6 reps=2 grade=good streak=2 -->\n";
+        let content =
+            "Q :: A\n<!-- sr due=2026-08-20 ease=2.50 interval=6 reps=2 grade=good streak=2 -->\n";
         let result = grade_card_line(content, 0, sm2::Grade::Good, grade_today()).unwrap();
         assert!(result.contains("streak=3"));
     }
 
     #[test]
     fn test_grade_card_line_streak_resets_to_zero_on_again() {
-        let content = "Q :: A\n<!-- sr due=2026-08-20 ease=2.50 interval=6 reps=2 grade=good streak=3 -->\n";
+        let content =
+            "Q :: A\n<!-- sr due=2026-08-20 ease=2.50 interval=6 reps=2 grade=good streak=3 -->\n";
         let result = grade_card_line(content, 0, sm2::Grade::Again, grade_today()).unwrap();
         assert!(result.contains("streak=0"));
     }
 
     #[test]
     fn test_grade_card_line_streak_unchanged_on_hard() {
-        let content = "Q :: A\n<!-- sr due=2026-08-20 ease=2.50 interval=6 reps=2 grade=good streak=2 -->\n";
+        let content =
+            "Q :: A\n<!-- sr due=2026-08-20 ease=2.50 interval=6 reps=2 grade=good streak=2 -->\n";
         let result = grade_card_line(content, 0, sm2::Grade::Hard, grade_today()).unwrap();
         assert!(result.contains("streak=2"));
     }
