@@ -97,6 +97,7 @@ export function Layout() {
   const [pendingFlashcardInsert, setPendingFlashcardInsert] = useState<
     { editor: Editor; range: Range } | null
   >(null)
+  const [pendingCramStreak, setPendingCramStreak] = useState<number | null>(null)
   const settings = useSettingsStore((s) => s.settings)
   const setSettings = useSettingsStore((s) => s.setSettings)
   const scrollRef = useScrollRestoration(activeTab, isLoading)
@@ -196,7 +197,10 @@ export function Layout() {
           if (workspacePath) openOverlay('task')
           break
         case 'review':
-          if (workspacePath) openOverlay('review')
+          if (workspacePath) {
+            setPendingCramStreak(null)
+            openOverlay('review')
+          }
           break
         case 'deck-view':
           if (workspacePath) openOverlay('deck')
@@ -375,8 +379,24 @@ export function Layout() {
       {activeOverlay === 'template' && <TemplateDialog onClose={closeOverlay} />}
       {activeOverlay === 'graph' && <GraphView onClose={closeOverlay} />}
       {activeOverlay === 'task' && <TaskView onClose={closeOverlay} />}
-      {activeOverlay === 'review' && <ReviewSession onClose={closeOverlay} />}
-      {activeOverlay === 'deck' && <DeckView onClose={closeOverlay} />}
+      {activeOverlay === 'review' && (
+        <ReviewSession
+          mode={pendingCramStreak !== null ? { kind: 'cram', streak: pendingCramStreak } : { kind: 'due' }}
+          onClose={() => {
+            setPendingCramStreak(null)
+            closeOverlay()
+          }}
+        />
+      )}
+      {activeOverlay === 'deck' && (
+        <DeckView
+          onClose={closeOverlay}
+          onOpenCram={(streak) => {
+            setPendingCramStreak(streak)
+            openOverlay('review')
+          }}
+        />
+      )}
       {activeOverlay === 'formulaSheet' && <FormulaSheetPrompt onClose={closeOverlay} />}
       {activeOverlay === 'exportPdf' && currentNote && (
         <ExportPdfDialog noteTitle={currentNote.title} contentRef={editorPaneRef} onClose={closeOverlay} />
@@ -405,7 +425,10 @@ export function Layout() {
           onTemplateOpen={() => openOverlay('template')}
           onGraphOpen={() => openOverlay('graph')}
           onTaskOpen={() => openOverlay('task')}
-          onReviewOpen={() => openOverlay('review')}
+          onReviewOpen={() => {
+            setPendingCramStreak(null)
+            openOverlay('review')
+          }}
           onFormulaSheetOpen={() => openOverlay('formulaSheet')}
           onTerminalToggle={() => {
             setTerminalMounted(true)
@@ -478,9 +501,13 @@ export function Layout() {
               {!activeTab && workspacePath && notes.length > 0 && (
                 <HomeView
                   onOpenTaskView={() => openOverlay('task')}
-                  onOpenReview={() => openOverlay('review')}
+                  onOpenReview={() => {
+                    setPendingCramStreak(null)
+                    openOverlay('review')
+                  }}
                   onOpenDeckView={() => openOverlay('deck')}
                   onOpenSettings={() => openOverlay('settings')}
+                  overlayOpen={activeOverlay !== null}
                 />
               )}
               {!isLoading && activeTab && currentNote && (
