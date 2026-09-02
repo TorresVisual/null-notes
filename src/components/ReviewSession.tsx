@@ -4,8 +4,11 @@ import { api } from '../lib/tauri'
 import { useWorkspaceStore } from '../store/workspace'
 import type { DueCard, Grade } from '../types'
 
+export type ReviewMode = { kind: 'due' } | { kind: 'cram'; streak: number }
+
 interface ReviewSessionProps {
   onClose: () => void
+  mode?: ReviewMode
 }
 
 const GRADES: Array<{ grade: Grade; label: string }> = [
@@ -15,8 +18,15 @@ const GRADES: Array<{ grade: Grade; label: string }> = [
   { grade: 'easy', label: 'Easy' },
 ]
 
-export function ReviewSession({ onClose }: ReviewSessionProps) {
+// Good enough for study-order randomization — no seeding/fairness
+// requirement, this is a shuffled drill order, not anything scored.
+function shuffleCards(cards: DueCard[]): DueCard[] {
+  return [...cards].sort(() => Math.random() - 0.5)
+}
+
+export function ReviewSession({ onClose, mode = { kind: 'due' } }: ReviewSessionProps) {
   const workspacePath = useWorkspaceStore((s) => s.path)
+  const cramStreak = mode.kind === 'cram' ? mode.streak : null
   const [queue, setQueue] = useState<DueCard[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -29,12 +39,15 @@ export function ReviewSession({ onClose }: ReviewSessionProps) {
     if (!workspacePath) return
     setIsLoading(true)
     setError(null)
-    api.notes
-      .listDueCards(workspacePath)
-      .then((cards) => setQueue(cards))
+    const request =
+      cramStreak !== null
+        ? api.notes.listCramCards(workspacePath, cramStreak)
+        : api.notes.listDueCards(workspacePath)
+    request
+      .then((fetched) => setQueue(cramStreak !== null ? shuffleCards(fetched) : fetched))
       .catch((e: unknown) => setError(`Couldn't load the review queue: ${String(e)}`))
       .finally(() => setIsLoading(false))
-  }, [workspacePath])
+  }, [workspacePath, cramStreak])
 
   const current = queue[0]
 
@@ -48,8 +61,12 @@ export function ReviewSession({ onClose }: ReviewSessionProps) {
 
   function refetch() {
     if (!workspacePath) return
-    api.notes.listDueCards(workspacePath).then((cards) => {
-      setQueue(cards)
+    const request =
+      cramStreak !== null
+        ? api.notes.listCramCards(workspacePath, cramStreak)
+        : api.notes.listDueCards(workspacePath)
+    request.then((fetched) => {
+      setQueue(cramStreak !== null ? shuffleCards(fetched) : fetched)
       setRevealed(false)
     })
   }
@@ -110,7 +127,11 @@ export function ReviewSession({ onClose }: ReviewSessionProps) {
     <div className="search-overlay" onMouseDown={onClose}>
       <div className="review-session" onMouseDown={(e) => e.stopPropagation()}>
         <div className="settings-panel-header">
-          <h2>Review{queue.length > 0 ? ` (${queue.length} due)` : ''}</h2>
+          <h2>
+            {cramStreak !== null
+              ? `Cram — Category ${cramStreak}`
+              : `Review${queue.length > 0 ? ` (${queue.length} due)` : ''}`}
+          </h2>
           <button className="settings-panel-close" onClick={onClose} aria-label="Close review" title="Close review">
             <X size={16} />
           </button>
@@ -120,7 +141,9 @@ export function ReviewSession({ onClose }: ReviewSessionProps) {
         ) : error ? (
           <p className="empty-state">{error}</p>
         ) : !current ? (
-          <p className="empty-state">All done for today.</p>
+          <p className="empty-state">
+            {cramStreak !== null ? 'No cards in this category.' : 'All done for today.'}
+          </p>
         ) : (
           <div className="review-card">
             <p className="review-card-note">{current.noteTitle}</p>

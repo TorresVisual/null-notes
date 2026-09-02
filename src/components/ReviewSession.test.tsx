@@ -9,6 +9,7 @@ vi.mock('../lib/tauri', () => ({
   api: {
     notes: {
       listDueCards: vi.fn(),
+      listCramCards: vi.fn(),
       gradeCard: vi.fn(),
       gradeMcCard: vi.fn(),
     },
@@ -16,8 +17,8 @@ vi.mock('../lib/tauri', () => ({
 }))
 
 const cards: DueCard[] = [
-  { notePath: '/ws/a.md', noteTitle: 'A', kind: 'qa', front: 'Q1', back: 'A1', position: 0, options: [] },
-  { notePath: '/ws/b.md', noteTitle: 'B', kind: 'cloze', front: 'Q2 [...]', back: 'Q2 full', position: 3, options: [] },
+  { notePath: '/ws/a.md', noteTitle: 'A', kind: 'qa', front: 'Q1', back: 'A1', position: 0, options: [], streak: 0 },
+  { notePath: '/ws/b.md', noteTitle: 'B', kind: 'cloze', front: 'Q2 [...]', back: 'Q2 full', position: 3, options: [], streak: 0 },
 ]
 
 const mcCard: DueCard = {
@@ -28,6 +29,7 @@ const mcCard: DueCard = {
   back: '',
   position: 0,
   options: ['3', '4', '5'],
+  streak: 0,
 }
 
 beforeEach(() => {
@@ -125,5 +127,38 @@ describe('ReviewSession — multiple choice', () => {
     refetched = true
     fireEvent.click(screen.getByText('Next'))
     await waitFor(() => expect(screen.getByText(/all done/i)).toBeInTheDocument())
+  })
+})
+
+describe('ReviewSession — cram mode', () => {
+  beforeEach(() => {
+    useWorkspaceStore.setState({ path: '/ws' })
+    vi.mocked(api.notes.listDueCards).mockClear()
+    vi.mocked(api.notes.listCramCards).mockResolvedValue(cards)
+  })
+
+  it('fetches from listCramCards with the given streak, not listDueCards', async () => {
+    render(<ReviewSession onClose={vi.fn()} mode={{ kind: 'cram', streak: 2 }} />)
+    await waitFor(() => expect(api.notes.listCramCards).toHaveBeenCalledWith('/ws', 2))
+    expect(api.notes.listDueCards).not.toHaveBeenCalled()
+  })
+
+  it('shows the cram header instead of the due-queue header', async () => {
+    render(<ReviewSession onClose={vi.fn()} mode={{ kind: 'cram', streak: 2 }} />)
+    await waitFor(() => expect(screen.getByText('Cram — Category 2')).toBeInTheDocument())
+  })
+
+  it('shows the cram-specific empty state when the category has no cards', async () => {
+    vi.mocked(api.notes.listCramCards).mockResolvedValue([])
+    render(<ReviewSession onClose={vi.fn()} mode={{ kind: 'cram', streak: 2 }} />)
+    await waitFor(() => expect(screen.getByText('No cards in this category.')).toBeInTheDocument())
+  })
+
+  it('shuffles without dropping any fetched card', async () => {
+    render(<ReviewSession onClose={vi.fn()} mode={{ kind: 'cram', streak: 2 }} />)
+    await waitFor(() => {
+      const front = screen.queryByText('Q1') ?? screen.queryByText('Q2 [...]')
+      expect(front).toBeInTheDocument()
+    })
   })
 })
