@@ -36,15 +36,14 @@
 
 - [ ] Web app
 
-- [x] Better printing — Export to PDF and Print are now separate File menu items, each a small dialog ending in a silent WebView2 call (`PrintToPdf`/`Print`, never `ShowPrintUI`). One checkbox ("Include page numbers, date, and title") controls WebView2's all-or-nothing header/footer bundle. Fixed two real pagination gaps (`h4`-`h6` and block-math/diagrams could split across a page). **Design:** `docs/specs/better-printing-design.md`. **Plan:** `docs/plans/better-printing.md`.
+- [ ] Better printing — Export to PDF and Print are now separate File menu items, each a small dialog ending in a silent WebView2 call (`PrintToPdf`/`Print`, never `ShowPrintUI`). One checkbox ("Include page numbers, date, and title") controls WebView2's all-or-nothing header/footer bundle. Fixed two real pagination gaps (`h4`-`h6` and block-math/diagrams could split across a page). **Design:** `docs/specs/better-printing-design.md`. **Plan:** `docs/plans/better-printing.md`.
 
-margins on left and right + overlay issues
-preview is the frontend not the actual converted note
-none of the checkmarks work
+preview and export only show data when a checkmark has been set
+the data in the export is completely malformed it is mostly clipped
 
 dom.js:727 Uncaught TypeError: Cannot read properties of null (reading 'nextSibling')
 
-- [ ] Better Home screen
+- [x] Better Home screen
 
 - [ ] Left sidebar needs a design update
 
@@ -82,6 +81,9 @@ dom.js:727 Uncaught TypeError: Cannot read properties of null (reading 'nextSibl
 
 - [ ] Reorder task function invoked manually (apple notes has it by default but im not sure if i like it automatically) but the point is to reorder marked tasks to the bottom which would focus the next tasks at the top
 
+- [ ] pasting markdown gets code block -> markdown
+
+- [ ] Proper study feature with flashcard system
 
 
 ---
