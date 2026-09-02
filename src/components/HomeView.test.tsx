@@ -117,7 +117,7 @@ describe('HomeView', () => {
 
   it('shows the due count and a Start review button, calling onOpenReview', async () => {
     listDueCards.mockResolvedValue([
-      { notePath: '/ws/a.md', noteTitle: 'A', kind: 'qa', front: 'Q', back: 'A', position: 0, options: [] },
+      { notePath: '/ws/a.md', noteTitle: 'A', kind: 'qa', front: 'Q', back: 'A', position: 0, options: [], streak: 0 },
     ])
     const onOpenReview = vi.fn()
     render(<HomeView onOpenTaskView={vi.fn()} onOpenReview={onOpenReview} onOpenDeckView={() => {}} onOpenSettings={() => {}} />)
@@ -175,7 +175,7 @@ describe('HomeView', () => {
       { notePath: '/ws/a.md', noteTitle: 'A', text: 'Finish proof', position: 0 },
     ])
     listDueCards.mockResolvedValue([
-      { notePath: '/ws/a.md', noteTitle: 'A', kind: 'qa', front: 'Q', back: 'A', position: 0, options: [] },
+      { notePath: '/ws/a.md', noteTitle: 'A', kind: 'qa', front: 'Q', back: 'A', position: 0, options: [], streak: 0 },
     ])
     useWorkspaceStore.setState({ repoMode: 'notesOnly', gitDiverged: null, gitPendingPaths: [] })
 

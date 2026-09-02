@@ -71,6 +71,8 @@ export const api = {
       invoke<McGradeResult>('grade_mc_card', { path, position, picked, workspace }),
     listAllCards: (workspace: string) =>
       invoke<CardSummary[]>('list_all_cards', { workspace }),
+    listCramCards: (workspace: string, streak: number) =>
+      invoke<DueCard[]>('list_cram_cards', { workspace, streak }),
   },
   templates: {
     list: (workspace: string) =>

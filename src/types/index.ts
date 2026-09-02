@@ -156,6 +156,7 @@ export interface DueCard {
   back: string
   position: number
   options: string[]
+  streak: number
 }
 
 export interface McGradeResult {
@@ -171,6 +172,7 @@ export interface CardSummary {
   position: number
   due: string
   interval: number
+  streak: number
   tags: string[]
 }
 

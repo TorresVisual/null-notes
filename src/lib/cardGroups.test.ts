@@ -11,6 +11,7 @@ const card = (over: Partial<CardSummary>): CardSummary => ({
   position: 0,
   due: '2026-01-01',
   interval: 0,
+  streak: 0,
   tags: [],
   ...over,
 })
