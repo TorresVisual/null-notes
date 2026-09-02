@@ -114,6 +114,11 @@ pub async fn run_migrations(pool: &SqlitePool) -> Result<()> {
     add_column_if_missing(pool, "ALTER TABLE review_cards ADD COLUMN options TEXT").await?;
     add_column_if_missing(pool, "ALTER TABLE review_cards ADD COLUMN grade TEXT").await?;
 
+    // Second column addition. `streak` counts consecutive clean (Good/Easy)
+    // grades — see sm2::next_streak — and is the grouping key cram mode
+    // drills by. NULL for a never-graded card, same posture as grade.
+    add_column_if_missing(pool, "ALTER TABLE review_cards ADD COLUMN streak INTEGER").await?;
+
     Ok(())
 }
 
@@ -122,16 +127,17 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn test_run_migrations_adds_options_and_grade_columns() {
+    async fn test_run_migrations_adds_options_and_grade_and_streak_columns() {
         let pool = SqlitePool::connect("sqlite::memory:").await.unwrap();
         run_migrations(&pool).await.unwrap();
 
-        // A row insert naming both new columns is the simplest proof they
-        // exist and accept NULL — sqlx has no schema-introspection helper
-        // exposed here, and this exercises exactly what set_cards will do.
+        // A row insert naming all three added columns is the simplest proof
+        // they exist and accept NULL — sqlx has no schema-introspection
+        // helper exposed here, and this exercises exactly what set_cards
+        // will do.
         sqlx::query(
-            "INSERT INTO review_cards (note_path, kind, front, back, position, due, ease, interval, reps, options, grade)
-             VALUES ('/a.md', 'mc', 'Q', '', 0, '2026-01-01', 2.5, 0, 0, NULL, NULL)",
+            "INSERT INTO review_cards (note_path, kind, front, back, position, due, ease, interval, reps, options, grade, streak)
+             VALUES ('/a.md', 'mc', 'Q', '', 0, '2026-01-01', 2.5, 0, 0, NULL, NULL, NULL)",
         )
         .execute(&pool)
         .await
