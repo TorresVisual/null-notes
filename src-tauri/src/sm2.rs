@@ -129,6 +129,19 @@ pub fn mc_auto_grade(last_grade: Option<Grade>, correct: bool) -> Grade {
     Grade::from_rung(next.clamp(0, 3))
 }
 
+/// `reps` counts every non-`Again` grade, `Hard` included — `streak` is
+/// stricter: only a clean `Good`/`Easy` promotes it, `Hard` holds it in
+/// place, and `Again` always zeroes it. This is the grouping key cram mode
+/// drills by, so it has to reflect "answered cleanly N times in a row," not
+/// "reviewed N times."
+pub fn next_streak(streak: i64, grade: Grade) -> i64 {
+    match grade {
+        Grade::Again => 0,
+        Grade::Hard => streak,
+        Grade::Good | Grade::Easy => streak + 1,
+    }
+}
+
 /// Today's date as an ISO `YYYY-MM-DD` string — day granularity throughout,
 /// since reviews are a once-or-twice-a-day activity, not something needing
 /// sub-day scheduling.
@@ -283,5 +296,37 @@ mod tests {
         assert_eq!(Grade::Hard.as_str(), "hard");
         assert_eq!(Grade::Good.as_str(), "good");
         assert_eq!(Grade::Easy.as_str(), "easy");
+    }
+
+    #[test]
+    fn test_next_streak_again_resets_an_established_streak_to_zero() {
+        assert_eq!(next_streak(3, Grade::Again), 0);
+    }
+
+    #[test]
+    fn test_next_streak_again_on_a_new_card_stays_zero() {
+        assert_eq!(next_streak(0, Grade::Again), 0);
+    }
+
+    #[test]
+    fn test_next_streak_hard_leaves_an_established_streak_unchanged() {
+        assert_eq!(next_streak(3, Grade::Hard), 3);
+    }
+
+    #[test]
+    fn test_next_streak_hard_on_a_new_card_stays_zero() {
+        assert_eq!(next_streak(0, Grade::Hard), 0);
+    }
+
+    #[test]
+    fn test_next_streak_good_increments() {
+        assert_eq!(next_streak(0, Grade::Good), 1);
+        assert_eq!(next_streak(3, Grade::Good), 4);
+    }
+
+    #[test]
+    fn test_next_streak_easy_increments() {
+        assert_eq!(next_streak(0, Grade::Easy), 1);
+        assert_eq!(next_streak(3, Grade::Easy), 4);
     }
 }
