@@ -251,9 +251,11 @@ pub fn extract_formulas(content: &str) -> Vec<ExtractedFormula> {
 // A schedule comment is never itself a card, even though it starts a fresh
 // line right after one — checked first so the loop below never has to
 // special-case it.
-fn parse_sr_comment(line: &str) -> Option<(String, f64, i64, i64, Option<sm2::Grade>)> {
+fn parse_sr_comment(
+    line: &str,
+) -> Option<(String, f64, i64, i64, Option<sm2::Grade>, Option<i64>)> {
     let re = match Regex::new(
-        r"^<!--\s+sr\s+due=(\S+)\s+ease=(\S+)\s+interval=(\S+)\s+reps=(\S+)(?:\s+grade=(\S+))?\s+-->$",
+        r"^<!--\s+sr\s+due=(\S+)\s+ease=(\S+)\s+interval=(\S+)\s+reps=(\S+)(?:\s+grade=(\S+))?(?:\s+streak=(\S+))?\s+-->$",
     ) {
         Ok(re) => re,
         Err(_) => return None,
@@ -270,7 +272,8 @@ fn parse_sr_comment(line: &str) -> Option<(String, f64, i64, i64, Option<sm2::Gr
         "easy" => Some(sm2::Grade::Easy),
         _ => None,
     });
-    Some((due, ease, interval, reps, grade))
+    let streak = caps.get(6).and_then(|m| m.as_str().parse::<i64>().ok());
+    Some((due, ease, interval, reps, grade, streak))
 }
 
 // The schedule comment sits either directly after a card's content (a note
@@ -461,11 +464,11 @@ pub fn extract_cards(content: &str) -> Vec<ExtractedCard> {
             let option_count = mc_block_option_count(&lines, i);
             if let Some((front, options, correct)) = parse_mc_block(&lines, i) {
                 let comment_idx = sr_comment_idx(&lines, i + 1 + option_count);
-                let (due, ease, interval, reps, grade) = lines
+                let (due, ease, interval, reps, grade, _streak) = lines
                     .get(comment_idx)
                     .and_then(|l| parse_sr_comment(l))
-                    .map(|(d, e, iv, r, g)| (Some(d), Some(e), Some(iv), Some(r), g))
-                    .unwrap_or((None, None, None, None, None));
+                    .map(|(d, e, iv, r, g, s)| (Some(d), Some(e), Some(iv), Some(r), g, s))
+                    .unwrap_or((None, None, None, None, None, None));
                 cards.push(ExtractedCard {
                     kind: CardKind::Mc,
                     front,
@@ -493,11 +496,11 @@ pub fn extract_cards(content: &str) -> Vec<ExtractedCard> {
         };
 
         let comment_idx = sr_comment_idx(&lines, i + 1);
-        let (due, ease, interval, reps, grade) = lines
+        let (due, ease, interval, reps, grade, _streak) = lines
             .get(comment_idx)
             .and_then(|l| parse_sr_comment(l))
-            .map(|(d, e, iv, r, g)| (Some(d), Some(e), Some(iv), Some(r), g))
-            .unwrap_or((None, None, None, None, None));
+            .map(|(d, e, iv, r, g, s)| (Some(d), Some(e), Some(iv), Some(r), g, s))
+            .unwrap_or((None, None, None, None, None, None));
 
         cards.push(ExtractedCard {
             kind,
@@ -840,24 +843,31 @@ pub fn grade_card_line(
         sr_comment_idx(&borrowed, idx + 1)
     };
 
-    let current = lines
+    let (current, current_streak) = lines
         .get(comment_idx)
         .and_then(|l| parse_sr_comment(l))
-        .map(|(_, ease, interval, reps, _)| sm2::CardState {
-            ease,
-            interval,
-            reps,
+        .map(|(_, ease, interval, reps, _, streak)| {
+            (
+                sm2::CardState {
+                    ease,
+                    interval,
+                    reps,
+                },
+                streak.unwrap_or(0),
+            )
         })
-        .unwrap_or_default();
+        .unwrap_or((sm2::CardState::default(), 0));
 
     let next = sm2::next_state(current, grade, today);
+    let next_streak = sm2::next_streak(current_streak, grade);
     let comment = format!(
-        "<!-- sr due={} ease={:.2} interval={} reps={} grade={} -->",
+        "<!-- sr due={} ease={:.2} interval={} reps={} grade={} streak={} -->",
         next.due,
         next.ease,
         next.interval,
         next.reps,
-        grade.as_str()
+        grade.as_str(),
+        next_streak
     );
 
     let has_comment_line = lines
@@ -941,7 +951,7 @@ async fn grade_mc_card_at(
     let last_grade = lines
         .get(idx + 1 + option_count)
         .and_then(|l| parse_sr_comment(l))
-        .and_then(|(_, _, _, _, grade)| grade);
+        .and_then(|(_, _, _, _, grade, _)| grade);
     let resolved = sm2::mc_auto_grade(last_grade, is_correct);
 
     grade_card_at(path, position, resolved, workspace, db).await?;
@@ -2064,7 +2074,7 @@ mod tests {
         let result = grade_card_line("Q :: A\n", 0, sm2::Grade::Good, grade_today()).unwrap();
         assert_eq!(
             result,
-            "Q :: A\n<!-- sr due=2026-08-21 ease=2.50 interval=1 reps=1 grade=good -->\n"
+            "Q :: A\n<!-- sr due=2026-08-21 ease=2.50 interval=1 reps=1 grade=good streak=1 -->\n"
         );
     }
 
@@ -2074,7 +2084,7 @@ mod tests {
         let result = grade_card_line(content, 0, sm2::Grade::Good, grade_today()).unwrap();
         assert_eq!(
             result,
-            "Q :: A\n<!-- sr due=2026-09-04 ease=2.50 interval=15 reps=3 grade=good -->\n"
+            "Q :: A\n<!-- sr due=2026-09-04 ease=2.50 interval=15 reps=3 grade=good streak=1 -->\n"
         );
     }
 
@@ -2083,6 +2093,36 @@ mod tests {
         let content = "Q :: A\n<!-- sr due=2026-08-20 ease=2.50 interval=6 reps=2 -->\n";
         let result = grade_card_line(content, 0, sm2::Grade::Again, grade_today()).unwrap();
         assert!(result.contains("interval=1 reps=0"));
+    }
+
+    #[test]
+    fn test_grade_card_line_streak_increments_on_consecutive_good_grades() {
+        let content = "Q :: A\n<!-- sr due=2026-08-20 ease=2.50 interval=6 reps=2 grade=good streak=2 -->\n";
+        let result = grade_card_line(content, 0, sm2::Grade::Good, grade_today()).unwrap();
+        assert!(result.contains("streak=3"));
+    }
+
+    #[test]
+    fn test_grade_card_line_streak_resets_to_zero_on_again() {
+        let content = "Q :: A\n<!-- sr due=2026-08-20 ease=2.50 interval=6 reps=2 grade=good streak=3 -->\n";
+        let result = grade_card_line(content, 0, sm2::Grade::Again, grade_today()).unwrap();
+        assert!(result.contains("streak=0"));
+    }
+
+    #[test]
+    fn test_grade_card_line_streak_unchanged_on_hard() {
+        let content = "Q :: A\n<!-- sr due=2026-08-20 ease=2.50 interval=6 reps=2 grade=good streak=2 -->\n";
+        let result = grade_card_line(content, 0, sm2::Grade::Hard, grade_today()).unwrap();
+        assert!(result.contains("streak=2"));
+    }
+
+    #[test]
+    fn test_grade_card_line_old_format_comment_with_no_streak_field_defaults_to_zero() {
+        // Graded before this field existed — no `streak=` at all, not even
+        // `streak=0`. Must default the same way a never-graded card does.
+        let content = "Q :: A\n<!-- sr due=2026-08-20 ease=2.50 interval=1 reps=1 grade=good -->\n";
+        let result = grade_card_line(content, 0, sm2::Grade::Good, grade_today()).unwrap();
+        assert!(result.contains("streak=1"));
     }
 
     #[test]
