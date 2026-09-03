@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from 'vitest'
-import { moveSelectedNode, currentConvertTarget, isConvertibleNode, convertSelectedNode } from './BlockHandle'
+import { moveSelectedNode, currentConvertTarget, isConvertibleNode, convertSelectedNode, reorderTaskList } from './BlockHandle'
 
 const { Editor } = await import('@tiptap/core')
 const { NodeSelection } = await import('@tiptap/pm/state')
@@ -123,6 +123,82 @@ describe('currentConvertTarget / isConvertibleNode', () => {
     const node = selectedNode(e)
     expect(isConvertibleNode(node)).toBe(false)
     expect(currentConvertTarget(node)).toBeNull()
+  })
+})
+
+function selectFirstTaskList(e: InstanceType<typeof Editor>): void {
+  let pos: number | null = null
+  e.state.doc.descendants((node, nodePos) => {
+    if (pos !== null) return false
+    if (node.type.name === 'taskList') {
+      pos = nodePos
+      return false
+    }
+    return true
+  })
+  if (pos === null) throw new Error('no taskList node')
+  e.commands.setNodeSelection(pos)
+}
+
+function taskListItems(e: InstanceType<typeof Editor>): Array<{ text: string; checked: boolean }> {
+  const items: Array<{ text: string; checked: boolean }> = []
+  e.state.doc.descendants((node) => {
+    if (node.type.name !== 'taskList') return items.length === 0
+    node.forEach((child) => items.push({ text: child.textContent, checked: Boolean(child.attrs['checked']) }))
+    return false
+  })
+  return items
+}
+
+describe('reorderTaskList', () => {
+  it('moves checked items to the bottom, preserving relative order within each group', () => {
+    const e = mount('- [ ] alpha\n- [x] beta\n- [ ] gamma\n- [x] delta')
+    selectFirstTaskList(e)
+
+    expect(reorderTaskList(e)).toBe(true)
+
+    expect(taskListItems(e)).toEqual([
+      { text: 'alpha', checked: false },
+      { text: 'gamma', checked: false },
+      { text: 'beta', checked: true },
+      { text: 'delta', checked: true },
+    ])
+  })
+
+  it('keeps the reordered list selected afterward', () => {
+    const e = mount('- [ ] alpha\n- [x] beta')
+    selectFirstTaskList(e)
+
+    reorderTaskList(e)
+
+    const { selection } = e.state
+    expect(selection).toBeInstanceOf(NodeSelection)
+    expect((selection as InstanceType<typeof NodeSelection>).node.type.name).toBe('taskList')
+  })
+
+  it('does nothing when the list is already sorted', () => {
+    const e = mount('- [ ] alpha\n- [x] beta')
+    selectFirstTaskList(e)
+
+    expect(reorderTaskList(e)).toBe(false)
+    expect(taskListItems(e)).toEqual([
+      { text: 'alpha', checked: false },
+      { text: 'beta', checked: true },
+    ])
+  })
+
+  it('does nothing when the selection is not a taskList', () => {
+    const e = mount('<p>alpha</p>')
+    selectBlockContaining(e, 'alpha')
+
+    expect(reorderTaskList(e)).toBe(false)
+  })
+
+  it('does nothing when the selection is not a NodeSelection', () => {
+    const e = mount('- [ ] alpha\n- [x] beta')
+    e.commands.setTextSelection(2)
+
+    expect(reorderTaskList(e)).toBe(false)
   })
 })
 

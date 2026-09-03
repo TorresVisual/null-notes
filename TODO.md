@@ -25,7 +25,6 @@ preview and export only show data when a checkmark has been set the data in the 
 
 dom.js:727 Uncaught TypeError: Cannot read properties of null (reading 'nextSibling')
 
-- [x] Better Home screen
 - [ ] Left sidebar needs a design update
 - [ ] Better window title with what workspace / file is open
 - [ ] Custom Titlebar (no windows default)
@@ -45,6 +44,7 @@ dom.js:727 Uncaught TypeError: Cannot read properties of null (reading 'nextSibl
 - [ ] Recent workspaces in right click menu
 - [ ] Reorder task function invoked manually (apple notes has it by default but im not sure if i like it automatically) but the point is to reorder marked tasks to the bottom which would focus the next tasks at the top
 - [ ] pasting markdown gets code block -&gt; markdown
+- [x] Better Home screen
 - [x] Proper study feature with flashcard system
 
 ---
@@ -638,7 +638,7 @@ Do not let this influence P0–P14 design. Bundles the two checklist items needi
 - [x] "Terminal Precision" design system
 
 </details>
-\\---
+\\\\---
 
 ## Not doing
 

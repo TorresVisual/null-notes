@@ -2,10 +2,11 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { Editor } from '@tiptap/react'
 import DragHandle from '@tiptap/extension-drag-handle-react'
+import type { NestedOptions } from '@tiptap/extension-drag-handle'
 import { NodeSelection } from '@tiptap/pm/state'
 import type { Node as ProseMirrorNode } from '@tiptap/pm/model'
 import { isNodeRangeSelection } from '@tiptap/extension-node-range'
-import { GripVertical, Trash2, Copy, ChevronUp, ChevronDown, RefreshCw } from 'lucide-react'
+import { GripVertical, Trash2, Copy, ChevronUp, ChevronDown, RefreshCw, ListChecks } from 'lucide-react'
 
 interface BlockHandleProps {
   editor: Editor
@@ -53,6 +54,48 @@ export function moveSelectedNode(editor: Editor, direction: 'up' | 'down'): bool
   return true
 }
 
+/**
+ * Moves checked task items to the bottom of the selected task list,
+ * preserving relative order within each group — a manual "focus the next
+ * tasks" action, not an auto-sort on check. Nested sub-lists travel with
+ * their parent item untouched; only direct children get reordered.
+ */
+export function reorderTaskList(editor: Editor): boolean {
+  const { state } = editor
+  const { selection } = state
+  if (!(selection instanceof NodeSelection)) return false
+  const node = selection.node
+  if (node.type.name !== 'taskList') return false
+
+  const children: ProseMirrorNode[] = []
+  node.forEach((child) => children.push(child))
+  const reordered = [
+    ...children.filter((c) => !c.attrs['checked']),
+    ...children.filter((c) => c.attrs['checked']),
+  ]
+  if (reordered.every((c, i) => c === children[i])) return false
+
+  const { from, to } = selection
+  const tr = state.tr.replaceWith(from, to, node.type.create(node.attrs, reordered))
+  tr.setSelection(NodeSelection.create(tr.doc, from))
+  tr.scrollIntoView()
+  editor.view.dispatch(tr)
+  return true
+}
+
+/** Display concern only, mirroring `canMoveSelectedNode`: is there a
+ *  checked item followed by an unchecked one for `reorderTaskList` to move? */
+function canReorderTaskList(node: ProseMirrorNode | null): boolean {
+  if (!node || node.type.name !== 'taskList') return false
+  let seenChecked = false
+  let out = false
+  node.forEach((child) => {
+    if (child.attrs['checked']) seenChecked = true
+    else if (seenChecked) out = true
+  })
+  return out
+}
+
 export type ConvertTarget =
   | 'paragraph'
   | 'heading1'
@@ -85,6 +128,43 @@ const CONVERTIBLE_NODE_TYPE_NAMES = new Set(['paragraph', 'heading', 'bulletList
 // menu, which never got to show its items because its fetch kept getting
 // cancelled mid-flight).
 const DRAG_HANDLE_POSITION_CONFIG = { placement: 'left' } as const
+
+const LIST_CONTAINER_TYPE_NAMES = ['bulletList', 'orderedList', 'taskList']
+
+// Module-level for the same reason as DRAG_HANDLE_POSITION_CONFIG above.
+// Non-nested (the library's default) treats an entire list as one
+// undifferentiated top-level block: the grip centers on the whole list's
+// bounding box, not the hovered row, so a long list (a real checklist, not
+// a 2-3 item example) puts the grip screens away from the cursor.
+//
+// The library's own `allowedContainers` option looks like the fix but isn't:
+// it excludes a candidate unless it has an ANCESTOR of an allowed type, so
+// the list node itself — whose only ancestor is `doc` — is excluded outright,
+// making it impossible to ever select the whole list again (breaks Reorder
+// tasks and "Turn into" for lists entirely). `onlyNestedInsideLists` below
+// does the equivalent scoping without that self-exclusion: depth-1 (the
+// top-level block, whatever type it is, including the list itself) is
+// always left alone; only going deeper than that is restricted to inside
+// one of these three container types. `defaultRules` stays off for the same
+// reason — its `listWrapperDeprioritize` rule excludes the wrapper outright
+// too. Left unexcluded and at a shallower depth than its items, the list
+// still wins near the left edge (edgeDetection's default), where the grip
+// itself sits; hovering more centrally resolves to the individual item.
+const NESTED_LIST_DRAG_HANDLE_OPTIONS: NestedOptions = {
+  defaultRules: false,
+  rules: [
+    {
+      id: 'excludeListItemContentParagraph',
+      evaluate: ({ parent, isFirst }) =>
+        isFirst && parent && ['listItem', 'taskItem'].includes(parent.type.name) ? 1000 : 0,
+    },
+    {
+      id: 'onlyNestedInsideLists',
+      evaluate: ({ depth, $pos }) =>
+        depth > 1 && !LIST_CONTAINER_TYPE_NAMES.includes($pos.node(1).type.name) ? 1000 : 0,
+    },
+  ],
+}
 
 /** Whether "Turn into" should offer anything for this node at all — a
  *  generic type-swap only makes sense for plain text-block types, never
@@ -156,10 +236,54 @@ export function BlockHandle({ editor }: BlockHandleProps) {
   const [hoveredPos, setHoveredPos] = useState<number | null>(null)
   const [menuOpen, setMenuOpen] = useState(false)
   const gripRef = useRef<HTMLButtonElement>(null)
+  const lastHoveredPosRef = useRef<number | null>(null)
+
+  // DragHandle renders its `.drag-handle` wrapper as a sibling of the editor
+  // DOM, not a descendant — the grip sits flush against, but outside, the
+  // editor's own hoverable box. Moving the cursor toward it means crossing
+  // that boundary, and the library's own mouseleave guard is supposed to
+  // recognize "heading for the grip" and skip hiding — but at the exact
+  // crossing pixel, native hit-testing resolves to whatever sits behind the
+  // wrapper (this app's `.editor-pane`), not the wrapper itself, so the
+  // guard's `relatedTarget` check fails: it hides (visibility + pointer-
+  // events: none) *and* reports `onNodeChange(null)`, clearing our own
+  // `hoveredPos`, right as the cursor arrives — before a click can land, and
+  // even a click that does land finds `openMenu` sees nothing selected.
+  // Rather than fight that guard, undo both effects from outside once the
+  // cursor is near the grip's own last-known position. A margin, not a
+  // strict bounding-box test: the same boundary crossing that triggers the
+  // false hide can also (correctly, via edge detection) retarget the grip
+  // from a row to its enclosing list right as it happens, so the last-known
+  // rect the cursor needs to still be "in" isn't necessarily the one the
+  // cursor's own y was originally measured against.
+  useEffect(() => {
+    const MARGIN_PX = 32
+    function onMouseMove(e: MouseEvent) {
+      const wrapper = gripRef.current?.closest<HTMLElement>('.drag-handle')
+      if (!wrapper || wrapper.style.visibility !== 'hidden') return
+      const rect = wrapper.getBoundingClientRect()
+      if (rect.width === 0 || rect.height === 0) return
+      if (
+        e.clientX < rect.left - MARGIN_PX ||
+        e.clientX > rect.right + MARGIN_PX ||
+        e.clientY < rect.top - MARGIN_PX ||
+        e.clientY > rect.bottom + MARGIN_PX
+      ) {
+        return
+      }
+      wrapper.style.visibility = ''
+      wrapper.style.pointerEvents = 'auto'
+      setHoveredPos(lastHoveredPosRef.current)
+    }
+    document.addEventListener('mousemove', onMouseMove)
+    return () => document.removeEventListener('mousemove', onMouseMove)
+  }, [])
 
   const handleNodeChange = useCallback(
     ({ pos, node }: { pos: number; node: ProseMirrorNode | null; editor: Editor }) => {
-      setHoveredPos(node ? pos : null)
+      const next = node ? pos : null
+      if (next !== null) lastHoveredPosRef.current = next
+      setHoveredPos(next)
       setMenuOpen(false)
     },
     [],
@@ -191,6 +315,11 @@ export function BlockHandle({ editor }: BlockHandleProps) {
     // updates to follow the block, so the menu just repositions with it.
   }
 
+  function handleReorderTasks() {
+    reorderTaskList(editor)
+    closeMenu()
+  }
+
   function handleConvert(target: ConvertTarget) {
     convertSelectedNode(editor, target)
     closeMenu()
@@ -202,12 +331,13 @@ export function BlockHandle({ editor }: BlockHandleProps) {
   const singleNode = isSingle ? selection.node : null
   const convertTarget = singleNode ? currentConvertTarget(singleNode) : null
   const showConvert = singleNode !== null && isConvertibleNode(singleNode)
+  const showReorderTasks = convertTarget === 'taskList'
 
   return (
     <DragHandle
       editor={editor}
       onNodeChange={handleNodeChange}
-      nested={false}
+      nested={NESTED_LIST_DRAG_HANDLE_OPTIONS}
       // The library's own default ("left-start") top-aligns the handle to
       // the tracked node's bounding box, which only looks centered for a
       // node exactly as tall as the grip. Plain "left" centers it on the
@@ -231,10 +361,13 @@ export function BlockHandle({ editor }: BlockHandleProps) {
           canMoveUp={isSingle && canMoveSelectedNode(editor, 'up')}
           canMoveDown={isSingle && canMoveSelectedNode(editor, 'down')}
           convertTarget={showConvert ? convertTarget : null}
+          showReorderTasks={showReorderTasks}
+          canReorderTasks={showReorderTasks && canReorderTaskList(singleNode)}
           onDelete={handleDelete}
           onDuplicate={handleDuplicate}
           onMoveUp={() => handleMove('up')}
           onMoveDown={() => handleMove('down')}
+          onReorderTasks={handleReorderTasks}
           onConvert={handleConvert}
           onClose={closeMenu}
         />
@@ -251,10 +384,13 @@ interface BlockHandleMenuProps {
   /** The node's own target when it's convertible, else `null` when
    *  "Turn into" shouldn't render at all for this node. */
   convertTarget: ConvertTarget | null
+  showReorderTasks: boolean
+  canReorderTasks: boolean
   onDelete: () => void
   onDuplicate: () => void
   onMoveUp: () => void
   onMoveDown: () => void
+  onReorderTasks: () => void
   onConvert: (target: ConvertTarget) => void
   onClose: () => void
 }
@@ -265,10 +401,13 @@ function BlockHandleMenu({
   canMoveUp,
   canMoveDown,
   convertTarget,
+  showReorderTasks,
+  canReorderTasks,
   onDelete,
   onDuplicate,
   onMoveUp,
   onMoveDown,
+  onReorderTasks,
   onConvert,
   onClose,
 }: BlockHandleMenuProps) {
@@ -301,6 +440,11 @@ function BlockHandleMenu({
       {showDuplicate && (
         <button type="button" className="block-handle-menu-item" onClick={onDuplicate}>
           <Copy size={13} /> Duplicate
+        </button>
+      )}
+      {showReorderTasks && (
+        <button type="button" className="block-handle-menu-item" onClick={onReorderTasks} disabled={!canReorderTasks}>
+          <ListChecks size={13} /> Reorder tasks
         </button>
       )}
       {convertTarget && (
