@@ -3,88 +3,49 @@
 ## TODO's
 
 - [x] Home Button — clickable Home entry in the sidebar nav group, next to Search/Settings
-
 - [x] Outline in better place — now a persistent right-side rail beside the note, not stacked below its content
-
 - [x] Custom Modals for new for example — `PromptDialog` (in-app) replaces `window.prompt`; `window.confirm`/`alert` replaced with the native Tauri dialog already used in Settings
-
 - [x] Shift + ? opens shortcuts which shouldnt happen as thats the way i write '?' — the `?` listener now ignores editable targets
-
 - [x] != should convert to the unequal icon, &lt;= &gt;= too — `SmartSymbols` input rule (`≠`/`≤`/`≥`), skipped inside code
-
 - [x] Dragging doesnt work — Tauri's `dragDropEnabled` (on by default) was swallowing HTML5 drag events on Windows; now off
-
 - [x] Add $ $ Inline math as slash command — already existed as "Inline Equation"; renamed to "Inline Math" so `/math` finds it
-
 - [x] The auto git doesnt handle its own .gitignore — `checked_init_notes_repo` now commits the `.gitignore` it writes; auto-commit also merges the required lines into a pre-existing repo's `.gitignore` (Notes-only/Notes-monorepo only)
-
 - [x] Git actions constantly open terminals in the built app — every `git`/`gh` spawn now sets `CREATE_NO_WINDOW` on Windows
-
 - [x] Better custom modals design — the shared dialog chrome (`.settings-panel`, `.search-modal`, `.import-mode-dialog`, `.search-overlay`) had every button reading the same flat bordered-ghost weight regardless of importance, and a flat backdrop with no depth. Added `.dialog-action-primary` (filled accent, reuses `.workspace-picker-browse`'s hover-lift/glow language) for the one affirmative action per dialog — `PromptDialog`'s OK, `TemplateDialog`'s Create, `FormulaSheetPrompt`'s Generate — while Cancel/Back stay ghost. `.search-overlay` gained a `backdrop-filter: blur(3px)` for real separation from the app behind it, and the panel corner radius went 8px → 10px to match.
-
 - [x] Folders arent working properly — renaming/deleting a folder left `selectedFolder`/`expandedFolders` pointing at the stale path (the very next "New Note"/"New Folder" then wrote to a directory that no longer existed, and the row silently lost its expand/select state); `replaceOpenPath` now propagates a path change to those too, not just open tabs. Also: folders can now be dragged onto another folder to nest them (`renameFolder` already supported cross-directory moves, just wasn't exposed). **Second pass, found by an e2e repro of "can't see notes inside folders":** a folder always renders collapsed on creation, and a note lands in `selectedFolder ?? workspacePath` — so a freshly created folder's first note was invisible with no visual cue anything had happened. New `expandFolder` store action (add-only, unlike `toggleFolder`) is now called after creating a folder, after creating a note/canvas-note/PDF import in one, and after a drag-drop lands something in one. **Third pass:** the first root-drop target (the tiny workspace-name label) was real but impractical to hit with a real mouse — moved onto the root-level folder-tree list itself, which is only ever rendered once (nested folders render their own `<ul>` inline) and already fills the sidebar's whole remaining height, so dropping anywhere in its background or on a root-level note now moves the item to root. **Fourth pass — root cause of the missing-note report:** a real user has the same folder open as two separate workspaces (a subfolder standalone, and again as part of its parent). `db::notes::index_note`'s `ON CONFLICT(path) DO UPDATE` never updated the `workspace` column, only `title`/`updated_at` — so once a note's path was indexed under one workspace, scanning it from any *other* workspace whose tree also contains that file would find it on disk but `list_by_workspace` (filtered strictly by that stale column) would never return it. Invisible permanently, not just until a refresh. Fixed by adding `workspace = excluded.workspace` to the upsert; self-heals on the next scan of the note's true current workspace, since `scan_workspace` re-indexes every note it finds on disk before querying. Backend-only — no code was changed for the display/discoverability side, since `buildFolderTree` was correct all along for root-level notes. **Fifth pass:** the root drop worked but its highlight outline stuck on after a successful drop — `dragleave` doesn't reliably fire for every child-boundary crossing as the pointer moves around inside the list, so the indicator could get set true one last time with no matching leave event before the drop. `dragend` always fires exactly once when a drag concludes and bubbles through the dragged element's whole ancestor chain — which the root list always is, since every row in the tree lives somewhere inside it — so it's now the reliable fallback that force-clears the highlight regardless of what leave events did or didn't fire.
-
 - [x] Better Table Design and table support in wyswg
-
 - [x] The ctrl e shortcut doesnt work
-
 - [x] links and history at the bottom of notes should be collapsed by default
-
 - [ ] Use the built git feature to sync workspaces to other machines
-
 - [ ] Mobile app (need to think how we get syncing working)
-
 - [ ] Web app
-
 - [ ] Better printing — Export to PDF and Print are now separate File menu items, each a small dialog ending in a silent WebView2 call (`PrintToPdf`/`Print`, never `ShowPrintUI`). One checkbox ("Include page numbers, date, and title") controls WebView2's all-or-nothing header/footer bundle. Fixed two real pagination gaps (`h4`-`h6` and block-math/diagrams could split across a page). **Design:** `docs/specs/better-printing-design.md`. **Plan:** `docs/plans/better-printing.md`.
 
-preview and export only show data when a checkmark has been set
-the data in the export is completely malformed it is mostly clipped
+preview and export only show data when a checkmark has been set the data in the export is completely malformed it is mostly clipped
 
 dom.js:727 Uncaught TypeError: Cannot read properties of null (reading 'nextSibling')
 
 - [x] Better Home screen
-
 - [ ] Left sidebar needs a design update
-
 - [ ] Better window title with what workspace / file is open
-
 - [ ] Custom Titlebar (no windows default)
-
 - [ ] Recent searches only works current session
-
 - [ ] ![image.png](TODO.assets/image-1787696238603.png)![image.png](TODO.assets/image-1787696268102.png)This modal needs to be fixed
-
 - [ ] ![image.png](TODO.assets/image-1787696138751.png)These info's position needs to be better
-
 - [ ] ![image.png](TODO.assets/image-1787702297675.png)these tooltips designs
-
 - [ ] .assets folders aren't auto committed
-
 - [ ] add a open in null notes in my ide
-
 - [ ] search doesnt jump
-
 - [ ] fix top toolbar
-
 - [ ] reorder open tabs
-
 - [ ] editing larger notes is extremely laggy
-
-- [ ] when we select what do we want to copy?
-
+- [ ] when we select what do we want to copy? (currently its the markdown this is a design question)
 - [ ] Close Workspace
-
 - [ ] Recent workspaces
-
 - [ ] Recent workspaces in right click menu
-
 - [ ] Reorder task function invoked manually (apple notes has it by default but im not sure if i like it automatically) but the point is to reorder marked tasks to the bottom which would focus the next tasks at the top
-
-- [ ] pasting markdown gets code block -> markdown
-
+- [ ] pasting markdown gets code block -&gt; markdown
 - [x] Proper study feature with flashcard system
-
 
 ---
 
@@ -117,9 +78,7 @@ Effort: **S** ≈ hours · **M** ≈ a day or two · **L** ≈ several days.
 **All three were reported but unverified — triage began by reproducing them.** They sat on the daily-use path and were owned by no phase, which is why they had drifted to the top of this file with no place in the order. Two were real and are fixed; one did not reproduce.
 
 - [x] **Math doesn't get rendered in block maths.** Reproduced, and it was two defects in `BlockMath.tsx`'s markdown-it rule — parsing, not KaTeX or the node view. `$$…$$` **was not recognised at all** (it landed as literal paragraph text), though it is what Obsidian, Notion, GitHub and plain LaTeX habit all write; and **a** `$` **fence directly under a prose line was swallowed into that paragraph**, because the rule never registered as one that can terminate a paragraph — `prose\n$\nx^2\n$` read as the single run of text `prose $ x^2 $`. Now parsed liberally (`$`, `$$`, and one-line `$$…$$`) and still serialized conservatively as the lone `$` this app has always written. The silent-mode return had to move *after* validation: markdown-it asks in silent mode whether a line ends the paragraph above, and saying yes to an unclosed fence would cut a paragraph in half and render neither half as maths. Covered by `blockMathParsing.test.ts` — nine cases, four of them guard rails that already passed.
-
 - [x] **Derivatives like** `y'` **get parsed to** `^'y`**.** **Does not reproduce** — it did predate the fixes, as suspected. Converting all ten corpus sheets yields zero occurrences of `^'`, and every prime renders correctly: `y'`, `y''`, `y'_1`, `y'_2`, `\vec{y}'(t)`. `latex.rs`'s `is_prime_run` (added by the compact-fraction work) emits a prime run without a caret whenever it follows a base character. Closed as already fixed rather than fixed again; under the P4-2e freeze a bug that reproduces on no corpus document earns no work.
-
 - [x] **Spellcheck for German.** **App side, and now fixed.** The WebView chooses its dictionary from the nearest `lang` attribute; the editor set `spellcheck` but never a `lang`, so a note inherited `index.html`'s `lang="en"` and German prose was checked against English — every word underlined, which reads as the feature being broken. Added `spellcheckLanguage` to `AppSettings` (BCP-47, defaults to `de`, `#[serde(default = …)]` so a `settings.json` from an older build loads with `de` rather than `String::default()`'s empty string) and it now drives `lang` on both the TipTap root and the raw `<textarea>`. **The P2-3 caveat still stands and is not fixed by this:** whether any squiggle appears at all needs the OS's German language pack installed — WebView2 uses that, not Hunspell dictionaries of its own. This change is what makes the pack *usable* once present.
 
 ---
@@ -154,19 +113,12 @@ Both import modes, chosen at import time, the way Notion does it. **No OCR** —
 ### P4-1 Import mode picker + text-layer extraction — **L** ✅
 
 - [x] "Pages" vs "Markdown" choice at import; remembered in `settings.json`
-
 - [x] Extract the text layer via `page.text()` — chars, loose bounds, font metrics
-
 - [x] Reconstruct lines (baseline y) and blocks (vertical gap vs median line height)
-
 - [x] Headings from font size above the body median
-
 - [x] Code blocks from monospace runs — `font_is_fixed_pitch()`, no font-name list needed
-
 - [x] Lists from leading bullet/number glyph + indent, incl. nesting and wrapped items
-
 - [x] Bold/italic font variants → `**` / `*`
-
 - [x] Converted note is a normal editable note, and searchable via `Ctrl+K` *(closes the brief's "search should include PDFs" gap)*
 
 > `pdf/layout.rs` takes plain `CharBox` values, **not** pdfium types — that's what makes it testable on a machine with no pdfium. `pdf/extract.rs` is the thin translation layer and holds no decisions. Since verified against a real Analysis sheet, which exposed four bugs synthetic fixtures could not.
@@ -174,11 +126,8 @@ Both import modes, chosen at import time, the way Notion does it. **No OCR** —
 ### P4-2 Honest degradation — **M** ✅
 
 - [x] Detect maths-font runs and **rebuild them as LaTeX** (`$…$` / `$$…$$`) rather than emitting mangled glyph text
-
 - [x] Detect a near-empty text layer (scanned PDF) *before* converting — landed early in P4-1, since it was five lines and P4-1 must not write a garbage note
-
 - [x] **Offer** Pages mode, not just name it — a button, not only a message
-
 - [x] Never produce a garbled or empty note
 
 > **Shipped as image crops first, replaced with LaTeX the same day.** Crops were visually exact but fail the actual use case — pasting a converted sheet into an LLM prompt needs *text*, not an image, and an image never renders through the editor's own KaTeX nodes either. `pdf/maths.rs` now classifies *which* maths face a glyph came from (`CMMI` variable, `CMSY` relation, `MSBM` blackboard bold, …); `pdf/latex.rs` turns face + geometry into LaTeX. Four real bugs along the way: a radical sits on its own baseline above its radicand and has to be row-merged before its region forms; the subscript-vs-superscript offset threshold was sized for exponents and silently ate every subscript (`T_3` read as `T3`); a maths region bypasses `layout.rs`'s own space synthesis entirely and needed its own; a footnote marker is geometrically identical to a real exponent except that it follows terminal punctuation, which is now the signal that stops it bleeding in.
@@ -190,15 +139,10 @@ Both import modes, chosen at import time, the way Notion does it. **No OCR** —
 Converting a second real PDF and diffing the output against a note the user wrote by hand surfaced two bugs bad enough to matter more than anything P4-2 had already fixed. Later passes against further real documents (see P4-2c) fixed the rest but one.
 
 - [x] **Whole-document prose loss.** The extraction filter used `font_name().is_empty()` to spot pdfium's synthetic layout characters. That signal held for the first document this pipeline was built against, but is producer-dependent — this PDF's real body-text font *also* reports an empty name, and the filter silently discarded every word of German prose in the sheet, keeping only the equations. Now keyed on a near-zero font size instead (pdfium's own filler is consistently \~1.0pt; no real glyph in either document is ever that small).
-
 - [x] **Words torn apart mid-word with no maths or line break involved** (`wird jeweils` → `wirdj eweils`). A generated space's own `x` landed *inside* the following letter's advance box — sorting a row by raw `x` is exactly wrong when one character's coordinate lies. Rows are now ordered by position in the page's own extraction stream, which pdfium never gets wrong even when a glyph's geometry does.
-
 - [x] **Fractions.** Bar-less fractions are now reconstructed into `\frac{}{}` (see commit `05339ad`).
-
 - [x] `∮` **(contour integral) unrecognised.** The placeholder glyphs are now recognised and rendered as `\oint` (see commit `19814ee`).
-
 - [x] `(a$) C$` **boundary artifact.** An enumeration label's closing paren no longer leaks into a following equation's region (see commit `32fb56f`).
-
 - [x] `ß` **→** `ÿ`**.** Confirmed via `text_object().font()` that pdfium itself decodes this specific font's eszett glyph to `U+00FF`, not our pipeline. The font has no name to key a per-font fix off of, so the real glyph identity can't be recovered — but `ÿ` has no legitimate occurrence in this app's actual content (German/English CS notes), so `extract.rs` now unconditionally treats a body-text `ÿ` as this misdecode and corrects it to `ß`. A deliberate, documented substitution, not a guess.
 
 ### P4-2c Third through sixth real-document pass — **Analysis_2_Blatt12.pdf, Ue14.pdf, Analysis_2_Blatt11.pdf, Analysis_2_Blatt1_2026.pdf, Assignment10_DA.pdf** — all fixed
@@ -206,23 +150,14 @@ Converting a second real PDF and diffing the output against a note the user wrot
 Five more real documents — four Analysis worksheets plus an English-language algorithms assignment, the first non-German, non-Analysis document this pipeline has been tested against — tested the same way: convert, read the output against the source. The ligature item below was closed later than the rest, by a different kind of fix (dictionary disambiguation rather than geometry) once pdfium's own signal was confirmed to genuinely contain nothing further to extract.
 
 - [x] **A diaeresis attached to the wrong letter when its producer draws it *before* the vowel.** `combining_form`'s attachment rule (`layout.rs`) assumed an accent always sorts to just after its letter in stream order — true for the first document this was built against (`fu¨r`), false for Ue14.pdf, which draws `M¨o` (accent, then vowel) for "Möglichkeit". Stream order can't tell the two producers apart, so the rule is now x-proximity: the accent attaches to whichever neighbour, previous or next, its own glyph position is closer to. Fixed several words per page (`können`, `Möglichkeit`, `lösen`, `Reflexivität`, `Transitivität`, `Länge`).
-
 - [x] **A Greek-letter command swallowed the variable right after it.** `\alpha` immediately followed by the variable `f` rendered as `\alphaf` — LaTeX reads a run of letters straight through a backslash as one command name, so that's the undefined command `\alphaf`, not "α then f" (found on Analysis_2_Blatt12.pdf: `L\{\alphaf+\betag\}`). `latex.rs`'s `render()` now inserts a boundary space whenever the text just pushed ends a bare command name and the next text starts with a letter — but only when a `\` actually started that trailing letter run, so two ordinary adjacent variables (`e^{xy}`) stay glued exactly as the source had them.
-
 - [x] **An unrepresentable real glyph silently faked a word-space.** Same underlying discovery as the ligature item below, but the actual fix landed here: a real, body-sized glyph pdfium cannot map to Unicode (confirmed via *two* independent pdfium text APIs — the per-character path and `FPDFText_GetBoundedText` — both return the same result, so this is pdfium's own font data, not an artifact of our extraction) was being dropped outright in `extract.rs`. Dropping is worse than guessing wrong: the glyph vanishes but its geometric slot doesn't, so the gap reads to the space synthesizer as an ordinary word boundary — `Differentialgleichung` silently became the two plausible words `Di erentialgleichung`, with nothing to flag the sentence as broken. It's now kept as `U+FFFD`, which stays inside its word's geometry (`Di�erentialgleichung`) and makes the loss visible instead of silent. Caught the same class of bug in German typographic quotes too (`„Ableitung"` → `�Ableitung�`), not just the three ligatures originally diagnosed.
-
 - [x] **An operator name touching its argument with no space at all was never absorbed into its equation.** `O(m log n)` converted as `$O(m$log$n),$` — three broken fragments, `log` sitting outside any equation as plain text (same shape as `cos(z)` → `cos$(z)$` on Analysis_2_Blatt11.pdf, and `to` correctly staying prose but `s`/`t` on either side of it also splitting apart, `$s \mathrm{to} t$`, on Assignment10_DA.pdf). TeX sets an operator name upright, in the same *text* font family as ordinary prose — indistinguishable from prose by family alone — so `maths_runs`' region-growing had always stopped dead at the first letter of one. Growing outward (and the separate seed-merge step that decides whether two nearby maths seeds fuse at all) now cross a letter run if, and only if, it spells a name from the same known-operator list `latex.rs` already used for rendering — shared as `latex::KNOWN_OPERATOR_NAMES` so the two can't drift apart. The first attempt used "next character is non-alphabetic" as the word-boundary check (to stop "cos" matching inside "cosh") and broke `O(m log n)` a second way: TeX's own math-mode spacing between an operator and a parenthesis-less argument can be *zero*, so `log` sits directly against the italic variable `n` with no space glyph anywhere, and that check rejected the real match too. Fixed by matching the *maximal same-family letter run* instead of a fixed-length prefix — `n` is `Family::Italic`, not a continuation of `log`'s own upright word, so the family change alone marks the boundary regardless of spacing.
-
 - [x] **The plain integral** `∫`**, like** `∮`**, falls back to a placeholder pdfium can't identify.** Renders as a bare `Z` (Analysis_2_Blatt1_2026.pdf: `$$Z Z$$`). Confirmed by the same visual-verification standard as `∮`'s `H`/`I` — rendered the page to PNG and looked directly at the glyph before mapping anything, rather than assuming from an encoding table. `Z` at `Family::Extensible` now becomes `\int`. Less of a guess than `∮` even looked: `cmex10` is Knuth's own Metafont program, the same physical font essentially every LaTeX installation embeds unchanged, so this fallback behaviour is a property of that one standard font, not of any one document's producer. What still doesn't reconstruct is the *content* of a definite integral's limits when numerator/denominator/limits span multiple physical rows — the same 2D-layout limitation matrices already have, not a symbol-identity problem.
-
 - [x] **A small inline stacked fraction (no separate physical lines) didn't reconstruct as** `\frac{}{}`**.** `reconstruct_fractions` only handled a numerator and denominator on two entirely separate physical rows (a fraction bar spanning real vertical space). A *compact* fraction set within one region — `R = \frac{1}{2}` typeset small enough that "1" and "2" are just script-sized glyphs stacked at the same x — has no separate rows to pair, so it fell through to ordinary super/subscript handling with no base character to attach to: `R = ^1_2` (Analysis_2_Blatt11.pdf, twice; Analysis_1_Blatt2_2025.pdf, four times). `render()` now recognises a superscript run immediately followed by a subscript run stacked at (about) the same x, with nothing at base level between them, as this shape specifically. The first version keyed only on x-alignment and immediately regressed a real case on Analysis_2_Blatt12.pdf: `y'_1(t)` (a prime, then a subscript, both on base `y`) started rendering as `y\frac{'}{1}(t)`, because the prime and the "1" *also* land at nearly the same x — both simply sit right where `y` ends. x-alignment alone can't tell "compact fraction" from "prime plus subscript on the same base" apart; what does is whether a real base character immediately precedes the superscript run at all — a fraction's numerator is never attached to one (nothing before `1` in `= 1/2` would sensibly take it as an exponent), while every genuine superscript follows some base glyph directly. Caught by re-running the full six-document sweep after the fix, not by the isolated unit test, which is the whole reason that sweep exists.
-
 - [x] **Ligature glyphs (**`ff`**,** `fi`**,** `ffi`**) decode to font-specific control codepoints, not Unicode.** On Analysis_2_Blatt12.pdf, pdfium hands back `U+001B`/`U+001C`/`U+001E` for the `ff`/`fi`/`ffi` ligatures of a Type1 Computer Modern font. Geometry genuinely can't disambiguate them — `dump_ligature_widths` measured a confirmed `ff` glyph (`U+001B`) at exactly the same width as independently-decoded `f`+`i` — so `pdf::ligatures::disambiguate` (new module, `layout.rs`'s `join_lines`) instead tries every candidate (`ff`/`fi`/`fl`/`ffi`/`ffl`) against a bundled German+English word list (`random_word` crate) and keeps whichever makes the placeholder's whole word real, only when exactly one does. Runs after hyphenated line-wraps rejoin (a word can be split across two physical rows by the PDF's own line breaking, e.g. `di{FFFD}eren` / `zierbaren)`), so the full word is what gets checked. The same module also resolves the standalone-placeholder case for German typographic quotes (`„Ableitung"` was arriving as `�Ableitung�`) — deterministic from position alone (touching a letter on one side, whitespace/boundary on the other), no dictionary needed. Both leave `U+FFFD` visible, not silently wrong, whenever the signal is genuinely ambiguous (e.g. the bullet markers on this same document, `U+0088`, which have a space rather than a letter on the touching side, and stay unresolved).
-
 - [x] **A compact fraction whose numerator carries its own nested exponent split across two rows instead of reconstructing.** `group_lines`'s script-attachment pass (the one that places superscripts/subscripts once body-text rows are set) measured every script glyph's baseline tolerance only against a row's single tallest anchor. Found on Analysis_2_Blatt12.pdf's `e^{-bs}/s` (Laplace transform of the Heaviside step): the numerator's base `e` sits within tolerance of *both* its own exponent `-bs` (touching it, horizontal distance \~0) and the true body row a few points below — and lost that tie-break to the exponent every time, purely on distance, stranding the whole numerator on an isolated row while the denominator `s` (correctly) landed in the body row, with no base character to attach to (rendered as a bare `_s`). Fixed two ways together: scripts are now placed largest-first (a numerator's own exponent is smaller again, the same convention TeX itself uses for nested script sizes, so placing the shallower script first gives the deeper one a real sibling already in the row), and each row's tolerance check now measures against whichever of its own members sits closest in `y` to the candidate, not always the row's single tallest character — letting a nested exponent measure against its own immediate base instead of the row's dominant body text.
-
 - [x] **A piecewise (**`\cases`**) function definition scattered across four disconnected lines instead of reconstructing.** `H(t-b) = { 1 für t≥b, 0 für t<b` (Heaviside step function, Analysis_2_Blatt12.pdf) is genuine 2D layout: a prefix (`H(t-b) =`), a tall opening brace, and two case rows each splitting into a value and a condition — but the prefix row's own `y` sits *between* the two case rows (TeX centres it vertically against the whole block), which every other reconstruction pass in this file had assumed couldn't happen. New pass `reconstruct_cases` (`layout.rs`, runs in `group_lines` before `reconstruct_fraction_sums`/`reconstruct_tables`, or two aligned case rows read as a two-row table) finds the brace by `latex::is_cases_brace`, collects the case rows below it by left-aligned column rather than by `y`-order, and finds the prefix purely by `x` — the one row whose right edge sits flush against the brace's own left edge. Each case row's value/condition split reuses `split_into_terms`; the condition (`für t ≥ b`, real prose mixed with maths) needed a new `render_condition` helper, since `to_latex` on its own only recognises a fixed, ASCII-only list of operator names as upright text. One real bug caught only by testing against the actual document, not the hand-built fixture: the case-row search had no vertical bound at all, so the page's own footer page-number — coincidentally close to the brace's `x` — joined the candidates and broke the column-alignment check for all of them; `CASES_MAX_ROW_GAP` bounds how far below the brace a row may sit before it stops being a plausible case.
-
 - [x] **A multi-row vector or matrix scattered across disconnected lines instead of reconstructing.** `⃗v(x, y) = (3x² − 3y² + 2x + 2y, −6xy + 2x − 2y)` (Analysis_2_Blatt11.pdf item 6, a 2-row column vector) is the same shape class as the `\cases` block above: a tall bracket pair, content rows between them, and a prefix row (`⃗v(x, y) =`, `.`) whose own `y` sits *between* the content rows rather than above or below all of them. New pass `reconstruct_matrices` (`layout.rs`, runs in `group_lines` right after `reconstruct_cases`) finds the bracket row via a new `latex::bracket_glyph`/`matrix_bracket_row` pair (mirroring `is_cases_brace`/`cases_brace_row`, generalized to two glyphs and tolerant of leading prose sharing the bracket row — confirmed on Analysis_2_Blatt5_2026.pdf item 3, `"3. Gegeben ist das Vektorfeld ("`), collects content rows by x-containment within the bracket's interior span, and splits the prefix row by x into a `before`/`after` pair around the bracket rather than only a `before` (the trailing `.` sits *after* the close bracket). Column count reuses `table_gutters`/`split_row_into_cells` — the same cross-row alignment judgment `reconstruct_tables` already relies on — verified against a genuine `pdflatex`-compiled 2×2 matrix (no real document in the corpus has 2+ columns) rather than a synthetic fixture, since the detection keys off real CMEX placeholder glyphs a mock PDF library never produces. Two real bugs caught only by testing against the actual document: `to_latex`/`synthesize_gaps` requires x-sorted input, but a raw pre-`build_line` row is only roughly x-ordered (final ordering is `build_line`'s own job) — a content row's superscript exponent came out detached and appended at the row's end until every row was explicitly x-sorted before rendering; and, exactly like the cases-block bug, the content-row search had no vertical bound at all, so a later exercise's own `\oint_C` and the page's footer number — both coincidentally sharing the bracket's x-band — joined the candidates from hundreds of points away, which `MATRIX_MAX_ROW_GAP` (mirroring `CASES_MAX_ROW_GAP`) now bounds.
 
   Follow-up, same entry: **Analysis_2_Blatt7_2026.pdf's six vector fields**, initially left unfixed for using a different, unconfirmed codepoint set, are now also confirmed reconstructing — rendering the page and reading exact geometry showed the "second bracket pair" was never a nested bracket at all: a taller 3-row pmatrix needs its bracket assembled from two stacked half-height Private-Use-Area glyph pieces per side (same x, same width, a fixed 21.519pt vertical offset, identical across all six instances), and the second piece lands glued directly onto the vector's own middle row — simultaneously its prefix (`⃗v(x, y, z) =`), its own second content row, and the stray delimiter piece. Fixed two ways: any `bracket_glyph`-matching character is now stripped from a content row before rendering, wherever it lands (handles the assembled piece without modelling why the font split it); and the prefix-row search now also checks whether that row's own characters include real content inside the bracket's column, folding it into the content set when they do. Along the way, `MATRIX_MAX_ROW_GAP` needed widening (3.0 → 5.0): it was calibrated only against Analysis_2_Blatt11.pdf's 2-row case and excluded the bottom row of a real 3-row one, since the gap is measured from the bracket's own (top-piece) row and grows with row count.
@@ -230,9 +165,7 @@ Five more real documents — four Analysis worksheets plus an English-language a
   A second, unrelated bug turned up in the same regression sweep: Ue9.pdf Beispiel 9.3's own large `\left(\right)` delimiter (an even taller, 4-piece assembly, wrapping the inclusion-exclusion formula's nested Σ operators) is geometrically indistinguishable from a real matrix's bracket row, and was swallowing the formula's summation limits as bogus matrix rows. Every real matrix in the corpus has content that's plain algebra with no big operators of its own, so `reconstruct_matrices` now bails out of a match entirely (not just drops the offending row — guessing which to keep would be exactly the kind of forced fix this pipeline avoids) whenever a candidate content row carries an Extensible-family character that isn't a bracket piece.
 
   Further follow-up: **a system of equations can place several independent small matrices/vectors inline in one sentence** — `⃗y'(t) = Ay(t) + b(t), mit ⃗y(0) = y₀` (Analysis_2_Blatt12.pdf items 4/5), three bracket pairs sharing one row, with both content rows holding all three matrices'/vectors' values interleaved. `matrix_bracket_row`/`reconstruct_matrices` generalize in place from exactly one bracket pair to N (N=1 degrades to the existing behavior, not a separate code path): the bracket-row predicate now accepts any number of alternating open/close pairs separated only by whitespace; content rows are found once across the whole row and sliced per bracket, so each bracket runs today's single-bracket column-splitting independently; and the prefix generalizes from a `before`/`after` pair to N+1 fragments (before the first bracket, between each adjacent pair, after the last). The real-document regression sweep this generalization requires (every prior real case, re-verified) surfaced two more false positives it unlocked: a run of independent `\binom{}{}`s (Ue9.pdf Beispiel 9.2) shares the exact same bracket-plus-two-rows geometry a real vector takes. Fixed with two guards grounded in what actually differs: a content row must touch at least one bracket's own physical column, not just the overall multi-bracket bounding envelope (which had let a stray prose fragment sitting in the gap between two unrelated brackets — "sowohl ... als auch ..." — corrupt the row count); and for N&gt;1 specifically, some text must introduce the brackets (either on the bracket row itself or as prefix text before the first bracket), the way every confirmed real system of equations does and no standalone `\binom` ever does.
-
 - [x] **An accent could be deferred arbitrarily far past its word in stream order, not just to an immediate neighbour.** Originally diagnosed as "grouped onto the wrong row" (Ue14.pdf: `isẗ (jeweils mit Begrundung!).̈`, the `ü` of "Begründung" seemingly attached to the previous row's "ist"), but the real mechanism turned out simpler and much more common: `group_lines`' own row-assignment was already correct — the accent and its letter land in the same row — the bug was entirely inside `build_line`'s stream-index sort, which can place a heavily-deferred accent many positions away from its true base letter within that (correctly identified) row. Confirmed on Analysis_2_Blatt1_2026.pdf's heading: the diaeresis for "Übungsblatt" arrives *eleven* characters after the word, immediately before the next line's own "1." list marker, though its x stays within 1.5pt of the "U" throughout. The existing forward/backward x-proximity attachment (see above) only ever checked immediate stream neighbours, so this fell through it entirely. A new pass, `relocate_stray_accents`, runs once per row before that logic does: for every accent, find the closest non-accent character anywhere else *in that same row* by x; if it isn't already an immediate neighbour, physically move the accent to sit right after it, leaving the existing combining logic to run unmodified. Fixed essentially every remaining accent failure across all six documents at once — `Übungsblatt` (four of six documents' own headings), `Überprüfen`, `erfüllt`, `Äquivalenzrelation`, `eingeführten`, `können/müssen`, and the original `Begründung` — not just the one case it was diagnosed from.
-
 - [x] **A page-footer page number could still leak into the converted note as a stray line, outside the two incidental cases already caught above.** Both prior fixes only bounded a page number's *blast radius* on an unrelated reconstruction pass (`CASES_MAX_ROW_GAP`, `MATRIX_MAX_ROW_GAP`); neither removed the footer itself. `group_lines` now runs `strip_page_furniture` before any other row-level pass, dropping an isolated, pattern-matching page number/header (bare digit, "Seite N", "Page N of M", "- N -") from a region's topmost or bottommost row before it can become body content at all. See `docs/specs/pdf-page-furniture-design.md`.
 
 ### P4-2d Seventh real-document pass — Analysis_2_Blatt5_2026.pdf, revisited — all fixed
@@ -240,9 +173,7 @@ Five more real documents — four Analysis worksheets plus an English-language a
 A closer read of a document already in the corpus (P4-2c's multi-bracket generalization was confirmed against it) turned up three more bugs, none of them matrix/vector-shaped this time.
 
 - [x] `\vec{}` **rendered as a literal accent glued onto its letter.** Computer Modern draws `\vec` by placing the combining right-arrow accent `U+20D7` directly *before* its base letter (confirmed on this document's own char stream) — the opposite of Unicode's own convention, and with no precomposed codepoint the way `layout.rs`'s `combining_form` has for a diaeresis. Unhandled, `⃗v(x, y) = ...` rendered as the bare accent character next to `v` rather than `\vec{v}`; `latex.rs`'s `render()` now recognises the accent and wraps the following character before falling through to the per-character path. (This also fixed the display text of every vector/matrix test from P4-2c — those were asserting on `⃗v`, the un-rendered accent, not `\vec{v}`.)
-
 - [x] **An upright Greek capital touching its word with no space glyph at all stayed stranded as plain prose.** `Potenzialfunktion Φ(x, y)` left `Φ` outside any equation — TeX sets an upright Greek capital in the same upright text font prose uses, so it's indistinguishable from a word by family alone, and unlike the `O(m log n)`/`cos(z)` case, there's no real word gap anywhere to anchor a whole-word match against; the fixed known-operator-name scan only ever matched a complete word, never a single bridgeable symbol glued straight onto one. New `is_bridgeable_symbol` (`layout.rs`) peels off one non-ASCII character at a time when it has its own known `latex::symbol_command` — restricted to non-ASCII so it can never fire mid-word on ordinary Latin prose.
-
 - [x] **A big operator's subscripted limit (**`\iiint_K`**) reconstructed as a bar-less fraction instead.** Geometrically identical to a fraction's numerator/denominator pair — a maths-only row stacked above another, straddled by a baseline — so `find_fraction_pair` was pairing a triple-integral row with its limit row and emitting `\frac{\int\int\int}{K}` in place of `M = \iiint_K (y+1)\,dx\,dy\,dz`. Generalized `find_fraction_pair` into `find_stacked_pair` (shared geometry search, parameterized by which rows are eligible as the top half and how the two combine) with two callers: `reconstruct_fractions` (unchanged behaviour, now explicitly excluding a big-operator-only top row) and the new `reconstruct_operator_limits`, which collapses a run of identical operator glyphs (`is_repeated_operator_token`/`collapse_operator_run` — `\int \int \int` → `\iiint`) into the limit form instead.
 
 ### P4-2e Pipeline completion criteria — **S**, docs only ✅ *frozen 2026-08-13*
@@ -250,15 +181,10 @@ A closer read of a document already in the corpus (P4-2c's multi-bracket general
 > The only subsystem here with no natural end. \~120 commits in the two weeks after P4-2 was declared done, none wrong individually, none bounded collectively. **Ruled fractions was the last 2D shape**; the freeze took effect on its completion. Full reasoning in [ROADMAP.md](docs/ROADMAP.md) §Phase 4.
 
 - [x] Finish ruled fractions — the one named, finite carve-out *(*`c72a24e`*…*`851bfff`*; Blatt11 5 → 10 fractions, Blatt10 2 → 3, no sheet reduced)*
-
 - [x] **Corpus frozen** at the documents already in it; adding one is a deliberate decision, not a reflex
-
 - [x] **Bar is "faster than transcribing by hand," not "correct"** — M4's own DoD
-
 - [x] **A new bug earns work only if it is whole-document** (prose loss, mid-word tearing) **or recurs across ≥2 corpus documents.** Single-document cosmetic bugs get recorded here and left — *the load-bearing rule, and the one that will feel wrong to apply*
-
 - [x] **2D-layout reconstruction closed** — matrices, `\cases`, stacked fractions, operator limits, tables, ruled fractions is the complete set. Anything else renders as glyph text; `throwOnError: false` contains it
-
 - [x] **Re-entry only** when real coursework use produces a document failing the by-hand bar — not from a diagnostic sweep
 
 #### Filed, not fixed — the record the freeze creates
@@ -270,11 +196,8 @@ Bugs found after the freeze that do not clear the bar above. Recorded so they ar
 ### P4-3 Exercise splitting & solution scaffold — **M** ✅ — *step 3, closes M4*
 
 - [x] Split on exercise headings (`Aufgabe N`, `Beispiel N.M`, `Task N`, `Exercise N`, `Problem N`, `N.`) into `## Task N` + `### Solution` pairs — **on request only**, via *Split Into Tasks* in the slash menu and File menu
-
 - [x] **"Add next task"** command — appends the next correctly-numbered pair, **with its own canvas**, so space per task is never planned in advance
-
 - [x] **Every** `### Solution` **holds a handwriting canvas** — the actual point of the workflow; an empty heading left you inserting ink by hand once per exercise
-
 - [x] No heading match → convert as one unsplit document; never drop content
 
 > **Importing a PDF never does this.** The first cut ran splitting unconditionally inside `pages_to_markdown`, which was wrong: asserting a document *is* an exercise sheet is a claim only the reader can make, and a lecture script or a paper would have been rewritten just as readily. A Markdown import now produces plain Markdown and `extract.rs` has a test pinning that; the splitter moved out of `pdf/` to `src/exercises.rs`, since the pipeline no longer calls it and a hand-written note is as valid an input. Nothing is remembered — a remembered "always split" setting would be the same automatic behaviour wearing a checkbox. \*\***The pattern is chosen once per document, not per block.** Ue5/6/9 name their exercises `Beispiel N.M.` and use *top-level ordered items as sub-parts*, numbered continuously across exercises and restarting partway; the Analysis sheets do the exact opposite. Splitting either by the other's rule cuts inside every exercise it has, so the keyword pattern claims the document outright when it matches twice and ordered items are used only when it does not. Ordered items are then narrowed to the **longest consecutive run starting at 1** — which is what excludes the `11. Übungsblatt` line every Analysis sheet opens with, without a list of title words that would only be a guess about the next document.
@@ -304,11 +227,8 @@ Two modes, different defaults — everything here follows from this:
 ### P5-1 Repo detection + per-workspace config — **S/M** ✅
 
 - [x] Detect mode on open: repo root ≈ workspace (notes-only) vs. subtree of a source repo (code repo)
-
 - [x] Shell out to `git`, **not** `git2`/`gix` — inherits credential helpers, SSH agent, signing, `.gitconfig` for free
-
 - [x] Per-workspace, machine-local config beside `.workspace.json` (already gitignored) — "should this machine autocommit" isn't a fact about the notes
-
 - [x] **Opt-in**: detecting a repo prompts once, never starts committing on its own
 
 > `git -C <workspace> rev-parse --show-toplevel`, canonicalized on both sides before comparing (git normalises its own output to forward slashes even on Windows, so a raw string compare against the workspace path would mismatch on separator style alone). Any failure — including `git` missing from `PATH` — reads as "not a repo," off the exit code rather than a parsed message, and never blocks the workspace from opening. Config is two fields only (`prompted`, `autoCommit`) on `WorkspaceState`; cadence and push policy are P5-2's and P5-3's own tasks, not scaffolded here ahead of the code that would read them. A one-time banner (`GitAutoCommitPrompt`) offers the toggle when a repo is first detected; a Settings-panel row (visible only when the open workspace is a detected repo) revisits it later — both go through one `useGitConfig` hook, so there's a single persistence path. Repo mode itself is never persisted, only re-detected each open — it's a fact about the disk that can change between sessions.
@@ -316,15 +236,10 @@ Two modes, different defaults — everything here follows from this:
 ### P5-2 Batched auto-commit — **M** ✅
 
 - [x] One commit per session / N minutes idle — never per-save (far coarser than the 600 ms save and 2.5 s reindex debounces)
-
 - [x] Message summarizes which notes changed
-
 - [x] **Always** `git add -- <paths>` **/** `git commit -- <paths>` — never `git add -A`, never a bare commit that sweeps in staged work
-
 - [x] Skip entirely on mid-rebase/merge/cherry-pick, detached HEAD, or existing conflict markers; report quietly, never repair
-
 - [x] Run hooks and abort on failure — no silent `--no-verify`; opt-in per-workspace toggle to skip them
-
 - [x] **Test: staged and unstaged source changes are byte-identical after an auto-commit.** The one unforgivable failure.
 
 > `checked_auto_commit` resolves the git dir once (`rev-parse --absolute-git-dir`) and answers detached-HEAD/merge/cherry-pick/rebase by reading it directly; only unresolved conflicts need a real `git` call (`ls-files -u`). A conflicted merge sets `MERGE_HEAD` too, so it reports as "a merge is in progress" rather than "unresolved conflicts" — the more specific, more actionable reason; exercising the conflicts check in isolation needed a conflicting `stash pop` instead of a merge. The idle timer lives on the frontend (`useGitAutoCommit`, resets on every new saved path, default 10 minutes via `git.idleMinutes`) and also flushes once on session end. A non-`Committed` outcome leaves the batch pending rather than clearing it, so the next trigger retries instead of losing the changes. First version of the "nothing else touched" test compared the whole-repo diff listing before/after, which is wrong — it shrinks once the note's own change lands; fixed to scope the comparison to the untouched file specifically.
@@ -332,9 +247,7 @@ Two modes, different defaults — everything here follows from this:
 ### P5-3 Push policy — **S** ✅
 
 - [x] Notes-only: push after commit (on by default, configurable)
-
 - [x] Code repo: **never auto-push at any setting** — notes ride along with your next real push
-
 - [x] Surface no-remote / auth failure / non-fast-forward; never retry blindly, never force
 
 > `checked_push` refuses `RepoMode::CodeRepo` unconditionally as a Rust-level guard, on top of the frontend's own single call site being gated on `repoMode === 'notesOnly'` — two independent places a code-repo push would have to slip through, not one.
@@ -342,15 +255,10 @@ Two modes, different defaults — everything here follows from this:
 ### P5-4 Fast-forward-only auto-pull — **M** ✅ — *most dangerous task on the roadmap*
 
 - [x] Fetch and compare on workspace open (optionally on an interval)
-
 - [x] No divergent local commits → fast-forward silently (P0-5's watcher already debounces the file burst; P3-4 traced this exact path)
-
 - [x] Diverged → **stop.** Bar reusing the P0-5 conflict-bar pattern; you resolve it in the terminal (P8) or your Git tool
-
 - [x] **Never** auto-merge, auto-rebase, or write a conflict marker into a `.md`
-
 - [x] A dirty buffer is never overwritten by a pull — extends the existing CLAUDE.md rule to the pull path
-
 - [x] Test: a deliberately diverged history produces **zero** conflict markers in any `.md`
 
 > `git merge --ff-only` does the actual fast-forward — refuses rather than merging if it isn't a pure fast-forward, or if a local uncommitted change would be overwritten. No new reload logic was needed for the dirty-buffer rule: a fast-forward's resulting file changes are an ordinary external edit, and P0-5's watcher plus `useNote`'s existing conflict handling already cover exactly this path. `GitDivergedBar` reuses `ConflictBar`'s `.conflict-bar` styling rather than a second bar look.
@@ -358,9 +266,7 @@ Two modes, different defaults — everything here follows from this:
 ### P5-5 Repo creation for a notes-only workspace — **S** ✅
 
 - [x] Offer `git init` + the `.gitignore` P3-4 documents when the workspace isn't a repo
-
 - [x] Optional GitHub remote via `gh repo create` — **private by default**
-
 - [x] No `gh`? Init locally and print the exact remote command. Never a hard dependency
 
 > `checked_init_notes_repo` never overwrites an existing `.gitignore`. Any `gh repo create` failure — absent, not logged in, network — falls through to `InitializedLocalOnly` with the exact `git remote add origin <url>` command surfaced in an alert. Settings sets `repoMode` to `'notesOnly'` directly after a successful init rather than re-running detection, which reuses P5-1's existing one-time-prompt wiring unchanged: `git.prompted` is still `false`, so the auto-commit banner appears right away.
@@ -378,11 +284,8 @@ Two modes, different defaults — everything here follows from this:
 ### P6-1 Proof blocks + collapsible sections — **M** ✅
 
 - [x] Theorem / Lemma / Corollary / Proof / Definition / Example blocks, optional numbering + title
-
 - [x] Collapsible sections — decision made (below), now presentation-only and reachable from `/`
-
 - [x] Build on the existing `Callout` node pattern — don't invent a second block mechanism
-
 - [x] Round-trips through save→reload; prints correctly in PDF export
 
 > **Decided, 2026-08-18: collapse state is presentation-only.** `Details.tsx`'s `open`/closed state is now plain React component state, never a node-attribute update — toggling a section no longer dirties the buffer, so it can't trigger a save or (under P5) an auto-commit for what is purely a view-state click. The tradeoff this gives up: collapse state doesn't survive reopening the note, and a raw `<details>` in the file (no `open` attribute) always renders closed in GitHub — accepted, since the DoD explicitly named this as the requirement, not an oversight. Reachable from `/` as *Collapsible Section*. \*\***Theorem/Lemma/Corollary/Proof/Definition/Example are new** `calloutType` **values on the existing** `Callout` **node**, per the DoD's "don't invent a second block mechanism" — same `> [!TYPE] Title` admonition syntax, with a new `number` attribute (`> [!THEOREM 3.2] Squeeze Theorem`) so P6-7's cross-references have something to resolve against. A `Proof` block appends a QED mark (`∎`) after its last child — CSS only, never stored. All six reachable from `/`; the print stylesheet gets a palette pass and `break-inside: avoid` alongside the existing callout types. A collapsed `Details` section stays in the DOM (hidden via CSS, not unmounted) specifically so PDF export/print can force it visible — otherwise a collapsed section would silently vanish from the exported PDF.
@@ -390,7 +293,6 @@ Two modes, different defaults — everything here follows from this:
 ### P6-2 Algorithm blocks — **M** *(after P6-1, reuse its machinery)* ✅
 
 - [x] Complexity / Pseudocode / Implementation / References slots
-
 - [x] Serialises to Markdown that still reads sensibly in any other editor
 
 > **Reuses P6-1's machinery literally** — `algorithm` is one more `calloutType` on the same `Callout` node, no new node type. The four slots are bold-labeled paragraphs (`**Complexity:**`, `**Pseudocode:**`, …) inside the blockquote body rather than a fixed sub-schema, which is what makes it a plain, portable `.md` structure instead of the most bespoke node in the app — a bold line followed by a blank line and its content is legible in any Markdown viewer, GitHub included. Reachable from `/` as *Algorithm Block*, prefilled with all four slots (`Pseudocode`/`Implementation` as code blocks). \*\***Building this found a real, pre-existing bug in** `Callout`**'s parser**, not introduced by P6-1/P6-2 but first exercised by them: a blockquote line directly under the marker line, with no blank line before it, is the *same* Markdown paragraph as the marker (a soft line break) — and the old parser's `firstP.remove()` deleted that whole paragraph, marker **and** body, rather than just the marker. Silent content loss on save→reload for any callout typed by hand without a blank line after `[!TYPE]`. Fixed: only the marker's own text characters are stripped from the DOM now: `Callout.tsx`'s `updateDOM` walks `firstP`'s child nodes, removing whole nodes that fall inside the marker line and `Text.deleteData`-splitting the one that straddles the boundary, leaving everything after it — including inline marks — as the callout's real first body paragraph. \*\***Filed, not fixed — a separate, narrower bug surfaced while testing the fix above:** a `<strong>` (or presumably any mark) run that ends immediately adjacent to more plain text with **no space or line break between them**, inside a `Callout`'s `wrapBlock`-serialized body, round-trips with its closing `**` misplaced (`**Complexity**:X` instead of `**Complexity:**X`) — confirmed via raw JSON content, so it's in `wrapBlock`/`renderContent`'s interaction with prosemirror-markdown's own mark-boundary logic, not in the parser fixed above. Doesn't reproduce through the actual `/` insertion path (each slot's label and value are separate paragraphs), only through hand-typed Markdown with a mark glued straight onto trailing text. Single, narrow trigger condition — recorded rather than chased, same posture as the frozen PDF pipeline's filed-bugs list.
@@ -398,9 +300,7 @@ Two modes, different defaults — everything here follows from this:
 ### P6-3 Templates — **S/M** ✅
 
 - [x] `templates/` folder in the workspace; "New from template" in sidebar + File menu (`Ctrl Shift T`)
-
 - [x] Placeholder substitution — `{{date}}`, `{{title}}`, and any `{{name}}` the template uses, prompted at creation time; no logic beyond literal find-and-replace
-
 - [x] Ship the P4-3 exercise-sheet layout as the first template
 
 > `templates/` is excluded from the ordinary note scan (`is_excluded_dir`, same plumbing as `node_modules`/sidecars) — a template is authored to be filled in, not a note in its own right. The dialog always asks for a note title (needed for the filename regardless of what the template contains) plus one field per `{{name}}` the template actually uses, `{{date}}` pre-filled with today. Seeding the starter template is its own opt-in button in the empty state — nothing writes into `templates/` until asked, same posture as P7-3's project-notes scaffold. `create_note_from_template` writes the filled content verbatim rather than synthesizing a `# {title}` heading, so a template's own structure survives exactly as authored.
@@ -408,7 +308,6 @@ Two modes, different defaults — everything here follows from this:
 ### P6-4 Equation snippets — **S** ✅
 
 - [x] `/gradient` → `\nabla f(x)` and friends, as one editable table
-
 - [x] Offered only in a maths context
 
 > `SlashCommands` turned out to be unreachable here: `InlineMath`/`BlockMath` edit LaTeX in a plain `<input>`/`<textarea>` outside ProseMirror, and the `Suggestion` plugin only sees PM transactions. `src/lib/mathSnippets.ts` holds the twenty-entry table plus three pure functions (`activeSlashQuery`, `matchMathSnippets`, `applyMathSnippet`); `useMathSnippetMenu` wires them to a live input (caret tracking, keyboard nav), shared by both node views via one `MathSnippetMenu` dropdown.
@@ -416,11 +315,8 @@ Two modes, different defaults — everything here follows from this:
 ### P6-6 Outline / TOC panel — **S** ✅
 
 - [x] Current note's headings in the right rail, click to jump
-
 - [x] Highlight the heading currently in view
-
 - [x] Share the rail with the backlinks panel — no third permanent column
-
 - [x] Toggle on the P2-2 shortcut layer
 
 > No backend work — heading data is already in the ProseMirror doc. Proposed with the P9 study features but moved here: it's **S** and serves any long note, so parking it behind three phases would waste it.
@@ -430,9 +326,7 @@ Two modes, different defaults — everything here follows from this:
 ### P6-7 Cross-references — **S** *(added 2026-08-18, from a review pass)* ✅
 
 - [x] Recognise `Theorem 3.2` (block-type keyword + its own number) in prose, resolved against P6-1's numbered blocks
-
 - [x] `[[Theorem: name]]` continues to work unchanged — an ordinary wiki-link, just pointed at a block-bearing note
-
 - [x] Clicking a resolved reference jumps to the block; an unresolvable one renders inert, same "prefer a miss" posture as P7-1/P1-1
 
 > **Dependency:** P6-1 (block numbering is the referent).
@@ -442,9 +336,7 @@ Two modes, different defaults — everything here follows from this:
 ### P6-5 Search refinement — **S** ✅ *(closes M6)*
 
 - [x] Filter results by folder and by tag, without leaving the keyboard
-
 - [x] Recent-searches list, persisted per workspace
-
 - [x] `type:` (block type, once P6-1/P6-2 exist) — `task:` left out: P9-1's `note_tasks` table doesn't exist yet, per the roadmap's own "optional extension, not a blocker"
 
 > `src/lib/searchQuery.ts` parses the fixed `folder:`/`tag:`/`type:` key list (no quoting, deliberately not a query language); filters compose freely with each other and with free text. Fixing this properly meant scoping `search_notes` to a workspace for the first time — it previously searched across every workspace this app's shared `index.db` has ever indexed, a real gap a `folder:`/`tag:` filter would otherwise have inherited. Recent searches persist through `WorkspaceState.recentSearches`, the same save/load checkpoints as `openTabs`/`expandedFolders`; a query is recorded only when a result is actually opened.
@@ -462,7 +354,6 @@ The brief's second pillar. Notes stay plain `.md` — a deep link is ordinary Ma
 > `is_excluded_dir` skipped only `.ink` and dot-directories, so the scan walked `node_modules/` and `target/` — 580 `.md` files across 218 dependency directories in this repo, against the 46 in `docs/` actually wanted. Now excludes `node_modules`, `target`, `dist`, `build` (exact match, so a folder named `distributed` survives) and the `.pdf`/`.assets` sidecars that had been left in the tree alongside the already-excluded `.ink`.
 
 - [x] Exclude `node_modules`, `target`, `dist`, `build` in `is_excluded_dir` (`src-tauri/src/commands/notes.rs`) — it had skipped only `.ink` and dot-directories
-
 - [x] DoD: opening this repo as a workspace lists `docs/` and nothing from `node_modules/` or `target/`, as fast as a notes-only workspace — *unit-verified on the predicate and by file counts; the in-app open is part of the dogfood slice itself*
 
 > A workspace is just a folder scanned for `.md`, so "open a code repo as a workspace" **already works** — the scan simply drowns in dependencies first. P7-3 was scheduled **M** behind three phases; the part that actually unblocks daily use is hours.
@@ -472,13 +363,9 @@ The brief's second pillar. Notes stay plain `.md` — a deep link is ordinary Ma
 ### P7-1 Code deep links — **M** ✅ *(landed together with P7-4)*
 
 - [x] Recognise `src/main.cpp:58` and `path/file.rs#L20-L30` in note text
-
 - [x] Resolve relative to workspace root — *project root deferred with P5-1's repo detection; a link outside the workspace is inert rather than wrong*
-
 - [x] Click opens the configured editor at that file and line
-
 - [x] Unresolvable path renders inert with a "not found" affordance, like an unresolved wiki-link
-
 - [x] Shell metacharacters in a path cannot cause command execution — **with a test**
 
 > **Three structural guarantees, not checks.** No shell ever (`Command` with one `.arg()` per argument). The template is tokenized **before** substitution, never after — substituting first and splitting after would reintroduce word-splitting, so the tokenizer never sees a resolved path at all. And a target is refused unless every component is `Component::Normal`, following `assets.rs`: rejected *as written* rather than normalised and compared, because normalising invites a gap between the string checked and the string used. Ten backend tests, including a path containing `; rm -rf ~` staying one argument.
@@ -488,15 +375,12 @@ The brief's second pillar. Notes stay plain `.md` — a deep link is ordinary Ma
 ### P7-4 Editor command setting — **S** ✅ *(landed with P7-1, not after)*
 
 - [x] Configurable launch command template (VS Code / JetBrains / Neovim / Sublime) in the settings panel
-
 - [x] Detect what's installed — probes `PATH` via `where`/`which` on load, **only when the template is empty**, so a typed template is never overwritten
-
 - [x] Switching editors changes where links open, with no code change
 
 ### P7-2 "Open in IDE" on code blocks — **S** ✅
 
 - [x] Action on code blocks that carry a source path, reusing P7-1's launcher and guardrails
-
 - [x] Appears only when the path resolves — never a dead button
 
 > A block "carries a source path" when its first line, comment marker optional (`//`, `#`, `--`, `;`, `%`), is nothing but the path — `// src/main.rs` above a pasted function, which is already how this gets written by hand. `codeBlockSourcePath` (`lib/codeLinks.ts`) reuses `findCodeLinks` rather than a second recognizer; a path named only in passing ("see src/main.rs for details") or a block naming two paths matches nothing, same "prefer a miss" posture as P7-1. The button is a widget decoration — nothing new stored in the document, nothing to serialize — sharing `CodeLink`'s resolution cache and its `resolve_code_links`/`open_in_editor` backend commands directly (`resolveMissing` now exported for this). Hidden in the P3-2 print export as an interactive-only affordance.
@@ -504,7 +388,6 @@ The brief's second pillar. Notes stay plain `.md` — a deep link is ordinary Ma
 ### P7-3 Project awareness & project notes — **M** ✅
 
 - [x] Open a code repo as a workspace; surface its `README.md` / `docs/` / `notes/` with no import step — *delivered by P7-3a, then verified: this repo now scans to \~60 real* `.md` *files across* `docs/`*,* `notes/` *and the root, and nothing else*
-
 - [x] ~~Opt-in scaffold of~~ `notes/` ~~(Architecture / Meeting / Research / Todo) — ~~**~~never automatic~~**~~, never writes into source folders~~ — *removed 2026-08-25, see below*
 
 > *Removed 2026-08-25.* Old, narrow — useful only inside a code repo the user already has open — and manual note creation was never enough of a burden to justify keeping it, let alone the "surface it more prominently" idea a later product-completion pass considered and dropped for the same reason. `scaffold_project_notes`/`scaffold_project_notes_at`, its four tests, the `File > Scaffold Project Notes` menu item, and the frontend hook are all deleted, not just hidden.
@@ -518,11 +401,8 @@ The brief's AI ask is a *terminal* feature, not an AI feature: no AI code, no AP
 ### P8-1 Terminal pane — **M/L** ✅
 
 - [x] PTY-backed pane rooted at the workspace
-
 - [x] Active note's path available as an env var + one-key insert
-
 - [x] `claude` editing the open note updates the editor through the **existing** watcher path — no new reload logic, no conflict special-case
-
 - [x] Closing the pane leaves no orphaned process
 
 > Done. `portable-pty` (ConPTY on Windows) + `xterm.js`, base64-chunked output over a Tauri event (same shape as `read_ink`/`read_pdf_page`). Toggling (``` Ctrl+\``) only flips CSS visibility — the shell survives being hidden; only "Kill Terminal" or the app window closing actually tears it down.  ```NULL_NOTES_ACTIVE_NOTE`is frozen at spawn time; the header button covers the live case. One real bug found in manual QA: the insert-path button silently did nothing because`terminal_open`'s spawn wasn't awaited before the first write — a human's typing speed outlasted the race, a fast click didn't. Fixed by chaining every write onto the open promise; regression test confirmed against the pre-fix code via `git stash`. Design: `docs/specs/terminal-pane-design.md\`.
@@ -538,45 +418,30 @@ The only phase not from the brief. Everything before it is *capture*; this is *r
 ### P9-1 Workspace-wide task view — **S/M** ✅
 
 - [x] Extract `- [ ]` / `- [x]` into a `note_tasks` table (path, text, done, position), mirroring `note_tags`
-
 - [x] Build it in the existing `reindex_note` path — inherits the P0-3 debounce and P0-5 watcher for free
-
 - [x] View of open tasks grouped by note/folder; click jumps to the task
-
 - [x] Ticking from the view writes through the normal save path
-
 - [x] Delete `index.db`, reopen → identical list (rebuildable the same way `note_tags`/`note_links` already are — lazily, on next reindex, not eagerly on scan)
 
 ### P9-2 Formula sheet generation — **M** ✅
 
 - [x] Collect all block math across a scope (folder / tag / workspace)
-
 - [x] Output a **generated note** — plain `.md`, editable afterwards, printable via P3-2
-
 - [x] Deduplicate identical formulas
-
 - [x] Optional caption: source note + heading
-
 - [x] Generate on demand — **no live-updating magic file** that rewrites itself behind your back
 
 ### P9-3 Spaced repetition — **decision, then L** ✅
 
 - [x] **Decide storage before writing any code** — not refactorable later; it determines what happens to every existing card when a note is renamed
-
   - **A — inline HTML comment beside each card** *(recommended, and the one shipped)*: `<!-- sr due=… ease=… interval=… reps=… -->`. Survives renames/moves/Git with no key tracking — which matters because note `id` is non-stable and `path` is the real key. Cost: reviews write note files and churn Git history.
   - **B —** `.review.json` **sidecar**: notes stay pristine, but cards need stable keys — reintroduces the identity problem the app has avoided by never needing one. Editing a card or moving its note can silently orphan its schedule.
   - **C — frontmatter**: rejected on inspection. Cards are per-*card*, not per-note, so it's all of B's identity problem with none of A's locality.
-
 - [x] Card syntax: cloze deletion + `Question :: Answer`
-
 - [ ] ~~P6-1 theorem/proof blocks become cards for free~~ — deliberately deferred; not in this task's DoD, and a theorem can already be hand-turned into a `Question :: Answer` card in seconds
-
 - [x] SM-2 scheduling + review session UI
-
 - [x] Derived `review_cards` table for "what's due", rebuildable from the notes
-
 - [x] Cards stay readable as plain Markdown in any other editor
-
 - [x] Renaming/moving a note does not orphan its cards
 
 > This was the named trigger for the **frontmatter** decision deferred in the roadmap. Option A won, so frontmatter was never needed.
@@ -584,17 +449,11 @@ The only phase not from the brief. Everything before it is *capture*; this is *r
 ### P9-4 Workspace dashboard — **M** ✅ *(added 2026-08-18, from a review pass; capstone — sequence last in P9)*
 
 - [x] **Continue** — last few open notes, from `.workspace.json`'s existing session state
-
 - [x] **Recent** — recently edited notes, from existing mtime
-
 - [x] **Tasks** — open count, from P9-1's `note_tasks`
-
 - [x] **Study** — shipped as a disabled placeholder initially, wired live to `review_cards` the same day P9-3 shipped
-
 - [x] **Git** — up-to-date / unpushed / diverged, from P5's existing status calls
-
 - [x] No new derived state — every section reads data another task already produces
-
 - [x] Clicking an item opens it exactly like its source view would
 
 > **Dependency:** P9-1, P9-3, P5-2/P5-3/P5-4. *Built ahead of P9-3 with Study stubbed out; see the roadmap's "Done, ahead of P9-3" note — Study was wired live once P9-3 landed.*
@@ -614,11 +473,8 @@ Do not let these influence P0–P9 design.
 Syntax highlighting and manual language selection are the only code-block features that exist today. Executable code blocks stay under **P10-2** — not duplicated here.
 
 - [x] P11-1 Read-only affordances — **S**
-
   - [x] Copy button on every code block
-
   - [x] Line numbers (gutter)
-
   - [x] Word wrap toggle
 
 > All three are widget decorations (`CodeBlockToolbar.ts`), the same shape as P7-2's "Open in IDE" button — nothing new in the document except a `codeBlock.wrap` attribute, and that one is presentation-only like P6-1's collapse-state decision, so it never reaches the markdown fence (tiptap-markdown's codeBlock serializer only ever reads `language`). Line numbers count **source lines, not visual rows** — exact whenever wrap is off (the default), approximate once a block wraps, the same simplification most lightweight editors accept over measuring real layout. Copy tries `navigator.clipboard.writeText` first and falls back to a hidden-textarea `execCommand('copy')` if the WebView rejects it. Covered by 9 new frontend tests and an e2e spec (`p11-1-code-block-affordances.e2e.ts`); the word-wrap-toggle case passed on every run (including its own screenshot). The other two cases hit a pre-existing cold-start flake in this WebView/driver combination — confirmed unrelated to this feature by re-running an already-shipped, untouched spec (`p6-academic-blocks.e2e.ts`) in isolation and seeing its own first test fail the same way.
@@ -630,11 +486,8 @@ Syntax highlighting and manual language selection are the only code-block featur
 **Also fixed in passing:** P11-1's line-number gutter had a real, since-fixed alignment bug the single-line screenshot it originally shipped with never exposed — a genuinely multi-line block (the one this task's own e2e spec pastes) showed numbers bunching two-per-row and running out before the last lines. Rebuilt as one marker per line (`inline-block` + matching negative margin, netting zero width in the surrounding text's own flow) instead of one absolutely-positioned column of newline-joined text — the number now shares its line's own line box by construction, rather than merely being *positioned* to line up with it.
 
 - [x] P11-3 Editing ergonomics — **M**
-
   - [x] Configurable tab width / tabs-vs-spaces (hardcoded to 2 spaces today)
-
   - [x] Code folding
-
   - [x] In-block search (find within the current code block)
 
 > **Indent setting** (`codeIndentWidth`/`codeIndentChar` in `settings.json`, app-wide like every other editor preference) replaces all six sites in `CodeBlockEditor.ts` that hardcoded a 2-space unit — Tab insert, Shift+Tab outdent (both single-line and multi-line-selection variants), and the nested-indent-after-`{` cases. Defaults preserve the exact old behavior byte-for-byte. \*\***Code folding** is indentation-based (a line folds if its next non-blank line is indented deeper; a run of deeper lines closes the fold, with a dangling trailing blank line never ending one) and lives in `CodeBlockToolbar.ts` alongside the line-number gutter, since both are fundamentally the same per-line gutter concern — keeping them in one file avoided a fragile cross-plugin assumption about whether a line-number widget would inherit `display:none` from a separately-owned hide decoration. Fold state is a plain `Set` of positions in plugin state, remapped via `tr.mapping` on every edit and never written to the note — the same presentation-only call as P6-1's `Details` collapse state. **Real bug found and fixed before shipping:** a classic closure-over-mutated-loop-variable trap — the fold placeholder's widget factory closed over the loop's own `i`, which gets reassigned (`i = end`) later in the *same* iteration to skip past hidden lines; since a widget factory only runs when ProseMirror actually builds the DOM (after the whole loop has finished), it read the mutated value and reported the wrong hidden-line count. Fixed by snapshotting `i`/`end` into their own `const`s before the reassignment. Caught by the test suite itself, not manual inspection. \*\***In-block search** (`Ctrl+F`, new `CodeBlockSearch.ts`) intercepts the key only when the caret is inside a code block, otherwise leaving WebView2's own native find dialog untouched (nothing else in this app currently intercepts `Ctrl+F`). The query lives in plugin state, not just the `<input>`'s own DOM value, because `decorations(state)` — where the match highlights come from — only ever receives `state`, never the live view; the search bar's own widget carries a stable decoration `key` so ProseMirror reuses the same DOM node (and the input keeps focus and cursor position) across every keystroke, with the match counter and scroll-into-view handled imperatively in the plugin's `view()` hook instead, the same idiom `CodeBlockOpenInIde.ts`'s ask/redraw cycle already uses.
@@ -642,9 +495,7 @@ Syntax highlighting and manual language selection are the only code-block featur
 > Covered by 7 new indent tests, 13 new fold tests (pure `foldEndIndex`/`splitLines` cases plus DOM integration), 12 new search tests (pure `findMatches` plus DOM integration), and an e2e spec exercising all three against the real compiled app — each sub-feature confirmed passing at least once with a screenshot (search, fold) or a file-content assertion (tab character), all independently, since the well-documented WebView cold-start flake (P11-1/P11-2) meant no single run happened to land all three at once. One real e2e-authoring bug found and fixed along the way: closing the Settings dialog via `Ctrl+,` doesn't return focus to the editor, so the next test's `/` landed nowhere until the spec explicitly refocused first.
 
 - [x] P11-4 Appearance — **S** — closes M11
-
   - [x] Syntax highlight theme picker (one hardcoded palette today)
-
   - [x] Adjustable font size for code blocks, independent of the editor's prose size
 
 > Two settings, both app-wide in `settings.json` like every other editor preference: `codeTheme` (`'material-ocean'` | `'one-dark'`) and `codeFontSizePx`. The theme picker works by scoping the second palette under a `data-code-theme="one-dark"` attribute `NoteEditor.tsx` sets from the setting — the existing Material Ocean rules stay unscoped as the fallback (and the default), so the attribute-plus-class selector for One Dark simply outranks them on specificity regardless of source order, no cascade-layer trick needed. Font size stopped being `0.88em` of the editor's own prose size and became a standalone `--code-font-size` custom property set via inline style, independent of prose by construction rather than by convention — the gutter's own width (`--gutter-width`, itself in `em`) scales proportionally along with it, which is a side effect worth knowing about rather than a bug. Covered by 3 new frontend tests (`NoteEditor.test.tsx`, verifying the attribute/CSS-variable wiring itself) plus the Rust settings round-trip/tolerance tests every prior P11 setting also got. Verified end-to-end against the real compiled app — screenshotted, both the color swap and the size change visible in one shot.
@@ -708,7 +559,6 @@ The two remaining "checklist has it, the app doesn't" gaps in the writing surfac
 **Not a Graphviz/TikZ revival** — both stay cut. Guided authoring for the checklist's named diagram types, mostly by scaffolding Mermaid's own grammar rather than a new rendering engine.
 
 - [x] P14-1 Mermaid template gallery — **S/M**. Starting flowchart/class/state-machine/ER/graph templates — covers UML, class diagrams, state machines, ER diagrams, trees, graphs and flowcharts through Mermaid's existing grammar.
-
 - [x] P14-2 CS-structure templates — **M**. Guided binary-tree and linked-list starting points specifically — the two shapes drawn constantly and fiddly in Mermaid's generic graph syntax.
 
 > A new `MERMAID_TEMPLATES` table (mirroring `mathSnippets.ts`) replaces the single generic "Mermaid Diagram" slash entry with seven named ones: Flowchart, Graph, Class Diagram, State Machine, ER Diagram, Binary Tree, Linked List — each `/`-reachable and correctly connected on insertion. A standing test parses every template through the real `mermaid` package (`mermaid.parse` — full layout needs `getBBox`, absent in jsdom). Full 834-test suite green, typecheck clean. Not verified live — an e2e spec hit the same driver-timing flake P13-3's own spec recorded this session.
@@ -724,9 +574,7 @@ The two remaining "checklist has it, the app doesn't" gaps in the writing surfac
 Do not let this influence P0–P14 design. Bundles the two checklist items needing a capability the app doesn't have (recognizing handwritten ink) — sits next to, not in reversal of, the already-cut "Handwriting search" (that verdict assumed no recognition capability existed). Revisit only if real use of P13's ink tools wants this.
 
 - [ ] P15-1 Decision fork — **L**. Choose or rule out an approach before any code; gates P15-2/P15-3 entirely.
-
 - [ ] P15-2 Ink-to-LaTeX conversion — **L**. Gated on P15-1.
-
 - [ ] P15-3 Search across drawings — **M**. Gated on P15-1 — once ink has a recognized text representation, index it like any other content.
 
 ---
@@ -737,15 +585,10 @@ Do not let this influence P0–P14 design. Bundles the two checklist items needi
 <summary>P0 — Trustworthy daily driver (M0 ✅)</summary>
 
 - [x] P0-1 Debounced autosave with `clean|dirty|saving|error` state; flushes on tab switch, unmount, window close
-
 - [x] P0-2 Save failures surface with retry; buffer stays dirty on failure
-
 - [x] P0-3 `save_note` writes the file only; `reindex_note` carries FTS/tags/links on a lazier debounce
-
 - [x] P0-4 `write_atomic` — temp file → fsync → rename
-
 - [x] P0-5 Workspace watcher; clean buffers follow disk, dirty ones get a conflict bar
-
 - [x] Real-use soak — no data-loss incident
 
 </details>
@@ -753,13 +596,9 @@ Do not let this influence P0–P14 design. Bundles the two checklist items needi
 <summary>P1 — Everyday-use completeness (M1 ✅)</summary>
 
 - [x] P1-1 Clicking an unresolved `[[link]]` creates and opens the note
-
 - [x] P1-2 Recent workspaces + `Ctrl+P` quick switcher
-
 - [x] P1-3 Rename a note; inbound `[[links]]` follow
-
 - [x] P1-4 Destructive deletes confirm (was already true on audit)
-
 - [x] P1-5 App identity — `null-notes`, `dev.nullnotes.app`, real README *(app icon still Tauri's default — needs an asset, not a code change)*
 
 </details>
@@ -767,19 +606,12 @@ Do not let this influence P0–P14 design. Bundles the two checklist items needi
 <summary>P2 — Feel & ergonomics (M2 ✅)</summary>
 
 - [x] P2-1 Settings panel — autosave delay, editor width; persists to `settings.json` in the app data dir
-
 - [x] P2-2 Native File/Edit/View menu + shortcuts overlay, one command dispatcher
-
 - [x] P2-4 Onboarding empty states
-
 - [x] P2-3 Editor niceties — all four boxes:
-
   - [x] Spellcheck toggle driving both editors, off by default; `#[serde(default)]` so a pre-existing `settings.json` still loads. Checks **prose only** — code, maths, mermaid, tags and wiki-link targets set `spellcheck="false"` and inherit out of it *(whether squiggles render at all is a WebView2/OS capability, not ours)*
-
   - [x] Paste/drop images into a `NoteName.assets/` sidecar as ordinary `![alt](path)` Markdown *(paths are URL-encoded only at the Markdown boundary — sidecar names contain spaces, and a bare space ends a link destination)*
-
   - [x] Cursor + scroll restored per note across tab switches
-
   - [x] Backspace at the start of a non-first list item joins into the previous item instead of tearing the list in half
 
 > Append any new annoyance found in daily use to a fresh P2-3 box here rather than opening a new task.
@@ -789,11 +621,8 @@ Do not let this influence P0–P14 design. Bundles the two checklist items needi
 <summary>P3 — Headline features (M3 ✅)</summary>
 
 - [x] P3-1 PDF import as reference images; OCR pipeline deleted; pages land in a `NoteName.pdf/` sidecar
-
 - [x] P3-2 Export to PDF via the WebView print pipeline + a `@media print` stylesheet
-
 - [x] P3-3 Connections graph — `d3-force`, ticked to convergence, no per-frame re-render
-
 - [x] P3-4 Git/Syncthing sync guidance *(mostly already true by construction)*
 
 </details>
@@ -801,21 +630,15 @@ Do not let this influence P0–P14 design. Bundles the two checklist items needi
 <summary>Editing core (pre-roadmap)</summary>
 
 - [x] Live-preview WYSIWYG, plain `.md` as the only format, GitHub Markdown
-
 - [x] KaTeX (inline + block), Mermaid, syntax-highlighted code, callouts, tables, task lists
-
 - [x] Wiki-links + backlinks panel, `#tags` + tag browser, FTS search (`Ctrl+K`)
-
 - [x] Vector ink blocks inline in notes — pen/eraser/shapes, pressure, palm rejection
-
 - [x] Folder tree with create/rename/delete cascade, drag-to-move
-
 - [x] Per-workspace session persistence (open tabs, expanded folders)
-
 - [x] "Terminal Precision" design system
 
 </details>
-\---
+\\---
 
 ## Not doing
 
