@@ -26,9 +26,11 @@ interface HomeViewProps {
   onOpenReview: () => void
   onOpenDeckView: () => void
   onOpenSettings: () => void
+  /** Any overlay closing (review, deck, tasks) can change these counts, so refetch when it does. */
+  overlayOpen?: boolean
 }
 
-export function HomeView({ onOpenTaskView, onOpenReview, onOpenDeckView, onOpenSettings }: HomeViewProps) {
+export function HomeView({ onOpenTaskView, onOpenReview, onOpenDeckView, onOpenSettings, overlayOpen = false }: HomeViewProps) {
   const openTabs = useWorkspaceStore((s) => s.openTabs)
   const setActiveTab = useWorkspaceStore((s) => s.setActiveTab)
   const openTab = useWorkspaceStore((s) => s.openTab)
@@ -46,19 +48,15 @@ export function HomeView({ onOpenTaskView, onOpenReview, onOpenDeckView, onOpenS
   const workspacePath = useWorkspaceStore((s) => s.path)
   const [tasks, setTasks] = useState<OpenTask[]>([])
 
-  useEffect(() => {
-    if (!workspacePath) return
-    api.notes.listOpenTasks(workspacePath).then(setTasks)
-  }, [workspacePath])
-
-  const taskItems = tasks.slice(0, SECTION_CAP)
-
   const [dueCards, setDueCards] = useState<DueCard[]>([])
 
   useEffect(() => {
-    if (!workspacePath) return
+    if (!workspacePath || overlayOpen) return
+    api.notes.listOpenTasks(workspacePath).then(setTasks)
     api.notes.listDueCards(workspacePath).then(setDueCards)
-  }, [workspacePath])
+  }, [workspacePath, overlayOpen])
+
+  const taskItems = tasks.slice(0, SECTION_CAP)
 
   const repoMode = useWorkspaceStore((s) => s.repoMode)
   const gitDiverged = useWorkspaceStore((s) => s.gitDiverged)
