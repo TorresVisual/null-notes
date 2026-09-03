@@ -83,7 +83,7 @@ dom.js:727 Uncaught TypeError: Cannot read properties of null (reading 'nextSibl
 
 - [ ] pasting markdown gets code block -> markdown
 
-- [ ] Proper study feature with flashcard system
+- [x] Proper study feature with flashcard system
 
 
 ---
