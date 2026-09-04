@@ -152,7 +152,7 @@ export function Sidebar({
               <Network size={14} />
             </button>
           </TooltipTrigger>
-          <TooltipContent>Graph view (Ctrl G)</TooltipContent>
+          <TooltipContent>Graph view <kbd>Ctrl G</kbd></TooltipContent>
         </Tooltip>
         <Tooltip>
           <TooltipTrigger asChild>
@@ -165,7 +165,7 @@ export function Sidebar({
               <ListChecks size={14} />
             </button>
           </TooltipTrigger>
-          <TooltipContent>Tasks (Ctrl Shift K)</TooltipContent>
+          <TooltipContent>Tasks <kbd>Ctrl Shift K</kbd></TooltipContent>
         </Tooltip>
         <Tooltip>
           <TooltipTrigger asChild>
@@ -178,7 +178,7 @@ export function Sidebar({
               <GraduationCap size={14} />
             </button>
           </TooltipTrigger>
-          <TooltipContent>Review (Ctrl Shift R)</TooltipContent>
+          <TooltipContent>Review <kbd>Ctrl Shift R</kbd></TooltipContent>
         </Tooltip>
         <Tooltip>
           <TooltipTrigger asChild>
@@ -191,7 +191,7 @@ export function Sidebar({
               <SquareTerminal size={14} />
             </button>
           </TooltipTrigger>
-          <TooltipContent>Terminal (Ctrl `)</TooltipContent>
+          <TooltipContent>Terminal <kbd>Ctrl `</kbd></TooltipContent>
         </Tooltip>
         <Tooltip>
           <TooltipTrigger asChild>

@@ -1890,6 +1890,26 @@ code {
   font-family: inherit;
 }
 
+/* The `* { padding: 0 }` reset above is unlayered, so it always wins over a
+   same-property Tailwind utility (which lives in `@layer utilities`)
+   regardless of specificity — `px-3 py-1.5` on TooltipContent computed to
+   0px on every side. Plain CSS here, same as every other hand-styled
+   selector in this file, actually wins the cascade. */
+[data-slot="tooltip-content"] {
+  padding: var(--space-xs) var(--space-sm);
+}
+
+/* Same key-cap look as .sidebar-nav-btn kbd, reused so a toolbar tooltip's
+   shortcut hint doesn't drift into its own one-off style. */
+[data-slot="tooltip-content"] kbd {
+  font-size: 10px;
+  color: var(--text-secondary);
+  background: var(--border-strong);
+  border-radius: 3px;
+  padding: 2px 6px;
+  font-family: inherit;
+}
+
 /* Full-text search modal */
 .search-overlay {
   position: fixed;
