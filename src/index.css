@@ -3407,7 +3407,7 @@ code {
   background: var(--bg-raised);
   border: 1px solid var(--border-strong);
   border-radius: 8px;
-  width: min(480px, calc(100vw - 40px));
+  width: min(680px, calc(100vw - 40px));
   box-shadow: var(--shadow-modal);
   padding: var(--space-lg);
   display: flex;
@@ -3419,7 +3419,8 @@ code {
   display: flex;
   flex-direction: column;
   gap: var(--space-md);
-  padding: var(--space-lg) 0;
+  min-height: 360px;
+  padding: var(--space-xl) 0;
 }
 
 .review-card-note {
@@ -3430,7 +3431,8 @@ code {
 
 .review-card-front, .review-card-back {
   color: var(--text-primary);
-  font-size: 15px;
+  font-size: 18px;
+  line-height: 1.6;
   margin: 0;
 }
 
@@ -3446,8 +3448,8 @@ code {
   border-radius: 6px;
   color: var(--text-primary);
   cursor: pointer;
-  padding: 6px 14px;
-  font-size: 13px;
+  padding: 9px 18px;
+  font-size: 15px;
 }
 
 .review-card-reveal:hover { border-color: var(--accent); }
@@ -3464,8 +3466,8 @@ code {
   border-radius: 6px;
   color: var(--text-primary);
   cursor: pointer;
-  padding: 6px 0;
-  font-size: 13px;
+  padding: 9px 0;
+  font-size: 15px;
 }
 
 .review-card-grade:hover { border-color: var(--accent); color: var(--accent); }
@@ -3483,10 +3485,10 @@ code {
   display: flex;
   align-items: center;
   gap: var(--space-sm);
-  padding: 6px 10px;
+  padding: 9px 12px;
   border: 1px solid var(--border-strong);
   border-radius: 6px;
-  font-size: 13px;
+  font-size: 15px;
   color: var(--text-primary);
   cursor: pointer;
 }
