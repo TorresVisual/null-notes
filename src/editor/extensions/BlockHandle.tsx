@@ -54,6 +54,24 @@ export function moveSelectedNode(editor: Editor, direction: 'up' | 'down'): bool
   return true
 }
 
+/** The enclosing taskList for the current selection — either the taskList
+ *  itself (reachable only via the sliver at its own top/bottom edge, per
+ *  NESTED_LIST_DRAG_HANDLE_OPTIONS below) or, when a single taskItem row is
+ *  selected, its direct parent. Letting a row's own grip reach its list's
+ *  "Reorder tasks" means that action no longer depends on hitting the edge
+ *  at all — the normal, per-row hover path is enough. */
+function resolveTaskList(selection: NodeSelection): { node: ProseMirrorNode; from: number; to: number } | null {
+  if (selection.node.type.name === 'taskList') {
+    return { node: selection.node, from: selection.from, to: selection.to }
+  }
+  if (selection.node.type.name !== 'taskItem') return null
+  const $pos = selection.$from
+  const parent = $pos.parent
+  if (parent.type.name !== 'taskList') return null
+  const from = $pos.before($pos.depth)
+  return { node: parent, from, to: from + parent.nodeSize }
+}
+
 /**
  * Moves checked task items to the bottom of the selected task list,
  * preserving relative order within each group — a manual "focus the next
@@ -64,8 +82,9 @@ export function reorderTaskList(editor: Editor): boolean {
   const { state } = editor
   const { selection } = state
   if (!(selection instanceof NodeSelection)) return false
-  const node = selection.node
-  if (node.type.name !== 'taskList') return false
+  const target = resolveTaskList(selection)
+  if (!target) return false
+  const { node, from, to } = target
 
   const children: ProseMirrorNode[] = []
   node.forEach((child) => children.push(child))
@@ -75,7 +94,6 @@ export function reorderTaskList(editor: Editor): boolean {
   ]
   if (reordered.every((c, i) => c === children[i])) return false
 
-  const { from, to } = selection
   const tr = state.tr.replaceWith(from, to, node.type.create(node.attrs, reordered))
   tr.setSelection(NodeSelection.create(tr.doc, from))
   tr.scrollIntoView()
@@ -145,13 +163,30 @@ const LIST_CONTAINER_TYPE_NAMES = ['bulletList', 'orderedList', 'taskList']
 // does the equivalent scoping without that self-exclusion: depth-1 (the
 // top-level block, whatever type it is, including the list itself) is
 // always left alone; only going deeper than that is restricted to inside
-// one of these three container types. `defaultRules` stays off for the same
-// reason — its `listWrapperDeprioritize` rule excludes the wrapper outright
-// too. Left unexcluded and at a shallower depth than its items, the list
-// still wins near the left edge (edgeDetection's default), where the grip
-// itself sits; hovering more centrally resolves to the individual item.
+// one of these three container types.
+//
+// `edgeDetection`'s default preset scores each candidate independently as
+// `1000 - strength(500) * depth` when the cursor is near that candidate's
+// OWN left edge. A list item sits at depth 2, so `500 * 2 == 1000` — its
+// score hits exactly zero and it is excluded outright, not merely
+// outscored, the instant the cursor is anywhere left of the row's own text.
+// Since the grip itself renders in exactly that gutter (`placement: 'left'`
+// puts it just outside the node's own bounding box), approaching ANY row's
+// grip to click it always re-resolves to the shallower, unexcluded list
+// (depth 1, only -500) instead — the grip visibly jumps to the list's own
+// centered position, which only happens to sit under the cursor for
+// whichever row is nearest the list's vertical middle. Every other row's
+// grip is unreachable. Dropping `'left'` from `edges` removes the one
+// x-only, y-independent check that fires uniformly across a row's full
+// height regardless of which row it is; `'top'`/`'bottom'` are y-based, so
+// they only fire in the thin band right at the whole list's own top or
+// bottom boundary (which coincides with its first/last row) — the list
+// stays reachable there, and every row in between now scores a plain tie
+// against its own list (both unexcluded), which `find-drag-target`'s own
+// tie-break resolves to the deeper, more specific candidate: the row.
 const NESTED_LIST_DRAG_HANDLE_OPTIONS: NestedOptions = {
   defaultRules: false,
+  edgeDetection: { edges: ['top', 'bottom'], threshold: 12, strength: 500 },
   rules: [
     {
       id: 'excludeListItemContentParagraph',
@@ -331,7 +366,8 @@ export function BlockHandle({ editor }: BlockHandleProps) {
   const singleNode = isSingle ? selection.node : null
   const convertTarget = singleNode ? currentConvertTarget(singleNode) : null
   const showConvert = singleNode !== null && isConvertibleNode(singleNode)
-  const showReorderTasks = convertTarget === 'taskList'
+  const taskListTarget = isSingle ? resolveTaskList(selection) : null
+  const showReorderTasks = taskListTarget !== null
 
   return (
     <DragHandle
@@ -362,7 +398,7 @@ export function BlockHandle({ editor }: BlockHandleProps) {
           canMoveDown={isSingle && canMoveSelectedNode(editor, 'down')}
           convertTarget={showConvert ? convertTarget : null}
           showReorderTasks={showReorderTasks}
-          canReorderTasks={showReorderTasks && canReorderTaskList(singleNode)}
+          canReorderTasks={canReorderTaskList(taskListTarget?.node ?? null)}
           onDelete={handleDelete}
           onDuplicate={handleDuplicate}
           onMoveUp={() => handleMove('up')}

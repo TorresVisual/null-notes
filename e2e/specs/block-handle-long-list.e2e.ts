@@ -95,8 +95,14 @@ describe('block handle on a long task list', () => {
 
     await screenshot('block-handle-long-list-hover-last-row')
 
-    // The whole list must still be reachable near the edge, where the grip
-    // itself sits — this is what "Reorder tasks" and "Turn into" target.
+    // The whole list must still be reachable — but only right at its own
+    // top/bottom boundary (edgeDetection's 'top'/'bottom' edges), not
+    // anywhere along a row's left gutter: that x-only check fired for every
+    // row regardless of height, which is what made individual row grips
+    // unreachable (see BlockHandle.tsx's NESTED_LIST_DRAG_HANDLE_OPTIONS
+    // comment). Hovering within a few px of the first row's own top edge —
+    // which coincides with the whole list's top edge — still resolves to
+    // the list.
     const firstRow = rows[0]
     if (!firstRow) throw new Error('row 0 missing')
     const firstRowLeft = await browser.execute(
@@ -105,7 +111,7 @@ describe('block handle on a long task list', () => {
     expect(firstRowLeft).not.toBeNull()
     await browser
       .action('pointer')
-      .move({ duration: 150, x: Math.round((firstRowLeft as number) + 3), y: Math.round(firstRow.top + firstRow.height / 2) })
+      .move({ duration: 150, x: Math.round((firstRowLeft as number) + 3), y: Math.round(firstRow.top + 5) })
       .perform()
     await browser.pause(300)
     await clickInPage('.block-handle-grip')

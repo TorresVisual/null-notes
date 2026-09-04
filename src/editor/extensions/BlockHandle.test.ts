@@ -140,6 +140,20 @@ function selectFirstTaskList(e: InstanceType<typeof Editor>): void {
   e.commands.setNodeSelection(pos)
 }
 
+function selectTaskItemContaining(e: InstanceType<typeof Editor>, needle: string): void {
+  let pos: number | null = null
+  e.state.doc.descendants((node, nodePos) => {
+    if (pos !== null) return false
+    if (node.type.name === 'taskItem' && node.textContent.includes(needle)) {
+      pos = nodePos
+      return false
+    }
+    return true
+  })
+  if (pos === null) throw new Error(`no taskItem containing "${needle}"`)
+  e.commands.setNodeSelection(pos)
+}
+
 function taskListItems(e: InstanceType<typeof Editor>): Array<{ text: string; checked: boolean }> {
   const items: Array<{ text: string; checked: boolean }> = []
   e.state.doc.descendants((node) => {
@@ -184,6 +198,20 @@ describe('reorderTaskList', () => {
     expect(taskListItems(e)).toEqual([
       { text: 'alpha', checked: false },
       { text: 'beta', checked: true },
+    ])
+  })
+
+  it('reorders the enclosing list when a single task item row is selected', () => {
+    const e = mount('- [ ] alpha\n- [x] beta\n- [ ] gamma\n- [x] delta')
+    selectTaskItemContaining(e, 'gamma')
+
+    expect(reorderTaskList(e)).toBe(true)
+
+    expect(taskListItems(e)).toEqual([
+      { text: 'alpha', checked: false },
+      { text: 'gamma', checked: false },
+      { text: 'beta', checked: true },
+      { text: 'delta', checked: true },
     ])
   })
 
