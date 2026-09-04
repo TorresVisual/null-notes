@@ -7,7 +7,6 @@
 - [ ] Web app (no local md files fully git)
 - [ ] Better printing — Export to PDF and Print are now separate File menu items, each a small dialog ending in a silent WebView2 call (`PrintToPdf`/`Print`, never `ShowPrintUI`). One checkbox ("Include page numbers, date, and title") controls WebView2's all-or-nothing header/footer bundle. Fixed two real pagination gaps (`h4`-`h6` and block-math/diagrams could split across a page). **Design:** `docs/specs/better-printing-design.md`. **Plan:** `docs/plans/better-printing.md`.   preview and export only show data when a checkmark has been set the data in the export is completely malformed it is mostly clipped dom.js:727 Uncaught TypeError: Cannot read properties of null (reading 'nextSibling')
 - [ ] Left sidebar needs a design update
-- [x] Better window title with what workspace / file is open
 - [ ] Custom Titlebar (no windows default)
 - [ ] Recent searches only works current session
 - [ ] ![image.png](TODO.assets/image-1787696138751.png)These info's position needs to be better
@@ -23,6 +22,7 @@
 - [ ] Recent workspaces
 - [ ] Recent workspaces in right click menu
 - [ ] pasting markdown gets code block with language set to markdown
+- [x] Better window title with what workspace / file is open
 - [x] ![image.png](TODO.assets/image-1787696238603.png)![image.png](TODO.assets/image-1787696268102.png)This modal needs to be fixed
 - [x] Reorder task function invoked manually (apple notes has it by default but im not sure if i like it automatically) but the point is to reorder marked tasks to the bottom which would focus the next tasks at the top
 - [x] Home Button — clickable Home entry in the sidebar nav group, next to Search/Settings
@@ -633,7 +633,7 @@ Do not let this influence P0–P14 design. Bundles the two checklist items needi
 - [x] "Terminal Precision" design system
 
 </details>
-\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\---
+\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\---
 
 ## Not doing
 
