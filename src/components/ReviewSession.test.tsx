@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { ReviewSession } from './ReviewSession'
 import { api } from '../lib/tauri'
@@ -36,6 +36,10 @@ beforeEach(() => {
   useWorkspaceStore.setState({ path: '/ws' })
   vi.mocked(api.notes.listDueCards).mockResolvedValue(cards)
   vi.mocked(api.notes.gradeCard).mockResolvedValue(undefined)
+})
+
+afterEach(() => {
+  vi.restoreAllMocks()
 })
 
 describe('ReviewSession', () => {
@@ -99,6 +103,19 @@ describe('ReviewSession — multiple choice', () => {
     expect(screen.getByText('Submit')).toBeDisabled()
     fireEvent.click(screen.getByLabelText('4'))
     expect(screen.getByText('Submit')).not.toBeDisabled()
+  })
+
+  it('randomizes the displayed option order while keeping each choice gradeable', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0)
+    vi.mocked(api.notes.gradeMcCard).mockResolvedValue({ correct: [1] })
+    render(<ReviewSession onClose={vi.fn()} />)
+
+    await waitFor(() => screen.getByText('What is 2+2?'))
+    expect(screen.getAllByRole('checkbox').map((input) => input.getAttribute('aria-label'))).toEqual(['4', '5', '3'])
+
+    fireEvent.click(screen.getByLabelText('4'))
+    fireEvent.click(screen.getByText('Submit'))
+    await waitFor(() => expect(api.notes.gradeMcCard).toHaveBeenCalledWith('/ws/c.md', 0, [1], '/ws'))
   })
 
   it('submits picked options and highlights correct/incorrect after grading', async () => {

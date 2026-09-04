@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { X } from 'lucide-react'
 import { api } from '../lib/tauri'
 import { useWorkspaceStore } from '../store/workspace'
@@ -22,6 +22,17 @@ const GRADES: Array<{ grade: Grade; label: string }> = [
 // requirement, this is a shuffled drill order, not anything scored.
 function shuffleCards(cards: DueCard[]): DueCard[] {
   return [...cards].sort(() => Math.random() - 0.5)
+}
+
+function shuffledIndices(length: number): number[] {
+  const indices = Array.from({ length }, (_, index) => index)
+  for (let index = indices.length - 1; index > 0; index -= 1) {
+    const randomIndex = Math.floor(Math.random() * (index + 1))
+    const selected = indices[index]!
+    indices[index] = indices[randomIndex]!
+    indices[randomIndex] = selected
+  }
+  return indices
 }
 
 export function ReviewSession({ onClose, mode = { kind: 'due' } }: ReviewSessionProps) {
@@ -50,6 +61,10 @@ export function ReviewSession({ onClose, mode = { kind: 'due' } }: ReviewSession
   }, [workspacePath, cramStreak])
 
   const current = queue[0]
+  const optionOrder = useMemo(
+    () => (current?.kind === 'mc' ? shuffledIndices(current.options.length) : []),
+    [current],
+  )
 
   // Resets per-card UI state whenever the front card changes — including
   // right after grading, since a new due-queue fetch always produces a new
@@ -151,20 +166,23 @@ export function ReviewSession({ onClose, mode = { kind: 'due' } }: ReviewSession
             {current.kind === 'mc' ? (
               <>
                 <ul className="review-card-options">
-                  {current.options.map((opt, i) => (
-                    <li key={i} className={`review-card-option${optionClass(i)}`}>
-                      <label>
-                        <input
-                          type="checkbox"
-                          checked={picked.has(i)}
-                          disabled={mcResult !== null}
-                          onChange={() => togglePick(i)}
-                          aria-label={opt}
-                        />
-                        {opt}
-                      </label>
-                    </li>
-                  ))}
+                  {optionOrder.map((optionIndex) => {
+                    const opt = current.options[optionIndex]!
+                    return (
+                      <li key={optionIndex} className={`review-card-option${optionClass(optionIndex)}`}>
+                        <label>
+                          <input
+                            type="checkbox"
+                            checked={picked.has(optionIndex)}
+                            disabled={mcResult !== null}
+                            onChange={() => togglePick(optionIndex)}
+                            aria-label={opt}
+                          />
+                          {opt}
+                        </label>
+                      </li>
+                    )
+                  })}
                 </ul>
                 {mcResult === null ? (
                   <button
