@@ -21,7 +21,11 @@
 - [ ] Close Workspace
 - [ ] Recent workspaces
 - [ ] Recent workspaces in right click menu
-- [ ] pasting markdown gets code block with language set to markdown
+- [ ] pasting markdown gets code block with language set to markdown (pasting is entirely broken)
+- [ ] renaming doesnt stick title is still old
+- [ ] add images to flashcards (also reveal backside image as answer)
+- [ ] markdown render arrows (-> / <-> / <-) (renders in source but not in preview)
+- [ ] Search needs major improvements
 - [x] Better window title with what workspace / file is open
 - [x] ![image.png](TODO.assets/image-1787696238603.png)![image.png](TODO.assets/image-1787696268102.png)This modal needs to be fixed
 - [x] Reorder task function invoked manually (apple notes has it by default but im not sure if i like it automatically) but the point is to reorder marked tasks to the bottom which would focus the next tasks at the top
