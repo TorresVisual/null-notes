@@ -383,8 +383,22 @@ button, [role="button"], .tree-row, .tab, .search-result, .slash-menu-item,
   display: flex;
   background: var(--bg-raised);
   border-bottom: 1px solid var(--border);
-  overflow-x: auto;
   flex-shrink: 0;
+}
+
+/* Scrolls independently so a long tab list can never push save/git status
+   off-screen — status always stays visible in .tab-bar-status. */
+.tab-bar-tabs {
+  display: flex;
+  overflow-x: auto;
+  min-width: 0;
+}
+
+.tab-bar-status {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  margin-left: auto;
 }
 
 .tab {
@@ -1567,7 +1581,6 @@ code {
 
 /* View source/preview toggle button */
 .view-toggle {
-  margin-left: auto;
   padding: 6px 12px;
   background: none;
   border: none;
@@ -1584,7 +1597,6 @@ code {
 
 /* Save state chip — sits at the right end of the tab bar */
 .save-status {
-  margin-left: auto;
   display: flex;
   align-items: center;
   gap: var(--space-xs);

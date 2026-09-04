@@ -31,29 +31,31 @@ export function TabBar({
   if (openTabs.length === 0) return null
   return (
     <div className="tab-bar" role="tablist">
-      {openTabs.map((path) => {
-        const name = path.split(/[\\/]/).pop()?.replace('.md', '') ?? path
-        const isActive = path === activeTab
-        const isFlashing = path === flashTabPath
-        return (
-          <div
-            key={path}
-            role="tab"
-            aria-selected={isActive}
-            className={`tab${isActive ? ' active' : ''}${isFlashing ? ' tab-flash' : ''}`}
-            onAnimationEnd={() => {
-              if (isFlashing) setFlashTabPath(null)
-            }}
-          >
-            <button onClick={() => setActiveTab(path)} title={name}>{name}</button>
-            <button className="tab-close" onClick={() => closeTab(path)} aria-label={`Close ${name}`}>
-              <X size={12} />
-            </button>
-          </div>
-        )
-      })}
+      <div className="tab-bar-tabs">
+        {openTabs.map((path) => {
+          const name = path.split(/[\\/]/).pop()?.replace('.md', '') ?? path
+          const isActive = path === activeTab
+          const isFlashing = path === flashTabPath
+          return (
+            <div
+              key={path}
+              role="tab"
+              aria-selected={isActive}
+              className={`tab${isActive ? ' active' : ''}${isFlashing ? ' tab-flash' : ''}`}
+              onAnimationEnd={() => {
+                if (isFlashing) setFlashTabPath(null)
+              }}
+            >
+              <button onClick={() => setActiveTab(path)} title={name}>{name}</button>
+              <button className="tab-close" onClick={() => closeTab(path)} aria-label={`Close ${name}`}>
+                <X size={12} />
+              </button>
+            </div>
+          )
+        })}
+      </div>
       {activeTab && (
-        <>
+        <div className="tab-bar-status">
           <SaveStatus
             state={saveState}
             error={saveError}
@@ -68,7 +70,7 @@ export function TabBar({
           >
             {viewMode === 'wysiwyg' ? 'Source' : 'Preview'}
           </button>
-        </>
+        </div>
       )}
     </div>
   )
