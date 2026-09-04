@@ -7,13 +7,18 @@ function noteName(path: string): string {
   return folderName(path).replace(/\.md$/, '')
 }
 
-export function useWindowTitle(workspacePath: string | null, activeTab: string | null) {
+export function useWindowTitle(workspacePath: string | null, activeTab: string | null): string {
+  const title = [
+    activeTab ? noteName(activeTab) : null,
+    workspacePath ? folderName(workspacePath) : null,
+    'null-notes',
+  ]
+    .filter((p): p is string => p !== null)
+    .join(' — ')
+
   useEffect(() => {
-    const parts = [
-      activeTab ? noteName(activeTab) : null,
-      workspacePath ? folderName(workspacePath) : null,
-      'null-notes',
-    ].filter((p): p is string => p !== null)
-    getCurrentWindow().setTitle(parts.join(' — '))
-  }, [workspacePath, activeTab])
+    getCurrentWindow().setTitle(title)
+  }, [title])
+
+  return title
 }

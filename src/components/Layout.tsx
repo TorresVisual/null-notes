@@ -5,6 +5,7 @@ import { listen } from '@tauri-apps/api/event'
 import { Loader2 } from 'lucide-react'
 import { Sidebar } from './Sidebar'
 import { TabBar } from './TabBar'
+import { Titlebar } from './Titlebar'
 import { TooltipProvider } from './ui/tooltip'
 import { NoteEditor } from '../editor/NoteEditor'
 import { RawEditor } from '../editor/RawEditor'
@@ -77,7 +78,7 @@ export function Layout() {
     keepMine,
     reloadTheirs,
   } = useNote(activeTab)
-  useWindowTitle(workspacePath, activeTab)
+  const windowTitle = useWindowTitle(workspacePath, activeTab)
   const { saveSession, openWorkspace, openWorkspaceAt } = useWorkspace()
   const { updateGit } = useGitConfig()
   const { flushGitCommit } = useGitAutoCommit()
@@ -371,6 +372,8 @@ export function Layout() {
 
   return (
     <TooltipProvider>
+    <div className="app-shell">
+    <Titlebar title={windowTitle} onCommand={runCommand} />
     <div className="layout">
       {activeOverlay === 'search' && <SearchModal onClose={closeOverlay} />}
       {activeOverlay === 'switcher' && <QuickSwitcher onClose={closeOverlay} />}
@@ -538,6 +541,7 @@ export function Layout() {
           />
         )}
       </div>
+    </div>
     </div>
     </TooltipProvider>
   )

@@ -238,9 +238,73 @@ button, [role="button"], .tree-row, .tab, .search-result, .slash-menu-item,
 ::-webkit-scrollbar-thumb:hover { background: var(--text-tertiary); }
 
 /* Layout */
+.app-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+.titlebar {
+  display: flex;
+  align-items: center;
+  height: 32px;
+  flex-shrink: 0;
+  padding-left: 8px;
+  background: var(--bg-raised);
+  border-bottom: 1px solid var(--border);
+  user-select: none;
+}
+
+.titlebar-menus { display: flex; align-items: center; height: 100%; }
+
+.titlebar-menu-trigger {
+  height: 100%;
+  padding: 0 10px;
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.titlebar-menu-trigger:hover,
+.titlebar-menu-trigger[data-state='open'] {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.titlebar-title {
+  flex: 1;
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-tertiary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 0 8px;
+}
+
+.titlebar-controls { display: flex; align-items: center; height: 100%; }
+
+.titlebar-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 100%;
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.titlebar-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+.titlebar-btn-close:hover { background: var(--danger); color: #fff; }
+
 .layout {
   display: flex;
-  height: 100vh;
+  flex: 1;
+  min-height: 0;
 }
 
 .sidebar {
@@ -2103,7 +2167,8 @@ code {
    folder rename/delete); the plain `button` selector stays for any other
    hand-rolled `.context-menu` consumer. */
 .context-menu button,
-.context-menu [data-slot="context-menu-item"] {
+.context-menu [data-slot="context-menu-item"],
+.context-menu [data-slot="dropdown-menu-item"] {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -2119,10 +2184,19 @@ code {
 
 .context-menu button:hover,
 .context-menu [data-slot="context-menu-item"]:hover,
-.context-menu [data-slot="context-menu-item"][data-highlighted] { background: var(--bg-hover); }
+.context-menu [data-slot="context-menu-item"][data-highlighted],
+.context-menu [data-slot="dropdown-menu-item"]:hover,
+.context-menu [data-slot="dropdown-menu-item"][data-highlighted] { background: var(--bg-hover); }
 .context-menu button.danger,
 .context-menu [data-slot="context-menu-item"][data-variant="destructive"] { color: var(--danger); }
-.context-menu hr { border: none; border-top: 1px solid var(--border); margin: 4px 0; }
+.context-menu hr,
+.context-menu [data-slot="dropdown-menu-separator"] { border: none; border-top: 1px solid var(--border); margin: 4px 0; height: 0; }
+.context-menu [data-slot="dropdown-menu-shortcut"] {
+  margin-left: auto;
+  padding-left: 16px;
+  color: var(--text-tertiary);
+  font-size: 11px;
+}
 
 .tree-row.drag-over { background: var(--accent-bg); outline: 1px dashed var(--accent); }
 
