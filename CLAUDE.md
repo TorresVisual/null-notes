@@ -5,7 +5,7 @@ A WYSIWYG Markdown note-taking app for CS students. Desktop-primary (Tauri + Win
 ## Stack
 
 - **Shell:** Tauri 2
-- **Backend:** Rust (file I/O, PDF pipeline, OCR orchestration)
+- **Backend:** Rust (file I/O, PDF pipeline)
 - **Frontend:** React 19 + TypeScript (strict)
 - **Editor:** TipTap 3 (ProseMirror)
 - **Styling:** Tailwind v4 + shadcn/ui (app shell) · plain CSS in `src/index.css` (editor)
@@ -18,7 +18,7 @@ A WYSIWYG Markdown note-taking app for CS students. Desktop-primary (Tauri + Win
 src-tauri/        Rust backend
   src/
     commands/     Tauri IPC commands (one file per domain)
-    pdf/          PDF pipeline (render, OCR, parse)
+    pdf/          PDF pipeline (render, parse)
     db/           SQLite queries
 
 src/              React frontend
@@ -54,7 +54,7 @@ Never use `.unwrap()` or `.expect()` outside of tests. Use `?` to propagate erro
 
 ### Async
 
-Use `tokio` for all async. Long-running operations (OCR, PDF render) run in `tokio::task::spawn_blocking` to avoid blocking the async executor.
+Use `tokio` for all async. Long-running operations (PDF render, code execution) run in `tokio::task::spawn_blocking` or a dedicated thread to avoid blocking the async executor.
 
 ### Style
 
@@ -82,7 +82,7 @@ Data integrity rules. Breaking one of these silently loses or corrupts a note.
 
 Where a file lives decides whether it syncs. That is the whole contract between storage and sync, so it's a decision to make deliberately, not a side effect of picking a path.
 
-- **Inside the workspace folder** — travels with the notes: `.md` files, `NoteName.ink/`, `NoteName.pdf/` and `NoteName.assets/` sidecars, and `.workspace.json` (UI state, gitignored).
+- **Inside the workspace folder** — travels with the notes: `.md` files, `NoteName.ink/`, `NoteName.pdf/`, `NoteName.diagrams/` and `NoteName.assets/` sidecars, and `.workspace.json` (UI state, gitignored).
 - **In the OS app-data dir** — stays on this machine: `index.db`, `settings.json`, `recent-workspaces.json`.
 
 `index.db` is outside because a binary SQLite file cannot be merged across machines, and it's safe to exclude only because it's rebuildable — those two facts hold each other up. Ink, PDF and image sidecars are inside because a note whose drawings or figures didn't travel with it is a broken note.
@@ -95,36 +95,13 @@ Sidecar directories are named after the note (`Lecture 7.assets/`), so their pat
 
 ## The PDF pipeline
 
-No OCR. A typeset PDF carries its own text layer, and reading it is exact where recognising pixels would only ever be a guess.
-
-`pdf/layout.rs` reconstructs document structure (lines, blocks, headings, code, lists, emphasis) from plain `CharBox` values and **must not gain a pdfium dependency**. Nothing in CI has the pdfium native library — the render tests are `#[ignore]`d for that reason — so a pdfium-free module is the only part of this pipeline that can actually be tested. `pdf/extract.rs` is the translation layer: it turns pdfium types into `CharBox` and makes no decisions. Put judgement in `layout`, plumbing in `extract`.
-
-Use `loose_bounds()`, not `tight_bounds()` — tight bounds cover a glyph's inked extent, so gap-based space detection fires after every comma. pdfium is synchronous, so page work belongs in `spawn_blocking`.
-
-Two things about pdfium that cost real debugging time:
-
-- It injects **synthetic characters** describing the text layer's own structure (CR/LF at every line end, spacing markers). They report a font size of 1.0 with zero bounds, and are identified by an **empty font name** — real glyphs always have one. Keeping them drags a row's median font size to 1.0 and collapses the baseline tolerance, which shreds the whole document.
-- It binds its library **once per process**, not once per call — `bind_pdfium()` on the *second* PDF imported in a running session answers `PdfiumLibraryBindingsAlreadyInitialized` rather than returning the bindings. Treat that as success (`Pdfium::default()` reuses the live bindings), never as "pdfium not found".
-
-Equations are rebuilt as LaTeX, not cropped — a cropped image can't be pasted into a prompt, searched, or edited, and doesn't render through the editor's own KaTeX nodes. A LaTeX PDF contains no LaTeX either, but which face a glyph came from carries most of its meaning: `pdf/maths.rs` classifies the face (`CMMI` a variable, `CMSY` a relation, `MSBM` blackboard bold, …), and `pdf/latex.rs` turns face plus geometry into text — smaller and off-baseline is a script, consecutive upright letters are an operator name. A maths region is a direct slice of the page's character row, so it bypasses `layout.rs`'s own gap-based space synthesis and has to redo it locally against the same `SPACE_GAP`. A footnote marker and a real exponent are the same geometry (raised, reduced size); the only distinguishing signal is that an exponent never follows terminal punctuation. `throwOnError: false` on both maths nodes means a bad equation renders its own KaTeX error rather than breaking anything around it.
-
-Glyphs are not the only input. A fraction bar is a **drawn rule**, not a character, so it never reaches the text layer — and it is the only record of how many fraction terms a row carries and where each one begins. `pdf/rules.rs` holds that geometry (pdfium-free, like `columns.rs`; `extract.rs` translates `PdfPageObject::Path` into it), and `reconstruct_ruled_fractions` uses each bar's x-span to split a row of side-by-side fractions that the older gap-ranking passes can only guess at. Take rule geometry from `bounds()`, never `segments()` — pdfium reports segment coordinates in the path's own object space, so a full-width page rule reads `0,0 → 595.3,0` wherever it actually sits. A bar's span alone cannot tell a fraction bar from page furniture, because a full-width separator's span contains every prose row on the page; width relative to the surrounding content is what separates them.
-
-Judging this pipeline means looking at real output: `pdf/dump.rs` holds `#[ignore]`d diagnostics driven by `NULL_NOTES_PDF`. Every bug found so far was invisible in synthetic fixtures.
-
-**The pipeline is frozen** (roadmap §P4-2e). The ten sheets in `notes/exercise_sheets/` are the regression suite and adding one is a deliberate decision. A new bug earns work only if it is whole-document — silent prose loss, mid-word tearing — or recurs across two or more of them; single-document cosmetic bugs get recorded in `TODO.md` under "Filed, not fixed" and left. 2D-layout reconstruction is closed: matrices, `\cases`, stacked fractions, operator limits, tables and ruled fractions are the complete set, and anything else renders as glyph-order text. `pdf/exercises.rs` is the one part still open to change, and it works on the assembled Markdown rather than on `Block`s because an exercise spans page breaks while blocks exist one region at a time.
+No OCR — a typeset PDF's own text layer is read exactly, never recognised from pixels. Structure, pdfium gotchas, maths/LaTeX reconstruction and the frozen-pipeline regression policy are documented in `src-tauri/src/pdf/CLAUDE.md`; read it before touching anything under `pdf/`.
 
 ---
 
-## Launching external processes
+## Commands: process execution
 
-`commands/editor_launch.rs` runs the user's editor on a path **taken from note text**, and a note is a hand-editable file that may arrive by Git pull, by Syncthing, or out of a converted PDF. The target is attacker-influenced and the sink is process execution, so three properties are structural rather than checks:
-
-- **No shell.** `std::process::Command` with one `.arg()` per argument. Never `sh -c` or `cmd /c`.
-- **Tokenize the command template *before* substitution, never after.** Splitting a filled-in string back into words reintroduces exactly the injection this prevents. The tokenizer never sees a resolved path.
-- **Refuse any path component that is not `Component::Normal`** — as written, never normalised and then compared. Normalising opens a gap between the string that was checked and the string that runs. `commands/assets.rs`'s `resolve_relative` is the same rule for file reads.
-
-Anything that resolves must also exist; an unresolvable link renders inert rather than launching. A failed existence lookup marks its targets unresolved, so this fails inert and never open.
+`src-tauri/src/commands/CLAUDE.md` covers the two places this backend spawns a process from note-derived input — launching the user's editor and running a note's code blocks — and the structural (not just checked) rules that keep both injection-safe.
 
 ## TypeScript Guidelines
 
