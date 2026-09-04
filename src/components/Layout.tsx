@@ -39,6 +39,7 @@ import { useCreateNote } from '../hooks/useCreateNote'
 import { useCreateFolder } from '../hooks/useCreateFolder'
 import { useCreateCanvasNote } from '../hooks/useCreateCanvasNote'
 import { useScrollRestoration } from '../hooks/useScrollRestoration'
+import { useWindowTitle } from '../hooks/useWindowTitle'
 import { useOverlayManager } from '../hooks/useOverlayManager'
 import { ConflictBar } from './ConflictBar'
 import { GitAutoCommitPrompt } from './GitAutoCommitPrompt'
@@ -76,6 +77,7 @@ export function Layout() {
     keepMine,
     reloadTheirs,
   } = useNote(activeTab)
+  useWindowTitle(workspacePath, activeTab)
   const { saveSession, openWorkspace, openWorkspaceAt } = useWorkspace()
   const { updateGit } = useGitConfig()
   const { flushGitCommit } = useGitAutoCommit()
