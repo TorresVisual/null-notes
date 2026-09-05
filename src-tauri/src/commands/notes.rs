@@ -1557,6 +1557,13 @@ async fn create_folder_at(parent: &str, name: &str) -> anyhow::Result<String> {
 }
 
 async fn rename_folder_at(old_path: &str, new_path: &str, db: &DbPool) -> anyhow::Result<()> {
+    // `fs::rename` overwrites an existing destination silently (on Windows,
+    // Rust's implementation passes MOVEFILE_REPLACE_EXISTING) — checked
+    // up front so a name collision fails loudly instead of destroying
+    // whatever already lived at `new_path`.
+    if tokio::fs::metadata(new_path).await.is_ok() {
+        anyhow::bail!("a file or folder already exists at {new_path}");
+    }
     tokio::fs::rename(old_path, new_path).await?;
     let old_prefix = format!("{}{}", old_path, std::path::MAIN_SEPARATOR);
     let new_prefix = format!("{}{}", new_path, std::path::MAIN_SEPARATOR);
@@ -1577,6 +1584,11 @@ async fn move_note_at(path: &str, dest_folder: &str, db: &DbPool) -> anyhow::Res
         .ok_or_else(|| anyhow::anyhow!("note path has no file name: {path}"))?
         .to_os_string();
     let new_path = std::path::Path::new(dest_folder).join(&file_name);
+    // Same silent-overwrite hazard as `rename_folder_at`: a same-named note
+    // already at the destination must block the move, not lose its content.
+    if tokio::fs::metadata(&new_path).await.is_ok() {
+        anyhow::bail!("a note already exists at {}", new_path.display());
+    }
     tokio::fs::rename(path, &new_path).await?;
 
     let new_path_str = new_path.to_string_lossy().into_owned();
@@ -3196,6 +3208,33 @@ mod folder_tests {
     }
 
     #[tokio::test]
+    async fn test_rename_folder_at_rejects_existing_destination() {
+        let tmp = tempdir().unwrap();
+        let root = tmp.path();
+        let old_dir = root.join("Old");
+        let new_dir = root.join("New");
+        std::fs::create_dir_all(&old_dir).unwrap();
+        std::fs::write(old_dir.join("note.md"), "# Old").unwrap();
+        std::fs::create_dir_all(&new_dir).unwrap();
+        std::fs::write(new_dir.join("note.md"), "# Survivor").unwrap();
+
+        let pool = make_pool().await;
+        let result = rename_folder_at(
+            &old_dir.to_string_lossy(),
+            &new_dir.to_string_lossy(),
+            &pool,
+        )
+        .await;
+
+        assert!(result.is_err());
+        assert_eq!(
+            std::fs::read_to_string(new_dir.join("note.md")).unwrap(),
+            "# Survivor",
+            "existing note at the destination must not be overwritten"
+        );
+    }
+
+    #[tokio::test]
     async fn test_delete_folder_at_removes_dir_and_notes() {
         let tmp = tempdir().unwrap();
         let root = tmp.path();
@@ -3281,6 +3320,33 @@ mod folder_tests {
             .await
             .unwrap();
         assert_eq!(notes[0].path, new_path);
+    }
+
+    #[tokio::test]
+    async fn test_move_note_at_rejects_existing_destination() {
+        let tmp = tempdir().unwrap();
+        let root = tmp.path();
+        let src_dir = root.join("Src");
+        let dest_dir = root.join("Dest");
+        std::fs::create_dir_all(&src_dir).unwrap();
+        std::fs::create_dir_all(&dest_dir).unwrap();
+        std::fs::write(src_dir.join("note.md"), "# Moving").unwrap();
+        std::fs::write(dest_dir.join("note.md"), "# Survivor").unwrap();
+
+        let pool = make_pool().await;
+        let old_path = src_dir.join("note.md").to_string_lossy().into_owned();
+        let result = move_note_at(&old_path, &dest_dir.to_string_lossy(), &pool).await;
+
+        assert!(result.is_err());
+        assert!(
+            src_dir.join("note.md").exists(),
+            "source note must stay put"
+        );
+        assert_eq!(
+            std::fs::read_to_string(dest_dir.join("note.md")).unwrap(),
+            "# Survivor",
+            "existing note at the destination must not be overwritten"
+        );
     }
 
     #[tokio::test]
