@@ -6,6 +6,7 @@ import { useWorkspaceStore } from '../store/workspace'
 import { useGitConfig } from '../hooks/useGitConfig'
 import { api } from '../lib/tauri'
 import { Dialog, DialogContent, DialogTitle } from './ui/dialog'
+import { ErrorLogDialog } from './ErrorLogDialog'
 
 interface SettingsPanelProps {
   onClose: () => void
@@ -28,6 +29,7 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
   const gitAllowCodeRepoPush = useWorkspaceStore((s) => s.git.allowCodeRepoPush)
   const { updateGit } = useGitConfig()
   const [error, setError] = useState<string | null>(null)
+  const [showErrorLog, setShowErrorLog] = useState(false)
 
   async function update(patch: Partial<typeof settings>) {
     const next = { ...settings, ...patch }
@@ -41,6 +43,7 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
   }
 
   return (
+    <>
     <Dialog open onOpenChange={(next) => !next && onClose()}>
       <DialogContent className="settings-panel settings-panel--lg" showCloseButton={false}>
         <div className="settings-panel-header">
@@ -284,6 +287,18 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
                 />
               </span>
             </label>
+
+            <label className="settings-row">
+              <span>
+                Error log
+                <small>Errors captured from this app, kept on this machine for later triage.</small>
+              </span>
+              <span className="settings-row-control">
+                <button className="dialog-action" onClick={() => setShowErrorLog(true)}>
+                  View error log
+                </button>
+              </span>
+            </label>
           </div>
 
           {(workspacePath && repoMode === null) || repoMode ? (
@@ -473,5 +488,7 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
         </div>
       </DialogContent>
     </Dialog>
+    {showErrorLog && <ErrorLogDialog onClose={() => setShowErrorLog(false)} />}
+    </>
   )
 }
