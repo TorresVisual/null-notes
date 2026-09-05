@@ -3027,6 +3027,14 @@ code {
   transition: outline-color 1.2s ease;
 }
 
+/* Briefly marks whatever block a search-result jump landed on — any
+   element, unlike cross-ref-target's fixed set of block kinds. */
+.search-jump-target {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  transition: outline-color 1.2s ease;
+}
+
 /* Footnotes (P13-1) — same visual language as .cross-ref: a reference is a
    small, clickable jump link, not part of the running prose. */
 .footnote-ref-button {

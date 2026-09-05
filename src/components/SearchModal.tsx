@@ -44,6 +44,8 @@ export function SearchModal({ onClose }: SearchModalProps) {
   function open(path: string) {
     addRecentSearch(query)
     openTab(path)
+    const { text } = parseSearchQuery(query)
+    if (text) scrollToText(text)
     onClose()
   }
 
@@ -95,6 +97,28 @@ export function SearchModal({ onClose }: SearchModalProps) {
       </Command>
     </CommandDialog>
   )
+}
+
+/** Scrolls to and briefly highlights the first match of `text` in the note
+ *  just opened by search — mirrors CrossRef's `scrollToBlock`: the target
+ *  note may still be mounting, so this retries across a bounded number of
+ *  frames instead of giving up on the first miss. Matches within a single
+ *  text node only, same scope limit as FindReplace's `findDocMatches`. */
+export function scrollToText(text: string, attempt = 0): void {
+  const root = document.querySelector('.note-editor .ProseMirror')
+  if (root) {
+    const needle = text.toLowerCase()
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT)
+    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+      if (!node.textContent?.toLowerCase().includes(needle)) continue
+      const el = node.parentElement
+      el?.scrollIntoView?.({ block: 'center', behavior: 'smooth' })
+      el?.classList.add('search-jump-target')
+      setTimeout(() => el?.classList.remove('search-jump-target'), 1500)
+      return
+    }
+  }
+  if (attempt < 90) requestAnimationFrame(() => scrollToText(text, attempt + 1))
 }
 
 function renderSnippet(snippet: string) {
