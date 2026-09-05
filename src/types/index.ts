@@ -119,6 +119,13 @@ export interface AppSettings {
   codeRunTimeoutSecs: number
 }
 
+export interface ErrorLogEntry {
+  timestamp: string
+  source: string
+  message: string
+  context: string | null
+}
+
 export interface GraphLink {
   sourcePath: string
   targetTitle: string

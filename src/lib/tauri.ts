@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core'
-import type { NoteMetadata, WorkspaceState, WorkspaceTree, SearchResult, AppSettings, GraphLink, GraphTag, RepoMode, CommitOutcome, PushOutcome, PullOutcome, RepoInitOutcome, TemplateMetadata, CrossRefTarget, OpenTask, DueCard, Grade, NoteHistoryEntry, BacklinkEntry, PrinterInfo, McGradeResult, CardSummary } from '../types'
+import type { NoteMetadata, WorkspaceState, WorkspaceTree, SearchResult, AppSettings, GraphLink, GraphTag, RepoMode, CommitOutcome, PushOutcome, PullOutcome, RepoInitOutcome, TemplateMetadata, CrossRefTarget, OpenTask, DueCard, Grade, NoteHistoryEntry, BacklinkEntry, PrinterInfo, McGradeResult, CardSummary, ErrorLogEntry } from '../types'
 import type { PdfPage, PdfMarkdownImport } from '../pdf/types'
 import { useWorkspaceStore } from '../store/workspace'
 import { sidecarDir } from './pathPrefix'
@@ -124,6 +124,14 @@ export const api = {
       invoke<AppSettings>('load_settings'),
     save: (settings: AppSettings) =>
       invoke<void>('save_settings', { settings }),
+  },
+  errorLog: {
+    record: (source: string, message: string, context: string | null) =>
+      invoke<void>('record_error', { source, message, context }),
+    list: () =>
+      invoke<ErrorLogEntry[]>('list_errors'),
+    clear: () =>
+      invoke<void>('clear_errors'),
   },
   assets: {
     write: async (notePath: string, mime: string, data: number[]): Promise<string> => {
