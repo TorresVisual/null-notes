@@ -22,13 +22,13 @@ export function ErrorLogDialog({ onClose }: ErrorLogDialogProps) {
 
   return (
     <Dialog open onOpenChange={(next) => !next && onClose()}>
-      <DialogContent className="error-log-dialog" showCloseButton={false}>
-        <div className="error-log-dialog-header">
+      <DialogContent className="settings-panel error-log-dialog" showCloseButton={false}>
+        <div className="settings-panel-header">
           <DialogTitle asChild>
             <h2>Error log</h2>
           </DialogTitle>
           <button
-            className="error-log-dialog-close"
+            className="settings-panel-close"
             onClick={onClose}
             aria-label="Close error log"
             title="Close error log"
@@ -37,23 +37,21 @@ export function ErrorLogDialog({ onClose }: ErrorLogDialogProps) {
           </button>
         </div>
 
-        <div className="error-log-dialog-body">
+        <div className="settings-panel-body error-log-list">
           {entries.length === 0 ? (
-            <p className="error-log-empty">No errors recorded.</p>
+            <p className="template-empty-hint">No errors recorded.</p>
           ) : (
-            <ul className="error-log-list">
-              {entries.map((entry, i) => (
-                <li key={i} className="error-log-entry">
-                  <span className="error-log-timestamp">{entry.timestamp}</span>
-                  <span className="error-log-source">{entry.source}</span>
-                  <span className="error-log-message">{entry.message}</span>
-                </li>
-              ))}
-            </ul>
+            entries.map((entry, i) => (
+              <div key={i} className="error-log-entry">
+                <span className="error-log-timestamp">{entry.timestamp}</span>
+                <span className="error-log-source">{entry.source}</span>
+                <span className="error-log-message">{entry.message}</span>
+              </div>
+            ))
           )}
         </div>
 
-        <div className="error-log-dialog-footer">
+        <div className="settings-panel-footer">
           <button className="settings-reset" onClick={() => void handleClear()}>
             Clear log
           </button>

@@ -206,7 +206,7 @@ button, [role="button"], .tree-row, .tab, .search-result, .slash-menu-item,
 
 .context-menu, .slash-menu, .math-editor, .math-snippet-menu, .block-handle-menu,
 .search-modal, .settings-panel, .import-mode-dialog, .graph-view, .task-view,
-.review-session, .formula-sheet-prompt, .toast {
+.review-session, .formula-sheet-prompt, .toast, .error-log-dialog {
   animation: surface-in var(--duration-base) var(--ease-spring);
 }
 
@@ -3516,6 +3516,29 @@ code {
 }
 
 .task-view-item-text:hover { text-decoration: underline; }
+
+/* Error log dialog — reuses .settings-panel for chrome and
+   .template-empty-hint for the empty state; only the entry row is its own. */
+.error-log-dialog {
+  width: min(640px, calc(100vw - 40px));
+  max-height: min(600px, calc(100vh - 60px));
+}
+
+.error-log-list {
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.error-log-entry {
+  display: flex;
+  gap: var(--space-sm);
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.error-log-timestamp { color: var(--text-tertiary); white-space: nowrap; }
+.error-log-source { color: var(--accent); white-space: nowrap; }
+.error-log-message { color: var(--text-primary); overflow-wrap: anywhere; }
 
 /* Review session (P9-3) — shares the settings-panel/task-view shell. */
 .review-session {

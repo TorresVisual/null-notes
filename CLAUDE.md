@@ -190,6 +190,8 @@ Every shadcn component reads Terminal Precision's existing tokens through a brid
 
 `cn()` (clsx + tailwind-merge) lives in `src/lib/utils.ts`. `@/*` resolves to `src/*` (both `tsconfig.json` and `vite.config.ts`).
 
+In practice, every app-shell dialog (Settings, Task view, Template picker, Shortcuts, the graph view) renders its *content* through plain `src/index.css` classes, not Tailwind utilities — `Dialog`/`DialogContent` from `src/components/ui/dialog.tsx` supply the overlay/positioning, but the card chrome and everything inside it is `.settings-panel` and friends (`.settings-panel-header/-body/-footer/-close`, `.settings-reset`, `.template-empty-hint`, …). A new dialog reuses those classes for its chrome rather than inventing its own — add only the CSS a new list/row actually needs, and register the dialog's outer class in the `surface-in` keyframe selector list. A className with no matching rule in `index.css` renders as unstyled text; this has bitten every dialog added without checking first (e.g. the error log viewer), so grep `index.css` for the classNames a new dialog introduces before calling it done.
+
 ### TipTap extensions
 
 Each custom node type lives in its own file under `src/editor/extensions/`. Export a configured `Extension` object, not a raw class.
