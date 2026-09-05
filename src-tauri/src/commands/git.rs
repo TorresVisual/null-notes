@@ -248,6 +248,68 @@ fn build_commit_message(paths: &[String]) -> String {
     format!("notes: update {summary}")
 }
 
+fn resolve(workspace: &str, path: &str) -> PathBuf {
+    let p = Path::new(path);
+    if p.is_absolute() {
+        p.to_path_buf()
+    } else {
+        Path::new(workspace).join(p)
+    }
+}
+
+/// Drops any pathspec that `git add` would otherwise choke the *whole batch*
+/// on: one that no longer exists on disk and was never tracked (e.g. a
+/// pasted-image `.assets` sidecar cleaned up before its batched commit fired).
+/// `git add` treats such a pathspec as fatal — "did not match any files" —
+/// and stages nothing at all for the call, not just that one path, which is
+/// exactly the silent-forever-retry failure this guards against: the caller
+/// only gets a `CommitOutcome`, never a chance to drop the one bad entry.
+/// A path that used to be tracked but is now deleted is kept — `git add`
+/// correctly stages that as a removal.
+fn addable_paths(workspace: &str, paths: &[String]) -> anyhow::Result<Vec<String>> {
+    if paths.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let ls_output = no_window_command("git")
+        .arg("-C")
+        .arg(workspace)
+        .arg("ls-files")
+        .arg("--")
+        .args(paths)
+        .output()?;
+    let tracked: std::collections::HashSet<String> = String::from_utf8_lossy(&ls_output.stdout)
+        .lines()
+        .map(|s| s.replace('\\', "/"))
+        .collect();
+
+    let toplevel_output = no_window_command("git")
+        .arg("-C")
+        .arg(workspace)
+        .arg("rev-parse")
+        .arg("--show-toplevel")
+        .output()?;
+    let root = String::from_utf8_lossy(&toplevel_output.stdout)
+        .trim()
+        .replace('\\', "/");
+
+    Ok(paths
+        .iter()
+        .filter(|p| {
+            if resolve(workspace, p).exists() {
+                return true;
+            }
+            let normalized = p.replace('\\', "/");
+            let rel = normalized
+                .strip_prefix(&root)
+                .map(|s| s.trim_start_matches('/'))
+                .unwrap_or(normalized.as_str());
+            tracked.contains(rel)
+        })
+        .cloned()
+        .collect())
+}
+
 fn has_pending_changes(workspace: &str, paths: &[String]) -> anyhow::Result<bool> {
     if paths.is_empty() {
         return Ok(false);
@@ -321,6 +383,7 @@ pub fn checked_auto_commit(
     if mode != RepoMode::CodeRepo && ensure_notes_gitignore(workspace)? {
         paths.push(".gitignore".to_string());
     }
+    let paths = addable_paths(workspace, &paths)?;
 
     if !has_pending_changes(workspace, &paths)? {
         return Ok(CommitOutcome::NothingToCommit);
@@ -1385,6 +1448,33 @@ mod tests {
         let files = String::from_utf8_lossy(&last_commit_files.stdout);
         assert!(files.contains("note.md"));
         assert!(!files.contains("src.rs"));
+    }
+
+    // Regression: a pending path for something removed before its batched
+    // commit fired (e.g. a pasted-image `.assets` dir cleaned up mid-cycle)
+    // must not poison the whole batch — the real, still-pending change has
+    // to commit anyway.
+    #[test]
+    fn a_ghost_path_alongside_a_real_change_still_commits_the_real_change() {
+        let tmp = tempdir().unwrap();
+        git_init(tmp.path());
+        commit_file(tmp.path(), "note.md", "# Note\n");
+        std::fs::write(tmp.path().join("note.md"), "# Note\nchanged\n").unwrap();
+        let ghost = tmp
+            .path()
+            .join("never-existed.assets")
+            .to_string_lossy()
+            .into_owned();
+
+        let outcome = checked_auto_commit(
+            &tmp.path().to_string_lossy(),
+            RepoMode::CodeRepo,
+            &["note.md".to_string(), ghost],
+            false,
+        )
+        .unwrap();
+
+        assert_eq!(outcome, CommitOutcome::Committed);
     }
 
     #[test]
