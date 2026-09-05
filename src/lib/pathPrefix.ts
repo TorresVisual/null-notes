@@ -15,3 +15,10 @@ export function replacePathPrefix(path: string, oldPrefix: string, newPrefix: st
   }
   return path
 }
+
+// A note's sidecar directory — mirrors the Rust side's `sidecar_dir_for`
+// (strip the note's extension, append `.<suffix>`) so the frontend can name
+// the same `.ink`/`.pdf`/`.diagrams`/`.assets` folder without a round trip.
+export function sidecarDir(notePath: string, suffix: string): string {
+  return notePath.replace(/\.[^./\\]+$/, `.${suffix}`)
+}

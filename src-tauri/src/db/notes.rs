@@ -630,8 +630,20 @@ mod tests {
     use super::*;
     use crate::db::schema::run_migrations;
 
+    // `:memory:` gives every pooled connection its own separate database —
+    // with the pool's default of several connections, a query can land on a
+    // connection that never saw run_migrations and see an empty (or
+    // "no such table") database. Capping the pool at one connection forces
+    // every query through the same in-memory database migrations just ran
+    // against. Without this, these tests are flaky under concurrent load,
+    // not deterministically broken — the usual symptom is "passes alone,
+    // fails in the full suite."
     async fn make_pool() -> SqlitePool {
-        let pool = SqlitePool::connect("sqlite::memory:").await.unwrap();
+        let pool = sqlx::sqlite::SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect("sqlite::memory:")
+            .await
+            .unwrap();
         run_migrations(&pool).await.unwrap();
         pool
     }

@@ -1060,16 +1060,22 @@ pub async fn create_note(
     Ok(meta)
 }
 
+async fn delete_note_at(path: &str, db: &DbPool) -> anyhow::Result<()> {
+    tokio::fs::remove_file(path).await?;
+
+    // Every sidecar, not just .ink — a note's images/PDF pages/diagrams are
+    // just as orphaned on disk (and just as invisible to git) if left behind.
+    for suffix in ["ink", "pdf", "diagrams", "assets"] {
+        let dir = super::sidecar_dir_for(path, suffix);
+        let _ = tokio::fs::remove_dir_all(&dir).await;
+    }
+
+    forget_note(path, db).await
+}
+
 #[tauri::command]
 pub async fn delete_note(path: String, db: State<'_, DbPool>) -> Result<(), String> {
-    tokio::fs::remove_file(&path)
-        .await
-        .map_err(|e| e.to_string())?;
-
-    let ink_dir = path.trim_end_matches(".md").to_string() + ".ink";
-    let _ = tokio::fs::remove_dir_all(&ink_dir).await;
-
-    forget_note(&path, &db).await.map_err(|e| e.to_string())
+    delete_note_at(&path, &db).await.map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -1573,17 +1579,18 @@ async fn move_note_at(path: &str, dest_folder: &str, db: &DbPool) -> anyhow::Res
     let new_path = std::path::Path::new(dest_folder).join(&file_name);
     tokio::fs::rename(path, &new_path).await?;
 
-    let ink_dir = path.trim_end_matches(".md").to_string() + ".ink";
-    if tokio::fs::metadata(&ink_dir).await.is_ok() {
-        let new_ink_dir = new_path
-            .to_string_lossy()
-            .trim_end_matches(".md")
-            .to_string()
-            + ".ink";
-        tokio::fs::rename(&ink_dir, &new_ink_dir).await?;
+    let new_path_str = new_path.to_string_lossy().into_owned();
+    // A note dragged into another folder must carry every sidecar with it —
+    // a note whose ink, PDF pages, images or diagrams didn't travel with it
+    // is a broken note (see the storage boundary contract in CLAUDE.md).
+    for suffix in ["ink", "pdf", "diagrams", "assets"] {
+        let old_dir = super::sidecar_dir_for(path, suffix);
+        if tokio::fs::metadata(&old_dir).await.is_ok() {
+            let new_dir = super::sidecar_dir_for(&new_path_str, suffix);
+            tokio::fs::rename(&old_dir, &new_dir).await?;
+        }
     }
 
-    let new_path_str = new_path.to_string_lossy().into_owned();
     db::notes::update_path(db, path, &new_path_str).await?;
     Ok(new_path_str)
 }
@@ -2401,7 +2408,11 @@ mod save_tests {
 
     #[tokio::test]
     async fn test_index_note_at_makes_content_searchable() {
-        let pool = DbPool::connect("sqlite::memory:").await.unwrap();
+        let pool = sqlx::sqlite::SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect("sqlite::memory:")
+            .await
+            .unwrap();
         run_migrations(&pool).await.unwrap();
 
         index_note_at(
@@ -2469,7 +2480,11 @@ mod save_tests {
 
     #[tokio::test]
     async fn test_backlinks_with_context_reads_the_snippet_from_disk() {
-        let pool = DbPool::connect("sqlite::memory:").await.unwrap();
+        let pool = sqlx::sqlite::SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect("sqlite::memory:")
+            .await
+            .unwrap();
         run_migrations(&pool).await.unwrap();
         let tmp = tempdir().unwrap();
         let ws = tmp.path().to_string_lossy().into_owned();
@@ -2495,7 +2510,11 @@ mod save_tests {
 
     #[tokio::test]
     async fn test_backlinks_with_context_snippet_is_none_when_the_file_is_gone() {
-        let pool = DbPool::connect("sqlite::memory:").await.unwrap();
+        let pool = sqlx::sqlite::SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect("sqlite::memory:")
+            .await
+            .unwrap();
         run_migrations(&pool).await.unwrap();
         let tmp = tempdir().unwrap();
         let ws = tmp.path().to_string_lossy().into_owned();
@@ -2522,7 +2541,11 @@ mod save_tests {
 
     #[tokio::test]
     async fn test_index_note_at_populates_review_cards() {
-        let pool = DbPool::connect("sqlite::memory:").await.unwrap();
+        let pool = sqlx::sqlite::SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect("sqlite::memory:")
+            .await
+            .unwrap();
         run_migrations(&pool).await.unwrap();
         index_note_at("/ws/a.md", "/ws", "Q :: A\n", &pool)
             .await
@@ -2537,7 +2560,11 @@ mod save_tests {
 
     #[tokio::test]
     async fn test_forget_note_clears_its_cards() {
-        let pool = DbPool::connect("sqlite::memory:").await.unwrap();
+        let pool = sqlx::sqlite::SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect("sqlite::memory:")
+            .await
+            .unwrap();
         run_migrations(&pool).await.unwrap();
         index_note_at("/ws/a.md", "/ws", "Q :: A\n", &pool)
             .await
@@ -2557,7 +2584,11 @@ mod save_tests {
     // rather than leaving it stuck un-gradeable.
     #[tokio::test]
     async fn test_grade_card_at_missing_note_purges_its_stale_card() {
-        let pool = DbPool::connect("sqlite::memory:").await.unwrap();
+        let pool = sqlx::sqlite::SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect("sqlite::memory:")
+            .await
+            .unwrap();
         run_migrations(&pool).await.unwrap();
         index_note_at("/ws/gone.md", "/ws", "Q :: A\n", &pool)
             .await
@@ -2574,7 +2605,11 @@ mod save_tests {
 
     #[tokio::test]
     async fn test_grade_mc_card_at_correct_pick_reports_the_answer_and_advances_grade() {
-        let pool = DbPool::connect("sqlite::memory:").await.unwrap();
+        let pool = sqlx::sqlite::SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect("sqlite::memory:")
+            .await
+            .unwrap();
         run_migrations(&pool).await.unwrap();
         let tmp = tempdir().unwrap();
         let path = tmp.path().join("a.md");
@@ -2601,7 +2636,11 @@ mod save_tests {
 
     #[tokio::test]
     async fn test_grade_mc_card_at_grades_a_note_saved_with_the_editors_blank_line() {
-        let pool = DbPool::connect("sqlite::memory:").await.unwrap();
+        let pool = sqlx::sqlite::SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect("sqlite::memory:")
+            .await
+            .unwrap();
         run_migrations(&pool).await.unwrap();
         let tmp = tempdir().unwrap();
         let path = tmp.path().join("a.md");
@@ -2631,7 +2670,11 @@ mod save_tests {
 
     #[tokio::test]
     async fn test_grade_mc_card_at_partial_multi_select_pick_is_still_wrong() {
-        let pool = DbPool::connect("sqlite::memory:").await.unwrap();
+        let pool = sqlx::sqlite::SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect("sqlite::memory:")
+            .await
+            .unwrap();
         run_migrations(&pool).await.unwrap();
         let tmp = tempdir().unwrap();
         let path = tmp.path().join("a.md");
@@ -2658,7 +2701,11 @@ mod save_tests {
 
     #[tokio::test]
     async fn test_grade_mc_card_at_reordered_picks_still_match() {
-        let pool = DbPool::connect("sqlite::memory:").await.unwrap();
+        let pool = sqlx::sqlite::SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect("sqlite::memory:")
+            .await
+            .unwrap();
         run_migrations(&pool).await.unwrap();
         let tmp = tempdir().unwrap();
         let path = tmp.path().join("a.md");
@@ -2686,7 +2733,11 @@ mod save_tests {
 
     #[tokio::test]
     async fn test_grade_mc_card_at_missing_note_purges_its_stale_card() {
-        let pool = DbPool::connect("sqlite::memory:").await.unwrap();
+        let pool = sqlx::sqlite::SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect("sqlite::memory:")
+            .await
+            .unwrap();
         run_migrations(&pool).await.unwrap();
         index_note_at("/ws/gone.md", "/ws", "Q ::\n- [x] a\n", &pool)
             .await
@@ -2745,7 +2796,11 @@ mod save_tests {
         std::fs::write(&target, "# Big O Notation\nWhat it means.\n").unwrap();
         std::fs::write(&source, "# Source\nSee [[Big O Notation]] for details.\n").unwrap();
 
-        let pool = DbPool::connect("sqlite::memory:").await.unwrap();
+        let pool = sqlx::sqlite::SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect("sqlite::memory:")
+            .await
+            .unwrap();
         run_migrations(&pool).await.unwrap();
         index_note_at(
             &target.to_string_lossy(),
@@ -2798,7 +2853,11 @@ mod save_tests {
         std::fs::write(&target, "# Old Title\nbody\n").unwrap();
         std::fs::write(&other, "# Other\nSee [[Something Else]].\n").unwrap();
 
-        let pool = DbPool::connect("sqlite::memory:").await.unwrap();
+        let pool = sqlx::sqlite::SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect("sqlite::memory:")
+            .await
+            .unwrap();
         run_migrations(&pool).await.unwrap();
         index_note_at(&target.to_string_lossy(), &ws, "# Old Title\nbody\n", &pool)
             .await
@@ -2848,7 +2907,11 @@ mod save_tests {
     async fn test_generate_formula_sheet_at_dedupes_and_groups_by_note_and_heading() {
         let tmp = tempdir().unwrap();
         let ws = tmp.path().to_string_lossy().into_owned();
-        let pool = DbPool::connect("sqlite::memory:").await.unwrap();
+        let pool = sqlx::sqlite::SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect("sqlite::memory:")
+            .await
+            .unwrap();
         run_migrations(&pool).await.unwrap();
         seed_formula_fixture(tmp.path(), &ws, &pool).await;
 
@@ -2868,7 +2931,11 @@ mod save_tests {
     async fn test_generate_formula_sheet_at_filters_by_folder() {
         let tmp = tempdir().unwrap();
         let ws = tmp.path().to_string_lossy().into_owned();
-        let pool = DbPool::connect("sqlite::memory:").await.unwrap();
+        let pool = sqlx::sqlite::SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect("sqlite::memory:")
+            .await
+            .unwrap();
         run_migrations(&pool).await.unwrap();
         seed_formula_fixture(tmp.path(), &ws, &pool).await;
 
@@ -2888,7 +2955,11 @@ mod save_tests {
     async fn test_generate_formula_sheet_at_filters_by_tag() {
         let tmp = tempdir().unwrap();
         let ws = tmp.path().to_string_lossy().into_owned();
-        let pool = DbPool::connect("sqlite::memory:").await.unwrap();
+        let pool = sqlx::sqlite::SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect("sqlite::memory:")
+            .await
+            .unwrap();
         run_migrations(&pool).await.unwrap();
         seed_formula_fixture(tmp.path(), &ws, &pool).await;
 
@@ -2908,7 +2979,11 @@ mod save_tests {
     async fn test_generate_formula_sheet_at_refuses_to_overwrite_an_existing_file() {
         let tmp = tempdir().unwrap();
         let ws = tmp.path().to_string_lossy().into_owned();
-        let pool = DbPool::connect("sqlite::memory:").await.unwrap();
+        let pool = sqlx::sqlite::SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect("sqlite::memory:")
+            .await
+            .unwrap();
         run_migrations(&pool).await.unwrap();
         seed_formula_fixture(tmp.path(), &ws, &pool).await;
         let existing = tmp.path().join("Formula Sheet.md");
@@ -2927,7 +3002,11 @@ mod save_tests {
     async fn test_generate_formula_sheet_at_skips_a_note_whose_file_no_longer_exists_on_disk() {
         let tmp = tempdir().unwrap();
         let ws = tmp.path().to_string_lossy().into_owned();
-        let pool = DbPool::connect("sqlite::memory:").await.unwrap();
+        let pool = sqlx::sqlite::SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect("sqlite::memory:")
+            .await
+            .unwrap();
         run_migrations(&pool).await.unwrap();
         seed_formula_fixture(tmp.path(), &ws, &pool).await;
 
@@ -2960,8 +3039,16 @@ mod folder_tests {
     use crate::db::schema::run_migrations;
     use tempfile::tempdir;
 
+    // max_connections(1): an unbounded pool against `:memory:` hands out a
+    // fresh, empty database per connection, so a query can silently miss the
+    // migrations run_migrations just applied on a different one — see the
+    // matching comment on db::notes::tests::make_pool for the full story.
     async fn make_pool() -> DbPool {
-        let pool = DbPool::connect("sqlite::memory:").await.unwrap();
+        let pool = sqlx::sqlite::SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect("sqlite::memory:")
+            .await
+            .unwrap();
         run_migrations(&pool).await.unwrap();
         pool
     }
@@ -3142,7 +3229,7 @@ mod folder_tests {
     }
 
     #[tokio::test]
-    async fn test_move_note_at_moves_file_and_ink_sidecar() {
+    async fn test_move_note_at_moves_file_and_every_sidecar() {
         let tmp = tempdir().unwrap();
         let root = tmp.path();
         let src_dir = root.join("Src");
@@ -3150,8 +3237,11 @@ mod folder_tests {
         std::fs::create_dir_all(&src_dir).unwrap();
         std::fs::create_dir_all(&dest_dir).unwrap();
         std::fs::write(src_dir.join("note.md"), "# Note").unwrap();
-        std::fs::create_dir_all(src_dir.join("note.ink")).unwrap();
-        std::fs::write(src_dir.join("note.ink").join("sketch-1.svg"), "<svg></svg>").unwrap();
+        for suffix in ["ink", "pdf", "diagrams", "assets"] {
+            let dir = src_dir.join(format!("note.{suffix}"));
+            std::fs::create_dir_all(&dir).unwrap();
+            std::fs::write(dir.join("child"), "content").unwrap();
+        }
 
         let pool = make_pool().await;
         let old_path = src_dir.join("note.md").to_string_lossy().into_owned();
@@ -3173,11 +3263,64 @@ mod folder_tests {
             .unwrap();
 
         assert!(std::path::Path::new(&new_path).exists());
-        assert!(dest_dir.join("note.ink").join("sketch-1.svg").exists());
         assert!(!src_dir.join("note.md").exists());
+        for suffix in ["ink", "pdf", "diagrams", "assets"] {
+            assert!(
+                dest_dir
+                    .join(format!("note.{suffix}"))
+                    .join("child")
+                    .exists(),
+                "note.{suffix} must travel with the note"
+            );
+            assert!(
+                !src_dir.join(format!("note.{suffix}")).exists(),
+                "note.{suffix} must not be left behind"
+            );
+        }
         let notes = db::notes::list_by_workspace(&pool, &root.to_string_lossy())
             .await
             .unwrap();
         assert_eq!(notes[0].path, new_path);
+    }
+
+    #[tokio::test]
+    async fn test_delete_note_at_removes_every_sidecar() {
+        let tmp = tempdir().unwrap();
+        let root = tmp.path();
+        std::fs::write(root.join("note.md"), "# Note").unwrap();
+        for suffix in ["ink", "pdf", "diagrams", "assets"] {
+            let dir = root.join(format!("note.{suffix}"));
+            std::fs::create_dir_all(&dir).unwrap();
+            std::fs::write(dir.join("child"), "content").unwrap();
+        }
+
+        let pool = make_pool().await;
+        let path = root.join("note.md").to_string_lossy().into_owned();
+        db_index_note(
+            &pool,
+            &NoteMetadata {
+                id: "a".into(),
+                title: "Note".into(),
+                path: path.clone(),
+                workspace: root.to_string_lossy().into_owned(),
+                updated_at: 1000,
+            },
+        )
+        .await
+        .unwrap();
+
+        delete_note_at(&path, &pool).await.unwrap();
+
+        assert!(!root.join("note.md").exists());
+        for suffix in ["ink", "pdf", "diagrams", "assets"] {
+            assert!(
+                !root.join(format!("note.{suffix}")).exists(),
+                "note.{suffix} must not survive delete"
+            );
+        }
+        let notes = db::notes::list_by_workspace(&pool, &root.to_string_lossy())
+            .await
+            .unwrap();
+        assert!(notes.is_empty());
     }
 }

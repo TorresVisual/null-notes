@@ -6,7 +6,7 @@ import { useNotesStore } from '../store/notes'
 import { promptText } from '../store/promptDialog'
 import { api } from '../lib/tauri'
 import { refreshTree } from '../hooks/useWorkspace'
-import { folderName, isUnderPath } from '../lib/pathPrefix'
+import { folderName, isUnderPath, sidecarDir } from '../lib/pathPrefix'
 import type { TreeEntry } from '../lib/folderTree'
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from './ui/context-menu'
 
@@ -43,6 +43,10 @@ export function TreeNode({ entry, depth }: TreeNodeProps) {
       try {
         await api.notes.rename(entry.path, newTitle, workspace)
         setFolderError(null)
+        // rename_note rewrites the file's content (and its title) in place
+        // via write_atomic, bypassing useNote's own save path — without this
+        // the change never enters the auto-commit's pending list.
+        useWorkspaceStore.getState().addGitPendingPath(entry.path)
         await refreshTree()
       } catch (err) {
         setFolderError(err instanceof Error ? err.message : String(err))
@@ -56,8 +60,12 @@ export function TreeNode({ entry, depth }: TreeNodeProps) {
       removeNote(entry.path)
       closeTab(entry.path)
       // Otherwise the deletion never enters the auto-commit's pathspec-scoped
-      // pending list — the file is gone on disk, but `git rm` never runs, so
-      // it silently never reaches the repo (or GitHub) at all.
+      // pending list — the files are gone on disk, but `git rm` never runs,
+      // so they silently never reach the repo (or GitHub) at all. delete_note
+      // removes every sidecar, so every sidecar needs to be queued too.
+      for (const suffix of ['ink', 'pdf', 'diagrams', 'assets']) {
+        useWorkspaceStore.getState().addGitPendingPath(sidecarDir(entry.path, suffix))
+      }
       useWorkspaceStore.getState().addGitPendingPath(entry.path)
     }
 
@@ -103,11 +111,23 @@ export function TreeNode({ entry, depth }: TreeNodeProps) {
       if (notePath) {
         const newPath = await api.notes.moveNote(notePath, entry.path)
         replaceOpenPath(notePath, newPath)
+        // Old path/dirs so git registers the removal, new ones so it
+        // registers the addition — a bare fs::rename shows up as both to git
+        // status. move_note_at moves every sidecar (ink/pdf/diagrams/assets)
+        // alongside the note itself, so all of them need to be queued too.
+        for (const suffix of ['ink', 'pdf', 'diagrams', 'assets']) {
+          useWorkspaceStore.getState().addGitPendingPath(sidecarDir(notePath, suffix))
+          useWorkspaceStore.getState().addGitPendingPath(sidecarDir(newPath, suffix))
+        }
+        useWorkspaceStore.getState().addGitPendingPath(notePath)
+        useWorkspaceStore.getState().addGitPendingPath(newPath)
       } else if (draggedFolderPath && !isUnderPath(entry.path, draggedFolderPath)) {
         const separator = entry.path.includes('\\') ? '\\' : '/'
         const newPath = `${entry.path}${separator}${folderName(draggedFolderPath)}`
         await api.notes.renameFolder(draggedFolderPath, newPath)
         replaceOpenPath(draggedFolderPath, newPath)
+        useWorkspaceStore.getState().addGitPendingPath(draggedFolderPath)
+        useWorkspaceStore.getState().addGitPendingPath(newPath)
       } else {
         return
       }
@@ -129,6 +149,8 @@ export function TreeNode({ entry, depth }: TreeNodeProps) {
       await api.notes.renameFolder(entry.path, newPath)
       replaceOpenPath(entry.path, newPath)
       setFolderError(null)
+      useWorkspaceStore.getState().addGitPendingPath(entry.path)
+      useWorkspaceStore.getState().addGitPendingPath(newPath)
       await refreshTree()
     } catch (e) {
       setFolderError(e instanceof Error ? e.message : String(e))

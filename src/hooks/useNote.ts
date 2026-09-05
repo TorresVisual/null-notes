@@ -3,7 +3,7 @@ import { listen } from '@tauri-apps/api/event'
 import { api } from '../lib/tauri'
 import { useWorkspaceStore } from '../store/workspace'
 import { useSettingsStore } from '../store/settings'
-import { folderName } from '../lib/pathPrefix'
+import { folderName, sidecarDir } from '../lib/pathPrefix'
 
 export type SaveState = 'clean' | 'dirty' | 'saving' | 'error'
 
@@ -183,7 +183,22 @@ export function useNote(path: string | null) {
     setSaveError(null)
   }, [])
 
-  useEffect(() => () => void flush(), [path, flush])
+  // GC runs after the final flush, not on every keystroke — deleting an
+  // orphaned image immediately would out-race ProseMirror's undo stack and
+  // turn a ctrl+z into a broken image. Once the tab is gone, so is that undo
+  // history, so closing is the first point it's safe to reap.
+  useEffect(
+    () => () => {
+      const notePath = path
+      void flush().then(() => {
+        if (!notePath) return
+        void api.assets.gc(notePath, contentRef.current).then(() => {
+          useWorkspaceStore.getState().addGitPendingPath(sidecarDir(notePath, 'assets'))
+        })
+      })
+    },
+    [path, flush],
+  )
 
   useEffect(() => {
     const handler = () => void flush()

@@ -7,7 +7,8 @@
 - [ ] Web app (no local md files fully git)
 - [ ] Better printing — Export to PDF and Print are now separate File menu items, each a small dialog ending in a silent WebView2 call (`PrintToPdf`/`Print`, never `ShowPrintUI`). One checkbox ("Include page numbers, date, and title") controls WebView2's all-or-nothing header/footer bundle. Fixed two real pagination gaps (`h4`-`h6` and block-math/diagrams could split across a page). **Design:** `docs/specs/better-printing-design.md`. **Plan:** `docs/plans/better-printing.md`.   preview and export only show data when a checkmark has been set the data in the export is completely malformed it is mostly clipped dom.js:727 Uncaught TypeError: Cannot read properties of null (reading 'nextSibling')
 - [ ] Left sidebar needs a design update
-- [ ] .assets folders aren't auto committed
+- [x] all . folders aren't auto committed deleteted and renamed files are also an issue
+- [x] fix db flakiness
 - [ ] add a open in null notes in my ide
 - [ ] search doesnt jump
 - [ ] fix top toolbar
@@ -19,7 +20,7 @@
 - [ ] Recent workspaces in right click menu
 - [ ] pasting markdown gets code block with language set to markdown (pasting is entirely broken)
 - [ ] renaming doesnt stick title is still old
-- [ ] fix db flakiness
+
 - [ ] add images to flashcards (also reveal backside image as answer)
 - [ ] markdown render arrows (-&gt; / &lt;-&gt; / &lt;-) (renders in source but not in preview)
 - [ ] Search needs major improvements

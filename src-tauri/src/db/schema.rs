@@ -128,7 +128,13 @@ mod tests {
 
     #[tokio::test]
     async fn test_run_migrations_adds_options_and_grade_and_streak_columns() {
-        let pool = SqlitePool::connect("sqlite::memory:").await.unwrap();
+        // See db::notes::tests::make_pool for why this pool is capped at
+        // one connection against `:memory:`.
+        let pool = sqlx::sqlite::SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect("sqlite::memory:")
+            .await
+            .unwrap();
         run_migrations(&pool).await.unwrap();
 
         // A row insert naming all three added columns is the simplest proof
@@ -146,7 +152,13 @@ mod tests {
 
     #[tokio::test]
     async fn test_run_migrations_is_idempotent_against_an_already_migrated_db() {
-        let pool = SqlitePool::connect("sqlite::memory:").await.unwrap();
+        // See db::notes::tests::make_pool for why this pool is capped at
+        // one connection against `:memory:`.
+        let pool = sqlx::sqlite::SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect("sqlite::memory:")
+            .await
+            .unwrap();
         run_migrations(&pool).await.unwrap();
         // Re-running against an already-migrated DB must not error on the
         // "duplicate column name" the second ALTER TABLE always produces.

@@ -11,6 +11,9 @@ vi.mock('../lib/tauri', () => ({
       save: vi.fn(),
       reindex: vi.fn(),
     },
+    assets: {
+      gc: vi.fn().mockResolvedValue(undefined),
+    },
   },
 }))
 

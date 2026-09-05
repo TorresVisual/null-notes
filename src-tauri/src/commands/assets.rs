@@ -97,6 +97,31 @@ pub async fn read_note_asset(note_path: String, relative: String) -> Result<Stri
     Ok(base64::engine::general_purpose::STANDARD.encode(bytes))
 }
 
+/// Deletes any file in the note's `.assets` sidecar whose name no longer
+/// appears in `content`. Called when a note tab closes (after its final
+/// save), never on keystroke — deleting on every edit would out-race
+/// ProseMirror's undo stack and turn a ctrl+z into a broken image. Matching
+/// on the generated file name alone (not the full encoded path) sidesteps
+/// needing to know how the caller encoded the directory prefix.
+#[tauri::command]
+pub async fn gc_note_assets(note_path: String, content: String) -> Result<(), String> {
+    let dir = PathBuf::from(assets_dir_for(&note_path));
+    let mut entries = match tokio::fs::read_dir(&dir).await {
+        Ok(entries) => entries,
+        Err(_) => return Ok(()),
+    };
+
+    while let Some(entry) = entries.next_entry().await.map_err(|e| e.to_string())? {
+        let file_name = entry.file_name();
+        let file_name = file_name.to_string_lossy();
+        if !content.contains(file_name.as_ref()) {
+            let _ = tokio::fs::remove_file(entry.path()).await;
+        }
+    }
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -145,6 +170,32 @@ mod tests {
             encoded,
             base64::engine::general_purpose::STANDARD.encode([1, 2, 3, 4])
         );
+    }
+
+    #[tokio::test]
+    async fn test_gc_removes_only_assets_no_longer_referenced_in_content() {
+        let tmp = tempdir().unwrap();
+        let note = tmp.path().join("Note.md").to_string_lossy().into_owned();
+
+        let kept = write_note_asset(note.clone(), "image/png".into(), vec![1])
+            .await
+            .unwrap();
+        let orphaned = write_note_asset(note.clone(), "image/png".into(), vec![2])
+            .await
+            .unwrap();
+
+        let content = format!("![kept]({kept})");
+        gc_note_assets(note.clone(), content).await.unwrap();
+
+        assert!(resolve_relative(&note, &kept).unwrap().exists());
+        assert!(!resolve_relative(&note, &orphaned).unwrap().exists());
+    }
+
+    #[tokio::test]
+    async fn test_gc_is_a_no_op_when_the_assets_dir_does_not_exist() {
+        let tmp = tempdir().unwrap();
+        let note = tmp.path().join("Note.md").to_string_lossy().into_owned();
+        gc_note_assets(note, "no images here".into()).await.unwrap();
     }
 
     #[tokio::test]

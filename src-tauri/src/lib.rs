@@ -133,6 +133,7 @@ pub fn run() {
             commands::pdf::pdf_has_text_layer,
             commands::assets::write_note_asset,
             commands::assets::read_note_asset,
+            commands::assets::gc_note_assets,
             commands::window::confirm_close,
             commands::printing::list_printers,
             commands::printing::export_pdf,

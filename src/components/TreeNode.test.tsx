@@ -76,7 +76,15 @@ describe('TreeNode delete (note)', () => {
     await userEvent.click(screen.getByRole('button', { name: `Delete ${noteEntry.name}` }))
 
     expect(notesApi.delete).toHaveBeenCalledWith(noteEntry.path)
-    expect(useWorkspaceStore.getState().gitPendingPaths).toEqual([noteEntry.path])
+    expect(useWorkspaceStore.getState().gitPendingPaths).toEqual(
+      expect.arrayContaining([
+        noteEntry.path,
+        `${noteEntry.path.replace(/\.md$/, '')}.ink`,
+        `${noteEntry.path.replace(/\.md$/, '')}.pdf`,
+        `${noteEntry.path.replace(/\.md$/, '')}.diagrams`,
+        `${noteEntry.path.replace(/\.md$/, '')}.assets`,
+      ]),
+    )
   })
 
   it('does nothing when the confirm dialog is declined', async () => {

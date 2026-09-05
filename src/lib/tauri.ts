@@ -1,6 +1,8 @@
 import { invoke } from '@tauri-apps/api/core'
 import type { NoteMetadata, WorkspaceState, WorkspaceTree, SearchResult, AppSettings, GraphLink, GraphTag, RepoMode, CommitOutcome, PushOutcome, PullOutcome, RepoInitOutcome, TemplateMetadata, CrossRefTarget, OpenTask, DueCard, Grade, NoteHistoryEntry, BacklinkEntry, PrinterInfo, McGradeResult, CardSummary } from '../types'
 import type { PdfPage, PdfMarkdownImport } from '../pdf/types'
+import { useWorkspaceStore } from '../store/workspace'
+import { sidecarDir } from './pathPrefix'
 
 export const api = {
   notes: {
@@ -124,16 +126,28 @@ export const api = {
       invoke<void>('save_settings', { settings }),
   },
   assets: {
-    write: (notePath: string, mime: string, data: number[]) =>
-      invoke<string>('write_note_asset', { notePath, mime, data }),
+    write: async (notePath: string, mime: string, data: number[]): Promise<string> => {
+      const relative = await invoke<string>('write_note_asset', { notePath, mime, data })
+      // Otherwise a pasted/dropped image never enters the auto-commit's
+      // pending list — only the note.md that links to it does.
+      useWorkspaceStore.getState().addGitPendingPath(sidecarDir(notePath, 'assets'))
+      return relative
+    },
     read: (notePath: string, relative: string) =>
       invoke<string>('read_note_asset', { notePath, relative }),
+    gc: (notePath: string, content: string) =>
+      invoke<void>('gc_note_assets', { notePath, content }),
   },
   pdf: {
     ensureDir: (notePath: string) =>
       invoke<string>('ensure_pdf_dir', { notePath }),
-    importPages: (pdfPath: string, notePath: string) =>
-      invoke<PdfPage[]>('import_pdf_pages', { pdfPath, notePath }),
+    importPages: async (pdfPath: string, notePath: string): Promise<PdfPage[]> => {
+      const pages = await invoke<PdfPage[]>('import_pdf_pages', { pdfPath, notePath })
+      // Otherwise imported PDF pages never enter the auto-commit's pending
+      // list — only the note.md that embeds them does.
+      useWorkspaceStore.getState().addGitPendingPath(sidecarDir(notePath, 'pdf'))
+      return pages
+    },
     readPage: (path: string) =>
       invoke<string>('read_pdf_page', { path }),
     hasTextLayer: (pdfPath: string) =>
