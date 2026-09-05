@@ -5,6 +5,7 @@ import 'katex/dist/katex.min.css'
 import '@xterm/xterm/css/xterm.css'
 import App from "./App";
 import { logError } from "./lib/errorLog";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 
 window.addEventListener('error', (event) => {
   logError('window-error', event.message, event.error instanceof Error ? event.error.stack : undefined)
@@ -25,6 +26,8 @@ console.error = (...args: unknown[]) => {
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
-    <App />
+    <ErrorBoundary>
+      <App />
+    </ErrorBoundary>
   </React.StrictMode>,
 );
