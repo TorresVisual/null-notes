@@ -23,6 +23,9 @@
 - [ ] settings tab needs a redesign pass
 - [ ] Runaway backslash duplication corrupted a task-item line in TODO.md (grew to 65MB/65M backslashes locally; git history already has a 16.8MB `TODO.md` committed at HEAD `c9b1529` from the same bug, doubling roughly each save: 108KB → 124KB → 141KB → 2.2MB → 16.8MB). Ruled out: the shared `prosemirror-markdown`/`tiptap-markdown` parse↔serialize round trip (`esc()` backslash-escaping) — reproduced it directly with `coreExtensions` across repeated open/save cycles, stable, no growth. Still unexplained: what actually duplicates content on save. Candidates to check live (needs the real running app, not vitest): a paste handler or math/`SmartSymbols` input rule misfiring on `\`, or something in the autosave/reindex path re-appending old content instead of replacing it. Needs `main`'s HEAD `TODO.md` history cleaned up too (still 16.8MB there even though the working copy is fixed).
 - [ ] better loading screen
+- [ ] store scroll position
+- [ ] better cram mode design with better completion of category / 
+- [ ] show how many cards are left in current category (cram mode)
 - [x] Dragging a note or folder onto a destination that already had a same-named note/folder silently overwrote it — `move_note_at`/`rename_folder_at` called `fs::rename` straight to the destination, which replaces an existing file on Windows with no warning. Surfaced as a React "duplicate key" console error (two open tabs left pointing at the one surviving path) rather than as the actual data loss. Both now check the destination first and reject the move with an error instead of touching anything.
 - [x] reorder open tabs
 - [x] search doesnt jump

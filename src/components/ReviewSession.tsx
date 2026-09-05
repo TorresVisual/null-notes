@@ -145,7 +145,7 @@ export function ReviewSession({ onClose, mode = { kind: 'due' } }: ReviewSession
         <div className="settings-panel-header">
           <h2>
             {cramStreak !== null
-              ? `Cram — Category ${cramStreak}`
+              ? `Cram — Category ${cramStreak}${queue.length > 0 ? ` (${queue.length} left)` : ''}`
               : `Review${queue.length > 0 ? ` (${queue.length} due)` : ''}`}
           </h2>
           <button className="settings-panel-close" onClick={onClose} aria-label="Close review" title="Close review">

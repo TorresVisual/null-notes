@@ -160,9 +160,9 @@ describe('ReviewSession — cram mode', () => {
     expect(api.notes.listDueCards).not.toHaveBeenCalled()
   })
 
-  it('shows the cram header instead of the due-queue header', async () => {
+  it('shows the cram header with cards remaining instead of the due-queue header', async () => {
     render(<ReviewSession onClose={vi.fn()} mode={{ kind: 'cram', streak: 2 }} />)
-    await waitFor(() => expect(screen.getByText('Cram — Category 2')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText('Cram — Category 2 (2 left)')).toBeInTheDocument())
   })
 
   it('shows the cram-specific empty state when the category has no cards', async () => {

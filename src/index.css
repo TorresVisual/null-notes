@@ -3546,11 +3546,13 @@ code {
   border: 1px solid var(--border-strong);
   border-radius: 8px;
   width: min(680px, calc(100vw - 40px));
+  max-height: calc(85vh - var(--space-lg));
   box-shadow: var(--shadow-modal);
   padding: var(--space-lg);
   display: flex;
   flex-direction: column;
   gap: var(--space-lg);
+  overflow-y: auto;
 }
 
 .review-card {
