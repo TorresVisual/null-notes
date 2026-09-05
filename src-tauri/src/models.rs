@@ -1,6 +1,15 @@
 use crate::sm2;
 use serde::{Deserialize, Serialize};
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ErrorEntry {
+    pub timestamp: String,
+    pub source: String,
+    pub message: String,
+    pub context: Option<String>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 #[serde(rename_all = "camelCase")]
 pub struct NoteMetadata {

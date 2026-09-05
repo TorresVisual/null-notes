@@ -3,6 +3,7 @@ pub mod code_run;
 pub mod crossref;
 pub mod diagrams;
 pub mod editor_launch;
+pub mod error_log;
 pub mod git;
 pub mod ink;
 pub mod notes;

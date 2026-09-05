@@ -5,7 +5,11 @@ pub mod models;
 pub mod pdf;
 pub mod sm2;
 
+use std::path::PathBuf;
+use std::sync::OnceLock;
 use tauri::{Emitter, Manager};
+
+static ERROR_LOG_DIR: OnceLock<PathBuf> = OnceLock::new();
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -25,6 +29,12 @@ pub fn run() {
         })
         .setup(move |app| {
             let data_dir = app.path().app_data_dir()?;
+            let _ = ERROR_LOG_DIR.set(data_dir.clone());
+            std::panic::set_hook(Box::new(|info| {
+                if let Some(dir) = ERROR_LOG_DIR.get() {
+                    commands::error_log::append_entry_sync(dir, "panic", &info.to_string(), None);
+                }
+            }));
             let pool = tauri::async_runtime::block_on(db::init_db(&data_dir))
                 .expect("failed to initialise database");
             app.manage(pool);
@@ -120,6 +130,9 @@ pub fn run() {
             commands::workspace::initial_workspace,
             commands::settings::load_settings,
             commands::settings::save_settings,
+            commands::error_log::record_error,
+            commands::error_log::list_errors,
+            commands::error_log::clear_errors,
             commands::ink::ensure_ink_dir,
             commands::ink::read_ink,
             commands::ink::write_ink,
