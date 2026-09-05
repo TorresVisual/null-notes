@@ -104,6 +104,51 @@ describe('useNote', () => {
     )
   })
 
+  // Regression: gc must see the just-saved content even when the tab closes
+  // in the same tick as the save, before React has re-rendered — otherwise
+  // navigating away right after a paste (before the debounce fires) reaps
+  // the freshly-written image before its reference is ever accounted for.
+  it('gc on close sees content saved in the same tick as the close', async () => {
+    const { result, unmount } = await mountNote()
+
+    // Deliberately not wrapped in `act()`: this is the same synchronous
+    // save-then-navigate-away sequence a real paste-then-click race hits,
+    // with no render in between to flush a ref-mirroring effect.
+    result.current.save('# Note\n![image.png](note.assets/image-1.png)')
+    unmount()
+
+    await waitFor(() =>
+      expect(api.assets.gc).toHaveBeenCalledWith(
+        '/ws/note.md',
+        '# Note\n![image.png](note.assets/image-1.png)',
+      ),
+    )
+  })
+
+  // Regression: switching away (e.g. to Home, path -> null) runs this note's
+  // gc-on-close cleanup AND the next context's "reset to no note" effect in
+  // the same commit. The gc call reads contentRef only after flush()
+  // resolves (a later microtask) — if it reads the *live* ref at that point
+  // rather than a value captured at cleanup time, it sees the new context's
+  // reset content instead of the closing note's, and reaps everything.
+  it('gc on switching away uses the closing note\'s content, not the next context\'s reset', async () => {
+    const { result, rerender } = renderHook(({ path }) => useNote(path), {
+      initialProps: { path: '/ws/note.md' as string | null },
+    })
+    await waitFor(() => expect(result.current.isLoading).toBe(false))
+
+    act(() => result.current.save('# Note\n![image.png](note.assets/image-1.png)'))
+
+    rerender({ path: null })
+
+    await waitFor(() =>
+      expect(api.assets.gc).toHaveBeenCalledWith(
+        '/ws/note.md',
+        '# Note\n![image.png](note.assets/image-1.png)',
+      ),
+    )
+  })
+
   it('reindexes after the file write, on a lazier schedule', async () => {
     const { result } = await mountNote()
 

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { X } from 'lucide-react'
 import { api } from '../lib/tauri'
 import { useWorkspaceStore } from '../store/workspace'
+import { CardText } from './CardText'
 import type { DueCard, Grade } from '../types'
 
 export type ReviewMode = { kind: 'due' } | { kind: 'cram'; streak: number }
@@ -162,7 +163,9 @@ export function ReviewSession({ onClose, mode = { kind: 'due' } }: ReviewSession
         ) : (
           <div className="review-card">
             <p className="review-card-note">{current.noteTitle}</p>
-            <p className="review-card-front">{current.front}</p>
+            <p className="review-card-front">
+              <CardText text={current.front} notePath={current.notePath} />
+            </p>
             {current.kind === 'mc' ? (
               <>
                 <ul className="review-card-options">
@@ -178,7 +181,7 @@ export function ReviewSession({ onClose, mode = { kind: 'due' } }: ReviewSession
                             onChange={() => togglePick(optionIndex)}
                             aria-label={opt}
                           />
-                          {opt}
+                          <CardText text={opt} notePath={current.notePath} />
                         </label>
                       </li>
                     )
@@ -200,7 +203,9 @@ export function ReviewSession({ onClose, mode = { kind: 'due' } }: ReviewSession
               </>
             ) : revealed ? (
               <>
-                <p className="review-card-back">{current.back}</p>
+                <p className="review-card-back">
+                  <CardText text={current.back} notePath={current.notePath} />
+                </p>
                 <div className="review-card-grades">
                   {GRADES.map(({ grade: g, label }) => (
                     <button key={g} className="review-card-grade" onClick={() => grade(g)}>

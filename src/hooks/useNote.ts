@@ -36,13 +36,14 @@ export function useNote(path: string | null) {
   const incoming = useRef<string | null>(null)
   const lastWritten = useRef<string | null>(null)
 
-  useEffect(() => {
-    contentRef.current = content
-  }, [content])
+  const setContentAndRef = useCallback((value: string) => {
+    contentRef.current = value
+    setContent(value)
+  }, [])
 
   useEffect(() => {
     if (!path) {
-      setContent('')
+      setContentAndRef('')
       return
     }
     setIsLoading(true)
@@ -52,10 +53,10 @@ export function useNote(path: string | null) {
     lastWritten.current = null
     api.notes
       .open(path)
-      .then(setContent)
+      .then(setContentAndRef)
       .catch((e: unknown) => setSaveError(`Could not open note: ${String(e)}`))
       .finally(() => setIsLoading(false))
-  }, [path])
+  }, [path, setContentAndRef])
 
   const flushIndex = useCallback(async () => {
     if (indexTimer.current) {
@@ -122,14 +123,14 @@ export function useNote(path: string | null) {
 
   const save = useCallback(
     (markdown: string) => {
-      setContent(markdown)
+      setContentAndRef(markdown)
       if (!path || !workspacePath) return
       pendingWrite.current = { path, workspace: workspacePath, content: markdown }
       setSaveState('dirty')
       if (saveTimer.current) clearTimeout(saveTimer.current)
       saveTimer.current = setTimeout(() => void flushSave(), saveDebounceMs)
     },
-    [path, workspacePath, flushSave, saveDebounceMs],
+    [path, workspacePath, flushSave, saveDebounceMs, setContentAndRef],
   )
 
   // Dismissing only hides the message — the buffer stays dirty and will retry
@@ -155,11 +156,11 @@ export function useNote(path: string | null) {
         setConflict(true)
         return
       }
-      setContent(fresh)
+      setContentAndRef(fresh)
       setSaveState('clean')
     })
     return () => void unlisten.then((off) => off())
-  }, [path])
+  }, [path, setContentAndRef])
 
   const keepMine = useCallback(() => {
     incoming.current = null
@@ -178,10 +179,10 @@ export function useNote(path: string | null) {
     }
     pendingWrite.current = null
     lastWritten.current = fresh
-    setContent(fresh)
+    setContentAndRef(fresh)
     setSaveState('clean')
     setSaveError(null)
-  }, [])
+  }, [setContentAndRef])
 
   // GC runs after the final flush, not on every keystroke — deleting an
   // orphaned image immediately would out-race ProseMirror's undo stack and
@@ -190,9 +191,15 @@ export function useNote(path: string | null) {
   useEffect(
     () => () => {
       const notePath = path
+      // Captured now, synchronously — by the time flush() resolves, the
+      // note being switched to (even "no note", i.e. Home) has already run
+      // its own effect and reset contentRef.current for its own context.
+      // Reading the ref inside the .then() below would gc this note's
+      // assets against that other note's content instead of its own.
+      const contentAtClose = contentRef.current
       void flush().then(() => {
         if (!notePath) return
-        void api.assets.gc(notePath, contentRef.current).then(() => {
+        void api.assets.gc(notePath, contentAtClose).then(() => {
           useWorkspaceStore.getState().addGitPendingPath(sidecarDir(notePath, 'assets'))
         })
       })

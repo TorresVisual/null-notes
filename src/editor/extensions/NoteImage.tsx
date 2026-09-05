@@ -1,4 +1,3 @@
-import { useEffect, useState } from 'react'
 import { Node, mergeAttributes } from '@tiptap/core'
 import type { Editor } from '@tiptap/core'
 import { Plugin } from '@tiptap/pm/state'
@@ -6,6 +5,7 @@ import type { EditorView } from '@tiptap/pm/view'
 import { ReactNodeViewRenderer, NodeViewWrapper } from '@tiptap/react'
 import type { ReactNodeViewProps } from '@tiptap/react'
 import { api } from '../../lib/tauri'
+import { useResolvedAssetSrc } from '../../hooks/useResolvedAssetSrc'
 
 interface NoteImageAttrs {
   src: string
@@ -13,10 +13,6 @@ interface NoteImageAttrs {
   title: string | null
   width: number | null
   height: number | null
-}
-
-function isExternal(src: string): boolean {
-  return /^(https?:|data:)/.test(src)
 }
 
 // Sidecar directories are named after the note, so they routinely contain
@@ -45,30 +41,7 @@ export function decodeSrc(src: string): string {
 function NoteImageView({ node, editor }: ReactNodeViewProps) {
   const { src, alt, title } = node.attrs as unknown as NoteImageAttrs
   const notePath = editor.storage.noteContext.notePath
-  const [resolved, setResolved] = useState<string | null>(null)
-  const [failed, setFailed] = useState(false)
-
-  useEffect(() => {
-    let cancelled = false
-    setResolved(null)
-    setFailed(false)
-    if (!src) return
-    if (isExternal(src)) {
-      setResolved(src)
-      return
-    }
-    api.assets
-      .read(notePath, src)
-      .then((base64) => {
-        if (!cancelled) setResolved(`data:image;base64,${base64}`)
-      })
-      .catch(() => {
-        if (!cancelled) setFailed(true)
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [src, notePath])
+  const { resolved, failed } = useResolvedAssetSrc(notePath, src)
 
   return (
     <NodeViewWrapper as="span" className="note-image">

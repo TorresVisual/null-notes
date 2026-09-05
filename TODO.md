@@ -16,13 +16,14 @@
 - [ ] Recent workspaces in right click menu
 - [ ] pasting markdown gets code block with language set to markdown (pasting is entirely broken)
 - [ ] renaming doesnt stick title is still old
-- [ ] add images to flashcards (also reveal backside image as answer)
+- [x] add images to flashcards (also reveal backside image as answer)
 - [ ] markdown render arrows (-&gt; / &lt;-&gt; / &lt;-) (renders in source but not in preview)
 - [ ] Search needs major improvements
 - [ ] Console warning: "flushSync was called from inside a lifecycle method" — comes from `@tiptap/react`'s `ReactRenderer` (node_modules/@tiptap/react/src/ReactRenderer.tsx:193), which flushSyncs on first render of a `ReactNodeViewRenderer` node view (wiki-links/hover-previews) to keep cursor position stable. Fires when that node view mounts during another component's React commit phase. Cosmetic/upstream so far — no reproduced functional break; find which call site creates the node view mid-lifecycle if it needs fixing.
 - [ ] settings tab needs a redesign pass
 - [ ] Runaway backslash duplication corrupted a task-item line in TODO.md (grew to 65MB/65M backslashes locally; git history already has a 16.8MB `TODO.md` committed at HEAD `c9b1529` from the same bug, doubling roughly each save: 108KB → 124KB → 141KB → 2.2MB → 16.8MB). Ruled out: the shared `prosemirror-markdown`/`tiptap-markdown` parse↔serialize round trip (`esc()` backslash-escaping) — reproduced it directly with `coreExtensions` across repeated open/save cycles, stable, no growth. Still unexplained: what actually duplicates content on save. Candidates to check live (needs the real running app, not vitest): a paste handler or math/`SmartSymbols` input rule misfiring on `\`, or something in the autosave/reindex path re-appending old content instead of replacing it. Needs `main`'s HEAD `TODO.md` history cleaned up too (still 16.8MB there even though the working copy is fixed).
 - [ ] better loading screen
+- [x] Dragging a note or folder onto a destination that already had a same-named note/folder silently overwrote it — `move_note_at`/`rename_folder_at` called `fs::rename` straight to the destination, which replaces an existing file on Windows with no warning. Surfaced as a React "duplicate key" console error (two open tabs left pointing at the one surviving path) rather than as the actual data loss. Both now check the destination first and reject the move with an error instead of touching anything.
 - [x] reorder open tabs
 - [x] search doesnt jump
 - [x] all . folders aren't auto committed deleted and renamed files are also an issue
@@ -50,7 +51,6 @@
 - [x] links and history at the bottom of notes should be collapsed by default
 - [x] Better Home screen
 - [x] Proper study feature with flashcard system
-- [x] Dragging a note or folder onto a destination that already had a same-named note/folder silently overwrote it — `move_note_at`/`rename_folder_at` called `fs::rename` straight to the destination, which replaces an existing file on Windows with no warning. Surfaced as a React "duplicate key" console error (two open tabs left pointing at the one surviving path) rather than as the actual data loss. Both now check the destination first and reject the move with an error instead of touching anything.
 
 ---
 
