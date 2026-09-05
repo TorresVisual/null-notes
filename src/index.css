@@ -440,6 +440,7 @@ button, [role="button"], .tree-row, .tab, .search-result, .slash-menu-item,
   to { background: transparent; }
 }
 .tab-flash { animation: tab-flash 900ms var(--ease-standard); }
+.tab-dragging { opacity: 0.5; }
 
 /* Editor scroll container — full width so the scrollbar sits at the window edge */
 /* .editor-scroll fills the whole row; the outline rail is an absolutely

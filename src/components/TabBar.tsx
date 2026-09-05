@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { X } from 'lucide-react'
 import { useWorkspaceStore } from '../store/workspace'
 import { SaveStatus } from './SaveStatus'
@@ -26,8 +27,9 @@ export function TabBar({
   gitCommitStatus,
   gitCommitDetail,
 }: TabBarProps) {
-  const { openTabs, activeTab, setActiveTab, closeTab, flashTabPath, setFlashTabPath } =
+  const { openTabs, activeTab, setActiveTab, closeTab, flashTabPath, setFlashTabPath, reorderTabs } =
     useWorkspaceStore()
+  const [draggedPath, setDraggedPath] = useState<string | null>(null)
   if (openTabs.length === 0) return null
   return (
     <div className="tab-bar" role="tablist">
@@ -41,9 +43,18 @@ export function TabBar({
               key={path}
               role="tab"
               aria-selected={isActive}
-              className={`tab${isActive ? ' active' : ''}${isFlashing ? ' tab-flash' : ''}`}
+              draggable
+              className={`tab${isActive ? ' active' : ''}${isFlashing ? ' tab-flash' : ''}${draggedPath === path ? ' tab-dragging' : ''}`}
               onAnimationEnd={() => {
                 if (isFlashing) setFlashTabPath(null)
+              }}
+              onDragStart={() => setDraggedPath(path)}
+              onDragEnd={() => setDraggedPath(null)}
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={(e) => {
+                e.preventDefault()
+                if (draggedPath) reorderTabs(draggedPath, path)
+                setDraggedPath(null)
               }}
             >
               <button onClick={() => setActiveTab(path)} title={name}>{name}</button>

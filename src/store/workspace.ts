@@ -36,6 +36,7 @@ interface WorkspaceStore {
   closeTab: (notePath: string) => void
   reopenClosedTab: () => void
   setActiveTab: (notePath: string | null) => void
+  reorderTabs: (fromPath: string, toPath: string) => void
   toggleFolder: (folderPath: string) => void
   expandFolder: (folderPath: string) => void
   setExpandedFolders: (paths: string[]) => void
@@ -135,6 +136,15 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   },
 
   setActiveTab: (notePath) => set({ activeTab: notePath }),
+
+  reorderTabs: (fromPath, toPath) => {
+    if (fromPath === toPath) return
+    const { openTabs } = get()
+    const next = openTabs.filter((p) => p !== fromPath)
+    const toIndex = next.indexOf(toPath)
+    next.splice(toIndex, 0, fromPath)
+    set({ openTabs: next })
+  },
 
   toggleFolder: (folderPath) => {
     const { expandedFolders } = get()

@@ -145,6 +145,21 @@ describe('useWorkspaceStore', () => {
     expect(useWorkspaceStore.getState().openTabs).toEqual(['/ws/Course10/b.md'])
   })
 
+  it('reorderTabs moves a tab to sit before its drop target', () => {
+    useWorkspaceStore.getState().openTab('/ws/a.md')
+    useWorkspaceStore.getState().openTab('/ws/b.md')
+    useWorkspaceStore.getState().openTab('/ws/c.md')
+    useWorkspaceStore.getState().reorderTabs('/ws/c.md', '/ws/a.md')
+    expect(useWorkspaceStore.getState().openTabs).toEqual(['/ws/c.md', '/ws/a.md', '/ws/b.md'])
+  })
+
+  it('reorderTabs is a no-op when dragged onto itself', () => {
+    useWorkspaceStore.getState().openTab('/ws/a.md')
+    useWorkspaceStore.getState().openTab('/ws/b.md')
+    useWorkspaceStore.getState().reorderTabs('/ws/a.md', '/ws/a.md')
+    expect(useWorkspaceStore.getState().openTabs).toEqual(['/ws/a.md', '/ws/b.md'])
+  })
+
   it('sets and clears the folder error message', () => {
     useWorkspaceStore.getState().setFolderError('a folder named X already exists')
     expect(useWorkspaceStore.getState().folderError).toBe('a folder named X already exists')
