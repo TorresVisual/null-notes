@@ -16,6 +16,13 @@ pub fn run() {
     let initial_workspace =
         commands::workspace::initial_workspace_from_args(std::env::args().skip(1));
 
+    #[cfg(windows)]
+    unsafe {
+        let _ = windows::Win32::UI::Shell::SetCurrentProcessExplicitAppUserModelID(
+            windows::core::w!("dev.nullnotes.app"),
+        );
+    }
+
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
