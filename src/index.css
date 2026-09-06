@@ -1702,10 +1702,23 @@ code {
   top: 0;
   z-index: 5;
   background: var(--bg-base);
-  /* One row that scrolls, never one that wraps: a bar which changes height
-     when you switch tools shifts the note under your pen mid-stroke. */
-  overflow-x: auto;
   flex-wrap: nowrap;
+}
+
+/* The scrollable part of the bar. Same "scroll, never wrap" reasoning as
+   before, but narrowed to just the icon groups: `.code-language-control`
+   used to live in this same scroll region via `margin-left: auto`, which
+   let a narrow window scroll it fully out of view with no visible control
+   left to reach it. Same fix as the tab bar's `.tab-bar-tabs`/
+   `.tab-bar-status` split — pin the one thing that must stay reachable
+   outside the region that scrolls. */
+.editor-toolbar-scroll {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  overflow-x: auto;
+  flex: 1;
+  min-width: 0;
 }
 
 .toolbar-group {
@@ -1747,7 +1760,7 @@ code {
   display: flex;
   align-items: center;
   gap: 6px;
-  margin-left: auto;
+  flex: none;
   color: var(--text-tertiary);
   font-size: 12px;
 }

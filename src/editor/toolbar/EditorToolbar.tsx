@@ -74,11 +74,18 @@ export function EditorToolbar({ editor, notePath }: EditorToolbarProps) {
         <InkToolGroup />
       ) : (
         <>
-          {editor && <InsertGroup editor={editor} notePath={notePath} />}
-          {editor && <span className="toolbar-sep" aria-hidden />}
-          {editor && <SheetGroup editor={editor} />}
-          {editor && <span className="toolbar-sep" aria-hidden />}
-          {editor && (codeBlockState.active ? (
+          <div className="editor-toolbar-scroll">
+            {editor && <InsertGroup editor={editor} notePath={notePath} />}
+            {editor && <span className="toolbar-sep" aria-hidden />}
+            {editor && <SheetGroup editor={editor} />}
+            {editor && !codeBlockState.active && (
+              <>
+                <span className="toolbar-sep" aria-hidden />
+                <TextFormatGroup editor={editor} />
+              </>
+            )}
+          </div>
+          {editor && codeBlockState.active && (
             <label className="code-language-control">
               <span>Language</span>
               <select
@@ -126,9 +133,7 @@ export function EditorToolbar({ editor, notePath }: EditorToolbarProps) {
                 <option value="yaml">YAML</option>
               </select>
             </label>
-          ) : (
-            <TextFormatGroup editor={editor} />
-          ))}
+          )}
         </>
       )}
     </div>
