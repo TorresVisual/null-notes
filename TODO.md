@@ -7,7 +7,6 @@
 - [ ] Mobile app (need to think how we get syncing working)
 - [ ] Web app (no local md files fully git)
 - [ ] add a open in null notes in my ide
-- [x] fix top toolbar — the code-block language `<select>` was pinned right via `margin-left: auto` inside the same `overflow-x: auto` region as the icon buttons, so at a narrow window it scrolled fully out of view with nothing left to click. Split into a scrolling `.editor-toolbar-scroll` for the icon groups and a pinned `.code-language-control`, same pattern as the tab bar's `.tab-bar-tabs`/`.tab-bar-status` split.
 - [ ] editing larger notes is extremely laggy
 - [ ] when we select what do we want to copy? (currently its the markdown this is a design question)
 - [ ] pasting markdown gets code block with language set to markdown (pasting is entirely broken)
@@ -27,6 +26,7 @@
 
   )
 - [ ] Shell extension open in null notes (both for folder (workspace) and single files that get copied into a temp workspace)
+- [x] fix top toolbar — the code-block language `<select>` was pinned right via `margin-left: auto` inside the same `overflow-x: auto` region as the icon buttons, so at a narrow window it scrolled fully out of view with nothing left to click. Split into a scrolling `.editor-toolbar-scroll` for the icon groups and a pinned `.code-language-control`, same pattern as the tab bar's `.tab-bar-tabs`/`.tab-bar-status` split.
 - [x] Left sidebar needs a design update (especially files and folders)
 - [x] Close Workspace
 - [x] Recent workspaces
