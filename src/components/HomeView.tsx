@@ -1,16 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import { History, Clock, ListTodo, GraduationCap, GitBranch } from 'lucide-react'
 import { useWorkspaceStore } from '../store/workspace'
-import { useNotesStore } from '../store/notes'
+import { useNotesStore, noteTitle } from '../store/notes'
 import { api } from '../lib/tauri'
 import { buildHomeSummary } from '../lib/homeSummary'
 import type { OpenTask, DueCard } from '../types'
 
 const SECTION_CAP = 5
-
-function tabLabel(path: string): string {
-  return path.split(/[\\/]/).pop()?.replace('.md', '') ?? path
-}
 
 function relativeTime(ms: number): string {
   const diffMin = Math.round((Date.now() - ms) / 60_000)
@@ -85,7 +81,7 @@ export function HomeView({ onOpenTaskView, onOpenReview, onOpenDeckView, onOpenS
             {continueItems.map((path) => (
               <li key={path}>
                 <button className="home-section-item" onClick={() => setActiveTab(path)}>
-                  {tabLabel(path)}
+                  {noteTitle(notes, path)}
                 </button>
               </li>
             ))}

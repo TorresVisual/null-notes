@@ -1,6 +1,15 @@
 import { create } from 'zustand'
 import type { NoteMetadata } from '../types'
 import { forgetPosition } from '../lib/notePositions'
+import { folderName } from '../lib/pathPrefix'
+
+// The tree already reads a note's display name from its title (the H1
+// heading), not its filename — rename_note rewrites that heading in place
+// without touching the file on disk. Anywhere else that shows a note's name
+// needs the same lookup, or it keeps showing the pre-rename filename forever.
+export function noteTitle(notes: NoteMetadata[], path: string): string {
+  return notes.find((n) => n.path === path)?.title ?? folderName(path).replace(/\.md$/, '')
+}
 
 interface NotesStore {
   notes: NoteMetadata[]

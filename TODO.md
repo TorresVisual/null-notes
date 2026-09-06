@@ -7,7 +7,7 @@
 - [ ] Mobile app (need to think how we get syncing working)
 - [ ] Web app (no local md files fully git)
 - [ ] add a open in null notes in my ide
-- [ ] renaming doesnt stick title is still old
+- [x] renaming doesnt stick title is still old
 - [ ] markdown render arrows (-&gt; / &lt;-&gt; / &lt;-) (renders in source but not in preview)
 - [ ] Search in note (ctrl f) needs major improvements
 - [ ] Console warning: "flushSync was called from inside a lifecycle method" — comes from `@tiptap/react`'s `ReactRenderer` (node_modules/@tiptap/react/src/ReactRenderer.tsx:193), which flushSyncs on first render of a `ReactNodeViewRenderer` node view (wiki-links/hover-previews) to keep cursor position stable. Fires when that node view mounts during another component's React commit phase. Cosmetic/upstream so far — no reproduced functional break; find which call site creates the node view mid-lifecycle if it needs fixing.

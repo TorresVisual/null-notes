@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { X } from 'lucide-react'
 import { useWorkspaceStore } from '../store/workspace'
+import { useNotesStore, noteTitle } from '../store/notes'
 import { SaveStatus } from './SaveStatus'
 import { GitCommitStatus } from './GitCommitStatus'
 import type { SaveState } from '../hooks/useNote'
@@ -29,13 +30,14 @@ export function TabBar({
 }: TabBarProps) {
   const { openTabs, activeTab, setActiveTab, closeTab, flashTabPath, setFlashTabPath, reorderTabs } =
     useWorkspaceStore()
+  const notes = useNotesStore((s) => s.notes)
   const [draggedPath, setDraggedPath] = useState<string | null>(null)
   if (openTabs.length === 0) return null
   return (
     <div className="tab-bar" role="tablist">
       <div className="tab-bar-tabs">
         {openTabs.map((path) => {
-          const name = path.split(/[\\/]/).pop()?.replace('.md', '') ?? path
+          const name = noteTitle(notes, path)
           const isActive = path === activeTab
           const isFlashing = path === flashTabPath
           return (
