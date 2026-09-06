@@ -6,6 +6,7 @@ pub mod editor_launch;
 pub mod error_log;
 pub mod git;
 pub mod ink;
+pub mod jumplist;
 pub mod notes;
 pub mod pdf;
 pub mod printing;
