@@ -36,6 +36,13 @@ pub fn run() {
         })
         .setup(move |app| {
             let data_dir = app.path().app_data_dir()?;
+            #[cfg(windows)]
+            {
+                let recents =
+                    tauri::async_runtime::block_on(commands::workspace::present_recents(&data_dir))
+                        .unwrap_or_default();
+                let _ = commands::jumplist::rebuild(&recents);
+            }
             let _ = ERROR_LOG_DIR.set(data_dir.clone());
             std::panic::set_hook(Box::new(|info| {
                 if let Some(dir) = ERROR_LOG_DIR.get() {

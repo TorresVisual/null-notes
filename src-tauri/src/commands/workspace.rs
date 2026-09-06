@@ -33,7 +33,7 @@ async fn read_recents(dir: &Path) -> anyhow::Result<Vec<String>> {
 
 // A workspace on an unplugged drive is hidden from the picker but kept in the
 // file, so it comes back on its own rather than being forgotten.
-async fn present_recents(dir: &Path) -> anyhow::Result<Vec<String>> {
+pub(crate) async fn present_recents(dir: &Path) -> anyhow::Result<Vec<String>> {
     let mut present = Vec::new();
     for path in read_recents(dir).await? {
         if tokio::fs::try_exists(&path).await.unwrap_or(false) {
@@ -83,7 +83,10 @@ pub async fn recent_workspaces(app: AppHandle) -> Result<Vec<String>, String> {
 #[tauri::command]
 pub async fn remember_workspace(app: AppHandle, path: String) -> Result<Vec<String>, String> {
     let dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
-    push_recent(&dir, &path).await.map_err(|e| e.to_string())
+    let recents = push_recent(&dir, &path).await.map_err(|e| e.to_string())?;
+    #[cfg(windows)]
+    let _ = crate::commands::jumplist::rebuild(&recents);
+    Ok(recents)
 }
 
 #[tauri::command]
