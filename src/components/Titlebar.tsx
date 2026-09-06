@@ -9,6 +9,7 @@ import {
   DropdownMenuShortcut,
   DropdownMenuTrigger,
 } from './ui/dropdown-menu'
+import { folderName } from '../lib/pathPrefix'
 
 interface MenuEntry {
   id: string
@@ -23,23 +24,26 @@ type MenuItemSpec = MenuEntry | { separator: true }
 // dropped: clipboard shortcuts work natively without a menu entry, and Quit
 // is now just the close button, routed through the same flush-before-close
 // path instead of bypassing it.
-const FILE_MENU: MenuItemSpec[] = [
-  { id: 'new-note', label: 'New Note', accel: 'Ctrl+N' },
-  { id: 'new-folder', label: 'New Folder', accel: 'Ctrl+Shift+N' },
-  { id: 'new-canvas', label: 'New Canvas Note' },
-  { id: 'new-from-template', label: 'New from Template…', accel: 'Ctrl+Shift+T' },
-  { separator: true },
-  { id: 'open-workspace', label: 'Open Workspace…', accel: 'Ctrl+O' },
-  { id: 'close-workspace', label: 'Close Workspace' },
-  { separator: true },
-  { id: 'split-tasks', label: 'Split Into Tasks' },
-  { id: 'generate-formula-sheet', label: 'Generate Formula Sheet…' },
-  { separator: true },
-  { id: 'export-pdf', label: 'Export to PDF…' },
-  { id: 'print', label: 'Print…' },
-  { separator: true },
-  { id: 'settings', label: 'Settings…', accel: 'Ctrl+,' },
-]
+function buildFileMenu(recentWorkspaces: string[]): MenuItemSpec[] {
+  return [
+    { id: 'new-note', label: 'New Note', accel: 'Ctrl+N' },
+    { id: 'new-folder', label: 'New Folder', accel: 'Ctrl+Shift+N' },
+    { id: 'new-canvas', label: 'New Canvas Note' },
+    { id: 'new-from-template', label: 'New from Template…', accel: 'Ctrl+Shift+T' },
+    { separator: true },
+    { id: 'open-workspace', label: 'Open Workspace…', accel: 'Ctrl+O' },
+    { id: 'close-workspace', label: 'Close Workspace' },
+    ...recentWorkspaces.map((path) => ({ id: `open-recent:${path}`, label: folderName(path) })),
+    { separator: true },
+    { id: 'split-tasks', label: 'Split Into Tasks' },
+    { id: 'generate-formula-sheet', label: 'Generate Formula Sheet…' },
+    { separator: true },
+    { id: 'export-pdf', label: 'Export to PDF…' },
+    { id: 'print', label: 'Print…' },
+    { separator: true },
+    { id: 'settings', label: 'Settings…', accel: 'Ctrl+,' },
+  ]
+}
 
 const VIEW_MENU: MenuItemSpec[] = [
   { id: 'home', label: 'Home', accel: 'Ctrl+H' },
@@ -61,9 +65,10 @@ const VIEW_MENU: MenuItemSpec[] = [
 interface TitlebarProps {
   title: string
   onCommand: (id: string) => void
+  recentWorkspaces?: string[]
 }
 
-export function Titlebar({ title, onCommand }: TitlebarProps) {
+export function Titlebar({ title, onCommand, recentWorkspaces = [] }: TitlebarProps) {
   const [maximized, setMaximized] = useState(false)
 
   useEffect(() => {
@@ -76,7 +81,7 @@ export function Titlebar({ title, onCommand }: TitlebarProps) {
   return (
     <div className="titlebar" data-tauri-drag-region>
       <div className="titlebar-menus">
-        <TitlebarMenu label="File" items={FILE_MENU} onCommand={onCommand} />
+        <TitlebarMenu label="File" items={buildFileMenu(recentWorkspaces)} onCommand={onCommand} />
         <TitlebarMenu label="View" items={VIEW_MENU} onCommand={onCommand} />
       </div>
       <div

@@ -43,6 +43,31 @@ describe('Titlebar', () => {
     expect(onCommand).toHaveBeenCalledWith('close-workspace')
   })
 
+  it('lists recent workspaces under Open Workspace, most-recent first', async () => {
+    const user = userEvent.setup()
+    render(
+      <Titlebar
+        title="null-notes"
+        onCommand={vi.fn()}
+        recentWorkspaces={['/ws/Lecture Notes', '/ws/CS 101']}
+      />,
+    )
+    await user.click(screen.getByText('File'))
+    expect(await screen.findByText('Lecture Notes')).toBeInTheDocument()
+    expect(screen.getByText('CS 101')).toBeInTheDocument()
+  })
+
+  it('dispatches open-recent:<path> when a recent workspace is picked', async () => {
+    const user = userEvent.setup()
+    const onCommand = vi.fn()
+    render(
+      <Titlebar title="null-notes" onCommand={onCommand} recentWorkspaces={['/ws/Lecture Notes']} />,
+    )
+    await user.click(screen.getByText('File'))
+    await user.click(await screen.findByText('Lecture Notes'))
+    expect(onCommand).toHaveBeenCalledWith('open-recent:/ws/Lecture Notes')
+  })
+
   it('wires the window controls to the Tauri window API', () => {
     render(<Titlebar title="null-notes" onCommand={vi.fn()} />)
     fireEvent.click(screen.getByLabelText('Minimize'))
