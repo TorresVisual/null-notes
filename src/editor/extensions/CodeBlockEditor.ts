@@ -1,5 +1,5 @@
 import { CodeBlockLowlight } from '@tiptap/extension-code-block-lowlight'
-import { Plugin, TextSelection } from '@tiptap/pm/state'
+import { Plugin, PluginKey, TextSelection } from '@tiptap/pm/state'
 import type { Transaction } from '@tiptap/pm/state'
 import { liftListItem, sinkListItem } from '@tiptap/pm/schema-list'
 import { joinTextblockBackward } from '@tiptap/pm/commands'
@@ -269,11 +269,50 @@ export const CodeBlockEditor = CodeBlockLowlight.extend({
   },
 
   addProseMirrorPlugins() {
-    const parentPlugins = this.parent?.() ?? []
+    // @tiptap/extension-code-block's own "codeBlockVSCodeHandler" plugin
+    // (inherited via CodeBlockLowlight) wraps ANY paste tagged with
+    // clipboard mimetype `vscode-editor-data` into a single code block using
+    // that source editor's language mode — unconditionally, before
+    // tiptap-markdown's paste parser ever runs. VS Code (and the
+    // Monaco/CodeMirror embeds many doc sites use) tags a copied markdown
+    // file with mode "markdown", so pasting a note's own source text turned
+    // into one giant `language: markdown` code block instead of content.
+    // Swap in the same plugin minus that one case; everything else (Python,
+    // Rust, ...) still auto-detects as before.
+    // `.key` is set at runtime (prosemirror-state's Plugin constructor) but
+    // not part of the public .d.ts.
+    const parentPlugins = (this.parent?.() ?? []).filter(
+      (plugin) => !(plugin as unknown as { key: string }).key.startsWith('codeBlockVSCodeHandler$'),
+    )
     const lowlight = this.options.lowlight as AutoDetectLowlight
 
     return [
       ...parentPlugins,
+      new Plugin({
+        key: new PluginKey('codeBlockVSCodeHandler'),
+        props: {
+          handlePaste: (view, event) => {
+            if (!event.clipboardData) return false
+            if (this.editor.isActive(this.type.name)) return false
+
+            const text = event.clipboardData.getData('text/plain')
+            const vscode = event.clipboardData.getData('vscode-editor-data')
+            const vscodeData = vscode ? (JSON.parse(vscode) as { mode?: string }) : undefined
+            const language = vscodeData?.mode
+            if (!text || !language || language === 'markdown') return false
+
+            const { tr, schema } = view.state
+            const textNode = schema.text(text.replace(/\r\n?/g, '\n'))
+            tr.replaceSelectionWith(this.type.create({ language }, textNode))
+            if (tr.selection.$from.parent.type !== this.type) {
+              tr.setSelection(TextSelection.near(tr.doc.resolve(Math.max(0, tr.selection.from - 2))))
+            }
+            tr.setMeta('paste', true)
+            view.dispatch(tr)
+            return true
+          },
+        },
+      }),
       new Plugin({
         appendTransaction: (transactions, _oldState, newState) => detectPastedLanguage(lowlight, transactions, newState),
       }),

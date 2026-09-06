@@ -7,12 +7,9 @@
 - [ ] Mobile app (need to think how we get syncing working)
 - [ ] Web app (no local md files fully git)
 - [ ] add a open in null notes in my ide
-
-- [ ] when we select what do we want to copy? (currently its the markdown this is a design question)
-- [ ] pasting markdown gets code block with language set to markdown (pasting is entirely broken)
 - [ ] renaming doesnt stick title is still old
 - [ ] markdown render arrows (-&gt; / &lt;-&gt; / &lt;-) (renders in source but not in preview)
-- [ ] Search needs major improvements
+- [ ] Search in note (ctrl f) needs major improvements
 - [ ] Console warning: "flushSync was called from inside a lifecycle method" — comes from `@tiptap/react`'s `ReactRenderer` (node_modules/@tiptap/react/src/ReactRenderer.tsx:193), which flushSyncs on first render of a `ReactNodeViewRenderer` node view (wiki-links/hover-previews) to keep cursor position stable. Fires when that node view mounts during another component's React commit phase. Cosmetic/upstream so far — no reproduced functional break; find which call site creates the node view mid-lifecycle if it needs fixing.
 - [ ] settings tab needs a redesign pass
 - [ ] Runaway backslash duplication corrupted a task-item line in TODO.md (grew to 65MB/65M backslashes locally; git history already has a 16.8MB `TODO.md` committed at HEAD `c9b1529` from the same bug, doubling roughly each save: 108KB → 124KB → 141KB → 2.2MB → 16.8MB). Ruled out: the shared `prosemirror-markdown`/`tiptap-markdown` parse↔serialize round trip (`esc()` backslash-escaping) — reproduced it directly with `coreExtensions` across repeated open/save cycles, stable, no growth. Still unexplained: what actually duplicates content on save. Candidates to check live (needs the real running app, not vitest): a paste handler or math/`SmartSymbols` input rule misfiring on `\`, or something in the autosave/reindex path re-appending old content instead of replacing it. Needs `main`'s HEAD `TODO.md` history cleaned up too (still 16.8MB there even though the working copy is fixed).
@@ -26,6 +23,7 @@
 
   )
 - [ ] Shell extension open in null notes (both for folder (workspace) and single files that get copied into a temp workspace)
+- [x] pasting markdown gets code block with language set to markdown (pasting is entirely broken) — two separate paste bugs. (1) `@tiptap/extension-code-block`'s built-in `codeBlockVSCodeHandler` paste plugin unconditionally wrapped any clipboard tagged with `vscode-editor-data` (VS Code, and Monaco/CodeMirror-based doc sites) into one code block using that editor's language mode, hijacking the paste before tiptap-markdown's own parser ran — now skipped specifically when the mode is `markdown`, so real-language pastes (Python, Rust, ...) still auto-detect as before. (2) `DivBlock`'s parse rule matched any generic `<div>`, and real websites wrap nearly everything in layout divs, so pasted web content round-tripped into literal `<div>` markup — now unwrapped out of pasted HTML via `transformPastedHTML` before the schema parses it (loaded `.md` files with intentional `<div align="center">` etc. are untouched, since that path doesn't go through paste).
 - [x] editing larger notes is extremely laggy
 - [x] fix top toolbar — the code-block language `<select>` was pinned right via `margin-left: auto` inside the same `overflow-x: auto` region as the icon buttons, so at a narrow window it scrolled fully out of view with nothing left to click. Split into a scrolling `.editor-toolbar-scroll` for the icon groups and a pinned `.code-language-control`, same pattern as the tab bar's `.tab-bar-tabs`/`.tab-bar-status` split.
 - [x] Left sidebar needs a design update (especially files and folders)

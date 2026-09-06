@@ -1,4 +1,5 @@
 import { Node, mergeAttributes } from '@tiptap/core'
+import { Plugin } from '@tiptap/pm/state'
 
 interface DivBlockAttrs {
   align: string | null
@@ -56,6 +57,30 @@ export const DivBlock = Node.create({
 
   renderHTML({ HTMLAttributes }) {
     return ['div', mergeAttributes(HTMLAttributes), 0]
+  },
+
+  // Real websites wrap nearly all content in layout <div>s that carry no
+  // meaning for a note — left alone, every one of them round-trips into
+  // literal <div> markup in the saved markdown. Unwrap generic divs out of
+  // pasted HTML before the schema ever parses it; this only touches paste
+  // (not a loaded .md file's own intentional `<div align="center">` etc.),
+  // and skips `[data-type]` divs so internal copy-paste of Callout/Details
+  // content is untouched.
+  addProseMirrorPlugins() {
+    return [
+      new Plugin({
+        props: {
+          transformPastedHTML(html) {
+            const wrapper = document.createElement('div')
+            wrapper.innerHTML = html
+            wrapper.querySelectorAll('div:not([data-type])').forEach((div) => {
+              div.replaceWith(...Array.from(div.childNodes))
+            })
+            return wrapper.innerHTML
+          },
+        },
+      }),
+    ]
   },
 
   addStorage() {
