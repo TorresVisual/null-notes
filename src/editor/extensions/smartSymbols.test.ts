@@ -66,6 +66,24 @@ describe('smart symbols', () => {
     expect(markdown(e)).toBe('a ≥ b')
   })
 
+  it('converts a typed "->" to →', () => {
+    const e = mount('')
+    type(e, 'a -> b')
+    expect(markdown(e)).toBe('a → b')
+  })
+
+  it('converts a typed "<-" to ←', () => {
+    const e = mount('')
+    type(e, 'a <- b')
+    expect(markdown(e)).toBe('a ← b')
+  })
+
+  it('converts a typed "<->" to ↔', () => {
+    const e = mount('')
+    type(e, 'a <-> b')
+    expect(markdown(e)).toBe('a ↔ b')
+  })
+
   it('leaves "!=" untouched inside a code block', () => {
     const e = mount('')
     e.commands.setCodeBlock()

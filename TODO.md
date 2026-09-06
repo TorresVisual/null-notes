@@ -7,8 +7,7 @@
 - [ ] Mobile app (need to think how we get syncing working)
 - [ ] Web app (no local md files fully git)
 - [ ] add a open in null notes in my ide
-- [x] renaming doesnt stick title is still old
-- [ ] markdown render arrows (-&gt; / &lt;-&gt; / &lt;-) (renders in source but not in preview)
+- [x] markdown render arrows (-&gt; / &lt;-&gt; / &lt;-) (renders in source but not in preview) — extended `SmartSymbols`' existing `!=`/`<=`/`>=` input-rule pattern with `->`→→, `<-`→←; `<->` cascades through `<-`→← first, then a third rule catches the trailing `←>`→↔ since input rules only see one keystroke at a time.
 - [ ] Search in note (ctrl f) needs major improvements
 - [ ] Console warning: "flushSync was called from inside a lifecycle method" — comes from `@tiptap/react`'s `ReactRenderer` (node_modules/@tiptap/react/src/ReactRenderer.tsx:193), which flushSyncs on first render of a `ReactNodeViewRenderer` node view (wiki-links/hover-previews) to keep cursor position stable. Fires when that node view mounts during another component's React commit phase. Cosmetic/upstream so far — no reproduced functional break; find which call site creates the node view mid-lifecycle if it needs fixing.
 - [ ] settings tab needs a redesign pass
@@ -23,6 +22,12 @@
 
   )
 - [ ] Shell extension open in null notes (both for folder (workspace) and single files that get copied into a temp workspace)
+- [ ] Renaming does rename sidecar folders but doesnt change the reference to it in the plain markdown
+- [ ] Note creation / rename modal needs a redesign
+- [ ] File - Exit
+- [ ] Possible issue: moving a note and i didnt see it getting commited in the new location
+- [ ] Position between Preview and Source isnt synced
+- [x] renaming doesnt stick title is still old
 - [x] pasting markdown gets code block with language set to markdown (pasting is entirely broken) — two separate paste bugs. (1) `@tiptap/extension-code-block`'s built-in `codeBlockVSCodeHandler` paste plugin unconditionally wrapped any clipboard tagged with `vscode-editor-data` (VS Code, and Monaco/CodeMirror-based doc sites) into one code block using that editor's language mode, hijacking the paste before tiptap-markdown's own parser ran — now skipped specifically when the mode is `markdown`, so real-language pastes (Python, Rust, ...) still auto-detect as before. (2) `DivBlock`'s parse rule matched any generic `<div>`, and real websites wrap nearly everything in layout divs, so pasted web content round-tripped into literal `<div>` markup — now unwrapped out of pasted HTML via `transformPastedHTML` before the schema parses it (loaded `.md` files with intentional `<div align="center">` etc. are untouched, since that path doesn't go through paste).
 - [x] editing larger notes is extremely laggy
 - [x] fix top toolbar — the code-block language `<select>` was pinned right via `margin-left: auto` inside the same `overflow-x: auto` region as the icon buttons, so at a narrow window it scrolled fully out of view with nothing left to click. Split into a scrolling `.editor-toolbar-scroll` for the icon groups and a pinned `.code-language-control`, same pattern as the tab bar's `.tab-bar-tabs`/`.tab-bar-status` split.

@@ -15,6 +15,11 @@ const REPLACEMENTS: Array<{ find: RegExp; replacement: string }> = [
   { find: /!=$/, replacement: '≠' },
   { find: /<=$/, replacement: '≤' },
   { find: />=$/, replacement: '≥' },
+  { find: /<-$/, replacement: '←' },
+  { find: /->$/, replacement: '→' },
+  // Typed as "<", "-", ">" in sequence, so "<-" converts to "←" first —
+  // this catches the trailing ">" and turns that into "↔".
+  { find: /←>$/, replacement: '↔' },
 ]
 
 export const SmartSymbols = Extension.create({
