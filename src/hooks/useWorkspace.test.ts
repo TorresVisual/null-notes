@@ -151,4 +151,26 @@ describe('useWorkspace', () => {
       expect.objectContaining({ git: { prompted: true, autoCommit: false, idleMinutes: 10, skipHooks: false, autoPush: true, allowCodeRepoPush: false } }),
     )
   })
+
+  it('closeWorkspace flushes the session, clears state, and falls back to the picker', async () => {
+    useWorkspaceStore.setState({
+      path: '/ws',
+      openTabs: ['/ws/a.md'],
+      activeTab: '/ws/a.md',
+      expandedFolders: ['/ws/folder'],
+    })
+    useNotesStore.setState({
+      notes: [{ id: '/ws/a.md', path: '/ws/a.md', title: 'a', workspace: '/ws', updatedAt: 0 }],
+      folders: ['/ws/folder'],
+    })
+    const { result } = renderHook(() => useWorkspace())
+
+    await result.current.closeWorkspace()
+
+    expect(workspace.save).toHaveBeenCalledWith('/ws', expect.any(Object))
+    expect(useWorkspaceStore.getState().path).toBeNull()
+    expect(useWorkspaceStore.getState().openTabs).toEqual([])
+    expect(useNotesStore.getState().notes).toEqual([])
+    expect(useNotesStore.getState().folders).toEqual([])
+  })
 })

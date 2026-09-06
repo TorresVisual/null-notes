@@ -36,6 +36,15 @@ export function useWorkspace() {
     await api.workspace.save(path, { openTabs, activeTab, expandedFolders, recentSearches, git })
   }, [])
 
+  const closeWorkspace = useCallback(async () => {
+    await saveSession()
+    resetForNewWorkspace()
+    clearNavigationHistory()
+    setNotes([])
+    setFolders([])
+    setPath(null)
+  }, [saveSession, resetForNewWorkspace, setNotes, setFolders, setPath])
+
   // Read the folder before touching any state: a recent workspace can be gone
   // by the time it's clicked, and a failed scan must leave the current one open.
   const openWorkspaceAt = useCallback(
@@ -95,5 +104,5 @@ export function useWorkspace() {
     await openWorkspaceAt(selected)
   }, [openWorkspaceAt])
 
-  return { openWorkspace, openWorkspaceAt, saveSession }
+  return { openWorkspace, openWorkspaceAt, saveSession, closeWorkspace }
 }

@@ -31,7 +31,7 @@ interface WorkspaceStore {
   closedTabs: string[]
   expandedFolders: string[]
   selectedFolder: string | null
-  setPath: (path: string) => void
+  setPath: (path: string | null) => void
   openTab: (notePath: string) => void
   closeTab: (notePath: string) => void
   reopenClosedTab: () => void
