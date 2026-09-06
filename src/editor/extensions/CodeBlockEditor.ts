@@ -299,7 +299,24 @@ export const CodeBlockEditor = CodeBlockLowlight.extend({
             const vscode = event.clipboardData.getData('vscode-editor-data')
             const vscodeData = vscode ? (JSON.parse(vscode) as { mode?: string }) : undefined
             const language = vscodeData?.mode
-            if (!text || !language || language === 'markdown') return false
+            if (!text) return false
+
+            // A markdown-mode source is this app's own content format, not
+            // code to wrap — run it through tiptap-markdown's own paste
+            // parser (same one plain-text paste already uses) so task
+            // lists, headings, etc. come in as real nodes instead of escaped
+            // text. HTML-flavored paste normally wins over plain text, which
+            // is exactly what skipped this case before.
+            if (language === 'markdown') {
+              const slice = view.someProp('clipboardTextParser', (f) => f(text, view.state.selection.$from, false, view))
+              if (!slice) return false
+              const tr = view.state.tr.replaceSelection(slice)
+              tr.setMeta('uiEvent', 'paste')
+              view.dispatch(tr)
+              return true
+            }
+
+            if (!language) return false
 
             const { tr, schema } = view.state
             const textNode = schema.text(text.replace(/\r\n?/g, '\n'))
