@@ -24,6 +24,7 @@ export function FolderTree({ entries, depth = 0 }: FolderTreeProps) {
   const workspacePath = useWorkspaceStore((s) => s.path)
   const replaceOpenPath = useWorkspaceStore((s) => s.replaceOpenPath)
   const setFolderError = useWorkspaceStore((s) => s.setFolderError)
+  const setSelectedFolder = useWorkspaceStore((s) => s.setSelectedFolder)
 
   async function handleDropAtRoot(e: React.DragEvent) {
     e.preventDefault()
@@ -59,6 +60,13 @@ export function FolderTree({ entries, depth = 0 }: FolderTreeProps) {
       }}
       onDragLeave={() => setDragOver(false)}
       onDrop={(e) => void handleDropAtRoot(e)}
+      // Row clicks bubble up here too, but their target is the row, not this
+      // <ul> — only a click that lands directly on the list's own empty
+      // background (below the last item, since this fills the sidebar's
+      // remaining height) should reselect root.
+      onClick={(e) => {
+        if (e.target === e.currentTarget && workspacePath) setSelectedFolder(workspacePath)
+      }}
       // dragleave doesn't reliably fire for every child-boundary crossing as
       // the pointer moves around inside this list, which can leave `dragOver`
       // stuck true after a successful drop. dragend always fires exactly
