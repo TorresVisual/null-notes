@@ -1,4 +1,5 @@
 import { Mark, mergeAttributes } from '@tiptap/core'
+import { Plugin } from '@tiptap/pm/state'
 
 interface SpanStyleAttrs {
   color: string | null
@@ -54,5 +55,29 @@ export const SpanStyle = Mark.create({
     const { color, backgroundColor, fontSize, ...rest } = HTMLAttributes as SpanStyleAttrs & Record<string, unknown>
     const style = buildStyle({ color: color ?? null, backgroundColor: backgroundColor ?? null, fontSize: fontSize ?? null })
     return ['span', mergeAttributes(rest, style ? { style } : {}), 0]
+  },
+
+  // IDEs (VS Code) and most websites wrap every span of copied text in its
+  // own inline `style="color: ..."`, even for plain unstyled text — VS
+  // Code's is its theme's baseline foreground color, applied uniformly.
+  // Left alone that noise round-trips into literal `<span style="...">` in
+  // the saved note (same failure as DivBlock's generic <div>s). Strip it
+  // from pasted HTML only, so this mark still round-trips a note's own
+  // intentionally-authored colored spans loaded from a .md file.
+  addProseMirrorPlugins() {
+    return [
+      new Plugin({
+        props: {
+          transformPastedHTML(html) {
+            const wrapper = document.createElement('div')
+            wrapper.innerHTML = html
+            wrapper.querySelectorAll('span[style]').forEach((span) => {
+              span.replaceWith(...Array.from(span.childNodes))
+            })
+            return wrapper.innerHTML
+          },
+        },
+      }),
+    ]
   },
 })
