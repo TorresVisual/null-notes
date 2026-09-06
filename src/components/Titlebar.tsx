@@ -30,6 +30,7 @@ const FILE_MENU: MenuItemSpec[] = [
   { id: 'new-from-template', label: 'New from Template…', accel: 'Ctrl+Shift+T' },
   { separator: true },
   { id: 'open-workspace', label: 'Open Workspace…', accel: 'Ctrl+O' },
+  { id: 'close-workspace', label: 'Close Workspace' },
   { separator: true },
   { id: 'split-tasks', label: 'Split Into Tasks' },
   { id: 'generate-formula-sheet', label: 'Generate Formula Sheet…' },

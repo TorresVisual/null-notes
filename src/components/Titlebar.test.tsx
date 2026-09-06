@@ -34,6 +34,15 @@ describe('Titlebar', () => {
     expect(onCommand).toHaveBeenCalledWith('open-workspace')
   })
 
+  it('dispatches close-workspace when picked from the File menu', async () => {
+    const user = userEvent.setup()
+    const onCommand = vi.fn()
+    render(<Titlebar title="null-notes" onCommand={onCommand} />)
+    await user.click(screen.getByText('File'))
+    await user.click(await screen.findByText('Close Workspace'))
+    expect(onCommand).toHaveBeenCalledWith('close-workspace')
+  })
+
   it('wires the window controls to the Tauri window API', () => {
     render(<Titlebar title="null-notes" onCommand={vi.fn()} />)
     fireEvent.click(screen.getByLabelText('Minimize'))

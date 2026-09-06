@@ -79,7 +79,7 @@ export function Layout() {
     reloadTheirs,
   } = useNote(activeTab)
   const windowTitle = useWindowTitle(workspacePath, activeTab)
-  const { saveSession, openWorkspace, openWorkspaceAt } = useWorkspace()
+  const { saveSession, openWorkspace, openWorkspaceAt, closeWorkspace } = useWorkspace()
   const { updateGit } = useGitConfig()
   const { flushGitCommit } = useGitAutoCommit()
   const repoMode = useWorkspaceStore((s) => s.repoMode)
@@ -153,6 +153,9 @@ export function Layout() {
           break
         case 'open-workspace':
           await openWorkspace()
+          break
+        case 'close-workspace':
+          if (workspacePath) await closeWorkspace()
           break
         case 'settings':
           openOverlay('settings')
@@ -251,6 +254,7 @@ export function Layout() {
       createFolder,
       createCanvasNote,
       openWorkspace,
+      closeWorkspace,
       openOverlay,
     ],
   )
