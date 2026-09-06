@@ -63,6 +63,7 @@ export function Layout() {
   const focusMode = useFocusModeStore((s) => s.enabled)
   const toggleFocusMode = useFocusModeStore((s) => s.toggle)
   const workspacePath = useWorkspaceStore((s) => s.path)
+  const recentWorkspaces = useWorkspaceStore((s) => s.recentWorkspaces)
   const notes = useNotesStore((s) => s.notes)
   const currentNote = notes.find((n) => n.path === activeTab)
   const {
@@ -132,6 +133,10 @@ export function Layout() {
   // from a mouse click.
   const runCommand = useCallback(
     async (id: string) => {
+      if (id.startsWith('open-recent:')) {
+        await openWorkspaceAt(id.slice('open-recent:'.length))
+        return
+      }
       switch (id) {
         case 'new-note': {
           const title = await promptText('Note title:')
@@ -254,6 +259,7 @@ export function Layout() {
       createFolder,
       createCanvasNote,
       openWorkspace,
+      openWorkspaceAt,
       closeWorkspace,
       openOverlay,
     ],
@@ -377,7 +383,7 @@ export function Layout() {
   return (
     <TooltipProvider>
     <div className="app-shell">
-    <Titlebar title={windowTitle} onCommand={runCommand} />
+    <Titlebar title={windowTitle} onCommand={runCommand} recentWorkspaces={recentWorkspaces} />
     <div className="layout">
       {activeOverlay === 'search' && <SearchModal onClose={closeOverlay} />}
       {activeOverlay === 'switcher' && <QuickSwitcher onClose={closeOverlay} />}
