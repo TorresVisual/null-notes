@@ -4,9 +4,11 @@ import { forgetPosition } from '../lib/notePositions'
 import { folderName } from '../lib/pathPrefix'
 
 // The tree already reads a note's display name from its title (the H1
-// heading), not its filename — rename_note rewrites that heading in place
-// without touching the file on disk. Anywhere else that shows a note's name
-// needs the same lookup, or it keeps showing the pre-rename filename forever.
+// heading) rather than reparsing the filename. `note_filename` sanitizes
+// characters a filesystem can't hold (":" etc. become "-"), so the filename
+// and the title can legitimately differ even right after a rename — the
+// title is the one the user actually typed. Anywhere else that shows a
+// note's name needs the same lookup, or it can show a mangled version of it.
 export function noteTitle(notes: NoteMetadata[], path: string): string {
   return notes.find((n) => n.path === path)?.title ?? folderName(path).replace(/\.md$/, '')
 }

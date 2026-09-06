@@ -973,6 +973,12 @@ fn rewrite_links(content: &str, old_title: &str, new_title: &str) -> anyhow::Res
         .into_owned())
 }
 
+// Titles are how `create_note` derives a filename in the first place, so a
+// rename that leaves the filename behind is only half done — everything that
+// keys off the path (Explorer, `.workspace.json`, git) would keep showing the
+// pre-rename name forever. Move the file (and its sidecars) to match, the
+// same way `move_note_at` does for a drag-and-drop move, and hand the new
+// path back so the caller can update open tabs.
 async fn rename_note_at(
     path: &str,
     new_title: &str,
@@ -986,12 +992,39 @@ async fn rename_note_at(
     if old_title != new_title {
         new_content = rewrite_links(&new_content, &old_title, new_title)?;
     }
-    write_atomic(Path::new(path), &new_content).await?;
-    index_note_at(path, workspace, &new_content, db).await?;
+
+    let parent = Path::new(path)
+        .parent()
+        .ok_or_else(|| anyhow::anyhow!("note path has no parent folder: {path}"))?;
+    let desired_path = parent.join(note_filename(new_title));
+    let desired_path_str = desired_path.to_string_lossy().into_owned();
+
+    let new_path = if desired_path_str != path {
+        // Same silent-overwrite hazard as `move_note_at`: a same-named note
+        // already at the destination must block the rename, not lose its content.
+        if tokio::fs::metadata(&desired_path).await.is_ok() {
+            anyhow::bail!("a note already exists at {desired_path_str}");
+        }
+        tokio::fs::rename(path, &desired_path).await?;
+        for suffix in ["ink", "pdf", "diagrams", "assets"] {
+            let old_dir = super::sidecar_dir_for(path, suffix);
+            if tokio::fs::metadata(&old_dir).await.is_ok() {
+                let new_dir = super::sidecar_dir_for(&desired_path_str, suffix);
+                tokio::fs::rename(&old_dir, &new_dir).await?;
+            }
+        }
+        db::notes::update_path(db, path, &desired_path_str).await?;
+        desired_path_str
+    } else {
+        path.to_string()
+    };
+
+    write_atomic(Path::new(&new_path), &new_content).await?;
+    index_note_at(&new_path, workspace, &new_content, db).await?;
 
     if old_title != new_title {
         for backlinker in db::notes::backlinks_for(db, workspace, &old_title).await? {
-            if backlinker.path == path {
+            if backlinker.path == new_path {
                 continue;
             }
             let content = tokio::fs::read_to_string(&backlinker.path).await?;
@@ -1006,7 +1039,7 @@ async fn rename_note_at(
     Ok(NoteMetadata {
         id: Uuid::new_v4().to_string(),
         title: new_title.to_string(),
-        path: path.to_string(),
+        path: new_path,
         workspace: workspace.to_string(),
         updated_at: now_ms(),
     })
@@ -2836,8 +2869,15 @@ mod save_tests {
             .unwrap();
 
         assert_eq!(meta.title, "Asymptotic Notation");
+        // The rename moves the file to match the new title — same as a
+        // drag-and-drop move — so the old filename shouldn't survive it.
         assert_eq!(
-            std::fs::read_to_string(&target).unwrap(),
+            meta.path,
+            tmp.path().join("Asymptotic Notation.md").to_string_lossy()
+        );
+        assert!(!target.exists());
+        assert_eq!(
+            std::fs::read_to_string(&meta.path).unwrap(),
             "# Asymptotic Notation\nWhat it means.\n"
         );
         assert_eq!(
@@ -2890,6 +2930,81 @@ mod save_tests {
         assert_eq!(
             std::fs::read_to_string(&other).unwrap(),
             "# Other\nSee [[Something Else]].\n"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_rename_note_at_moves_every_sidecar_with_the_file() {
+        let tmp = tempdir().unwrap();
+        let root = tmp.path();
+        let ws = root.to_string_lossy().into_owned();
+        std::fs::write(root.join("note.md"), "# Note").unwrap();
+        for suffix in ["ink", "pdf", "diagrams", "assets"] {
+            let dir = root.join(format!("note.{suffix}"));
+            std::fs::create_dir_all(&dir).unwrap();
+            std::fs::write(dir.join("child"), "content").unwrap();
+        }
+
+        let pool = sqlx::sqlite::SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect("sqlite::memory:")
+            .await
+            .unwrap();
+        run_migrations(&pool).await.unwrap();
+        let old_path = root.join("note.md").to_string_lossy().into_owned();
+        index_note_at(&old_path, &ws, "# Note", &pool)
+            .await
+            .unwrap();
+
+        let meta = rename_note_at(&old_path, "Renamed", &ws, &pool)
+            .await
+            .unwrap();
+
+        assert!(std::path::Path::new(&meta.path).exists());
+        assert!(!root.join("note.md").exists());
+        for suffix in ["ink", "pdf", "diagrams", "assets"] {
+            assert!(
+                root.join(format!("Renamed.{suffix}"))
+                    .join("child")
+                    .exists(),
+                "Renamed.{suffix} must travel with the note"
+            );
+            assert!(
+                !root.join(format!("note.{suffix}")).exists(),
+                "note.{suffix} must not be left behind"
+            );
+        }
+        let notes = db::notes::list_by_workspace(&pool, &ws).await.unwrap();
+        assert_eq!(notes[0].path, meta.path);
+    }
+
+    #[tokio::test]
+    async fn test_rename_note_at_rejects_a_name_already_taken() {
+        let tmp = tempdir().unwrap();
+        let root = tmp.path();
+        let ws = root.to_string_lossy().into_owned();
+        std::fs::write(root.join("note.md"), "# Old Title").unwrap();
+        std::fs::write(root.join("Taken.md"), "# Survivor").unwrap();
+
+        let pool = sqlx::sqlite::SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect("sqlite::memory:")
+            .await
+            .unwrap();
+        run_migrations(&pool).await.unwrap();
+        let old_path = root.join("note.md").to_string_lossy().into_owned();
+        index_note_at(&old_path, &ws, "# Old Title", &pool)
+            .await
+            .unwrap();
+
+        let result = rename_note_at(&old_path, "Taken", &ws, &pool).await;
+
+        assert!(result.is_err());
+        assert!(root.join("note.md").exists(), "source note must stay put");
+        assert_eq!(
+            std::fs::read_to_string(root.join("Taken.md")).unwrap(),
+            "# Survivor",
+            "existing note at the destination must not be overwritten"
         );
     }
 

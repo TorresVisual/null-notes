@@ -41,12 +41,21 @@ export function TreeNode({ entry, depth }: TreeNodeProps) {
       const newTitle = await promptText('New title:', entry.name)
       if (!newTitle || newTitle === entry.name) return
       try {
-        await api.notes.rename(entry.path, newTitle, workspace)
+        const renamed = await api.notes.rename(entry.path, newTitle, workspace)
         setFolderError(null)
-        // rename_note rewrites the file's content (and its title) in place
-        // via write_atomic, bypassing useNote's own save path — without this
-        // the change never enters the auto-commit's pending list.
+        // rename_note moves the file (and its sidecars) to match the new
+        // title, the same way a drag-and-drop move does — so open tabs and
+        // .workspace.json must be repointed at the new path, not just told
+        // a rename happened.
+        if (renamed.path !== entry.path) {
+          replaceOpenPath(entry.path, renamed.path)
+          for (const suffix of ['ink', 'pdf', 'diagrams', 'assets']) {
+            useWorkspaceStore.getState().addGitPendingPath(sidecarDir(entry.path, suffix))
+            useWorkspaceStore.getState().addGitPendingPath(sidecarDir(renamed.path, suffix))
+          }
+        }
         useWorkspaceStore.getState().addGitPendingPath(entry.path)
+        useWorkspaceStore.getState().addGitPendingPath(renamed.path)
         await refreshTree()
       } catch (err) {
         setFolderError(err instanceof Error ? err.message : String(err))
