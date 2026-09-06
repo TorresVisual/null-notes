@@ -2304,7 +2304,12 @@ code {
   white-space: nowrap;
 }
 
-.tree-note .tree-label { padding-left: 16px; }
+.tree-note .tree-label { padding-left: 4px; }
+.tree-folder .tree-label { font-weight: 600; }
+
+/* Traces a folder's nesting down through its children, offset to sit under
+   that folder's own chevron rather than the tree's left edge. */
+.tree-guide { border-left: 1px solid var(--border); }
 
 /* Scoped to .sidebar to outrank the generic `.sidebar button` rule, which is
    more specific than a bare `.tree-delete` and would otherwise force the

@@ -213,7 +213,7 @@ export function TreeNode({ entry, depth }: TreeNodeProps) {
         </ContextMenuContent>
       </ContextMenu>
       {isExpanded && (
-        <ul className="folder-tree">
+        <ul className="folder-tree tree-guide" style={{ marginLeft: 8 + depth * 14 + 6 }}>
           {entry.children.map((child) => (
             <TreeNode key={child.path} entry={child} depth={depth + 1} />
           ))}

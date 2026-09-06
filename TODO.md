@@ -6,7 +6,6 @@
 - [ ] Use the built git feature to sync workspaces to other machines
 - [ ] Mobile app (need to think how we get syncing working)
 - [ ] Web app (no local md files fully git)
-- [ ] Left sidebar needs a design update (especially files and folders)
 - [ ] add a open in null notes in my ide
 - [ ] fix top toolbar
 - [ ] editing larger notes is extremely laggy
@@ -28,6 +27,7 @@
 
   )
 - [ ] Shell extension open in null notes (both for folder (workspace) and single files that get copied into a temp workspace)
+- [x] Left sidebar needs a design update (especially files and folders)
 - [x] Close Workspace
 - [x] Recent workspaces
 - [x] Recent workspaces in right click menu
