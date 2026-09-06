@@ -55,12 +55,20 @@ function getEditorStatus(editor: Editor): EditorStatus {
 export function EditorStatusBar({ editor }: EditorStatusBarProps) {
   const [status, setStatus] = useState(() => getEditorStatus(editor))
 
+  // getEditorStatus walks the whole document for a word count, so on a large
+  // note it's too expensive to run on every keystroke's transaction event —
+  // debounced so it settles shortly after typing pauses instead of on each char.
   useEffect(() => {
-    const refresh = () => setStatus(getEditorStatus(editor))
+    let timer: ReturnType<typeof setTimeout> | null = null
+    const refresh = () => {
+      if (timer) clearTimeout(timer)
+      timer = setTimeout(() => setStatus(getEditorStatus(editor)), 150)
+    }
     editor.on('transaction', refresh)
     editor.on('selectionUpdate', refresh)
 
     return () => {
+      if (timer) clearTimeout(timer)
       editor.off('transaction', refresh)
       editor.off('selectionUpdate', refresh)
     }

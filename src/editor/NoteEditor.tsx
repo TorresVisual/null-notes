@@ -46,6 +46,11 @@ export function NoteEditor({
   const [, setEditorVersion] = useState(0)
   const codeTheme = useSettingsStore((s) => s.settings.codeTheme)
   const codeFontSizePx = useSettingsStore((s) => s.settings.codeFontSizePx)
+  // Set alongside every onChange, so the content-sync effect below can tell
+  // "this update came back from our own typing" from "content changed out
+  // from under us" with a === check instead of re-serializing the whole
+  // document a second time on every keystroke.
+  const lastEmitted = useRef<string | null>(null)
 
   const editor = useEditor({
     extensions: coreExtensions,
@@ -53,7 +58,9 @@ export function NoteEditor({
     editorProps: buildEditorProps(spellcheck, spellcheckLanguage),
     onUpdate({ editor }) {
       if (isProgrammaticUpdate.current) return
-      onChange(markdownOf(editor))
+      const markdown = markdownOf(editor)
+      lastEmitted.current = markdown
+      onChange(markdown)
     },
   })
 
@@ -67,6 +74,7 @@ export function NoteEditor({
 
   useEffect(() => {
     if (!editor) return
+    if (content === lastEmitted.current) return
     const current = markdownOf(editor)
     if (content !== current) {
       isProgrammaticUpdate.current = true
