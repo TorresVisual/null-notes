@@ -1,6 +1,7 @@
 import { Node, mergeAttributes } from '@tiptap/core'
 import { ReactNodeViewRenderer, NodeViewWrapper } from '@tiptap/react'
 import type { ReactNodeViewProps } from '@tiptap/react'
+import { sanitizeNoteHtml } from '@/lib/sanitizeHtml'
 
 // Block-level HTML elements (and void/self-contained tags) that TipTap doesn't
 // handle natively. We preserve these verbatim as opaque blocks. This includes
@@ -38,7 +39,7 @@ function HTMLBlockView({ node }: ReactNodeViewProps) {
   const { html } = node.attrs as unknown as HTMLBlockAttrs
   return (
     <NodeViewWrapper className="html-block-container" contentEditable={false} spellCheck={false}>
-      <div dangerouslySetInnerHTML={{ __html: html }} />
+      <div dangerouslySetInnerHTML={{ __html: sanitizeNoteHtml(html) }} />
     </NodeViewWrapper>
   )
 }

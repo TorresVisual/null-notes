@@ -1,6 +1,7 @@
 import { Node, mergeAttributes } from '@tiptap/core'
 import { ReactNodeViewRenderer, NodeViewWrapper } from '@tiptap/react'
 import type { ReactNodeViewProps } from '@tiptap/react'
+import { sanitizeNoteHtml } from '@/lib/sanitizeHtml'
 
 // Inline HTML elements that TipTap's schema doesn't know about natively.
 // We preserve these verbatim through the round-trip using dangerouslySetInnerHTML.
@@ -18,7 +19,7 @@ function HTMLInlineView({ node }: ReactNodeViewProps) {
   const { html } = node.attrs as unknown as HTMLInlineAttrs
   return (
     <NodeViewWrapper as="span" className="html-inline-container" spellCheck={false}>
-      <span dangerouslySetInnerHTML={{ __html: html }} />
+      <span dangerouslySetInnerHTML={{ __html: sanitizeNoteHtml(html) }} />
     </NodeViewWrapper>
   )
 }
