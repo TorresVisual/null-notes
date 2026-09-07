@@ -15,18 +15,24 @@ function MermaidView({ node }: ReactNodeViewProps) {
   const uid = useId().replace(/[^a-z0-9]/gi, '')
   const id = `md${uid}`
   const [svg, setSvg] = useState('')
+  const [error, setError] = useState(false)
 
   useEffect(() => {
+    setError(false)
     if (!code.trim()) return
     mermaid
       .render(id, code)
       .then(({ svg: out }) => setSvg(out))
-      .catch(() => setSvg(`<pre class="mermaid-error">${code}</pre>`))
+      .catch(() => setError(true))
   }, [code, id])
 
   return (
     <NodeViewWrapper className="mermaid-block" spellCheck={false}>
-      <div dangerouslySetInnerHTML={{ __html: svg || `<pre>${code}</pre>` }} />
+      {svg && !error ? (
+        <div dangerouslySetInnerHTML={{ __html: svg }} />
+      ) : (
+        <pre className={error ? 'mermaid-error' : undefined}>{code}</pre>
+      )}
     </NodeViewWrapper>
   )
 }
