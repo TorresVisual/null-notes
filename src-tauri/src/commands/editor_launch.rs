@@ -113,15 +113,22 @@ pub fn detect_editor_command() -> String {
     DEFAULT_EDITOR_COMMAND.to_string()
 }
 
+// The editor command template is read from settings.json below, not accepted
+// as a parameter — see settings::resolve_settings's docs (H-4).
 #[tauri::command]
 pub async fn open_in_editor(
     workspace: String,
     target: String,
     line: Option<u32>,
-    template: String,
+    app: tauri::AppHandle,
 ) -> Result<(), String> {
+    let settings = super::settings::resolve_settings(&app).await?;
     let resolved = resolve_in_workspace(&workspace, &target)?;
-    let (program, args) = build_command(&template, &resolved.to_string_lossy(), line.unwrap_or(1))?;
+    let (program, args) = build_command(
+        &settings.editor_command,
+        &resolved.to_string_lossy(),
+        line.unwrap_or(1),
+    )?;
 
     std::process::Command::new(program)
         .args(args)

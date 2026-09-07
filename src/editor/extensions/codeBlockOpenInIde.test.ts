@@ -73,7 +73,7 @@ describe('code block "Open in IDE"', () => {
     button?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
     await settle()
 
-    expect(openInEditor).toHaveBeenCalledWith('/ws', 'src/main.rs', 12, expect.any(String))
+    expect(openInEditor).toHaveBeenCalledWith('/ws', 'src/main.rs', 12)
   })
 
   // The DoD: never a dead button. An unresolved path shows nothing to click,

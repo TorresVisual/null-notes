@@ -19,7 +19,6 @@ export function useTerminal(
   containerRef: RefObject<HTMLDivElement | null>,
   workspace: string,
   notePath: string | null,
-  shell: string,
 ) {
   const termRef = useRef<Terminal | null>(null)
   // terminal_open (spawning a real shell process) is async and not
@@ -43,7 +42,7 @@ export function useTerminal(
     fit.fit()
     termRef.current = term
 
-    const ready = api.terminal.open(workspace, notePath, shell).then(() => {
+    const ready = api.terminal.open(workspace, notePath).then(() => {
       void api.terminal.resize(term.cols, term.rows)
       setIsReady(true)
     })

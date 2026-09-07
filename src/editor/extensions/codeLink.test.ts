@@ -70,7 +70,7 @@ describe('code deep links', () => {
     link?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
     await settle()
 
-    expect(openInEditor).toHaveBeenCalledWith('/ws', 'src/main.rs', 58, expect.any(String))
+    expect(openInEditor).toHaveBeenCalledWith('/ws', 'src/main.rs', 58)
   })
 
   // The safety property: an unresolved link says what it points at and does

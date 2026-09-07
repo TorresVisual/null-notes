@@ -171,18 +171,22 @@ fn spawn_supervisor(app: AppHandle, run_id: String, timeout_secs: u64) {
 // (runId/language/source/pythonCommand/cppCompilerCommand/timeoutSecs) plus
 // Tauri's own injected app/state — splitting it into a sub-struct would only
 // move the same six fields one level down, not reduce them.
+// python_command/cpp_compiler_command are read from settings.json below,
+// not accepted as parameters — see settings::resolve_settings's docs (H-4).
 #[allow(clippy::too_many_arguments)]
 #[tauri::command]
-pub fn run_code(
+pub async fn run_code(
     run_id: String,
     language: String,
     source: String,
-    python_command: String,
-    cpp_compiler_command: String,
     timeout_secs: u64,
     app: AppHandle,
     state: State<'_, RunState>,
 ) -> Result<(), String> {
+    let settings = super::settings::resolve_settings(&app).await?;
+    let python_command = settings.python_command;
+    let cpp_compiler_command = settings.cpp_compiler_command;
+
     let dir = match tempfile::tempdir() {
         Ok(dir) => dir,
         Err(e) => {

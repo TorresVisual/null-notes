@@ -300,14 +300,7 @@ export const CodeBlockRun = Extension.create({
                     const runId = crypto.randomUUID()
                     view.dispatch(view.state.tr.setMeta(codeRunKey, { type: 'start', pos, runId }))
                     const settings = useSettingsStore.getState().settings
-                    void api.codeRun.run(
-                      runId,
-                      language,
-                      source,
-                      settings.pythonCommand,
-                      settings.cppCompilerCommand,
-                      settings.codeRunTimeoutSecs,
-                    )
+                    void api.codeRun.run(runId, language, source, settings.codeRunTimeoutSecs)
                   })
                 })
               return

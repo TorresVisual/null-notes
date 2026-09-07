@@ -68,7 +68,7 @@ describe('useTerminal', () => {
     terminal.open.mockReturnValue(new Promise<void>((resolve) => { resolveOpen = resolve }))
 
     const { result } = renderHook(() =>
-      useTerminal(fakeContainerRef(), '/ws', '/ws/Note.md', 'powershell'),
+      useTerminal(fakeContainerRef(), '/ws', '/ws/Note.md'),
     )
 
     result.current.insertText('/ws/Note.md')
@@ -82,7 +82,7 @@ describe('useTerminal', () => {
     terminal.open.mockResolvedValue(undefined)
 
     const { result } = renderHook(() =>
-      useTerminal(fakeContainerRef(), '/ws', '/ws/Note.md', 'powershell'),
+      useTerminal(fakeContainerRef(), '/ws', '/ws/Note.md'),
     )
     await waitFor(() => expect(terminal.open).toHaveBeenCalled())
 

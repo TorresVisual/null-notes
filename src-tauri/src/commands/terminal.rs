@@ -53,20 +53,25 @@ pub struct PtyState(pub Mutex<Option<PtySession>>);
 /// already open — reopening the pane reuses it rather than respawning, which
 /// is what lets a long-running process (e.g. `claude`) survive the panel
 /// being toggled shut and back open.
+///
+/// The shell is read from `settings.json` here, not accepted as a parameter —
+/// see `settings::resolve_settings`'s docs for why (H-4).
 #[tauri::command]
-pub fn terminal_open(
+pub async fn terminal_open(
     workspace: String,
     note_path: Option<String>,
-    shell: String,
     app: AppHandle,
     state: State<'_, PtyState>,
 ) -> Result<(), String> {
+    // Resolved before the lock is taken: a std::sync::MutexGuard can't be held
+    // across an .await point, and this settings read is the only async step.
+    let settings = super::settings::resolve_settings(&app).await?;
+    let (program, args) = parse_shell(&settings.terminal_shell)?;
+
     let mut guard = state.0.lock().map_err(|e| e.to_string())?;
     if guard.is_some() {
         return Ok(());
     }
-
-    let (program, args) = parse_shell(&shell)?;
 
     let pty_system = native_pty_system();
     let pair = pty_system

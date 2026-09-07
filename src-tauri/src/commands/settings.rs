@@ -4,7 +4,7 @@ use tauri::{AppHandle, Manager};
 
 const SETTINGS_FILE: &str = "settings.json";
 
-async fn load_settings_from_dir(dir: &Path) -> anyhow::Result<AppSettings> {
+pub(crate) async fn load_settings_from_dir(dir: &Path) -> anyhow::Result<AppSettings> {
     let file = dir.join(SETTINGS_FILE);
     let mut settings = if file.exists() {
         serde_json::from_str(&tokio::fs::read_to_string(&file).await?)?
@@ -44,8 +44,42 @@ pub async fn load_settings(app: AppHandle) -> Result<AppSettings, String> {
         .map_err(|e| e.to_string())
 }
 
+/// Reads settings straight from disk for a command that needs one of the
+/// exec-related fields (terminal shell, run-code interpreter/compiler, editor
+/// template) — the values themselves never travel through the IPC call that
+/// spawns a process (H-4), so a note's own injected script cannot choose what
+/// runs by passing a different string as an argument.
+pub(crate) async fn resolve_settings(app: &AppHandle) -> Result<AppSettings, String> {
+    let dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    load_settings_from_dir(&dir)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Rejects an exec-related field whose program does not resolve on `PATH`
+/// (H-5) — otherwise a value written once by an injected script would keep
+/// spawning that program on every future terminal/run/editor launch, long
+/// after the script that wrote it is gone. Empty is allowed: it means
+/// "undetected yet," and `load_settings_from_dir` fills it in on next load.
+fn validate_exec_field(label: &str, value: &str) -> Result<(), String> {
+    if value.trim().is_empty() {
+        return Ok(());
+    }
+    let program = super::editor_launch::tokenize(value);
+    let program = program.first().ok_or_else(|| format!("{label} is empty"))?;
+    if !super::editor_launch::is_on_path(program) {
+        return Err(format!("{label} does not resolve on PATH: {program}"));
+    }
+    Ok(())
+}
+
 #[tauri::command]
 pub async fn save_settings(app: AppHandle, settings: AppSettings) -> Result<(), String> {
+    validate_exec_field("editorCommand", &settings.editor_command)?;
+    validate_exec_field("terminalShell", &settings.terminal_shell)?;
+    validate_exec_field("pythonCommand", &settings.python_command)?;
+    validate_exec_field("cppCompilerCommand", &settings.cpp_compiler_command)?;
+
     let dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
     save_settings_to_dir(&dir, &settings)
         .await
@@ -261,6 +295,23 @@ mod tests {
         // Same guarantee for P10-2: an older settings.json loads with the
         // one timeout every run has always implicitly had, not 0.
         assert_eq!(loaded.code_run_timeout_secs, 10);
+    }
+
+    #[test]
+    fn validate_exec_field_allows_empty() {
+        assert!(validate_exec_field("editorCommand", "").is_ok());
+        assert!(validate_exec_field("editorCommand", "   ").is_ok());
+    }
+
+    #[test]
+    fn validate_exec_field_allows_a_program_on_path() {
+        // cargo is on PATH by definition wherever `cargo test` runs.
+        assert!(validate_exec_field("editorCommand", "cargo --version").is_ok());
+    }
+
+    #[test]
+    fn validate_exec_field_rejects_a_program_not_on_path() {
+        assert!(validate_exec_field("editorCommand", "definitely-not-a-real-binary-zzz").is_err());
     }
 
     #[tokio::test]

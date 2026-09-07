@@ -5,7 +5,6 @@ import { useTerminal } from '../hooks/useTerminal'
 interface TerminalPaneProps {
   workspace: string
   notePath: string | null
-  shell: string
   hidden: boolean
   onClose: () => void
 }
@@ -14,9 +13,9 @@ interface TerminalPaneProps {
 // ever hidden/shown via CSS — the whole point is that the shell underneath
 // survives the panel being toggled shut, so this component must never
 // unmount as a side effect of the toggle.
-export function TerminalPane({ workspace, notePath, shell, hidden, onClose }: TerminalPaneProps) {
+export function TerminalPane({ workspace, notePath, hidden, onClose }: TerminalPaneProps) {
   const containerRef = useRef<HTMLDivElement>(null)
-  const { insertText, kill, isReady } = useTerminal(containerRef, workspace, notePath, shell)
+  const { insertText, kill, isReady } = useTerminal(containerRef, workspace, notePath)
 
   const noteLabel = notePath ? notePath.split(/[\\/]/).pop() : null
 

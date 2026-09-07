@@ -545,7 +545,6 @@ export function Layout() {
           <TerminalPane
             workspace={workspacePath}
             notePath={activeTab}
-            shell={settings.terminalShell}
             hidden={!terminalOpen}
             onClose={() => setTerminalOpen(false)}
           />

@@ -45,8 +45,8 @@ export const api = {
       invoke<string>('split_into_tasks', { markdown }),
     resolveCodeLinks: (workspace: string, targets: string[]) =>
       invoke<boolean[]>('resolve_code_links', { workspace, targets }),
-    openInEditor: (workspace: string, target: string, line: number | null, template: string) =>
-      invoke<void>('open_in_editor', { workspace, target, line, template }),
+    openInEditor: (workspace: string, target: string, line: number | null) =>
+      invoke<void>('open_in_editor', { workspace, target, line }),
     renameFolder: (oldPath: string, newPath: string) =>
       invoke<void>('rename_folder', { oldPath, newPath }),
     deleteFolder: (path: string) =>
@@ -164,8 +164,8 @@ export const api = {
       invoke<PdfMarkdownImport>('import_pdf_markdown', { pdfPath }),
   },
   terminal: {
-    open: (workspace: string, notePath: string | null, shell: string) =>
-      invoke<void>('terminal_open', { workspace, notePath, shell }),
+    open: (workspace: string, notePath: string | null) =>
+      invoke<void>('terminal_open', { workspace, notePath }),
     write: (data: string) =>
       invoke<void>('terminal_write', { data }),
     resize: (cols: number, rows: number) =>
@@ -174,15 +174,8 @@ export const api = {
       invoke<void>('terminal_close'),
   },
   codeRun: {
-    run: (
-      runId: string,
-      language: string,
-      source: string,
-      pythonCommand: string,
-      cppCompilerCommand: string,
-      timeoutSecs: number,
-    ) =>
-      invoke<void>('run_code', { runId, language, source, pythonCommand, cppCompilerCommand, timeoutSecs }),
+    run: (runId: string, language: string, source: string, timeoutSecs: number) =>
+      invoke<void>('run_code', { runId, language, source, timeoutSecs }),
     sendInput: (runId: string, text: string) =>
       invoke<void>('send_input', { runId, text }),
     stop: (runId: string) =>

@@ -4,7 +4,6 @@ import { Decoration, DecorationSet } from '@tiptap/pm/view'
 import type { EditorState } from '@tiptap/pm/state'
 import { codeBlockSourcePath } from '../../lib/codeLinks'
 import { useWorkspaceStore } from '../../store/workspace'
-import { useSettingsStore } from '../../store/settings'
 import { api } from '../../lib/tauri'
 import { isResolved, resolveMissing } from './CodeLink'
 
@@ -103,12 +102,7 @@ export const CodeBlockOpenInIde = Extension.create({
             if (!workspace || !target) return
 
             const rawLine = el.getAttribute('data-line')
-            void api.notes.openInEditor(
-              workspace,
-              target,
-              rawLine ? Number(rawLine) : null,
-              useSettingsStore.getState().settings.editorCommand,
-            )
+            void api.notes.openInEditor(workspace, target, rawLine ? Number(rawLine) : null)
           }
           view.dom.addEventListener('click', onClick)
 
