@@ -65,7 +65,7 @@ export function TreeNode({ entry, depth }: TreeNodeProps) {
     async function handleDelete(e: React.MouseEvent) {
       e.stopPropagation()
       if (!(await confirm(`Delete "${entry.name}"?`))) return
-      await api.notes.delete(entry.path)
+      await api.notes.delete(workspace, entry.path)
       removeNote(entry.path)
       closeTab(entry.path)
       // Otherwise the deletion never enters the auto-commit's pathspec-scoped

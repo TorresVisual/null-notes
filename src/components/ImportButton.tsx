@@ -110,7 +110,7 @@ export function ImportButton() {
           ? `# ${picked.title}\n\n${convertedBody}`
           : `# ${picked.title}\n\n${pagesToMarkdown(await importPages(picked.path, note.path))}\n`
 
-      await api.notes.save(note.path, content)
+      await api.notes.save(workspacePath, note.path, content)
       await api.notes.reindex(note.path, workspacePath, content)
       addNote({ ...note, title: picked.title })
       openTab(note.path)

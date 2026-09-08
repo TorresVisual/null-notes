@@ -62,7 +62,7 @@ describe('WikiLinkView preview', () => {
 
     await user.hover(getWikiLink(container))
 
-    await waitFor(() => expect(openNote).toHaveBeenCalledWith('/ws/big-o.md'))
+    await waitFor(() => expect(openNote).toHaveBeenCalledWith('/ws', '/ws/big-o.md'))
     // Tooltip content renders via a Radix Portal into document.body, outside
     // RTL's own `container` — query the document, not the container.
     await waitFor(() => expect(document.querySelector('.wiki-link-preview')?.textContent).toBe('Bounds on growth rate.'))

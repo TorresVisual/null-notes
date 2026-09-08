@@ -47,7 +47,8 @@ export function TemplateDialog({ onClose }: TemplateDialogProps) {
   }
 
   async function handlePick(meta: TemplateMetadata) {
-    const content = await api.templates.read(meta.path)
+    if (!workspacePath) return
+    const content = await api.templates.read(workspacePath, meta.path)
     const placeholderFields = extractPlaceholders(content).filter((name) => name !== 'title')
     const allFields = ['title', ...placeholderFields]
     const today = new Date().toISOString().slice(0, 10)

@@ -33,7 +33,7 @@ export function useCreateCanvasNote() {
         const svgPath = `${dir}${sep}page.svg`
         await inkApi.write(svgPath, EMPTY_PAGE)
         const body = canvasNoteBody(title, svgPath, EMPTY_PAGE.width, EMPTY_PAGE.height)
-        await api.notes.save(meta.path, body)
+        await api.notes.save(workspacePath, meta.path, body)
         await api.notes.reindex(meta.path, workspacePath, body)
         addNote(meta)
         openTab(meta.path)

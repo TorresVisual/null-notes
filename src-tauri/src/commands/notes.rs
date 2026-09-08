@@ -6,7 +6,7 @@ use crate::models::{
 use crate::sm2;
 use regex::Regex;
 use std::collections::HashSet;
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::State;
 use tokio::io::AsyncWriteExt;
@@ -17,6 +17,29 @@ fn now_ms() -> i64 {
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
         .as_millis() as i64
+}
+
+// open_note/save_note/delete_note/read_template each receive a note's own
+// full path (produced by scan_workspace, already absolute) rather than a
+// workspace-relative target, so they can't reuse editor_launch's
+// resolve_in_workspace (which joins a relative path onto a base dir). Same
+// posture as that function and assets.rs's resolve_relative though: reject a
+// `..`/prefix-escaping component as written, before ever comparing against
+// the workspace, so a literal escape can't be normalised away first (M-1).
+fn require_within_workspace(workspace: &str, path: &str) -> Result<(), String> {
+    let candidate = Path::new(path);
+    if !candidate.is_absolute() {
+        return Err(format!("not an absolute path: {path}"));
+    }
+    for component in candidate.components() {
+        if matches!(component, Component::ParentDir | Component::CurDir) {
+            return Err(format!("path escapes the workspace: {path}"));
+        }
+    }
+    if !candidate.starts_with(Path::new(workspace)) {
+        return Err(format!("path is outside the workspace: {path}"));
+    }
+    Ok(())
 }
 
 const MAX_TITLE_CHARS: usize = 60;
@@ -646,7 +669,8 @@ pub async fn scan_workspace(
 }
 
 #[tauri::command]
-pub async fn open_note(path: String) -> Result<String, String> {
+pub async fn open_note(workspace: String, path: String) -> Result<String, String> {
+    require_within_workspace(&workspace, &path)?;
     tokio::fs::read_to_string(&path)
         .await
         .map_err(|e| e.to_string())
@@ -713,7 +737,8 @@ async fn index_note_at(
 // Deliberately does no database work: typing latency must not depend on
 // FTS/tag/link reindexing. The caller drives `reindex_note` separately.
 #[tauri::command]
-pub async fn save_note(path: String, content: String) -> Result<(), String> {
+pub async fn save_note(workspace: String, path: String, content: String) -> Result<(), String> {
+    require_within_workspace(&workspace, &path)?;
     write_atomic(Path::new(&path), &content)
         .await
         .map_err(|e| e.to_string())
@@ -1107,7 +1132,12 @@ async fn delete_note_at(path: &str, db: &DbPool) -> anyhow::Result<()> {
 }
 
 #[tauri::command]
-pub async fn delete_note(path: String, db: State<'_, DbPool>) -> Result<(), String> {
+pub async fn delete_note(
+    workspace: String,
+    path: String,
+    db: State<'_, DbPool>,
+) -> Result<(), String> {
+    require_within_workspace(&workspace, &path)?;
     delete_note_at(&path, &db).await.map_err(|e| e.to_string())
 }
 
@@ -1446,7 +1476,8 @@ pub async fn list_templates(
 }
 
 #[tauri::command]
-pub async fn read_template(path: String) -> Result<String, String> {
+pub async fn read_template(workspace: String, path: String) -> Result<String, String> {
+    require_within_workspace(&workspace, &path)?;
     tokio::fs::read_to_string(&path)
         .await
         .map_err(|e| e.to_string())
@@ -1680,6 +1711,82 @@ pub async fn move_note(
 mod tests {
     use super::*;
     use tempfile::tempdir;
+
+    #[test]
+    fn require_within_workspace_accepts_a_path_inside_the_workspace() {
+        let tmp = tempdir().unwrap();
+        let ws = tmp.path().to_string_lossy().into_owned();
+        let note = tmp.path().join("Note.md").to_string_lossy().into_owned();
+        let nested = tmp
+            .path()
+            .join("Folder")
+            .join("Note.md")
+            .to_string_lossy()
+            .into_owned();
+
+        assert!(require_within_workspace(&ws, &note).is_ok());
+        assert!(require_within_workspace(&ws, &nested).is_ok());
+    }
+
+    // The classic string-prefix bug: a sibling directory whose name extends
+    // the workspace's own name (".../ws-evil") starts with the string ".../ws"
+    // but is not inside it.
+    #[test]
+    fn require_within_workspace_refuses_a_sibling_directory_with_a_shared_prefix() {
+        let tmp = tempdir().unwrap();
+        let ws = tmp.path().join("ws").to_string_lossy().into_owned();
+        let sibling = tmp
+            .path()
+            .join("ws-evil")
+            .join("secret.md")
+            .to_string_lossy()
+            .into_owned();
+
+        assert!(require_within_workspace(&ws, &sibling).is_err());
+    }
+
+    #[test]
+    fn require_within_workspace_refuses_a_path_that_escapes_via_parent_dir() {
+        let tmp = tempdir().unwrap();
+        let ws = tmp.path().to_string_lossy().into_owned();
+        let escaped = tmp
+            .path()
+            .join("..")
+            .join("secret.md")
+            .to_string_lossy()
+            .into_owned();
+        let escaped_nested = tmp
+            .path()
+            .join("Folder")
+            .join("..")
+            .join("..")
+            .join("secret.md")
+            .to_string_lossy()
+            .into_owned();
+
+        assert!(require_within_workspace(&ws, &escaped).is_err());
+        assert!(require_within_workspace(&ws, &escaped_nested).is_err());
+    }
+
+    #[test]
+    fn require_within_workspace_refuses_a_relative_path() {
+        let tmp = tempdir().unwrap();
+        let ws = tmp.path().to_string_lossy().into_owned();
+        assert!(require_within_workspace(&ws, "Note.md").is_err());
+    }
+
+    #[test]
+    fn require_within_workspace_refuses_an_unrelated_absolute_path() {
+        let ws = tempdir().unwrap();
+        let other = tempdir().unwrap();
+        let unrelated = other
+            .path()
+            .join("secret.md")
+            .to_string_lossy()
+            .into_owned();
+
+        assert!(require_within_workspace(&ws.path().to_string_lossy(), &unrelated).is_err());
+    }
 
     // P7-3a. Opening a code repo as a workspace already worked; the scan just
     // drowned in node_modules and target before reaching docs/.

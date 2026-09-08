@@ -60,7 +60,9 @@ function WikiLinkView({ node }: ReactNodeViewProps) {
     // control flow no longer guarantees it), so it's re-checked here even
     // though this branch is unreachable with target undefined at runtime.
     if (!open || !target || preview !== null) return
-    void api.notes.open(target.path).then((content) => setPreview(excerptForPreview(content)))
+    void api.notes
+      .open(target.workspace, target.path)
+      .then((content) => setPreview(excerptForPreview(content)))
   }
 
   return (

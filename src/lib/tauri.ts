@@ -10,10 +10,10 @@ export const api = {
       invoke<NoteMetadata[]>('list_notes', { workspace }),
     scan: (workspace: string) =>
       invoke<WorkspaceTree>('scan_workspace', { workspace }),
-    open: (path: string) =>
-      invoke<string>('open_note', { path }),
-    save: (path: string, content: string) =>
-      invoke<void>('save_note', { path, content }),
+    open: (workspace: string, path: string) =>
+      invoke<string>('open_note', { workspace, path }),
+    save: (workspace: string, path: string, content: string) =>
+      invoke<void>('save_note', { workspace, path, content }),
     reindex: (path: string, workspace: string, content: string) =>
       invoke<void>('reindex_note', { path, workspace, content }),
     reindexFromDisk: (path: string, workspace: string) =>
@@ -22,8 +22,8 @@ export const api = {
       invoke<NoteMetadata>('create_note', { workspace, folder, title }),
     rename: (path: string, newTitle: string, workspace: string) =>
       invoke<NoteMetadata>('rename_note', { path, newTitle, workspace }),
-    delete: (path: string) =>
-      invoke<void>('delete_note', { path }),
+    delete: (workspace: string, path: string) =>
+      invoke<void>('delete_note', { workspace, path }),
     search: (
       workspace: string,
       query: string,
@@ -79,8 +79,8 @@ export const api = {
   templates: {
     list: (workspace: string) =>
       invoke<TemplateMetadata[]>('list_templates', { workspace }),
-    read: (path: string) =>
-      invoke<string>('read_template', { path }),
+    read: (workspace: string, path: string) =>
+      invoke<string>('read_template', { workspace, path }),
     seedDefaults: (workspace: string) =>
       invoke<TemplateMetadata[]>('seed_default_templates', { workspace }),
     createNote: (workspace: string, folder: string, title: string, content: string) =>

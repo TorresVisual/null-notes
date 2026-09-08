@@ -42,7 +42,7 @@ export function useNote(path: string | null) {
   }, [])
 
   useEffect(() => {
-    if (!path) {
+    if (!path || !workspacePath) {
       setContentAndRef('')
       return
     }
@@ -52,11 +52,11 @@ export function useNote(path: string | null) {
     setConflict(false)
     lastWritten.current = null
     api.notes
-      .open(path)
+      .open(workspacePath, path)
       .then(setContentAndRef)
       .catch((e: unknown) => setSaveError(`Could not open note: ${String(e)}`))
       .finally(() => setIsLoading(false))
-  }, [path, setContentAndRef])
+  }, [path, workspacePath, setContentAndRef])
 
   const flushIndex = useCallback(async () => {
     if (indexTimer.current) {
@@ -95,7 +95,7 @@ export function useNote(path: string | null) {
     pendingWrite.current = null
     setSaveState('saving')
     try {
-      await api.notes.save(job.path, job.content)
+      await api.notes.save(job.workspace, job.path, job.content)
       lastWritten.current = job.content
       useWorkspaceStore.getState().addGitPendingPath(job.path)
       if (!pendingWrite.current) {
@@ -143,10 +143,10 @@ export function useNote(path: string | null) {
   // An unmodified buffer follows the disk; a modified one never gets
   // overwritten silently — the user decides which version wins.
   useEffect(() => {
-    if (!path) return
+    if (!path || !workspacePath) return
     const unlisten = listen<string[]>('workspace-changed', async (event) => {
       if (!event.payload.includes(path)) return
-      const fresh = await api.notes.open(path)
+      const fresh = await api.notes.open(workspacePath, path)
       // Our own save echoes back through the watcher. If the disk holds
       // either the buffer or exactly what we last wrote, nobody else touched
       // it — typing past a save must not read as an external edit.
@@ -160,7 +160,7 @@ export function useNote(path: string | null) {
       setSaveState('clean')
     })
     return () => void unlisten.then((off) => off())
-  }, [path, setContentAndRef])
+  }, [path, workspacePath, setContentAndRef])
 
   const keepMine = useCallback(() => {
     incoming.current = null

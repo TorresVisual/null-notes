@@ -75,7 +75,7 @@ describe('TreeNode delete (note)', () => {
 
     await userEvent.click(screen.getByRole('button', { name: `Delete ${noteEntry.name}` }))
 
-    expect(notesApi.delete).toHaveBeenCalledWith(noteEntry.path)
+    expect(notesApi.delete).toHaveBeenCalledWith(noteEntry.note.workspace, noteEntry.path)
     expect(useWorkspaceStore.getState().gitPendingPaths).toEqual(
       expect.arrayContaining([
         noteEntry.path,

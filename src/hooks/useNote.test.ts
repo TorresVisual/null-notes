@@ -66,7 +66,7 @@ describe('useNote', () => {
     })
 
     expect(notes.save).toHaveBeenCalledTimes(1)
-    expect(notes.save).toHaveBeenCalledWith('/ws/note.md', '# Note\nabc')
+    expect(notes.save).toHaveBeenCalledWith('/ws', '/ws/note.md', '# Note\nabc')
   })
 
   it('records the saved path for auto-commit batching', async () => {
@@ -100,7 +100,7 @@ describe('useNote', () => {
     unmount()
 
     await waitFor(() =>
-      expect(notes.save).toHaveBeenCalledWith('/ws/note.md', '# Note\ntrailing keystrokes'),
+      expect(notes.save).toHaveBeenCalledWith('/ws', '/ws/note.md', '# Note\ntrailing keystrokes'),
     )
   })
 
@@ -180,7 +180,7 @@ describe('useNote', () => {
       await result.current.retrySave()
     })
 
-    expect(notes.save).toHaveBeenLastCalledWith('/ws/note.md', '# Note\nunlucky')
+    expect(notes.save).toHaveBeenLastCalledWith('/ws', '/ws/note.md', '# Note\nunlucky')
     expect(result.current.saveState).toBe('clean')
   })
 
@@ -205,7 +205,7 @@ describe('useNote', () => {
     await act(async () => {
       await vi.advanceTimersByTimeAsync(PAST_SAVE)
     })
-    expect(notes.save).toHaveBeenLastCalledWith('/ws/note.md', '# Note\nfirst')
+    expect(notes.save).toHaveBeenLastCalledWith('/ws', '/ws/note.md', '# Note\nfirst')
 
     act(() => result.current.save('# Note\nfirst and more'))
     notes.open.mockResolvedValue('# Note\nfirst')
@@ -251,7 +251,7 @@ describe('useNote', () => {
       await vi.advanceTimersByTimeAsync(PAST_SAVE)
     })
 
-    expect(notes.save).toHaveBeenLastCalledWith('/ws/note.md', '# Note\nmine wins')
+    expect(notes.save).toHaveBeenLastCalledWith('/ws', '/ws/note.md', '# Note\nmine wins')
     expect(result.current.conflict).toBe(false)
   })
 
