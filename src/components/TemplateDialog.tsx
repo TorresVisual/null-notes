@@ -91,14 +91,14 @@ export function TemplateDialog({ onClose }: TemplateDialogProps) {
             {templates?.length === 0 && (
               <>
                 <p className="template-empty-hint">
-                  No templates yet — add <code>.md</code> files to this workspace's{' '}
+                  No templates yet — add <code>.md</code> files to this workspace&apos;s{' '}
                   <code>templates/</code> folder, or start with the exercise-sheet layout.
                 </p>
                 <button className="import-mode-option" onClick={() => void handleSeedDefaults()}>
                   <FileText size={18} />
                   <span>
                     <strong>Add the exercise-sheet starter template</strong>
-                    <small>Task/Solution pairs, the same shape P4-3's Split Into Tasks produces.</small>
+                    <small>Task/Solution pairs, the same shape P4-3&apos;s Split Into Tasks produces.</small>
                   </span>
                 </button>
               </>

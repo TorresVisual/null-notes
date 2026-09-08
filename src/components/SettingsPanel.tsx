@@ -145,7 +145,7 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
             <label className="settings-row">
               <span>
                 Code block font size
-                <small>Independent of the editor's own text size above.</small>
+                <small>Independent of the editor&apos;s own text size above.</small>
               </span>
               <span className="settings-row-control">
                 <input
@@ -184,7 +184,7 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
                 Spellcheck language
                 <small>
                   A BCP-47 tag (<code>de</code>, <code>en</code>, <code>en-GB</code>). Whether squiggles appear at
-                  all is the OS language pack's call, not this app's.
+                  all is the OS language pack&apos;s call, not this app&apos;s.
                 </small>
               </span>
               <span className="settings-row-control">

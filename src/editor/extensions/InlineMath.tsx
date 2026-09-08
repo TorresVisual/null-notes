@@ -123,6 +123,8 @@ function InlineMathView({ node, editor, getPos, updateAttributes, deleteNode, se
           e.preventDefault()
           open()
         }}
+        // KaTeX's own rendered output, not note-derived HTML.
+        // eslint-disable-next-line react/no-danger
         dangerouslySetInnerHTML={{ __html: display.html }}
       />
       {editing && (
@@ -169,6 +171,7 @@ function InlineMathView({ node, editor, getPos, updateAttributes, deleteNode, se
             />
           </span>
           <MathCopyButton latex={draft} className="math-copy-button" />
+          {/* eslint-disable-next-line react/no-danger -- KaTeX's own rendered output, not note-derived HTML. */}
           <span className="math-editor-preview" dangerouslySetInnerHTML={{ __html: preview.html }} />
           {preview.error && <span className="math-editor-error">{preview.error}</span>}
         </span>

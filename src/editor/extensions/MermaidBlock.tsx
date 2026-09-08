@@ -29,6 +29,9 @@ function MermaidView({ node }: ReactNodeViewProps) {
   return (
     <NodeViewWrapper className="mermaid-block" spellCheck={false}>
       {svg && !error ? (
+        // Mermaid's own rendered output (H-3 fixed the raw-source fallback
+        // below, not this).
+        // eslint-disable-next-line react/no-danger
         <div dangerouslySetInnerHTML={{ __html: svg }} />
       ) : (
         <pre className={error ? 'mermaid-error' : undefined}>{code}</pre>

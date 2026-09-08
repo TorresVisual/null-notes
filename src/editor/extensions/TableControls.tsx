@@ -97,6 +97,9 @@ function svgIcon(inner: string, stroked: boolean): SVGSVGElement {
     svg.setAttribute('stroke-linecap', 'round')
     svg.setAttribute('stroke-linejoin', 'round')
   }
+  // `inner` is always one of this file's own hardcoded ICON_* constants,
+  // never note-derived text.
+  // eslint-disable-next-line no-unsanitized/property
   svg.innerHTML = inner
   return svg
 }

@@ -14,6 +14,8 @@ function ref(el: HTMLDivElement): RefObject<HTMLDivElement | null> {
 // isn't enough for these.
 function attachedContainer(html: string): HTMLDivElement {
   const el = document.createElement('div')
+  // Test-only helper; callers always pass this file's own hardcoded fixture strings.
+  // eslint-disable-next-line no-unsanitized/property
   el.innerHTML = html
   document.body.appendChild(el)
   return el

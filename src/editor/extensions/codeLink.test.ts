@@ -51,7 +51,7 @@ afterEach(() => {
 describe('code deep links', () => {
   it('asks the backend about the targets it finds, batched', async () => {
     resolveCodeLinks.mockResolvedValue([true, true])
-    const e = mount('<p>see src/main.rs:58 and docs/plan.md</p>')
+    mount('<p>see src/main.rs:58 and docs/plan.md</p>')
 
     await settle()
 

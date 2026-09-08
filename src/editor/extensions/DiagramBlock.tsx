@@ -3,6 +3,7 @@ import { Node, mergeAttributes } from '@tiptap/core'
 import { ReactNodeViewRenderer, NodeViewWrapper } from '@tiptap/react'
 import type { ReactNodeViewProps } from '@tiptap/react'
 import { diagramApi } from '../../lib/diagram'
+import { sanitizeNoteHtml } from '../../lib/sanitizeHtml'
 
 // Dynamically imported so @excalidraw/excalidraw (a multi-MB bundle) only
 // loads once a diagram is actually opened for editing — a note that never
@@ -62,7 +63,13 @@ function DiagramBlockView({ node }: ReactNodeViewProps) {
 
   return (
     <NodeViewWrapper className="diagram-block">
-      <div className="diagram-block-preview" dangerouslySetInnerHTML={{ __html: svg || '<svg></svg>' }} />
+      {/* The .diagrams/*.svg sidecar is normally only ever written by
+          exportToSvg below, but it's still a file on disk inside a workspace
+          that can be shared/synced — same trust boundary as a note's own
+          .md content (the class of issue H-3's mermaid fix addressed), so it
+          gets the same sanitizing pass as HTMLBlock/mermaid's SVG output. */}
+      {/* eslint-disable-next-line react/no-danger */}
+      <div className="diagram-block-preview" dangerouslySetInnerHTML={{ __html: sanitizeNoteHtml(svg) || '<svg></svg>' }} />
       <button type="button" className="diagram-block-edit" aria-label="Edit diagram" onClick={() => setEditing(true)}>
         Edit
       </button>

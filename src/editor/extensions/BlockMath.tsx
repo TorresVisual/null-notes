@@ -127,6 +127,8 @@ function BlockMathView({ node, editor, getPos, updateAttributes, deleteNode, sel
               e.preventDefault()
               open()
             }}
+            // KaTeX's own rendered output, not note-derived HTML.
+            // eslint-disable-next-line react/no-danger
             dangerouslySetInnerHTML={{ __html: display.html }}
           />
           {number && <span className="block-math-number">({number})</span>}
@@ -194,6 +196,7 @@ function BlockMathView({ node, editor, getPos, updateAttributes, deleteNode, sel
               onSelect={snippetMenu.select}
             />
           </div>
+          {/* eslint-disable-next-line react/no-danger -- KaTeX's own rendered output, not note-derived HTML. */}
           <div className="block-math-editor-preview" dangerouslySetInnerHTML={{ __html: preview.html }} />
           {preview.error && <div className="block-math-editor-error">{preview.error}</div>}
         </div>

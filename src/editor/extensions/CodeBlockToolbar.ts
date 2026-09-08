@@ -154,6 +154,9 @@ function blockActions(pos: number, wrap: boolean): HTMLElement {
   container.className = 'code-block-actions'
   container.contentEditable = 'false'
   container.setAttribute('data-pos', String(pos))
+  // Static template; `wrap` is a boolean interpolated into a class
+  // name/aria attr, never note-derived text.
+  // eslint-disable-next-line no-unsanitized/property
   container.innerHTML = `
     <button type="button" class="code-block-copy" data-action="copy" title="Copy code">Copy</button>
     <button type="button" class="code-block-wrap-toggle${wrap ? ' active' : ''}" data-action="wrap" aria-pressed="${wrap}" title="${wrap ? 'Disable word wrap' : 'Enable word wrap'}">Wrap</button>

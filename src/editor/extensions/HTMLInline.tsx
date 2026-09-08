@@ -19,6 +19,7 @@ function HTMLInlineView({ node }: ReactNodeViewProps) {
   const { html } = node.attrs as unknown as HTMLInlineAttrs
   return (
     <NodeViewWrapper as="span" className="html-inline-container" spellCheck={false}>
+      {/* eslint-disable-next-line react/no-danger -- run through sanitizeNoteHtml (H-2), not raw. */}
       <span dangerouslySetInnerHTML={{ __html: sanitizeNoteHtml(html) }} />
     </NodeViewWrapper>
   )

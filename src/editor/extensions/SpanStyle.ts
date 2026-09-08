@@ -70,6 +70,9 @@ export const SpanStyle = Mark.create({
         props: {
           transformPastedHTML(html) {
             const wrapper = document.createElement('div')
+            // Detached element, never attached to the document; ProseMirror
+            // re-parses the returned string through the schema afterward.
+            // eslint-disable-next-line no-unsanitized/property
             wrapper.innerHTML = html
             wrapper.querySelectorAll('span[style]').forEach((span) => {
               span.replaceWith(...Array.from(span.childNodes))

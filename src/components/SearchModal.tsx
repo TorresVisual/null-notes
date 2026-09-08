@@ -88,7 +88,7 @@ export function SearchModal({ onClose }: SearchModalProps) {
             <CommandEmpty className="search-empty">
               No results for &ldquo;{query}&rdquo;
               <span className="empty-state-detail">
-                Searches every note's title and body — try a shorter or different term, or narrow
+                Searches every note&apos;s title and body — try a shorter or different term, or narrow
                 with <code>folder:</code>/<code>tag:</code>.
               </span>
             </CommandEmpty>

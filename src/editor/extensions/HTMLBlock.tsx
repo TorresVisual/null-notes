@@ -39,6 +39,7 @@ function HTMLBlockView({ node }: ReactNodeViewProps) {
   const { html } = node.attrs as unknown as HTMLBlockAttrs
   return (
     <NodeViewWrapper className="html-block-container" contentEditable={false} spellCheck={false}>
+      {/* eslint-disable-next-line react/no-danger -- run through sanitizeNoteHtml (H-2), not raw. */}
       <div dangerouslySetInnerHTML={{ __html: sanitizeNoteHtml(html) }} />
     </NodeViewWrapper>
   )

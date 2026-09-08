@@ -142,7 +142,7 @@ export function handleCodeBlockKeyDown(view: EditorView, event: KeyboardEvent): 
     return true
   }
 
-  const nextIndent = /[\{\[\(]\s*$/.test(beforeCursor) ? `${indent}${indentUnit()}` : indent
+  const nextIndent = /[{[(]\s*$/.test(beforeCursor) ? `${indent}${indentUnit()}` : indent
   view.dispatch(view.state.tr.insertText(`\n${nextIndent}`, from, to))
   return true
 }
@@ -183,7 +183,7 @@ export function handleEditorKeyDown(view: EditorView, event: KeyboardEvent): boo
   if (handleCodeBlockKeyDown(view, event)) return true
 
   if (event.key === 'Backspace') {
-    const { $from, empty, from } = view.state.selection
+    const { empty, from } = view.state.selection
     if (!empty || from === 0) return false
 
     if (shouldJoinIntoPreviousListItem(view)) {
