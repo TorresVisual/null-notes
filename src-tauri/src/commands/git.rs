@@ -509,6 +509,13 @@ pub fn read_note_at_commit_at(
     note_path: &str,
     sha: &str,
 ) -> anyhow::Result<String> {
+    // sha is interpolated straight into a single `<rev>:<path>` argument below.
+    // Without this check a value like "--output=..." would be parsed by git
+    // as a flag rather than a revision (M-6) since it's never passed through
+    // a shell that would otherwise need escaping.
+    if sha.len() < 7 || sha.len() > 40 || !sha.bytes().all(|b| b.is_ascii_hexdigit()) {
+        anyhow::bail!("invalid commit sha: {sha}");
+    }
     let toplevel_output = no_window_command("git")
         .arg("-C")
         .arg(workspace)
@@ -1086,6 +1093,20 @@ mod tests {
             read_note_at_commit_at(&notes_dir.to_string_lossy(), &note_path, &sha).unwrap();
 
         assert_eq!(content, "# Todo\n\n- one\n");
+    }
+
+    #[test]
+    fn read_note_at_commit_rejects_a_sha_that_looks_like_a_flag() {
+        let tmp = tempdir().unwrap();
+        git_init(tmp.path());
+        let note_path = tmp.path().join("Todo.md").to_string_lossy().into_owned();
+        commit_note_file(tmp.path(), "Todo.md", "# Todo\n", "notes: update Todo");
+
+        let err =
+            read_note_at_commit_at(&tmp.path().to_string_lossy(), &note_path, "--output=evil")
+                .unwrap_err();
+
+        assert!(err.to_string().contains("invalid commit sha"));
     }
 
     #[test]
