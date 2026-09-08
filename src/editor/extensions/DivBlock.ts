@@ -1,5 +1,6 @@
 import { Node, mergeAttributes } from '@tiptap/core'
 import { Plugin } from '@tiptap/pm/state'
+import { encodeAttr } from '../../lib/htmlAttr'
 
 interface DivBlockAttrs {
   align: string | null
@@ -9,9 +10,9 @@ interface DivBlockAttrs {
 
 function buildDivTag(attrs: DivBlockAttrs): string {
   const parts: string[] = ['<div']
-  if (attrs.align) parts.push(` align="${attrs.align}"`)
-  if (attrs.className) parts.push(` class="${attrs.className}"`)
-  if (attrs.style) parts.push(` style="${attrs.style}"`)
+  if (attrs.align) parts.push(` align="${encodeAttr(attrs.align)}"`)
+  if (attrs.className) parts.push(` class="${encodeAttr(attrs.className)}"`)
+  if (attrs.style) parts.push(` style="${encodeAttr(attrs.style)}"`)
   parts.push('>')
   return parts.join('')
 }
