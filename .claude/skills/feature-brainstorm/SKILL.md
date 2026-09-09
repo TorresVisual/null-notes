@@ -31,7 +31,8 @@ Explore the relevant parts of the repository, including where present:
 - `package.json`
 - `Cargo.toml`
 - `notes/`
-- `docs/`
+- `docs/ROADMAP.md` — the authoritative plan and decision log (large; read the "Last updated" status block at the top and grep for relevant terms rather than reading it in full)
+- rest of `docs/`
 - tests
 - relevant configuration
 
@@ -101,14 +102,16 @@ Before creating an issue, check every candidate against all available project st
 
 1. Current source code
 2. `TODO.md`
-3. Documentation and notes
-4. Recent Git history
-5. Existing GitHub Issues
+3. `docs/ROADMAP.md` — grep it for terms related to the candidate. It records decisions inline, including options explicitly rejected on inspection, and it is the authoritative source when it disagrees with `TODO.md`.
+4. Documentation and notes
+5. Recent Git history
+6. Existing GitHub Issues
 
 Reject an idea if it:
 
 * already exists in the implementation
 * is already planned in `TODO.md`
+* was explicitly decided against in `docs/ROADMAP.md` (a rejected option, a dropped/superseded item, or a documented decision that already covers this ground)
 * is already represented by a GitHub Issue
 * is a near-duplicate of an existing issue
 * is merely a rewording of existing planned work
@@ -138,17 +141,14 @@ Quality and novelty are more important than quantity.
 
 For each surviving feature, create a separate GitHub Issue.
 
-Use this title format:
-
-```text
-Feature: <concise feature name>
-```
+Title: short and specific, no `Feature:`/`bug:` prefix — the `enhancement` label carries that, matching this repo's `file-issue` skill convention.
 
 Each issue should contain:
 
 * a concise explanation of what the feature does
 * why it matters specifically to `null-notes`
 * the user-facing behavior or capability
+* concrete `file:line` or function-name pointers into the relevant code, from the investigation in step 1, so a future session can act on it without re-investigating from scratch
 * enough context for the developer to understand the idea without reconstructing it from the title
 
 Keep the issue focused on **what and why**, not an unnecessarily detailed implementation plan.
