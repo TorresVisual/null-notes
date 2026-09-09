@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { X } from 'lucide-react'
+import { LoadingStatus } from './LoadingStatus'
 import { api } from '../lib/tauri'
 import { useWorkspaceStore } from '../store/workspace'
 import { CardText } from './CardText'
@@ -159,7 +160,7 @@ export function ReviewSession({ onClose, mode = { kind: 'due' } }: ReviewSession
           </button>
         </div>
         {isLoading ? (
-          <p className="status">Loading…</p>
+          <LoadingStatus />
         ) : error ? (
           <p className="empty-state">{error}</p>
         ) : !current ? (

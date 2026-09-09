@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { forceSimulation, forceLink, forceManyBody, forceCenter, forceCollide } from 'd3-force'
 import type { SimulationNodeDatum, SimulationLinkDatum } from 'd3-force'
 import { X } from 'lucide-react'
+import { LoadingStatus } from './LoadingStatus'
 import { useNotesStore } from '../store/notes'
 import { useWorkspaceStore } from '../store/workspace'
 import { api } from '../lib/tauri'
@@ -105,7 +106,7 @@ export function GraphView({ onClose }: GraphViewProps) {
           </button>
         </div>
         {isLoading ? (
-          <p className="status">Loading…</p>
+          <LoadingStatus />
         ) : nodes.length === 0 ? (
           <p className="empty-state">
             No notes yet.

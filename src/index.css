@@ -596,6 +596,17 @@ button, [role="button"], .tree-row, .tab, .search-result, .slash-menu-item,
   font: var(--text-empty-state);
 }
 
+.status {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-xs);
+}
+
+.status .spin {
+  color: var(--accent);
+}
+
 .spin {
   animation: spin 0.8s linear infinite;
 }

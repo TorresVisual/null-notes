@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { X } from 'lucide-react'
+import { LoadingStatus } from './LoadingStatus'
 import { api } from '../lib/tauri'
 import { useWorkspaceStore } from '../store/workspace'
 import { groupByNote } from '../lib/taskGroups'
@@ -71,7 +72,7 @@ export function TaskView({ onClose }: TaskViewProps) {
           </button>
         </div>
         {isLoading ? (
-          <p className="status">Loading…</p>
+          <LoadingStatus />
         ) : groups.length === 0 ? (
           <p className="empty-state">
             No open tasks in this workspace.

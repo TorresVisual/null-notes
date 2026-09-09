@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import type { Editor, Range } from '@tiptap/core'
 import { listen } from '@tauri-apps/api/event'
-import { Loader2 } from 'lucide-react'
 import { Sidebar } from './Sidebar'
 import { TabBar } from './TabBar'
 import { Titlebar } from './Titlebar'
@@ -15,6 +14,7 @@ import { BacklinksPanel } from './BacklinksPanel'
 import { NoteHistoryPanel } from './NoteHistoryPanel'
 import { OutlinePanel } from './OutlinePanel'
 import { WorkspacePicker } from './WorkspacePicker'
+import { LoadingStatus } from './LoadingStatus'
 import { SettingsPanel } from './SettingsPanel'
 import { ShortcutsOverlay } from './ShortcutsOverlay'
 import { PromptDialog } from './PromptDialog'
@@ -484,11 +484,7 @@ export function Layout() {
               className={`editor-pane${!activeTab && !workspacePath ? ' editor-pane--center' : ''}`}
               style={{ '--editor-max-width': `${settings.editorMaxWidthPx}px` } as CSSProperties}
             >
-              {isLoading && (
-                <p className="status">
-                  <Loader2 size={14} className="spin" /> Loading…
-                </p>
-              )}
+              {isLoading && <LoadingStatus />}
               {!isLoading && activeTab && viewMode === 'wysiwyg' && (
                 <NoteEditor
                   content={content}
