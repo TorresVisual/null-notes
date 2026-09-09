@@ -9,19 +9,27 @@ import { rememberPosition, recallPosition } from '../lib/notePositions'
 export function useScrollRestoration(
   activeTab: string | null,
   isLoading: boolean,
+  viewMode: 'wysiwyg' | 'raw',
 ): RefObject<HTMLDivElement | null> {
   const scrollRef = useRef<HTMLDivElement>(null)
   // Which note the scroll listener is currently recording for. Held in a ref
   // rather than the effect's closure so a scroll event that lands mid-switch
   // cannot write the outgoing note's offset under the incoming note's key.
   const recordingFor = useRef<string | null>(null)
+  // The listener effect below only attaches once, so it reads the current
+  // mode from a ref that every render keeps fresh rather than from a stale
+  // closure over the `viewMode` argument.
+  const recordingMode = useRef(viewMode)
+  recordingMode.current = viewMode
 
   useEffect(() => {
     const element = scrollRef.current
     if (!element) return
     const onScroll = () => {
       const path = recordingFor.current
-      if (path) rememberPosition(path, { scrollTop: element.scrollTop })
+      if (!path) return
+      const field = recordingMode.current === 'raw' ? 'rawScrollTop' : 'scrollTop'
+      rememberPosition(path, { [field]: element.scrollTop })
     }
     element.addEventListener('scroll', onScroll, { passive: true })
     return () => element.removeEventListener('scroll', onScroll)
@@ -34,7 +42,8 @@ export function useScrollRestoration(
     recordingFor.current = null
     if (!activeTab || isLoading) return
 
-    const target = recallPosition(activeTab)?.scrollTop ?? 0
+    const remembered = recallPosition(activeTab)
+    const target = (viewMode === 'raw' ? remembered?.rawScrollTop : remembered?.scrollTop) ?? 0
     element.scrollTop = target
     // What actually stuck: a note whose KaTeX, Mermaid and images have not
     // sized themselves yet is shorter than its final height, so the browser
@@ -63,7 +72,7 @@ export function useScrollRestoration(
     })
     observer.observe(content)
     return () => observer.disconnect()
-  }, [activeTab, isLoading])
+  }, [activeTab, isLoading, viewMode])
 
   return scrollRef
 }

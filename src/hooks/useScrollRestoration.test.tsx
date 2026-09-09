@@ -29,14 +29,15 @@ interface HarnessProps {
   activeTab: string | null
   isLoading: boolean
   maxScroll: number
+  viewMode?: 'wysiwyg' | 'raw'
 }
 
 // jsdom has no layout engine, so scrollTop assignment is never clamped on
 // its own. This patches the one element the hook touches to clamp against a
 // test-controlled ceiling, standing in for "the browser clamps the offset
 // down because the content isn't sized yet."
-function Harness({ activeTab, isLoading, maxScroll }: HarnessProps) {
-  const scrollRef = useScrollRestoration(activeTab, isLoading)
+function Harness({ activeTab, isLoading, maxScroll, viewMode = 'wysiwyg' }: HarnessProps) {
+  const scrollRef = useScrollRestoration(activeTab, isLoading, viewMode)
   // A ref (not the `maxScroll` prop directly) because the property below is
   // only defined once, on first mount — it needs a live value to read on
   // every later resize, not the value from the render that created it.
@@ -115,5 +116,21 @@ describe('useScrollRestoration', () => {
     fireResize?.()
 
     expect(el.scrollTop).toBe(42)
+  })
+
+  it('restores the raw-view offset, not the rendered-view one, when switching modes', () => {
+    vi.stubGlobal('ResizeObserver', FakeResizeObserver)
+    rememberPosition('Toggle.md', { scrollTop: 500, rawScrollTop: 120 })
+
+    const { rerender, container } = render(
+      <Harness activeTab="Toggle.md" isLoading={false} maxScroll={1000} viewMode="wysiwyg" />,
+    )
+    const el = container.firstElementChild as HTMLElement
+    expect(el.scrollTop).toBe(500)
+
+    rerender(
+      <Harness activeTab="Toggle.md" isLoading={false} maxScroll={1000} viewMode="raw" />,
+    )
+    expect(el.scrollTop).toBe(120)
   })
 })

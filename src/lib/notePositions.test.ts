@@ -14,12 +14,19 @@ describe('notePositions', () => {
     rememberPosition('Merge.md', { scrollTop: 420 })
     rememberPosition('Merge.md', { selection: 17 })
 
-    expect(recallPosition('Merge.md')).toEqual({ selection: 17, scrollTop: 420 })
+    expect(recallPosition('Merge.md')).toEqual({ selection: 17, scrollTop: 420, rawScrollTop: 0 })
   })
 
   it('defaults the half that was never written', () => {
     rememberPosition('Half.md', { scrollTop: 420 })
-    expect(recallPosition('Half.md')).toEqual({ selection: 0, scrollTop: 420 })
+    expect(recallPosition('Half.md')).toEqual({ selection: 0, scrollTop: 420, rawScrollTop: 0 })
+  })
+
+  it('keeps the raw-view offset independent of the rendered-view offset', () => {
+    rememberPosition('Modes.md', { scrollTop: 420 })
+    rememberPosition('Modes.md', { rawScrollTop: 90 })
+
+    expect(recallPosition('Modes.md')).toEqual({ selection: 0, scrollTop: 420, rawScrollTop: 90 })
   })
 
   it('keeps notes independent', () => {

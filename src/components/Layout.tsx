@@ -104,7 +104,7 @@ export function Layout() {
   const [pendingCramStreak, setPendingCramStreak] = useState<number | null>(null)
   const settings = useSettingsStore((s) => s.settings)
   const setSettings = useSettingsStore((s) => s.setSettings)
-  const scrollRef = useScrollRestoration(activeTab, isLoading)
+  const scrollRef = useScrollRestoration(activeTab, isLoading, viewMode)
 
   // The backend vetoes the close and hands control here so a pending edit
   // reaches disk first; the window only dies once confirmClose is called.
