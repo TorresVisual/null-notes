@@ -95,13 +95,15 @@ export function ReviewSession({ onClose, mode = { kind: 'due' } }: ReviewSession
   // no longer be trusted after any grade — only a fresh read reflects it.
   function grade(g: Grade) {
     if (!workspacePath || !current) return
+    const notePath = current.notePath
     // Grading can fail if the note was deleted outside the app (the backend
     // then drops its stale queue entry on its own) — refetch regardless so a
     // ghost card can't get stuck un-gradeable forever.
     void api.notes
-      .gradeCard(current.notePath, current.position, g, workspacePath)
+      .gradeCard(notePath, current.position, g, workspacePath)
+      .then(() => useWorkspaceStore.getState().addGitPendingPath(notePath))
       .catch(() => {})
-      .then(refetch)
+      .finally(refetch)
   }
 
   function togglePick(i: number) {
@@ -115,10 +117,14 @@ export function ReviewSession({ onClose, mode = { kind: 'due' } }: ReviewSession
 
   function submitMc() {
     if (!workspacePath || !current) return
+    const notePath = current.notePath
     setMcSubmitting(true)
     void api.notes
-      .gradeMcCard(current.notePath, current.position, Array.from(picked), workspacePath)
-      .then((result) => setMcResult(result.correct))
+      .gradeMcCard(notePath, current.position, Array.from(picked), workspacePath)
+      .then((result) => {
+        useWorkspaceStore.getState().addGitPendingPath(notePath)
+        setMcResult(result.correct)
+      })
       .catch(() => {
         // Same reasoning as grade(): the note may have been deleted outside
         // the app, or another card in it graded first and shifted this

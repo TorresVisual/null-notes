@@ -33,7 +33,7 @@ const mcCard: DueCard = {
 }
 
 beforeEach(() => {
-  useWorkspaceStore.setState({ path: '/ws' })
+  useWorkspaceStore.setState({ path: '/ws', gitPendingPaths: [] })
   vi.mocked(api.notes.listDueCards).mockResolvedValue(cards)
   vi.mocked(api.notes.gradeCard).mockResolvedValue(undefined)
 })
@@ -84,6 +84,26 @@ describe('ReviewSession', () => {
     expect(screen.queryByText('Reveal answer')).toBeInTheDocument()
   })
 
+  it('queues the graded note for auto-commit, like a normal save does', async () => {
+    render(<ReviewSession onClose={vi.fn()} />)
+    await waitFor(() => screen.getByText('Q1'))
+    fireEvent.click(screen.getByText('Reveal answer'))
+    fireEvent.click(screen.getByText('Good'))
+
+    await waitFor(() => expect(useWorkspaceStore.getState().gitPendingPaths).toContain('/ws/a.md'))
+  })
+
+  it('does not queue the note for auto-commit when grading fails', async () => {
+    vi.mocked(api.notes.gradeCard).mockRejectedValue(new Error('note deleted'))
+    render(<ReviewSession onClose={vi.fn()} />)
+    await waitFor(() => screen.getByText('Q1'))
+    fireEvent.click(screen.getByText('Reveal answer'))
+    fireEvent.click(screen.getByText('Good'))
+
+    await waitFor(() => expect(api.notes.gradeCard).toHaveBeenCalled())
+    expect(useWorkspaceStore.getState().gitPendingPaths).not.toContain('/ws/a.md')
+  })
+
   it('shows "all done" once the queue is empty', async () => {
     vi.mocked(api.notes.listDueCards).mockResolvedValue([])
     render(<ReviewSession onClose={vi.fn()} />)
@@ -93,7 +113,7 @@ describe('ReviewSession', () => {
 
 describe('ReviewSession — multiple choice', () => {
   beforeEach(() => {
-    useWorkspaceStore.setState({ path: '/ws' })
+    useWorkspaceStore.setState({ path: '/ws', gitPendingPaths: [] })
     vi.mocked(api.notes.listDueCards).mockResolvedValue([mcCard])
   })
 
@@ -130,6 +150,16 @@ describe('ReviewSession — multiple choice', () => {
     expect(screen.getByLabelText('4').closest('li')).toHaveClass('review-card-option-missed')
     expect(screen.getByText('Next')).toBeInTheDocument()
     expect(screen.getByLabelText('3')).toBeDisabled()
+  })
+
+  it('queues the note for auto-commit after a multiple-choice grade', async () => {
+    vi.mocked(api.notes.gradeMcCard).mockResolvedValue({ correct: [1] })
+    render(<ReviewSession onClose={vi.fn()} />)
+    await waitFor(() => screen.getByText('What is 2+2?'))
+    fireEvent.click(screen.getByLabelText('4'))
+    fireEvent.click(screen.getByText('Submit'))
+
+    await waitFor(() => expect(useWorkspaceStore.getState().gitPendingPaths).toContain('/ws/c.md'))
   })
 
   it('Next re-fetches the due queue', async () => {
