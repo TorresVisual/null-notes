@@ -32,15 +32,17 @@ interface HarnessProps {
   viewMode?: 'wysiwyg' | 'raw'
 }
 
-// jsdom has no layout engine, so scrollTop assignment is never clamped on
-// its own. This patches the one element the hook touches to clamp against a
-// test-controlled ceiling, standing in for "the browser clamps the offset
-// down because the content isn't sized yet."
+// jsdom has no layout engine, so scrollTop assignment is never clamped and
+// scrollHeight/clientHeight never reflect real content. This patches the one
+// element the hook touches: `clientHeight` fixed at 0 and `scrollHeight` set
+// to `maxScroll` makes the scrollable range exactly `maxScroll`, standing in
+// for "the browser clamps the offset down because the content isn't sized
+// yet."
 function Harness({ activeTab, isLoading, maxScroll, viewMode = 'wysiwyg' }: HarnessProps) {
   const scrollRef = useScrollRestoration(activeTab, isLoading, viewMode)
-  // A ref (not the `maxScroll` prop directly) because the property below is
-  // only defined once, on first mount — it needs a live value to read on
-  // every later resize, not the value from the render that created it.
+  // A ref (not the `maxScroll` prop directly) because the properties below
+  // are only defined once, on first mount — they need a live value to read
+  // on every later resize, not the value from the render that created them.
   const maxScrollRef = useRef(maxScroll)
   maxScrollRef.current = maxScroll
   return (
@@ -55,6 +57,8 @@ function Harness({ activeTab, isLoading, maxScroll, viewMode = 'wysiwyg' }: Harn
               value = Math.min(v, maxScrollRef.current)
             },
           })
+          Object.defineProperty(el, 'scrollHeight', { get: () => maxScrollRef.current })
+          Object.defineProperty(el, 'clientHeight', { get: () => 0 })
         }
         scrollRef.current = el
       }}
@@ -74,7 +78,9 @@ afterEach(() => {
 describe('useScrollRestoration', () => {
   it('keeps retrying across multiple late-layout passes, not just one frame', () => {
     vi.stubGlobal('ResizeObserver', FakeResizeObserver)
-    rememberPosition('Retry.md', { scrollTop: 500 })
+    // Fraction 1 = "restore to the very bottom" — with scrollHeight standing
+    // in for maxScroll, the target tracks maxScroll at every step below.
+    rememberPosition('Retry.md', { scrollFraction: 1 })
 
     const { rerender, container } = render(
       <Harness activeTab="Retry.md" isLoading={false} maxScroll={0} />,
@@ -100,7 +106,7 @@ describe('useScrollRestoration', () => {
 
   it('stops nudging once the user scrolls away on their own', () => {
     vi.stubGlobal('ResizeObserver', FakeResizeObserver)
-    rememberPosition('UserScroll.md', { scrollTop: 500 })
+    rememberPosition('UserScroll.md', { scrollFraction: 1 })
 
     // Clamped short of the target, so the watch stays active — a note
     // already at its final size never needed the retry loop to begin with.
@@ -118,9 +124,9 @@ describe('useScrollRestoration', () => {
     expect(el.scrollTop).toBe(42)
   })
 
-  it('restores the raw-view offset, not the rendered-view one, when switching modes', () => {
+  it('applies the same fraction to a differently-sized view when switching modes', () => {
     vi.stubGlobal('ResizeObserver', FakeResizeObserver)
-    rememberPosition('Toggle.md', { scrollTop: 500, rawScrollTop: 120 })
+    rememberPosition('Toggle.md', { scrollFraction: 0.5 })
 
     const { rerender, container } = render(
       <Harness activeTab="Toggle.md" isLoading={false} maxScroll={1000} viewMode="wysiwyg" />,
@@ -128,9 +134,10 @@ describe('useScrollRestoration', () => {
     const el = container.firstElementChild as HTMLElement
     expect(el.scrollTop).toBe(500)
 
-    rerender(
-      <Harness activeTab="Toggle.md" isLoading={false} maxScroll={1000} viewMode="raw" />,
-    )
-    expect(el.scrollTop).toBe(120)
+    // The raw view lays the same note out much shorter — the pixel offset
+    // that matched halfway in the rendered view would land in blank space
+    // here, so the hook has to recompute against the new scrollHeight.
+    rerender(<Harness activeTab="Toggle.md" isLoading={false} maxScroll={200} viewMode="raw" />)
+    expect(el.scrollTop).toBe(100)
   })
 })

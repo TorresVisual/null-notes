@@ -65,7 +65,13 @@ describe('the editor tells the WebView which dictionary to use', () => {
 
   it('puts it on the raw markdown editor too', () => {
     const { container } = render(
-      <RawEditor content="Rechtschreibung" spellcheck spellcheckLanguage="de" onChange={() => {}} />,
+      <RawEditor
+        content="Rechtschreibung"
+        notePath="Spellcheck.md"
+        spellcheck
+        spellcheckLanguage="de"
+        onChange={() => {}}
+      />,
     )
 
     const textarea = container.querySelector('textarea')

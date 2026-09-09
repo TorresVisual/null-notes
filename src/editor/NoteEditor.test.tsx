@@ -2,6 +2,7 @@ import { describe, it, expect, afterEach, vi } from 'vitest'
 import { render, cleanup, waitFor } from '@testing-library/react'
 import { NoteEditor } from './NoteEditor'
 import { useSettingsStore, DEFAULT_SETTINGS } from '../store/settings'
+import { rememberPosition } from '../lib/notePositions'
 
 afterEach(() => {
   cleanup()
@@ -96,5 +97,30 @@ describe('NoteEditor tab switch (#14)', () => {
     expect(flushSyncWarning).toBeUndefined()
 
     errorSpy.mockRestore()
+  })
+})
+
+describe('NoteEditor cursor restore (#31)', () => {
+  it('places the cursor at the remembered fraction through the document, not the raw editor coordinate space', async () => {
+    // 0.5 through a 10-character paragraph — the doc is
+    // `<p>0123456789</p>`, size 12, so the caret should land at doc position
+    // 6 (offset 5 inside the text, between "01234" and "56789").
+    rememberPosition('/fraction.md', { cursorFraction: 0.5 })
+
+    render(
+      <NoteEditor
+        content="0123456789"
+        notePath="/fraction.md"
+        spellcheck={false}
+        spellcheckLanguage="en"
+        onChange={() => {}}
+        onFlashcardCommand={() => {}}
+      />,
+    )
+
+    await waitFor(() => {
+      const selection = window.getSelection()
+      expect(selection?.anchorOffset).toBe(5)
+    })
   })
 })

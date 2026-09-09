@@ -1,9 +1,13 @@
 export interface NotePosition {
-  selection: number
-  scrollTop: number
-  // Kept separate from scrollTop: the rendered and raw views lay the same
-  // note out at very different heights, so one pixel offset can't serve both.
-  rawScrollTop: number
+  // Both stored as a 0..1 fraction through the document rather than an
+  // absolute character offset or pixel: the rendered and raw views lay the
+  // same note out completely differently, so a fraction is the only unit
+  // that means the same thing in both. Restoring within the same view still
+  // lands exactly (the fraction round-trips against the same content), and
+  // switching views lands at the closest equivalent spot instead of
+  // whatever the other view's absolute offset happened to be.
+  cursorFraction: number
+  scrollFraction: number
 }
 
 // Session-scoped, deliberately not persisted: where the cursor sat is not note
@@ -11,7 +15,7 @@ export interface NotePosition {
 // across restarts (open tabs, expanded folders).
 const positions = new Map<string, NotePosition>()
 
-const EMPTY: NotePosition = { selection: 0, scrollTop: 0, rawScrollTop: 0 }
+const EMPTY: NotePosition = { cursorFraction: 0, scrollFraction: 0 }
 
 export function rememberPosition(path: string, patch: Partial<NotePosition>): void {
   positions.set(path, { ...(positions.get(path) ?? EMPTY), ...patch })

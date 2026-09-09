@@ -11,34 +11,27 @@ describe('notePositions', () => {
   // The cursor and the scroll offset are written by two different components
   // at two different times, so a patch must not wipe the other half.
   it('merges partial updates rather than replacing the entry', () => {
-    rememberPosition('Merge.md', { scrollTop: 420 })
-    rememberPosition('Merge.md', { selection: 17 })
+    rememberPosition('Merge.md', { scrollFraction: 0.42 })
+    rememberPosition('Merge.md', { cursorFraction: 0.17 })
 
-    expect(recallPosition('Merge.md')).toEqual({ selection: 17, scrollTop: 420, rawScrollTop: 0 })
+    expect(recallPosition('Merge.md')).toEqual({ cursorFraction: 0.17, scrollFraction: 0.42 })
   })
 
   it('defaults the half that was never written', () => {
-    rememberPosition('Half.md', { scrollTop: 420 })
-    expect(recallPosition('Half.md')).toEqual({ selection: 0, scrollTop: 420, rawScrollTop: 0 })
-  })
-
-  it('keeps the raw-view offset independent of the rendered-view offset', () => {
-    rememberPosition('Modes.md', { scrollTop: 420 })
-    rememberPosition('Modes.md', { rawScrollTop: 90 })
-
-    expect(recallPosition('Modes.md')).toEqual({ selection: 0, scrollTop: 420, rawScrollTop: 90 })
+    rememberPosition('Half.md', { scrollFraction: 0.42 })
+    expect(recallPosition('Half.md')).toEqual({ cursorFraction: 0, scrollFraction: 0.42 })
   })
 
   it('keeps notes independent', () => {
-    rememberPosition('A.md', { scrollTop: 10 })
-    rememberPosition('B.md', { scrollTop: 99 })
+    rememberPosition('A.md', { scrollFraction: 0.1 })
+    rememberPosition('B.md', { scrollFraction: 0.99 })
 
-    expect(recallPosition('A.md')?.scrollTop).toBe(10)
-    expect(recallPosition('B.md')?.scrollTop).toBe(99)
+    expect(recallPosition('A.md')?.scrollFraction).toBe(0.1)
+    expect(recallPosition('B.md')?.scrollFraction).toBe(0.99)
   })
 
   it('forgets a note so a stale offset cannot outlive its path', () => {
-    rememberPosition('Gone.md', { scrollTop: 10 })
+    rememberPosition('Gone.md', { scrollFraction: 0.1 })
     forgetPosition('Gone.md')
 
     expect(recallPosition('Gone.md')).toBeUndefined()

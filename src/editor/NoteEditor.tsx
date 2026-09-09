@@ -107,7 +107,10 @@ export function NoteEditor({
     if (!editor) return
     const onSelectionUpdate = () => {
       setEditorVersion((version) => version + 1)
-      rememberPosition(notePath, { selection: editor.state.selection.anchor })
+      const size = editor.state.doc.content.size
+      rememberPosition(notePath, {
+        cursorFraction: size > 0 ? editor.state.selection.anchor / size : 0,
+      })
       // A canvas pointerdown does not move the ProseMirror selection, and the bar
       // preventDefaults its own presses, so this fires only when the caret really
       // lands in prose — which is exactly when the drawing tools should go away.
@@ -135,7 +138,7 @@ export function NoteEditor({
     if (!remembered) return
 
     editor.commands.command(({ tr, dispatch }) => {
-      const position = Math.min(remembered.selection, tr.doc.content.size)
+      const position = Math.round(remembered.cursorFraction * tr.doc.content.size)
       dispatch?.(tr.setSelection(TextSelection.near(tr.doc.resolve(position))))
       return true
     })

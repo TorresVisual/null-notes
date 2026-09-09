@@ -502,6 +502,7 @@ export function Layout() {
               {!isLoading && activeTab && viewMode === 'raw' && (
                 <RawEditor
                   content={content}
+                  notePath={activeTab}
                   spellcheck={settings.spellcheck}
                   spellcheckLanguage={settings.spellcheckLanguage}
                   onChange={(md) => void save(md)}
