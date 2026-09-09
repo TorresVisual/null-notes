@@ -28,6 +28,7 @@ beforeEach(() => {
     expandedFolders: [],
     selectedFolder: null,
     folderError: null,
+    gitPendingPaths: [],
   })
 })
 
@@ -55,6 +56,11 @@ describe('FolderTree root drop target', () => {
     await waitFor(() => {
       expect(notesApi.moveNote).toHaveBeenCalledWith('/ws/Sub/a.md', '/ws')
     })
+    // #18: a root-drop move wasn't queuing its paths into the auto-commit
+    // batch, so the move landed on disk but never got auto-committed.
+    expect(useWorkspaceStore.getState().gitPendingPaths).toEqual(
+      expect.arrayContaining(['/ws/Sub/a.md', '/ws/a.md']),
+    )
   })
 
   it('moves a dropped folder back to the workspace root', async () => {
@@ -69,6 +75,9 @@ describe('FolderTree root drop target', () => {
     await waitFor(() => {
       expect(notesApi.renameFolder).toHaveBeenCalledWith('/ws/Sub/Nested', '/ws/Nested')
     })
+    expect(useWorkspaceStore.getState().gitPendingPaths).toEqual(
+      expect.arrayContaining(['/ws/Sub/Nested', '/ws/Nested']),
+    )
   })
 
   it('does nothing when the drop carries neither a note nor a folder path', () => {

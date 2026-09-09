@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { TreeNode } from './TreeNode'
 import { useWorkspaceStore } from '../store/workspace'
 import { refreshTree } from '../hooks/useWorkspace'
-import { folderName, isUnderPath } from '../lib/pathPrefix'
+import { folderName, isUnderPath, sidecarDir } from '../lib/pathPrefix'
 import { api } from '../lib/tauri'
 import type { TreeEntry } from '../lib/folderTree'
 
@@ -36,11 +36,19 @@ export function FolderTree({ entries, depth = 0 }: FolderTreeProps) {
       if (notePath) {
         const newPath = await api.notes.moveNote(notePath, workspacePath)
         replaceOpenPath(notePath, newPath)
+        for (const suffix of ['ink', 'pdf', 'diagrams', 'assets']) {
+          useWorkspaceStore.getState().addGitPendingPath(sidecarDir(notePath, suffix))
+          useWorkspaceStore.getState().addGitPendingPath(sidecarDir(newPath, suffix))
+        }
+        useWorkspaceStore.getState().addGitPendingPath(notePath)
+        useWorkspaceStore.getState().addGitPendingPath(newPath)
       } else if (draggedFolderPath && !isUnderPath(workspacePath, draggedFolderPath)) {
         const separator = workspacePath.includes('\\') ? '\\' : '/'
         const newPath = `${workspacePath}${separator}${folderName(draggedFolderPath)}`
         await api.notes.renameFolder(draggedFolderPath, newPath)
         replaceOpenPath(draggedFolderPath, newPath)
+        useWorkspaceStore.getState().addGitPendingPath(draggedFolderPath)
+        useWorkspaceStore.getState().addGitPendingPath(newPath)
       } else {
         return
       }
