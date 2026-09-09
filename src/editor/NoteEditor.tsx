@@ -80,7 +80,17 @@ export function NoteEditor({
     const current = markdownOf(editor)
     if (content !== current) {
       isProgrammaticUpdate.current = true
+      // A node view mounted by this setContent (e.g. a wiki-link) makes
+      // tiptap's ReactRenderer flushSync, which React rejects from inside
+      // this effect's own commit (#14). isEditorContentInitialized is what
+      // ReactRenderer checks to decide flushSync vs. a queued microtask
+      // render — toggling it off for the call routes new node views through
+      // the async path instead, with no change to when `content` lands.
+      const withInitFlag = editor as unknown as { isEditorContentInitialized?: boolean }
+      const wasInitialized = withInitFlag.isEditorContentInitialized
+      withInitFlag.isEditorContentInitialized = false
       editor.commands.setContent(content)
+      withInitFlag.isEditorContentInitialized = wasInitialized
       isProgrammaticUpdate.current = false
     }
   }, [content, editor])
