@@ -3405,6 +3405,15 @@ code {
   width: 360px;
 }
 
+/* .settings-panel's gap only spaces DialogContent's direct children — the
+   form wrapping message/input/actions is a single such child, so it needs
+   its own flex+gap to space its contents the same way. */
+.prompt-dialog-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
 .prompt-dialog-message {
   font-size: 13px;
   color: var(--text-secondary);

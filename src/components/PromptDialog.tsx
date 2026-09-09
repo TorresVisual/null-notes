@@ -38,7 +38,7 @@ export function PromptDialog() {
   return (
     <Dialog open onOpenChange={(next) => !next && cancel()}>
       <DialogContent className="settings-panel prompt-dialog" showCloseButton={false}>
-        <form onSubmit={handleSubmit}>
+        <form className="prompt-dialog-form" onSubmit={handleSubmit}>
           <DialogTitle asChild>
             <p className="prompt-dialog-message">{message}</p>
           </DialogTitle>
