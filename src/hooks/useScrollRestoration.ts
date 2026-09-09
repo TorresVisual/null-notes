@@ -39,18 +39,30 @@ export function useScrollRestoration(
     // What actually stuck: a note whose KaTeX, Mermaid and images have not
     // sized themselves yet is shorter than its final height, so the browser
     // clamps the offset down.
-    const applied = element.scrollTop
+    let applied = element.scrollTop
     recordingFor.current = activeTab
 
     if (applied === target) return
 
-    // Retry once the late content has laid out, but only if the offset is
-    // still the clamped one — otherwise the user scrolled in the meantime and
-    // yanking them back would be worse than landing short.
-    const frame = requestAnimationFrame(() => {
-      if (element.scrollTop === applied) element.scrollTop = target
+    // A single rAF retry isn't enough: Mermaid renders via an async promise
+    // that can resolve many frames after mount, and images/KaTeX can keep
+    // reflowing the pane for a while too. Watch the content for as long as it
+    // keeps growing, nudging the offset back each time — but only while the
+    // offset is still the clamped one, otherwise the user scrolled in the
+    // meantime and yanking them back would be worse than landing short.
+    const content = element.firstElementChild
+    if (!content) return
+    const observer = new ResizeObserver(() => {
+      if (element.scrollTop !== applied) {
+        observer.disconnect()
+        return
+      }
+      element.scrollTop = target
+      applied = element.scrollTop
+      if (applied === target) observer.disconnect()
     })
-    return () => cancelAnimationFrame(frame)
+    observer.observe(content)
+    return () => observer.disconnect()
   }, [activeTab, isLoading])
 
   return scrollRef
