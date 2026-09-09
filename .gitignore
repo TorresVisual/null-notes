@@ -45,7 +45,6 @@ e2e/.artifacts/
 .superpowers/
 
 # Added by Null IDE Auto-Gitignore
-.claude/
 .playwright-mcp/
 .null/
 
