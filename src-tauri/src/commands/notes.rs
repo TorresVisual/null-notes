@@ -711,6 +711,19 @@ async fn write_atomic(path: &Path, content: &str) -> anyhow::Result<()> {
     result
 }
 
+// Pages-mode notes hold only `pdf-page` blocks referencing rendered page
+// images — none of a PDF's own text ever lands in the note's Markdown, so
+// without this the note is unsearchable by content (issue #33). The text
+// itself lives in the `.pdf` sidecar `import_pdf_pages` wrote it into, not
+// the note file, so it can't just be part of `content` here.
+async fn pdf_search_text_for(note_path: &str) -> String {
+    let sidecar = super::sidecar_dir_for(note_path, "pdf");
+    let text_path = Path::new(&sidecar).join(super::pdf::PDF_SEARCH_TEXT_FILE);
+    tokio::fs::read_to_string(text_path)
+        .await
+        .unwrap_or_default()
+}
+
 async fn index_note_at(
     path: &str,
     workspace: &str,
@@ -726,7 +739,13 @@ async fn index_note_at(
         updated_at: now_ms(),
     };
     db::notes::index_note(db, &meta).await?;
-    db::notes::index_note_content(db, path, &title, content).await?;
+    let pdf_text = pdf_search_text_for(path).await;
+    let fts_body = if pdf_text.is_empty() {
+        content.to_string()
+    } else {
+        format!("{content}\n\n{pdf_text}")
+    };
+    db::notes::index_note_content(db, path, &title, &fts_body).await?;
     db::notes::set_tags(db, path, &extract_tags(content)).await?;
     db::notes::set_links(db, path, &extract_links(content)).await?;
     db::notes::set_tasks(db, path, &extract_tasks(content)).await?;
@@ -2992,6 +3011,38 @@ mod save_tests {
             rewrite_links(content, "Big O Notation", "Asymptotic Notation").unwrap(),
             content
         );
+    }
+
+    #[tokio::test]
+    async fn test_reindex_note_picks_up_pdf_sidecar_search_text() {
+        // Pages-mode notes hold only `pdf-page` blocks — the PDF's own text
+        // lives solely in the `.pdf` sidecar `import_pdf_pages` writes
+        // (issue #33). This confirms `index_note_at` finds it there.
+        let tmp = tempdir().unwrap();
+        let ws = tmp.path().to_string_lossy().into_owned();
+        let note = tmp.path().join("Lecture 7.md");
+        let content = "# Lecture 7\n\n```pdf-page\n{\"src\":\"page-0.png\"}\n```\n";
+        std::fs::write(&note, content).unwrap();
+
+        let sidecar = tmp.path().join("Lecture 7.pdf");
+        std::fs::create_dir_all(&sidecar).unwrap();
+        std::fs::write(sidecar.join("text.txt"), "quicksort partitioning").unwrap();
+
+        let pool = sqlx::sqlite::SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect("sqlite::memory:")
+            .await
+            .unwrap();
+        run_migrations(&pool).await.unwrap();
+        index_note_at(&note.to_string_lossy(), &ws, content, &pool)
+            .await
+            .unwrap();
+
+        let results = db::notes::search_notes(&pool, &ws, Some("quicksort"), None, None, None)
+            .await
+            .unwrap();
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].path, note.to_string_lossy());
     }
 
     #[tokio::test]

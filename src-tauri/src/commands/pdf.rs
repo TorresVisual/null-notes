@@ -15,6 +15,11 @@ fn pdf_dir_for(note_path: &str) -> String {
     super::sidecar_dir_for(note_path, "pdf")
 }
 
+/// Name of the search-text sidecar `import_pdf_pages` writes next to a Pages
+/// note's rendered page images — see `commands::notes::pdf_search_text_for`,
+/// which reads it back in at reindex time.
+pub const PDF_SEARCH_TEXT_FILE: &str = "text.txt";
+
 #[tauri::command]
 pub async fn ensure_pdf_dir(note_path: String) -> Result<String, String> {
     let dir = pdf_dir_for(&note_path);
@@ -35,7 +40,7 @@ pub async fn import_pdf_pages(
         .await
         .map_err(|e| e.to_string())?;
 
-    crate::pdf::renderer::render_pages(
+    let pages = crate::pdf::renderer::render_pages(
         Path::new(&pdf_path),
         Path::new(&out_dir),
         |page, total_pages| {
@@ -43,7 +48,24 @@ pub async fn import_pdf_pages(
         },
     )
     .await
-    .map_err(|e| e.to_string())
+    .map_err(|e| e.to_string())?;
+
+    // Best-effort: a Pages-mode note whose text can't be extracted (e.g. a
+    // genuine scan) still gets its rendered pages — it just isn't searchable
+    // by content, same as before this sidecar existed.
+    let pdf_path_for_text = pdf_path.clone();
+    let text = tokio::task::spawn_blocking(move || {
+        let pages = crate::pdf::extract::extract_pages(Path::new(&pdf_path_for_text))?;
+        anyhow::Ok(crate::pdf::extract::pages_to_text(&pages))
+    })
+    .await
+    .ok()
+    .and_then(|r| r.ok());
+    if let Some(text) = text {
+        let _ = tokio::fs::write(Path::new(&out_dir).join(PDF_SEARCH_TEXT_FILE), text).await;
+    }
+
+    Ok(pages)
 }
 
 /// Whether a PDF carries a text layer worth converting.

@@ -133,6 +133,26 @@ pub fn pages_to_markdown(pages: &[ExtractedPage]) -> models::PdfMarkdownImport {
     }
 }
 
+/// Plain per-page text for search indexing — Pages-mode notes have no
+/// Markdown body of their own to index, so this is the only route their
+/// content has into FTS. Deliberately stops at `group_lines`: word/line
+/// spacing, nothing more. No column ordering, no maths reconstruction, no
+/// figure handling — those exist to make `pages_to_markdown` readable prose,
+/// which a search index doesn't need.
+pub fn pages_to_text(pages: &[ExtractedPage]) -> String {
+    pages
+        .iter()
+        .map(|page| {
+            layout::group_lines(&page.chars)
+                .iter()
+                .map(|line| line.text())
+                .collect::<Vec<_>>()
+                .join("\n")
+        })
+        .collect::<Vec<_>>()
+        .join("\n\n")
+}
+
 /// Distance from `x` to the nearest edge of `bounds` — `0.0` when `x` falls
 /// inside it. Used to assign an image that doesn't cleanly land inside any
 /// single multi-column region (e.g. one spanning a gutter) to whichever
@@ -564,6 +584,12 @@ mod tests {
             rules: Vec::new()
         }
         .is_effectively_empty());
+    }
+
+    #[test]
+    fn pages_to_text_joins_pages_with_a_blank_line() {
+        let pages = vec![page_of("first page"), page_of("second page")];
+        assert_eq!(pages_to_text(&pages), "first page\n\nsecond page");
     }
 
     #[test]
