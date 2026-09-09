@@ -71,3 +71,4 @@ e2e/.artifacts/
 .impeccable/live/*.png
 # impeccable-ignore-end
 .*.tmp
+.claude/
