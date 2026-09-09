@@ -6,6 +6,8 @@ import { TextSelection } from '@tiptap/pm/state'
 import { confirm, message } from '@tauri-apps/plugin-dialog'
 import { coreExtensions } from './extensions'
 import { rememberPosition, recallPosition } from '../lib/notePositions'
+import { takePendingHighlight } from '../lib/pendingHighlight'
+import { highlightSearchMatch } from './extensions/SearchJumpHighlight'
 import { handleEditorKeyDown, handleEditorTextInput } from './extensions/CodeBlockEditor'
 import { splitIntoTasks, report, markdownOf } from './splitIntoTasks'
 import { EditorStatusBar } from './EditorStatusBar'
@@ -133,6 +135,28 @@ export function NoteEditor({
     // cursor happened to be.
     editor.commands.focus(null, { scrollIntoView: false })
   }, [editor, notePath, content])
+
+  // A Ctrl+K search result jump (SearchModal's open()) leaves its target
+  // text in pendingHighlight.ts rather than calling into this note
+  // directly, since the note may not be mounted yet. This effect covers
+  // "just switched to this note"; the window-event listener below covers
+  // "this note was already the active tab", which changes neither notePath
+  // nor content, so this effect's deps would never re-fire for it.
+  useEffect(() => {
+    if (!editor) return
+    const text = takePendingHighlight(notePath)
+    if (text) highlightSearchMatch(editor, text)
+  }, [editor, notePath, content])
+
+  useEffect(() => {
+    if (!editor) return
+    const onSearchJump = () => {
+      const text = takePendingHighlight(notePath)
+      if (text) highlightSearchMatch(editor, text)
+    }
+    window.addEventListener('search:jump', onSearchJump)
+    return () => window.removeEventListener('search:jump', onSearchJump)
+  }, [editor, notePath])
 
   // Same shape, for "Split Into Tasks". Confirmed before it runs: this
   // rewrites the whole note, and asserting that a document *is* an exercise

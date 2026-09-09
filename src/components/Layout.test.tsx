@@ -1,10 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { render, screen, cleanup, act } from '@testing-library/react'
+import { render, screen, cleanup, act, fireEvent, waitFor } from '@testing-library/react'
 import { Layout } from './Layout'
 import { useWorkspaceStore } from '../store/workspace'
 import { useNotesStore } from '../store/notes'
 import { useSettingsStore, DEFAULT_SETTINGS } from '../store/settings'
 import { useNote } from '../hooks/useNote'
+import { api } from '../lib/tauri'
 
 vi.mock('@tauri-apps/api/event', () => ({
   listen: vi.fn().mockResolvedValue(vi.fn()),
@@ -49,6 +50,7 @@ vi.mock('../lib/tauri', () => ({
       listDueCards: vi.fn().mockResolvedValue([]),
       backlinksFor: vi.fn().mockResolvedValue([]),
       backlinksForWithContext: vi.fn().mockResolvedValue([]),
+      search: vi.fn().mockResolvedValue([]),
     },
     git: {
       listNoteHistory: vi.fn().mockResolvedValue([]),
@@ -158,6 +160,48 @@ describe('Layout overlay exclusivity', () => {
     act(() => pressKey('Escape'))
 
     expect(screen.queryByPlaceholderText(/Search notes/)).not.toBeInTheDocument()
+  })
+
+  it('scrolls to and highlights the match after selecting a free-text search result (#19)', async () => {
+    useWorkspaceStore.setState({ path: '/ws', activeTab: '/ws/Other.md', tagFilter: null })
+    useNotesStore.setState({
+      notes: [
+        { id: '1', path: '/ws/Other.md', title: 'Other', workspace: '/ws', updatedAt: 0 },
+        { id: '2', path: '/ws/Target.md', title: 'Target', workspace: '/ws', updatedAt: 0 },
+      ],
+      folders: [],
+      tags: [],
+    })
+    vi.mocked(useNote).mockImplementation((notePath) => ({
+      content: notePath === '/ws/Target.md' ? '# Target\n\nzzneedle marks the spot\n' : '',
+      save: vi.fn(),
+      isLoading: false,
+      saveState: 'clean',
+      saveError: null,
+      flush: vi.fn().mockResolvedValue(undefined),
+      retrySave: vi.fn(),
+      dismissError: vi.fn(),
+      conflict: false,
+      keepMine: vi.fn(),
+      reloadTheirs: vi.fn(),
+    }))
+    vi.mocked(api.notes.search).mockResolvedValue([
+      { path: '/ws/Target.md', title: 'Target', snippet: 'zzneedle marks the spot' },
+    ])
+
+    render(<Layout />)
+    act(() => runCommand('search'))
+    fireEvent.change(screen.getByPlaceholderText(/Search notes/), { target: { value: 'zzneedle' } })
+
+    const result = await waitFor(() => {
+      const el = document.querySelector('.search-result-title')
+      expect(el).toBeInTheDocument()
+      return el!
+    })
+
+    fireEvent.click(result)
+
+    await waitFor(() => expect(document.querySelector('.search-jump-target')).toBeInTheDocument())
   })
 })
 
