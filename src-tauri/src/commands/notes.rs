@@ -998,6 +998,46 @@ fn rewrite_links(content: &str, old_title: &str, new_title: &str) -> anyhow::Res
         .into_owned())
 }
 
+// Image/ink/pdf/diagram embeds hold a sidecar-relative link ("Old Note.assets/
+// foo.png"); NoteImage's Markdown syntax stores it `encodeURI`-escaped, the
+// fenced ink/pdf/diagram blocks store it raw. Rewriting the directory prefix
+// in both forms keeps embeds resolvable after the sidecar dirs are renamed.
+fn rewrite_sidecar_links(content: &str, old_stem: &str, new_stem: &str) -> String {
+    let mut out = content.to_string();
+    for suffix in [".ink", ".pdf", ".assets", ".diagrams"] {
+        out = out.replace(
+            &format!("{old_stem}{suffix}/"),
+            &format!("{new_stem}{suffix}/"),
+        );
+        out = out.replace(
+            &format!("{}{suffix}/", encode_uri_stem(old_stem)),
+            &format!("{}{suffix}/", encode_uri_stem(new_stem)),
+        );
+    }
+    out
+}
+
+// Mirrors the frontend's `encodeURI` boundary encoding (NoteImage.tsx) for
+// exactly the characters `note_filename` can produce: alphanumerics, spaces
+// and dashes. Spaces become `%20`; non-ASCII letters are percent-encoded by
+// UTF-8 byte, same as JS's encodeURI.
+fn encode_uri_stem(stem: &str) -> String {
+    let mut out = String::new();
+    for c in stem.chars() {
+        if c.is_ascii_alphanumeric() || c == '-' {
+            out.push(c);
+        } else if c == ' ' {
+            out.push_str("%20");
+        } else {
+            let mut buf = [0u8; 4];
+            for byte in c.encode_utf8(&mut buf).as_bytes() {
+                out.push_str(&format!("%{byte:02X}"));
+            }
+        }
+    }
+    out
+}
+
 // Titles are how `create_note` derives a filename in the first place, so a
 // rename that leaves the filename behind is only half done — everything that
 // keys off the path (Explorer, `.workspace.json`, git) would keep showing the
@@ -1043,6 +1083,21 @@ async fn rename_note_at(
     } else {
         path.to_string()
     };
+
+    // Sidecar dirs were just renamed above; the note's own Markdown still
+    // points image/ink/pdf/diagram embeds at the pre-rename directory name
+    // unless those links are rewritten the same way title/wiki-links are.
+    if new_path != path {
+        let old_stem = Path::new(path)
+            .file_stem()
+            .unwrap_or_default()
+            .to_string_lossy();
+        let new_stem = Path::new(&new_path)
+            .file_stem()
+            .unwrap_or_default()
+            .to_string_lossy();
+        new_content = rewrite_sidecar_links(&new_content, &old_stem, &new_stem);
+    }
 
     write_atomic(Path::new(&new_path), &new_content).await?;
     index_note_at(&new_path, workspace, &new_content, db).await?;
@@ -3083,6 +3138,43 @@ mod save_tests {
         }
         let notes = db::notes::list_by_workspace(&pool, &ws).await.unwrap();
         assert_eq!(notes[0].path, meta.path);
+    }
+
+    #[tokio::test]
+    async fn test_rename_note_at_rewrites_sidecar_links_in_its_own_content() {
+        let tmp = tempdir().unwrap();
+        let root = tmp.path();
+        let ws = root.to_string_lossy().into_owned();
+        std::fs::create_dir_all(root.join("Old Note.assets")).unwrap();
+        let content = concat!(
+            "# Old Note\n",
+            "![fig](Old%20Note.assets/image-1.png)\n",
+            "```ink\n{\"src\":\"Old Note.ink/a.svg\",\"width\":700,\"height\":400}\n```\n",
+        );
+        std::fs::write(root.join("Old Note.md"), content).unwrap();
+
+        let pool = sqlx::sqlite::SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect("sqlite::memory:")
+            .await
+            .unwrap();
+        run_migrations(&pool).await.unwrap();
+        let old_path = root.join("Old Note.md").to_string_lossy().into_owned();
+        index_note_at(&old_path, &ws, content, &pool).await.unwrap();
+
+        let meta = rename_note_at(&old_path, "New Note", &ws, &pool)
+            .await
+            .unwrap();
+
+        let new_content = std::fs::read_to_string(&meta.path).unwrap();
+        assert!(
+            new_content.contains("New%20Note.assets/image-1.png"),
+            "image link must follow the rename: {new_content}"
+        );
+        assert!(
+            new_content.contains("\"src\":\"New Note.ink/a.svg\""),
+            "ink embed link must follow the rename: {new_content}"
+        );
     }
 
     #[tokio::test]
