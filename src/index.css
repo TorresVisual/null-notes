@@ -1457,25 +1457,40 @@ code {
 }
 .code-run-stdin:focus-visible { outline: none; box-shadow: var(--focus-ring); border-color: var(--accent); }
 
-/* Note-wide find/replace — pinned to the top of the note via `sticky`
-   (not `.code-search-bar`'s `absolute`), since it needs to stay visible
-   while the whole note scrolls, not just float over one block. */
+/* Note-wide find/replace. Lives OUTSIDE the ProseMirror document as a
+   sibling of `.editor-scroll` inside `.editor-body` (see FindReplace.ts's
+   file header for why `position: absolute`, not `sticky`). `.editor-pane`
+   isn't reliably reproducible from CSS alone here — it can be narrower than
+   its own `max-width` (a visible scrollbar shrinks `.editor-scroll`'s
+   content box) or wider (the user's editor-width setting, a CSS variable
+   set on `.editor-pane` itself that a sibling of `.editor-scroll` can't
+   inherit) — so FindReplace.ts sets `left`/`width` in JS to mirror
+   `.editor-pane`'s actual rendered rect instead of guessing. The 48px
+   horizontal padding matches `.editor-pane`'s own so the bar's contents
+   line up with the toolbar's icon groups above it instead of sitting flush
+   with the column's raw edges. */
 .note-find-bar {
-  position: sticky;
+  position: absolute;
   top: 0;
-  z-index: 3;
+  padding: 0 48px;
+  /* Must outrank `.editor-toolbar`'s z-index: 5 — once the note is
+     scrolled, the sticky toolbar occupies this same `top: 0` coordinate,
+     and without a higher z-index here it paints over the bar and hides it
+     completely, which is exactly the bug this bar exists to not have. */
+  z-index: 6;
   background: var(--bg-raised);
   border-bottom: 1px solid var(--border);
-  border-radius: 6px 6px 0 0;
+  border-radius: 0 0 8px 8px;
+  box-shadow: var(--shadow-compact);
 }
 .note-find-row {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 5px 8px;
+  padding: 6px 0;
 }
 .note-find-toggle-replace {
-  padding: 2px 6px;
+  padding: 3px 6px;
   background: var(--bg-hover);
   border: 1px solid var(--border);
   border-radius: 4px;
@@ -1487,7 +1502,7 @@ code {
 .note-find-input, .note-find-replace-input {
   flex: 1;
   min-width: 0;
-  padding: 3px 6px;
+  padding: 4px 7px;
   background: var(--bg-hover);
   border: 1px solid var(--border-strong);
   border-radius: 4px;
@@ -1495,6 +1510,20 @@ code {
   font-size: 12px;
 }
 .note-find-input:focus-visible, .note-find-replace-input:focus-visible { outline: none; box-shadow: var(--focus-ring); border-color: var(--accent); }
+.note-find-input.invalid { border-color: var(--danger); }
+.note-find-option {
+  padding: 3px 6px;
+  background: var(--bg-hover);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-tertiary);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  flex: none;
+}
+.note-find-option:hover { color: var(--accent); border-color: var(--accent); }
+.note-find-option.active { color: var(--accent); border-color: var(--accent); background: var(--accent-bg); }
 .note-find-count {
   font-size: 11px;
   color: var(--text-tertiary);
@@ -1502,8 +1531,9 @@ code {
   text-align: right;
   flex: none;
 }
+.note-find-count-error { color: var(--danger); }
 .note-find-nav, .note-find-close {
-  padding: 2px 6px;
+  padding: 3px 6px;
   background: var(--bg-hover);
   border: 1px solid var(--border);
   border-radius: 4px;
@@ -1517,10 +1547,10 @@ code {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 0 8px 6px;
+  padding: 0 0 8px;
 }
 .note-find-replace-one, .note-find-replace-all {
-  padding: 3px 10px;
+  padding: 4px 10px;
   background: var(--bg-hover);
   border: 1px solid var(--border);
   border-radius: 4px;
@@ -1533,6 +1563,11 @@ code {
 
 .note-find-match { background: var(--accent-bg); border-radius: 2px; }
 .note-find-match-active { background: var(--accent); color: var(--accent-contrast); }
+/* Math atoms are whole-node matches (see FindReplace.ts) — an outline
+   instead of a background wash, since a background behind a KaTeX render
+   would clip against its own glyph ascenders/descenders unevenly. */
+.inline-math.note-find-match, .block-math.note-find-match { outline: 2px solid var(--accent-bg); border-radius: 3px; }
+.inline-math.note-find-match-active, .block-math.note-find-match-active { outline-color: var(--accent); }
 
 /* Focus mode (Ctrl+Shift+F) — every top-level block but the active one. */
 .focus-mode-dim { opacity: 0.35; transition: opacity 0.15s ease; }

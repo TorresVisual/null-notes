@@ -17,6 +17,10 @@ function codeBlock(text: string): string {
   return `<pre><code>${text}</code></pre>`
 }
 
+function inlineMath(latex: string): string {
+  return `<span data-type="inline-math" data-latex="${latex}"></span>`
+}
+
 function caretIn(e: InstanceType<typeof Editor>, needle: string): void {
   let position: number | null = null
   e.state.doc.descendants((node, pos) => {
@@ -42,18 +46,22 @@ function pressEscape(e: InstanceType<typeof Editor>): boolean | void {
   return e.view.someProp('handleKeyDown', (f) => (f as unknown as HandleKeyDown)(e.view, event))
 }
 
-function findBar(e: InstanceType<typeof Editor>): HTMLElement | null {
-  return e.view.dom.querySelector('.note-find-bar')
+// The bar lives outside `view.dom` now (see FindReplace.ts's file header) —
+// appended as a sibling of the ProseMirror root within the same mount
+// container, so a document-wide query finds it. Only one editor is ever
+// mounted at a time in this file (afterEach tears it down), so this is safe.
+function findBar(): HTMLElement | null {
+  return document.querySelector('.note-find-bar')
 }
 
-function findInput(e: InstanceType<typeof Editor>): HTMLInputElement {
-  const input = e.view.dom.querySelector('.note-find-input')
+function findInput(): HTMLInputElement {
+  const input = document.querySelector('.note-find-input')
   if (!(input instanceof HTMLInputElement)) throw new Error('no .note-find-input rendered')
   return input
 }
 
-function replaceInput(e: InstanceType<typeof Editor>): HTMLInputElement {
-  const input = e.view.dom.querySelector('.note-find-replace-input')
+function replaceInput(): HTMLInputElement {
+  const input = document.querySelector('.note-find-replace-input')
   if (!(input instanceof HTMLInputElement)) throw new Error('no .note-find-replace-input rendered')
   return input
 }
@@ -71,10 +79,14 @@ function matchTexts(e: InstanceType<typeof Editor>): string[] {
   return [...e.view.dom.querySelectorAll('.note-find-match')].map((el) => el.textContent ?? '')
 }
 
-function clickButton(e: InstanceType<typeof Editor>, selector: string): void {
-  const button = e.view.dom.querySelector(selector)
+function clickButton(selector: string): void {
+  const button = document.querySelector(selector)
   if (!(button instanceof HTMLElement)) throw new Error(`no element matching ${selector}`)
   button.click()
+}
+
+function clickOption(option: string): void {
+  clickButton(`.note-find-option[data-option="${option}"]`)
 }
 
 afterEach(() => {
@@ -88,7 +100,7 @@ describe('findDocMatches (pure-ish, over a real doc)', () => {
     expect(findDocMatches(e.state.doc, '')).toEqual([])
   })
 
-  it('finds matches across separate paragraphs, case-insensitively', () => {
+  it('finds matches across separate paragraphs, case-insensitively by default', () => {
     const e = mount('<p>Hello there</p><p>hello again</p>')
     const matches = findDocMatches(e.state.doc, 'hello')
     expect(matches).toHaveLength(2)
@@ -97,11 +109,45 @@ describe('findDocMatches (pure-ish, over a real doc)', () => {
     }
   })
 
-  it('skips text inside a code block', () => {
+  it('matches text inside a code block too', () => {
     const e = mount(`<p>needle in prose</p>${codeBlock('needle in code')}`)
     const matches = findDocMatches(e.state.doc, 'needle')
+    expect(matches).toHaveLength(2)
+  })
+
+  it('matches an equation whose LaTeX contains the query, as a whole-node match', () => {
+    const e = mount(`<p>see ${inlineMath('x^2 + y^2')} below</p>`)
+    const matches = findDocMatches(e.state.doc, 'x^2')
     expect(matches).toHaveLength(1)
-    expect(e.state.doc.textBetween(matches[0]!.from, matches[0]!.to)).toBe('needle')
+    expect(matches[0]!.kind).toBe('node')
+  })
+
+  it('case-sensitive option excludes differently-cased matches', () => {
+    const e = mount('<p>Hello hello</p>')
+    const insensitive = findDocMatches(e.state.doc, 'Hello', { caseSensitive: false, wholeWord: false, useRegex: false })
+    const sensitive = findDocMatches(e.state.doc, 'Hello', { caseSensitive: true, wholeWord: false, useRegex: false })
+    expect(insensitive).toHaveLength(2)
+    expect(sensitive).toHaveLength(1)
+  })
+
+  it('whole-word option excludes partial-word matches', () => {
+    const e = mount('<p>cat concatenate</p>')
+    const partial = findDocMatches(e.state.doc, 'cat', { caseSensitive: false, wholeWord: false, useRegex: false })
+    const whole = findDocMatches(e.state.doc, 'cat', { caseSensitive: false, wholeWord: true, useRegex: false })
+    expect(partial).toHaveLength(2)
+    expect(whole).toHaveLength(1)
+  })
+
+  it('regex option treats the query as a pattern', () => {
+    const e = mount('<p>cat1 cat2 dog3</p>')
+    const matches = findDocMatches(e.state.doc, 'cat\\d', { caseSensitive: false, wholeWord: false, useRegex: true })
+    expect(matches).toHaveLength(2)
+  })
+
+  it('an invalid regex pattern yields no matches instead of throwing', () => {
+    const e = mount('<p>hello</p>')
+    expect(() => findDocMatches(e.state.doc, '(unclosed', { caseSensitive: false, wholeWord: false, useRegex: true })).not.toThrow()
+    expect(findDocMatches(e.state.doc, '(unclosed', { caseSensitive: false, wholeWord: false, useRegex: true })).toEqual([])
   })
 })
 
@@ -111,19 +157,19 @@ describe('note-wide find/replace (P6 polish backlog)', () => {
 
     caretIn(e, 'prose')
     expect(pressCtrlF(e)).toBeTruthy()
-    expect(findBar(e)).not.toBeNull()
+    expect(findBar()).not.toBeNull()
     pressEscape(e)
 
     caretIn(e, 'x')
     pressCtrlF(e)
-    expect(findBar(e)).toBeNull()
+    expect(findBar()?.hidden).toBe(true)
   })
 
   it('highlights every match as the query is typed', () => {
     const e = mount('<p>alpha beta alpha</p>')
     pressCtrlF(e)
 
-    typeInto(findInput(e), 'alpha')
+    typeInto(findInput(), 'alpha')
 
     expect(matchTexts(e)).toEqual(['alpha', 'alpha'])
   })
@@ -131,37 +177,37 @@ describe('note-wide find/replace (P6 polish backlog)', () => {
   it('Enter advances the active match and wraps around', () => {
     const e = mount('<p>aa aa aa</p>')
     pressCtrlF(e)
-    typeInto(findInput(e), 'aa')
+    typeInto(findInput(), 'aa')
 
     const activeText = () => e.view.dom.querySelector('.note-find-match-active')?.textContent
     expect(e.view.dom.querySelectorAll('.note-find-match-active')).toHaveLength(1)
 
-    pressOnInput(findInput(e), 'Enter')
-    pressOnInput(findInput(e), 'Enter')
-    pressOnInput(findInput(e), 'Enter')
+    pressOnInput(findInput(), 'Enter')
+    pressOnInput(findInput(), 'Enter')
+    pressOnInput(findInput(), 'Enter')
     expect(activeText()).toBe('aa')
   })
 
   it('Escape closes the bar and clears all highlights', () => {
     const e = mount('<p>alpha beta</p>')
     pressCtrlF(e)
-    typeInto(findInput(e), 'alpha')
+    typeInto(findInput(), 'alpha')
     expect(matchTexts(e)).toHaveLength(1)
 
-    pressOnInput(findInput(e), 'Escape')
+    pressOnInput(findInput(), 'Escape')
 
-    expect(findBar(e)).toBeNull()
+    expect(findBar()?.hidden).toBe(true)
     expect(matchTexts(e)).toHaveLength(0)
   })
 
   it('replaces the active match only', () => {
     const e = mount('<p>alpha beta alpha</p>')
     pressCtrlF(e)
-    typeInto(findInput(e), 'alpha')
-    clickButton(e, '.note-find-toggle-replace')
-    typeInto(replaceInput(e), 'gamma')
+    typeInto(findInput(), 'alpha')
+    clickButton('.note-find-toggle-replace')
+    typeInto(replaceInput(), 'gamma')
 
-    clickButton(e, '.note-find-replace-one')
+    clickButton('.note-find-replace-one')
 
     expect(e.getText()).toBe('gamma beta alpha')
   })
@@ -169,32 +215,46 @@ describe('note-wide find/replace (P6 polish backlog)', () => {
   it('replaces every match at once', () => {
     const e = mount('<p>alpha beta alpha</p>')
     pressCtrlF(e)
-    typeInto(findInput(e), 'alpha')
-    clickButton(e, '.note-find-toggle-replace')
-    typeInto(replaceInput(e), 'gamma')
+    typeInto(findInput(), 'alpha')
+    clickButton('.note-find-toggle-replace')
+    typeInto(replaceInput(), 'gamma')
 
-    clickButton(e, '.note-find-replace-all')
+    clickButton('.note-find-replace-all')
 
     expect(e.getText()).toBe('gamma beta gamma')
   })
 
-  it('never searches or replaces inside a code block', () => {
-    const e = mount(codeBlock('needle'))
+  it('searches and replaces inside a code block too', () => {
+    const e = mount(`<p>needle in prose</p>${codeBlock('needle in code')}`)
+    caretIn(e, 'prose')
     pressCtrlF(e)
-    // Ctrl+F with the caret inside a code block falls through (previous
-    // test covers that); place the caret in prose instead by prepending one.
-    e.destroy()
+    typeInto(findInput(), 'needle')
+    clickButton('.note-find-toggle-replace')
+    typeInto(replaceInput(), 'pin')
+    clickButton('.note-find-replace-all')
 
-    const e2 = mount(`<p>needle in prose</p>${codeBlock('needle in code')}`)
-    caretIn(e2, 'prose')
-    pressCtrlF(e2)
-    typeInto(findInput(e2), 'needle')
-    clickButton(e2, '.note-find-toggle-replace')
-    typeInto(replaceInput(e2), 'pin')
-    clickButton(e2, '.note-find-replace-all')
+    expect(e.getText()).toContain('pin in prose')
+    expect(e.getText()).toContain('pin in code')
+  })
 
-    expect(e2.getText()).toContain('pin in prose')
-    expect(e2.getText()).toContain('needle in code')
-    e2.destroy()
+  it('toggling case-sensitive narrows the highlighted matches', () => {
+    const e = mount('<p>Hello hello</p>')
+    pressCtrlF(e)
+    typeInto(findInput(), 'Hello')
+    expect(matchTexts(e)).toHaveLength(2)
+
+    clickOption('caseSensitive')
+
+    expect(matchTexts(e)).toEqual(['Hello'])
+  })
+
+  it('an invalid regex shows an error instead of matches', () => {
+    const e = mount('<p>hello</p>')
+    pressCtrlF(e)
+    clickOption('useRegex')
+    typeInto(findInput(), '(unclosed')
+
+    expect(matchTexts(e)).toHaveLength(0)
+    expect(document.querySelector('.note-find-count')?.textContent).toBe('Invalid regex')
   })
 })
