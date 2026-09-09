@@ -2,31 +2,13 @@
 
 ## TODO's
 
-- [ ] Better printing — Export to PDF and Print are now separate File menu items, each a small dialog ending in a silent WebView2 call (`PrintToPdf`/`Print`, never `ShowPrintUI`). One checkbox ("Include page numbers, date, and title") controls WebView2's all-or-nothing header/footer bundle. Fixed two real pagination gaps (`h4`-`h6` and block-math/diagrams could split across a page). **Design:** `docs/specs/better-printing-design.md`. **Plan:** `docs/plans/better-printing.md`.   preview and export only show data when a checkmark has been set the data in the export is completely malformed it is mostly clipped dom.js:727 Uncaught TypeError: Cannot read properties of null (reading 'nextSibling')
-- [ ] Use the built git feature to sync workspaces to other machines
-- [ ] Mobile app (need to think how we get syncing working)
-- [ ] Web app (no local md files fully git)
-- [ ] add a open in null notes in my ide
-- [x] markdown render arrows (-&gt; / &lt;-&gt; / &lt;-) (renders in source but not in preview) — extended `SmartSymbols`' existing `!=`/`<=`/`>=` input-rule pattern with `->`→→, `<-`→←; `<->` cascades through `<-`→← first, then a third rule catches the trailing `←>`→↔ since input rules only see one keystroke at a time.
-- [ ] Search in note (ctrl f) needs major improvements
-- [ ] Console warning: "flushSync was called from inside a lifecycle method" — comes from `@tiptap/react`'s `ReactRenderer` (node_modules/@tiptap/react/src/ReactRenderer.tsx:193), which flushSyncs on first render of a `ReactNodeViewRenderer` node view (wiki-links/hover-previews) to keep cursor position stable. Fires when that node view mounts during another component's React commit phase. Cosmetic/upstream so far — no reproduced functional break; find which call site creates the node view mid-lifecycle if it needs fixing.
-- [ ] settings tab needs a redesign pass
-- [ ] Runaway backslash duplication corrupted a task-item line in TODO.md (grew to 65MB/65M backslashes locally; git history already has a 16.8MB `TODO.md` committed at HEAD `c9b1529` from the same bug, doubling roughly each save: 108KB → 124KB → 141KB → 2.2MB → 16.8MB). Ruled out: the shared `prosemirror-markdown`/`tiptap-markdown` parse↔serialize round trip (`esc()` backslash-escaping) — reproduced it directly with `coreExtensions` across repeated open/save cycles, stable, no growth. Still unexplained: what actually duplicates content on save. Candidates to check live (needs the real running app, not vitest): a paste handler or math/`SmartSymbols` input rule misfiring on `\`, or something in the autosave/reindex path re-appending old content instead of replacing it. Needs `main`'s HEAD `TODO.md` history cleaned up too (still 16.8MB there even though the working copy is fixed).
-- [ ] better loading screen
-- [ ] store scroll position
-- [ ] better cram mode design with better completion of category /
-- [ ] show how many cards are left in current category (cram mode)
-- [ ] this cram mode data doesnt get commited (
+Bugs and features are tracked as GitHub Issues on `TorresVisual/null-notes`
+(and, for IDE-side work, `TorresVisual/null-ide`) — not here. See
+`docs/agents/issue-tracker.md`. Use the `file-issue` skill
+(`.claude/skills/file-issue/`) to turn a rough note into a filed issue.
 
-  <!-- sr due=2026-09-13 ease=2.65 interval=8 reps=2 grade=easy streak=2 -->
+## Done (historical)
 
-  )
-- [ ] Shell extension open in null notes (both for folder (workspace) and single files that get copied into a temp workspace)
-- [ ] Renaming does rename sidecar folders but doesnt change the reference to it in the plain markdown
-- [ ] Note creation / rename modal needs a redesign
-- [ ] File - Exit
-- [ ] Possible issue: moving a note and i didnt see it getting commited in the new location
-- [ ] Position between Preview and Source isnt synced
 - [x] renaming doesnt stick title is still old
 - [x] pasting markdown gets code block with language set to markdown (pasting is entirely broken) — two separate paste bugs. (1) `@tiptap/extension-code-block`'s built-in `codeBlockVSCodeHandler` paste plugin unconditionally wrapped any clipboard tagged with `vscode-editor-data` (VS Code, and Monaco/CodeMirror-based doc sites) into one code block using that editor's language mode, hijacking the paste before tiptap-markdown's own parser ran — now skipped specifically when the mode is `markdown`, so real-language pastes (Python, Rust, ...) still auto-detect as before. (2) `DivBlock`'s parse rule matched any generic `<div>`, and real websites wrap nearly everything in layout divs, so pasted web content round-tripped into literal `<div>` markup — now unwrapped out of pasted HTML via `transformPastedHTML` before the schema parses it (loaded `.md` files with intentional `<div align="center">` etc. are untouched, since that path doesn't go through paste).
 - [x] editing larger notes is extremely laggy
@@ -91,7 +73,7 @@ Cut with reasoning in [ROADMAP §4](docs/ROADMAP.md#4-challenged--cut--de-scoped
 | ~~Citations / BibTeX~~ | A thesis need, not a coursework one; Zotero exists |
 | ~~Presentation / slides mode~~ | Niche — P3-2's PDF export already covers sharing with a study group |
 | ~~Graphviz, TikZ export~~ | Challenged — Mermaid + PDF export already cover the real need |
-| ~~Cloud sync, mobile, collaboration~~ | Local-first, desktop, single-user — all three are a different product. *(P5 automates your own Git against your own remote — that's P3-4 taken further, not a reversal.)* |
+| ~~Cloud sync, collaboration~~ | Local-first, single-user — still a different product. *(P5 automates your own Git against your own remote — that's P3-4 taken further, not a reversal.)* Mobile and web app were reconsidered 2026-09-09 — see `TorresVisual/null-notes#23` and `#24`. |
 | ~~Resolving merge conflicts~~ | P5 commits and fast-forwards only. The app never merges, rebases, force-pushes, resets, or edits a conflicted file |
 | ~~Workspace remembers AI conversations~~ | Belongs to the CLI tool once P8 lands, not to this app |
 | ~~Becoming an IDE~~ | P7 integrates with your editor. If a task starts wanting a language server, it's out of scope |

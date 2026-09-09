@@ -1,18 +1,21 @@
-# Issue tracker: TODO.md (manual, local)
+# Issue tracker: GitHub Issues
 
-Issues are found manually by the maintainer, not filed through GitHub/GitLab or any ticket system. They're tracked as checkbox items directly in `TODO.md` at the repo root.
-
-## Conventions
-
-- Open items: `- [ ] <description>`, in the "TODO's" section near the top of the file, or nested under a phase (`P0`–`P15`) further down
-- Closed items: `- [x] <description> — <one-line resolution, sometimes with multi-pass notes inline>`
-- The file also carries a phased roadmap with milestones; `docs/ROADMAP.md` holds the reasoning and Definitions of Done — if the two disagree, the roadmap wins
-- A "Filed, not fixed" subsection records bugs deliberately left unfixed because they don't clear the project's fix-worthiness bar (see `CLAUDE.md`'s PDF pipeline freeze rules)
+Bugs and features are tracked as GitHub Issues on `TorresVisual/null-notes`
+(IDE-side items on `TorresVisual/null-ide`) — not in `TODO.md`. `TODO.md`
+keeps the phased roadmap checklist and a historical log of closed items;
+`docs/ROADMAP.md` holds the reasoning and Definitions of Done — if the two
+disagree, the roadmap wins.
 
 ## When a skill says "publish to the issue tracker"
 
-Add a new `- [ ]` line to `TODO.md` — in the "TODO's" section unless it clearly belongs under an existing phase.
+Use the `file-issue` skill (`.claude/skills/file-issue/SKILL.md`): it
+investigates the codebase for context, asks the user to clarify anything
+ambiguous, drafts title/body/labels for review, then files with
+`gh issue create`. Don't file straight from a raw note without going through
+it — a note filed as-is often can't be acted on by a session that starts
+cold.
 
 ## When a skill says "fetch the relevant ticket"
 
-Read the referenced line or section of `TODO.md` directly; there's no per-ticket file to look up.
+`gh issue view <number> --repo TorresVisual/null-notes` (or `null-ide` for
+IDE-side tickets).

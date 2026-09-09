@@ -1290,7 +1290,8 @@ Per the mandate to remove work that doesn't earn its keep:
 | **TikZ export** | **Challenged — not scheduled** | Niche even for this audience, and only useful when handing work to LaTeX. P3-2's PDF export already covers submission. |
 | **CodeMirror 6 as the editor** | **Superseded** | The brief named CodeMirror; the app is built on TipTap/ProseMirror, which is what makes WYSIWYG-with-inline-ink possible at all. Recorded so the brief's stack list isn't mistaken for a pending migration. |
 | **Cloud sync** | **Cut (stays out of scope)** | Violates local-first principle; plain `.md` + Git/Syncthing already covers it. Invest in *making manual sync painless* (P3-4), not building sync. **Note (2026-07-29):** P5 automates the user's *own* Git against the user's *own* remote. That is this row's remedy taken further, not a reversal of it — the app still builds no accounts, no server, and no sync protocol, and still needs no network to open a note. |
-| **Mobile / tablet app** | **Cut** | Desktop + stylus is the whole point; a second platform is a different product. |
+| **Mobile / tablet app** | **Reconsidered (2026-09-09)** | Maintainer reopened this — see `TorresVisual/null-notes#23`. Not yet scoped or designed; the "different product" reasoning below no longer stands as a blocker, just unaddressed design work. |
+| **Web app (no local .md files, fully git-backed)** | **Reconsidered (2026-09-09)** | Maintainer reopened this alongside mobile — see `TorresVisual/null-notes#24`. Not yet scoped or designed. |
 | **Collaboration / multiplayer** | **Cut** | Single-user tool; enormous complexity for zero personal value. |
 | **Segment-level eraser, hold-to-snap shape recognition** | **Defer indefinitely** | Ink is already a daily-usable subsystem; these are diminishing-returns polish. Only revisit if real use demands it. |
 | **Distribution: installers, auto-update, code-signing, cross-platform** | **Out of scope now** | Personal tool. Revisit only if the audience decision changes to "ship to students." |
@@ -1386,7 +1387,6 @@ Five orderings are deliberate and worth not reshuffling:
 The following are **intentionally not on this roadmap**. Adding any of them is a scope change requiring a fresh decision:
 
 - Cloud sync / accounts / a backend server.
-- Mobile or tablet applications.
 - Real-time collaboration or sharing.
 - Public distribution: signed installers, auto-update, app-store presence, marketing site.
 - Cross-platform support beyond the current Windows-primary target (macOS/Linux are a happy accident, not a commitment).

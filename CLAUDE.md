@@ -251,7 +251,7 @@ npm run test:e2e             # rebuilds via `tauri build --debug`, then runs e2e
 
 ### Issue tracker
 
-Issues are tracked manually as checkbox items in `TODO.md` at the repo root — no GitHub Issues, no per-ticket files. See `docs/agents/issue-tracker.md`.
+Bugs and features are tracked as GitHub Issues on `TorresVisual/null-notes` (and `TorresVisual/null-ide` for IDE-side work) — not in `TODO.md`. Use the `file-issue` skill to turn a rough note into a filed issue. See `docs/agents/issue-tracker.md`.
 
 ### Domain docs
 
