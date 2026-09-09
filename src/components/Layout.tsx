@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import type { Editor, Range } from '@tiptap/core'
 import { listen } from '@tauri-apps/api/event'
+import { getCurrentWindow } from '@tauri-apps/api/window'
 import { Sidebar } from './Sidebar'
 import { TabBar } from './TabBar'
 import { Titlebar } from './Titlebar'
@@ -164,6 +165,9 @@ export function Layout() {
           break
         case 'settings':
           openOverlay('settings')
+          break
+        case 'exit':
+          await getCurrentWindow().close()
           break
         case 'search':
           openOverlay('search')

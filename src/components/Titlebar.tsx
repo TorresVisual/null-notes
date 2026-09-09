@@ -20,10 +20,10 @@ type MenuItemSpec = MenuEntry | { separator: true }
 
 // Mirrors the native menu structure the Rust side used to build (build_menu,
 // src-tauri/src/lib.rs, removed when decorations went custom) — same ids, so
-// Layout.tsx's runCommand needs no changes. Edit (clipboard) and Quit were
-// dropped: clipboard shortcuts work natively without a menu entry, and Quit
-// is now just the close button, routed through the same flush-before-close
-// path instead of bypassing it.
+// Layout.tsx's runCommand needs no changes. Edit (clipboard) was dropped:
+// clipboard shortcuts work natively without a menu entry. Exit routes
+// through the same window.close() the titlebar's close button uses, so it
+// still hits the flush-before-close path rather than bypassing it.
 function buildFileMenu(recentWorkspaces: string[]): MenuItemSpec[] {
   return [
     { id: 'new-note', label: 'New Note', accel: 'Ctrl+N' },
@@ -42,6 +42,8 @@ function buildFileMenu(recentWorkspaces: string[]): MenuItemSpec[] {
     { id: 'print', label: 'Print…' },
     { separator: true },
     { id: 'settings', label: 'Settings…', accel: 'Ctrl+,' },
+    { separator: true },
+    { id: 'exit', label: 'Exit' },
   ]
 }
 
