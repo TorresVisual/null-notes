@@ -4287,10 +4287,22 @@ code {
   height: auto;
 }
 
-.diagram-block-edit {
+.diagram-block-actions {
   position: absolute;
   top: 8px;
   right: 8px;
+  display: flex;
+  gap: 6px;
+  opacity: 0;
+  transition: opacity var(--duration-base) var(--ease-standard);
+}
+
+.diagram-block:hover .diagram-block-actions {
+  opacity: 1;
+}
+
+.diagram-block-edit,
+.diagram-block-copy {
   padding: 4px 10px;
   background: var(--bg-raised);
   border: 1px solid var(--border-strong);
@@ -4298,12 +4310,11 @@ code {
   color: var(--text-primary);
   font-size: 12px;
   cursor: pointer;
-  opacity: 0;
-  transition: opacity var(--duration-base) var(--ease-standard);
 }
 
-.diagram-block:hover .diagram-block-edit {
-  opacity: 1;
+.diagram-block-copy.copied {
+  color: var(--accent);
+  border-color: var(--accent);
 }
 
 .diagram-editor-overlay {

@@ -4,6 +4,8 @@ import { ReactNodeViewRenderer, NodeViewWrapper } from '@tiptap/react'
 import type { ReactNodeViewProps } from '@tiptap/react'
 import { diagramApi } from '../../lib/diagram'
 import { sanitizeNoteHtml } from '../../lib/sanitizeHtml'
+import { writeToClipboard } from '../../lib/clipboard'
+import { encodeSrc } from './NoteImage'
 
 // Dynamically imported so @excalidraw/excalidraw (a multi-MB bundle) only
 // loads once a diagram is actually opened for editing — a note that never
@@ -20,7 +22,22 @@ interface DiagramBlockAttrs {
   height: number
 }
 
-function DiagramBlockView({ node }: ReactNodeViewProps) {
+// A card's front/back is a plain text line (see extract_cards, notes.rs),
+// so a diagram can't be embedded as a card the way its own multi-line
+// ```diagram fence is — but the same `![alt](path)` an image card already
+// uses works unmodified for any note-relative path (read_note_asset just
+// joins it onto the note's directory, it isn't `.assets`-specific). This
+// converts the block's absolute svgSrc back to that note-relative form.
+export function relativeToNoteDir(notePath: string, absolutePath: string): string | null {
+  const sep = notePath.includes('\\') ? '\\' : '/'
+  const dirEnd = notePath.lastIndexOf(sep)
+  if (dirEnd === -1) return null
+  const prefix = notePath.slice(0, dirEnd) + sep
+  if (!absolutePath.startsWith(prefix)) return null
+  return absolutePath.slice(prefix.length).split('\\').join('/')
+}
+
+function DiagramBlockView({ node, editor }: ReactNodeViewProps) {
   // width/height are stored (see DiagramBlockAttrs below) but intentionally
   // not applied here — the preview sizes itself to the actual exported SVG's
   // own dimensions (see .diagram-block-preview svg's max-width/height:auto
@@ -28,8 +45,10 @@ function DiagramBlockView({ node }: ReactNodeViewProps) {
   // whose drawn content is much smaller than the block's nominal box used to
   // force a large empty region below the visible shapes.
   const { jsonSrc, svgSrc } = node.attrs as unknown as DiagramBlockAttrs
+  const notePath = editor.storage.noteContext.notePath
   const [svg, setSvg] = useState('')
   const [editing, setEditing] = useState(false)
+  const [copied, setCopied] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -70,9 +89,29 @@ function DiagramBlockView({ node }: ReactNodeViewProps) {
           gets the same sanitizing pass as HTMLBlock/mermaid's SVG output. */}
       {/* eslint-disable-next-line react/no-danger */}
       <div className="diagram-block-preview" dangerouslySetInnerHTML={{ __html: sanitizeNoteHtml(svg) || '<svg></svg>' }} />
-      <button type="button" className="diagram-block-edit" aria-label="Edit diagram" onClick={() => setEditing(true)}>
-        Edit
-      </button>
+      <div className="diagram-block-actions">
+        {relativeToNoteDir(notePath, svgSrc) && (
+          <button
+            type="button"
+            className={`diagram-block-copy${copied ? ' copied' : ''}`}
+            aria-label="Copy diagram as flashcard reference"
+            title="Copy as flashcard reference"
+            onClick={() => {
+              const relative = relativeToNoteDir(notePath, svgSrc)
+              if (!relative) return
+              void writeToClipboard(`![diagram](${encodeSrc(relative)})`).then(() => {
+                setCopied(true)
+                setTimeout(() => setCopied(false), 1200)
+              })
+            }}
+          >
+            {copied ? 'Copied' : 'Copy for card'}
+          </button>
+        )}
+        <button type="button" className="diagram-block-edit" aria-label="Edit diagram" onClick={() => setEditing(true)}>
+          Edit
+        </button>
+      </div>
       {editing && (
         <Suspense fallback={null}>
           <DiagramEditorOverlay
