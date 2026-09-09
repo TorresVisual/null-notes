@@ -2839,9 +2839,12 @@ code {
 /* Settings only — sized like a real window scaled down, not the compact
    list the shared shell gives Shortcuts/Template. The body scrolls
    independently of the header/footer so the Git section (only shown once a
-   workspace is open) never gets clipped off the bottom of a short window. */
+   workspace is open) never gets clipped off the bottom of a short window.
+   Width just clears .settings-row's own 640px cap plus padding/scrollbar
+   gutter — every row hits that cap regardless of panel width, so sizing
+   the panel any wider than this only adds dead space to its right. */
 .settings-panel--lg {
-  width: min(1040px, calc(100vw - 60px));
+  width: min(700px, calc(100vw - 60px));
   max-height: min(760px, calc(100vh - 60px));
 }
 
