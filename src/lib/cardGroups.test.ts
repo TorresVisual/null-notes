@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { groupCardsByNote } from './cardGroups'
+import { groupCardsByNote, groupCardsByStreak } from './cardGroups'
 import type { CardSummary } from '../types'
 
 const card = (over: Partial<CardSummary>): CardSummary => ({
@@ -27,5 +27,21 @@ describe('groupCardsByNote', () => {
     expect(groups.map((g) => g.notePath)).toEqual(['/ws/a.md', '/ws/b.md'])
     expect(groups[0]!.cards).toHaveLength(2)
     expect(groups[1]!.cards).toHaveLength(1)
+  })
+})
+
+describe('groupCardsByStreak', () => {
+  it('buckets cards by streak, sorted ascending, with counts', () => {
+    const cards = [
+      card({ streak: 2 }),
+      card({ streak: 0 }),
+      card({ streak: 2 }),
+      card({ streak: 1 }),
+    ]
+    expect(groupCardsByStreak(cards)).toEqual([
+      { streak: 0, count: 1 },
+      { streak: 1, count: 1 },
+      { streak: 2, count: 2 },
+    ])
   })
 })

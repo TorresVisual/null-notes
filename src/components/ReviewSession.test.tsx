@@ -3,13 +3,14 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { ReviewSession } from './ReviewSession'
 import { api } from '../lib/tauri'
 import { useWorkspaceStore } from '../store/workspace'
-import type { DueCard } from '../types'
+import type { CardSummary, DueCard } from '../types'
 
 vi.mock('../lib/tauri', () => ({
   api: {
     notes: {
       listDueCards: vi.fn(),
       listCramCards: vi.fn(),
+      listAllCards: vi.fn(),
       gradeCard: vi.fn(),
       gradeMcCard: vi.fn(),
     },
@@ -182,6 +183,7 @@ describe('ReviewSession — cram mode', () => {
     useWorkspaceStore.setState({ path: '/ws' })
     vi.mocked(api.notes.listDueCards).mockClear()
     vi.mocked(api.notes.listCramCards).mockResolvedValue(cards)
+    vi.mocked(api.notes.listAllCards).mockResolvedValue([])
   })
 
   it('fetches from listCramCards with the given streak, not listDueCards', async () => {
@@ -207,5 +209,45 @@ describe('ReviewSession — cram mode', () => {
       const front = screen.queryByText('Q1') ?? screen.queryByText('Q2 [...]')
       expect(front).toBeInTheDocument()
     })
+  })
+
+  it('shows a category switcher when more than one category has cards', async () => {
+    const allCards: CardSummary[] = [
+      { notePath: '/ws/a.md', noteTitle: 'A', kind: 'qa', front: 'Q1', back: 'A1', position: 0, due: '2026-01-01', interval: 0, streak: 0, tags: [] },
+      { notePath: '/ws/b.md', noteTitle: 'B', kind: 'qa', front: 'Q2', back: 'A2', position: 0, due: '2026-01-01', interval: 0, streak: 2, tags: [] },
+    ]
+    vi.mocked(api.notes.listAllCards).mockResolvedValue(allCards)
+    render(<ReviewSession onClose={vi.fn()} mode={{ kind: 'cram', streak: 2 }} onSwitchCategory={vi.fn()} />)
+
+    await waitFor(() => expect(screen.getByText('New (1)')).toBeInTheDocument())
+    expect(screen.getByText('Category 2 (1)')).toBeInTheDocument()
+  })
+
+  it('switches category on chip click without closing the session', async () => {
+    const allCards: CardSummary[] = [
+      { notePath: '/ws/a.md', noteTitle: 'A', kind: 'qa', front: 'Q1', back: 'A1', position: 0, due: '2026-01-01', interval: 0, streak: 0, tags: [] },
+      { notePath: '/ws/b.md', noteTitle: 'B', kind: 'qa', front: 'Q2', back: 'A2', position: 0, due: '2026-01-01', interval: 0, streak: 2, tags: [] },
+    ]
+    vi.mocked(api.notes.listAllCards).mockResolvedValue(allCards)
+    const onSwitchCategory = vi.fn()
+    const onClose = vi.fn()
+    render(<ReviewSession onClose={onClose} mode={{ kind: 'cram', streak: 2 }} onSwitchCategory={onSwitchCategory} />)
+
+    await waitFor(() => expect(screen.getByText('New (1)')).toBeInTheDocument())
+    fireEvent.click(screen.getByText('New (1)'))
+
+    expect(onSwitchCategory).toHaveBeenCalledWith(0)
+    expect(onClose).not.toHaveBeenCalled()
+  })
+
+  it('hides the category switcher when only one category has cards', async () => {
+    vi.mocked(api.notes.listCramCards).mockResolvedValue([cards[0]!])
+    vi.mocked(api.notes.listAllCards).mockResolvedValue([
+      { notePath: '/ws/a.md', noteTitle: 'A', kind: 'qa', front: 'Q1', back: 'A1', position: 0, due: '2026-01-01', interval: 0, streak: 2, tags: [] },
+    ])
+    render(<ReviewSession onClose={vi.fn()} mode={{ kind: 'cram', streak: 2 }} onSwitchCategory={vi.fn()} />)
+
+    await waitFor(() => screen.getByText('Q1'))
+    expect(screen.queryByText('Category 2 (1)')).not.toBeInTheDocument()
   })
 })

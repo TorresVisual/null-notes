@@ -4,6 +4,7 @@ import { LoadingStatus } from './LoadingStatus'
 import { api } from '../lib/tauri'
 import { useWorkspaceStore } from '../store/workspace'
 import { CardText } from './CardText'
+import { groupCardsByStreak, type CardStreakGroup } from '../lib/cardGroups'
 import type { DueCard, Grade } from '../types'
 
 export type ReviewMode = { kind: 'due' } | { kind: 'cram'; streak: number }
@@ -11,6 +12,7 @@ export type ReviewMode = { kind: 'due' } | { kind: 'cram'; streak: number }
 interface ReviewSessionProps {
   onClose: () => void
   mode?: ReviewMode
+  onSwitchCategory?: (streak: number) => void
 }
 
 const GRADES: Array<{ grade: Grade; label: string }> = [
@@ -37,7 +39,7 @@ function shuffledIndices(length: number): number[] {
   return indices
 }
 
-export function ReviewSession({ onClose, mode = { kind: 'due' } }: ReviewSessionProps) {
+export function ReviewSession({ onClose, mode = { kind: 'due' }, onSwitchCategory }: ReviewSessionProps) {
   const workspacePath = useWorkspaceStore((s) => s.path)
   const cramStreak = mode.kind === 'cram' ? mode.streak : null
   const [queue, setQueue] = useState<DueCard[]>([])
@@ -47,6 +49,18 @@ export function ReviewSession({ onClose, mode = { kind: 'due' } }: ReviewSession
   const [picked, setPicked] = useState<Set<number>>(new Set())
   const [mcResult, setMcResult] = useState<number[] | null>(null)
   const [mcSubmitting, setMcSubmitting] = useState(false)
+  const [categories, setCategories] = useState<CardStreakGroup[]>([])
+
+  // Lets the header offer a one-click switch to another category without
+  // leaving the review overlay — Deck View computes the same buckets, but
+  // going back there and clicking Cram again was the whole friction (#27).
+  useEffect(() => {
+    if (!workspacePath || cramStreak === null) return
+    api.notes
+      .listAllCards(workspacePath)
+      .then((cards) => setCategories(groupCardsByStreak(cards)))
+      .catch(() => {})
+  }, [workspacePath, cramStreak])
 
   useEffect(() => {
     if (!workspacePath) return
@@ -159,6 +173,19 @@ export function ReviewSession({ onClose, mode = { kind: 'due' } }: ReviewSession
             <X size={16} />
           </button>
         </div>
+        {cramStreak !== null && categories.length > 1 && onSwitchCategory && (
+          <div className="review-cram-categories">
+            {categories.map(({ streak, count }) => (
+              <button
+                key={streak}
+                className={`review-cram-category${streak === cramStreak ? ' review-cram-category-active' : ''}`}
+                onClick={() => onSwitchCategory(streak)}
+              >
+                {streak === 0 ? 'New' : `Category ${streak}`} ({count})
+              </button>
+            ))}
+          </div>
+        )}
         {isLoading ? (
           <LoadingStatus />
         ) : error ? (

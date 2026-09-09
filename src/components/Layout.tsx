@@ -401,6 +401,7 @@ export function Layout() {
             setPendingCramStreak(null)
             closeOverlay()
           }}
+          onSwitchCategory={(streak) => setPendingCramStreak(streak)}
         />
       )}
       {activeOverlay === 'deck' && (

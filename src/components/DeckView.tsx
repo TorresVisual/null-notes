@@ -3,7 +3,7 @@ import { X } from 'lucide-react'
 import { LoadingStatus } from './LoadingStatus'
 import { api } from '../lib/tauri'
 import { useWorkspaceStore } from '../store/workspace'
-import { groupCardsByNote } from '../lib/cardGroups'
+import { groupCardsByNote, groupCardsByStreak } from '../lib/cardGroups'
 import type { CardSummary } from '../types'
 
 interface DeckViewProps {
@@ -52,15 +52,7 @@ export function DeckView({ onClose, onOpenCram }: DeckViewProps) {
   )
 
   const groups = useMemo(() => groupCardsByNote(filtered), [filtered])
-  const categories = useMemo(() => {
-    const counts = new Map<number, number>()
-    for (const c of filtered) {
-      counts.set(c.streak, (counts.get(c.streak) ?? 0) + 1)
-    }
-    return Array.from(counts.entries())
-      .sort(([a], [b]) => a - b)
-      .map(([streak, count]) => ({ streak, count }))
-  }, [filtered])
+  const categories = useMemo(() => groupCardsByStreak(filtered), [filtered])
   const dueCount = useMemo(() => cards.filter((c) => isDueToday(c.due)).length, [cards])
   const masteredCount = useMemo(
     () => cards.filter((c) => c.interval >= MASTERED_INTERVAL_DAYS).length,

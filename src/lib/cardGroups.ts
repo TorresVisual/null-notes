@@ -24,3 +24,18 @@ export function groupCardsByNote(cards: CardSummary[]): CardGroup[] {
   }
   return groups
 }
+
+export interface CardStreakGroup {
+  streak: number
+  count: number
+}
+
+export function groupCardsByStreak(cards: CardSummary[]): CardStreakGroup[] {
+  const counts = new Map<number, number>()
+  for (const card of cards) {
+    counts.set(card.streak, (counts.get(card.streak) ?? 0) + 1)
+  }
+  return Array.from(counts.entries())
+    .sort(([a], [b]) => a - b)
+    .map(([streak, count]) => ({ streak, count }))
+}

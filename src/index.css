@@ -3749,6 +3749,28 @@ code {
   cursor: pointer;
 }
 
+.review-cram-categories {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+}
+
+.review-cram-category {
+  font-size: 12px;
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 2px 8px;
+  cursor: pointer;
+}
+
+.review-cram-category:hover { border-color: var(--accent); color: var(--accent); }
+
+.review-cram-category-active {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
 /* Workspace dashboard (P9-4) — an inline main-pane view, not a modal
    overlay, since it replaces the empty-state slot rather than sitting
    on top of a note. */
