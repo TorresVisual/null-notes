@@ -1,7 +1,3 @@
-!.claude/skills/
-!.claude/hooks/
-!.claude/agents/
-
 # Logs
 logs
 *.log
@@ -45,6 +41,10 @@ e2e/.artifacts/
 .superpowers/
 
 # Added by Null IDE Auto-Gitignore
+.claude/*
+!.claude/skills/
+!.claude/hooks/
+!.claude/agents/
 .playwright-mcp/
 .null/
 
