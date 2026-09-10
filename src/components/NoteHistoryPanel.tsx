@@ -98,22 +98,21 @@ export function NoteHistoryPanel({ notePath, saveState, currentContent, onRestor
                   {selected?.sha === entry.sha && previewError && (
                     <p className="note-history-error">{previewError}</p>
                   )}
-                  {selected?.sha === entry.sha && diff && (
+                  {selected?.sha === entry.sha && diff && !hasChanges && (
+                    <p className="note-history-diff-empty">No changes from your current version.</p>
+                  )}
+                  {selected?.sha === entry.sha && diff && hasChanges && (
                     <div className="note-history-preview">
-                      {hasChanges ? (
-                        <pre className="note-history-diff">
-                          {diff.map((line, i) => (
-                            <div key={i} className={`note-history-diff-${line.type}`}>
-                              <span className="note-history-diff-marker">
-                                {line.type === 'add' ? '+' : line.type === 'remove' ? '-' : ' '}
-                              </span>
-                              {line.text}
-                            </div>
-                          ))}
-                        </pre>
-                      ) : (
-                        <p className="note-history-diff-empty">No changes from your current version.</p>
-                      )}
+                      <pre className="note-history-diff">
+                        {diff.map((line, i) => (
+                          <div key={i} className={`note-history-diff-${line.type}`}>
+                            <span className="note-history-diff-marker">
+                              {line.type === 'add' ? '+' : line.type === 'remove' ? '-' : ' '}
+                            </span>
+                            {line.text}
+                          </div>
+                        ))}
+                      </pre>
                       <button className="note-history-restore" onClick={() => void handleRestore()}>
                         Restore this version
                       </button>

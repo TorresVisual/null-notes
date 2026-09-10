@@ -2590,7 +2590,7 @@ code {
 .note-history-diff-empty {
   color: var(--text-tertiary);
   font: var(--text-empty-state);
-  margin: 0 0 var(--space-sm);
+  margin: var(--space-sm) 0 0;
 }
 
 .note-history-diff {

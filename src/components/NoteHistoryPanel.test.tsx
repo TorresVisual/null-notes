@@ -135,7 +135,7 @@ describe('NoteHistoryPanel', () => {
 
     expect(await screen.findByText('No changes from your current version.')).toBeInTheDocument()
     expect(screen.queryByText(/^- same$/)).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Restore this version/ })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Restore this version/ })).not.toBeInTheDocument()
   })
 
   it("reads a commit at that commit's own path, not the note's current path, so pre-rename history still loads", async () => {
