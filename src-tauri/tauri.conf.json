@@ -43,6 +43,9 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "resources": {}
+    "resources": {
+      "../identity-package/null-notes-identity.msix": "",
+      "context-menu-handler/target/release/null_notes_context_menu.dll": ""
+    }
   }
 }
