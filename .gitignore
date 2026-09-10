@@ -26,6 +26,7 @@ coverage
 
 # Tauri
 src-tauri/target/
+src-tauri/context-menu-handler/target/
 
 # Workspace state
 .workspace.json
