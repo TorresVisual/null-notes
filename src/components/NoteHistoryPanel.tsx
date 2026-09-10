@@ -67,6 +67,7 @@ export function NoteHistoryPanel({ notePath, saveState, currentContent, onRestor
     () => (preview === null ? null : diffLines(preview, currentContent)),
     [preview, currentContent]
   )
+  const hasChanges = diff !== null && diff.some((line) => line.type !== 'same')
 
   return (
     <div className="note-history-panel">
@@ -99,16 +100,20 @@ export function NoteHistoryPanel({ notePath, saveState, currentContent, onRestor
                   )}
                   {selected?.sha === entry.sha && diff && (
                     <div className="note-history-preview">
-                      <pre className="note-history-diff">
-                        {diff.map((line, i) => (
-                          <div key={i} className={`note-history-diff-${line.type}`}>
-                            <span className="note-history-diff-marker">
-                              {line.type === 'add' ? '+' : line.type === 'remove' ? '-' : ' '}
-                            </span>
-                            {line.text}
-                          </div>
-                        ))}
-                      </pre>
+                      {hasChanges ? (
+                        <pre className="note-history-diff">
+                          {diff.map((line, i) => (
+                            <div key={i} className={`note-history-diff-${line.type}`}>
+                              <span className="note-history-diff-marker">
+                                {line.type === 'add' ? '+' : line.type === 'remove' ? '-' : ' '}
+                              </span>
+                              {line.text}
+                            </div>
+                          ))}
+                        </pre>
+                      ) : (
+                        <p className="note-history-diff-empty">No changes from your current version.</p>
+                      )}
                       <button className="note-history-restore" onClick={() => void handleRestore()}>
                         Restore this version
                       </button>

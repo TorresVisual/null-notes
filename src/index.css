@@ -2587,6 +2587,12 @@ code {
   margin: 0 0 var(--space-sm);
 }
 
+.note-history-diff-empty {
+  color: var(--text-tertiary);
+  font: var(--text-empty-state);
+  margin: 0 0 var(--space-sm);
+}
+
 .note-history-diff {
   font-family: var(--font-mono);
 }

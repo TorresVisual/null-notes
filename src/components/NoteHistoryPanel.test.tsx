@@ -117,6 +117,27 @@ describe('NoteHistoryPanel', () => {
     expect(readNoteAtCommit).toHaveBeenCalledOnce()
   })
 
+  it('shows an empty-diff message instead of an uncolored dump when the commit matches the current buffer', async () => {
+    const user = userEvent.setup()
+    listNoteHistory.mockResolvedValue([{ sha: 'a', timestampMs: 1000, message: 'notes: update Todo', path: '/ws/Todo.md' }])
+    readNoteAtCommit.mockResolvedValue('# Todo\n\n- same\n')
+
+    render(
+      <NoteHistoryPanel
+        notePath="/ws/Todo.md"
+        saveState="clean"
+        currentContent={'# Todo\n\n- same\n'}
+        onRestore={vi.fn()}
+      />
+    )
+    await expand(user)
+    await user.click(await screen.findByText('notes: update Todo'))
+
+    expect(await screen.findByText('No changes from your current version.')).toBeInTheDocument()
+    expect(screen.queryByText(/^- same$/)).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Restore this version/ })).toBeInTheDocument()
+  })
+
   it("reads a commit at that commit's own path, not the note's current path, so pre-rename history still loads", async () => {
     const user = userEvent.setup()
     listNoteHistory.mockResolvedValue([
