@@ -99,6 +99,10 @@ pub async fn remove_notes_under(pool: &SqlitePool, prefix: &str) -> Result<()> {
         .bind(&like_pattern)
         .execute(pool)
         .await?;
+    sqlx::query("DELETE FROM note_code_links WHERE source_path LIKE ? ESCAPE '\\'")
+        .bind(&like_pattern)
+        .execute(pool)
+        .await?;
     sqlx::query("DELETE FROM note_tasks WHERE note_path LIKE ? ESCAPE '\\'")
         .bind(&like_pattern)
         .execute(pool)
@@ -127,6 +131,11 @@ pub async fn update_path(pool: &SqlitePool, old_path: &str, new_path: &str) -> R
         .execute(pool)
         .await?;
     sqlx::query("UPDATE note_links SET source_path = ? WHERE source_path = ?")
+        .bind(new_path)
+        .bind(old_path)
+        .execute(pool)
+        .await?;
+    sqlx::query("UPDATE note_code_links SET source_path = ? WHERE source_path = ?")
         .bind(new_path)
         .bind(old_path)
         .execute(pool)
@@ -269,6 +278,25 @@ pub async fn set_links(pool: &SqlitePool, source_path: &str, targets: &[String])
         .await?;
     for target in targets {
         sqlx::query("INSERT INTO note_links (source_path, target_title) VALUES (?, ?)")
+            .bind(source_path)
+            .bind(target)
+            .execute(pool)
+            .await?;
+    }
+    Ok(())
+}
+
+pub async fn set_code_links(
+    pool: &SqlitePool,
+    source_path: &str,
+    targets: &[String],
+) -> Result<()> {
+    sqlx::query("DELETE FROM note_code_links WHERE source_path = ?")
+        .bind(source_path)
+        .execute(pool)
+        .await?;
+    for target in targets {
+        sqlx::query("INSERT INTO note_code_links (source_path, target) VALUES (?, ?)")
             .bind(source_path)
             .bind(target)
             .execute(pool)
@@ -579,6 +607,28 @@ pub async fn backlinks_for(
     )
     .bind(workspace)
     .bind(title)
+    .fetch_all(pool)
+    .await?;
+    Ok(rows)
+}
+
+/// Mirrors `backlinks_for`, but for code-file references (`target` is a
+/// workspace-relative path, matched exactly — unlike a wiki-link title, a
+/// pasted path isn't retyped with different casing).
+pub async fn code_backlinks_for(
+    pool: &SqlitePool,
+    workspace: &str,
+    target: &str,
+) -> Result<Vec<NoteMetadata>> {
+    let rows = sqlx::query_as::<_, NoteMetadata>(
+        "SELECT n.id, n.title, n.path, n.workspace, n.updated_at
+         FROM notes n
+         JOIN note_code_links ncl ON ncl.source_path = n.path
+         WHERE n.workspace = ? AND ncl.target = ?
+         ORDER BY n.updated_at DESC",
+    )
+    .bind(workspace)
+    .bind(target)
     .fetch_all(pool)
     .await?;
     Ok(rows)
@@ -1032,6 +1082,30 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_set_code_links_and_code_backlinks_for() {
+        let pool = make_pool().await;
+        index_note(&pool, &note("a", "A", "/ws/a.md", "/ws"))
+            .await
+            .unwrap();
+        set_code_links(&pool, "/ws/a.md", &["src/main.rs".to_string()])
+            .await
+            .unwrap();
+
+        let backlinks = code_backlinks_for(&pool, "/ws", "src/main.rs")
+            .await
+            .unwrap();
+        assert_eq!(backlinks.len(), 1);
+        assert_eq!(backlinks[0].id, "a");
+
+        // Unlike a wiki-link title, a path is matched exactly — a different
+        // case is a different file on a case-sensitive filesystem.
+        let none = code_backlinks_for(&pool, "/ws", "SRC/MAIN.RS")
+            .await
+            .unwrap();
+        assert!(none.is_empty());
+    }
+
+    #[tokio::test]
     async fn test_note_containing_marker_finds_the_defining_note() {
         let pool = make_pool().await;
         index_note(&pool, &note("a", "Analysis", "/ws/a.md", "/ws"))
@@ -1171,6 +1245,9 @@ mod tests {
         set_links(&pool, "/ws/old.md", &["Target".to_string()])
             .await
             .unwrap();
+        set_code_links(&pool, "/ws/old.md", &["src/main.rs".to_string()])
+            .await
+            .unwrap();
 
         update_path(&pool, "/ws/old.md", "/ws/Folder/old.md")
             .await
@@ -1181,6 +1258,11 @@ mod tests {
 
         let backlinks = backlinks_for(&pool, "/ws", "Target").await.unwrap();
         assert_eq!(backlinks[0].path, "/ws/Folder/old.md");
+
+        let code_backlinks = code_backlinks_for(&pool, "/ws", "src/main.rs")
+            .await
+            .unwrap();
+        assert_eq!(code_backlinks[0].path, "/ws/Folder/old.md");
     }
 
     #[tokio::test]

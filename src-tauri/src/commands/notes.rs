@@ -128,6 +128,40 @@ pub fn extract_links(content: &str) -> Vec<String> {
     links
 }
 
+// Rust port of `src/lib/codeLinks.ts`'s `PATTERN` — kept in sync by hand, not
+// shared, since the two sides have no code-sharing mechanism. Only the
+// target matters here (not the line suffix `findCodeLinks` also parses), and
+// the character class already excludes `:` and `#`, so any match containing
+// either has that suffix and only that suffix to strip.
+const CODE_LINK_PATTERN: &str =
+    r"(?:[\w.@+-]+/)+[\w.@+-]+\.[A-Za-z0-9]{1,8}(?::\d+(?::\d+)?|#L\d+(?:-L?\d+)?)?";
+
+fn strip_code_link_suffix(m: &str) -> &str {
+    match m.find(['#', ':']) {
+        Some(i) => &m[..i],
+        None => m,
+    }
+}
+
+/// The workspace-relative paths a note's prose references as `src/main.cpp`-
+/// or `src/main.cpp:58`-style code links (issue #37) — the reverse of what a
+/// note forward-links to, mirroring `extract_links`' shape for `note_links`.
+pub fn extract_code_link_targets(content: &str) -> Vec<String> {
+    let re = match Regex::new(CODE_LINK_PATTERN) {
+        Ok(re) => re,
+        Err(_) => return Vec::new(),
+    };
+    let mut seen = HashSet::new();
+    let mut targets = Vec::new();
+    for m in re.find_iter(content) {
+        let target = strip_code_link_suffix(m.as_str()).to_string();
+        if seen.insert(target.clone()) {
+            targets.push(target);
+        }
+    }
+    targets
+}
+
 /// Longest a backlink snippet is shown at before truncating with `…` — long
 /// enough to read as a sentence fragment, short enough that one backlink
 /// entry never dominates the panel.
@@ -142,6 +176,23 @@ pub fn extract_backlink_snippet(content: &str, title: &str) -> Option<String> {
     let pattern = format!(r"(?i)\[\[\s*{}\s*\]\]", regex::escape(title));
     let re = Regex::new(&pattern).ok()?;
     let line = content.lines().find(|line| re.is_match(line))?;
+    let trimmed = line.trim();
+    if trimmed.chars().count() > BACKLINK_SNIPPET_MAX_CHARS {
+        let truncated: String = trimmed.chars().take(BACKLINK_SNIPPET_MAX_CHARS).collect();
+        Some(format!("{truncated}…"))
+    } else {
+        Some(trimmed.to_string())
+    }
+}
+
+/// Mirrors `extract_backlink_snippet`, but for a code link: the first line
+/// whose own extracted targets contain `target` exactly, rather than a
+/// `[[...]]`-bracketed regex match — a code link carries no bracket syntax to
+/// anchor on.
+pub fn extract_code_backlink_snippet(content: &str, target: &str) -> Option<String> {
+    let line = content
+        .lines()
+        .find(|line| extract_code_link_targets(line).iter().any(|t| t == target))?;
     let trimmed = line.trim();
     if trimmed.chars().count() > BACKLINK_SNIPPET_MAX_CHARS {
         let truncated: String = trimmed.chars().take(BACKLINK_SNIPPET_MAX_CHARS).collect();
@@ -829,6 +880,7 @@ async fn index_note_at(
     db::notes::index_note_content(db, path, &title, &fts_body).await?;
     db::notes::set_tags(db, path, &extract_tags(content)).await?;
     db::notes::set_links(db, path, &extract_links(content)).await?;
+    db::notes::set_code_links(db, path, &extract_code_link_targets(content)).await?;
     db::notes::set_tasks(db, path, &extract_tasks(content)).await?;
     db::notes::set_cards(db, path, &extract_cards(content)).await?;
     Ok(())
@@ -1242,6 +1294,7 @@ async fn forget_note(path: &str, db: &DbPool) -> anyhow::Result<()> {
     db::notes::remove_from_fts(db, path).await?;
     db::notes::set_tags(db, path, &[]).await?;
     db::notes::set_links(db, path, &[]).await?;
+    db::notes::set_code_links(db, path, &[]).await?;
     db::notes::set_tasks(db, path, &[]).await?;
     db::notes::set_cards(db, path, &[]).await?;
     Ok(())
@@ -1474,6 +1527,36 @@ pub async fn backlinks_for_with_context(
     db: State<'_, DbPool>,
 ) -> Result<Vec<BacklinkEntry>, String> {
     backlinks_with_context(&db, &workspace, &title)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Mirrors `backlinks_with_context`, for code links: which notes reference
+/// `target`, and the line each references it on (issue #37).
+async fn code_backlinks_with_context(
+    pool: &DbPool,
+    workspace: &str,
+    target: &str,
+) -> anyhow::Result<Vec<BacklinkEntry>> {
+    let notes = db::notes::code_backlinks_for(pool, workspace, target).await?;
+    let mut entries = Vec::with_capacity(notes.len());
+    for note in notes {
+        let snippet = tokio::fs::read_to_string(&note.path)
+            .await
+            .ok()
+            .and_then(|content| extract_code_backlink_snippet(&content, target));
+        entries.push(BacklinkEntry { note, snippet });
+    }
+    Ok(entries)
+}
+
+#[tauri::command]
+pub async fn code_backlinks_for_with_context(
+    workspace: String,
+    target: String,
+    db: State<'_, DbPool>,
+) -> Result<Vec<BacklinkEntry>, String> {
+    code_backlinks_with_context(&db, &workspace, &target)
         .await
         .map_err(|e| e.to_string())
 }
@@ -2137,6 +2220,28 @@ mod tests {
     #[test]
     fn test_extract_links_empty_content() {
         assert!(extract_links("").is_empty());
+    }
+
+    #[test]
+    fn test_extract_code_link_targets_finds_a_path_with_a_line() {
+        let targets = extract_code_link_targets("See src/main.cpp:58 for the fix.");
+        assert_eq!(targets, vec!["src/main.cpp"]);
+    }
+
+    #[test]
+    fn test_extract_code_link_targets_deduplicates_exact_matches() {
+        let targets = extract_code_link_targets("src/main.rs:1 again: src/main.rs:99");
+        assert_eq!(targets, vec!["src/main.rs"]);
+    }
+
+    #[test]
+    fn test_extract_code_link_targets_ignores_bare_prose() {
+        assert!(extract_code_link_targets("Analysis 2: a 10:30 timestamp, README.").is_empty());
+    }
+
+    #[test]
+    fn test_extract_code_link_targets_empty_content() {
+        assert!(extract_code_link_targets("").is_empty());
     }
 
     #[test]
@@ -2876,6 +2981,59 @@ mod save_tests {
             snippet.chars().count()
         );
         assert!(snippet.ends_with('…'));
+    }
+
+    #[test]
+    fn test_extract_code_backlink_snippet_finds_the_linking_line() {
+        let content = "# Dijkstra\nSee src/graph.rs:58 for the relaxation step.\nMore text.";
+        assert_eq!(
+            extract_code_backlink_snippet(content, "src/graph.rs"),
+            Some("See src/graph.rs:58 for the relaxation step.".to_string())
+        );
+    }
+
+    #[test]
+    fn test_extract_code_backlink_snippet_is_none_when_the_target_is_absent() {
+        let content = "No code reference here at all.";
+        assert_eq!(extract_code_backlink_snippet(content, "src/graph.rs"), None);
+    }
+
+    #[test]
+    fn test_extract_code_backlink_snippet_requires_an_exact_target_match() {
+        // src/graph.rs is a substring of src/graph.rs.bak's match, but the
+        // extracted target differs — must not count as a reference.
+        let content = "See src/graph.rs.bak for the backup.";
+        assert_eq!(extract_code_backlink_snippet(content, "src/graph.rs"), None);
+    }
+
+    #[tokio::test]
+    async fn test_code_backlinks_with_context_reads_the_snippet_from_disk() {
+        let pool = sqlx::sqlite::SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect("sqlite::memory:")
+            .await
+            .unwrap();
+        run_migrations(&pool).await.unwrap();
+        let tmp = tempdir().unwrap();
+        let ws = tmp.path().to_string_lossy().into_owned();
+        let note_path = tmp.path().join("dijkstra.md");
+        let content = "# Dijkstra\nSee src/graph.rs:58 for the relaxation step.";
+        std::fs::write(&note_path, content).unwrap();
+
+        index_note_at(&note_path.to_string_lossy(), &ws, content, &pool)
+            .await
+            .unwrap();
+
+        let entries = code_backlinks_with_context(&pool, &ws, "src/graph.rs")
+            .await
+            .unwrap();
+
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].note.title, "Dijkstra");
+        assert_eq!(
+            entries[0].snippet.as_deref(),
+            Some("See src/graph.rs:58 for the relaxation step.")
+        );
     }
 
     #[tokio::test]

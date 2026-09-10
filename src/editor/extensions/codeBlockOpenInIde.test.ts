@@ -1,13 +1,19 @@
 import { describe, it, expect, afterEach, vi, beforeEach } from 'vitest'
+import type { BacklinkEntry } from '../../types'
 
 const resolveCodeLinks = vi.fn<(workspace: string, targets: string[]) => Promise<boolean[]>>()
 const openInEditor = vi.fn()
+const codeBacklinksForWithContext = vi.fn<
+  (workspace: string, target: string) => Promise<BacklinkEntry[]>
+>()
 
 vi.mock('../../lib/tauri', () => ({
   api: {
     notes: {
       resolveCodeLinks: (workspace: string, targets: string[]) => resolveCodeLinks(workspace, targets),
       openInEditor: (...args: unknown[]) => openInEditor(...args),
+      codeBacklinksForWithContext: (workspace: string, target: string) =>
+        codeBacklinksForWithContext(workspace, target),
     },
   },
 }))
@@ -40,11 +46,17 @@ function codeBlock(firstLine: string, language = 'rust'): string {
   return `<pre><code class="language-${language}">${firstLine}\nfn main() {}</code></pre>`
 }
 
+function backlinkEntry(path: string, title: string, snippet: string | null = null): BacklinkEntry {
+  return { note: { id: path, title, path, workspace: '/ws', updatedAt: 0 }, snippet }
+}
+
 beforeEach(() => {
   forgetResolvedCodeLinks()
   resolveCodeLinks.mockReset()
   openInEditor.mockReset()
-  useWorkspaceStore.setState({ path: '/ws' })
+  codeBacklinksForWithContext.mockReset()
+  codeBacklinksForWithContext.mockResolvedValue([])
+  useWorkspaceStore.setState({ path: '/ws', openTabs: [], activeTab: null })
 })
 
 afterEach(() => {
@@ -102,5 +114,44 @@ describe('code block "Open in IDE"', () => {
 
     expect(buttons(e)).toHaveLength(0)
     expect(resolveCodeLinks).not.toHaveBeenCalled()
+  })
+})
+
+describe('code block backlinks badge (issue #37)', () => {
+  it('shows a badge for notes that reference the same path, and opens one on click', async () => {
+    resolveCodeLinks.mockResolvedValue([true])
+    codeBacklinksForWithContext.mockResolvedValue([backlinkEntry('/ws/a.md', 'A', 'see src/main.rs:1')])
+    const e = mount(codeBlock('// src/main.rs'))
+    await settle()
+
+    const badge = e.view.dom.querySelector<HTMLElement>('.code-block-backlinks-badge')
+    expect(badge?.textContent).toBe('1 note')
+
+    badge?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    expect(useWorkspaceStore.getState().activeTab).toBeNull()
+
+    const item = e.view.dom.querySelector<HTMLElement>('.backlink-item')
+    item?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+
+    expect(useWorkspaceStore.getState().activeTab).toBe('/ws/a.md')
+  })
+
+  it('excludes the current note itself from the badge', async () => {
+    resolveCodeLinks.mockResolvedValue([true])
+    codeBacklinksForWithContext.mockResolvedValue([backlinkEntry('/ws/self.md', 'Self')])
+    const e = mount(codeBlock('// src/main.rs'))
+    e.storage.noteContext.notePath = '/ws/self.md'
+    await settle()
+
+    expect(e.view.dom.querySelector('.code-block-backlinks-badge')).toBeNull()
+  })
+
+  it('renders no badge when no other note references the path', async () => {
+    resolveCodeLinks.mockResolvedValue([true])
+    codeBacklinksForWithContext.mockResolvedValue([])
+    const e = mount(codeBlock('// src/main.rs'))
+    await settle()
+
+    expect(e.view.dom.querySelector('.code-block-backlinks-badge')).toBeNull()
   })
 })

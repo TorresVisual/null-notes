@@ -5,6 +5,7 @@ import type { EditorState } from '@tiptap/pm/state'
 import { findCodeLinks } from '../../lib/codeLinks'
 import { useWorkspaceStore } from '../../store/workspace'
 import { api } from '../../lib/tauri'
+import type { BacklinkEntry } from '../../types'
 
 /**
  * Makes `src/main.cpp:58` in note text clickable, opening the configured
@@ -41,6 +42,52 @@ export function isResolved(workspace: string, target: string): boolean {
 export function forgetResolvedCodeLinks(): void {
   resolved.clear()
   pending.clear()
+  codeBacklinks.clear()
+  backlinksPending.clear()
+}
+
+/** `workspace\0target` → the notes that reference it (issue #37's reverse
+ * lookup), cached the same way `resolved` is — the answer is a fact about
+ * the workspace's notes, not about any one editor instance or open tab. */
+const codeBacklinks = new Map<string, BacklinkEntry[]>()
+const backlinksPending = new Set<string>()
+
+export function getCodeBacklinks(workspace: string, target: string): BacklinkEntry[] {
+  return codeBacklinks.get(cacheKey(workspace, target)) ?? []
+}
+
+/**
+ * Asks the backend which notes reference each of `targets`, then redraws.
+ *
+ * Same batching/dedup shape as `resolveMissing` — a note full of annotated
+ * code blocks must not turn into one IPC round trip per block per render.
+ */
+export async function resolveCodeBacklinks(
+  workspace: string,
+  targets: string[],
+  redraw: () => void,
+): Promise<void> {
+  const unknown = [...new Set(targets)].filter(
+    (target) =>
+      !codeBacklinks.has(cacheKey(workspace, target)) &&
+      !backlinksPending.has(cacheKey(workspace, target)),
+  )
+  if (unknown.length === 0) return
+  unknown.forEach((target) => backlinksPending.add(cacheKey(workspace, target)))
+
+  await Promise.all(
+    unknown.map(async (target) => {
+      try {
+        const entries = await api.notes.codeBacklinksForWithContext(workspace, target)
+        codeBacklinks.set(cacheKey(workspace, target), entries)
+      } catch {
+        codeBacklinks.set(cacheKey(workspace, target), [])
+      } finally {
+        backlinksPending.delete(cacheKey(workspace, target))
+      }
+    }),
+  )
+  redraw()
 }
 
 /**

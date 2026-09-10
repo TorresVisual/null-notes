@@ -3151,10 +3151,15 @@ code {
 /* "Open in IDE" (P7-2) — only ever rendered once the path resolves, so
    there is no disabled/missing variant to style here. */
 .note-editor pre { position: relative; }
-.code-block-open-in-ide {
+.code-block-open-in-ide-group {
   position: absolute;
   top: 6px;
   right: 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.code-block-open-in-ide {
   padding: 2px 8px;
   background: var(--bg-raised);
   border: 1px solid var(--border);
@@ -3168,6 +3173,40 @@ code {
   color: var(--accent);
   border-color: var(--accent);
 }
+
+/* "N notes" badge (issue #37) — the reverse of the Open button: which other
+   notes reference this same file. Only rendered once the count is known and
+   nonzero, next to the Open button rather than replacing it. */
+.code-block-backlinks { position: relative; }
+.code-block-backlinks-badge {
+  padding: 2px 8px;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-tertiary);
+  font-size: 11px;
+  font-family: var(--font-mono);
+  cursor: pointer;
+}
+.code-block-backlinks-badge:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+.code-block-backlinks-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  min-width: 200px;
+  max-width: 280px;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 10px;
+  box-shadow: var(--shadow-compact);
+  z-index: 30;
+}
+.code-block-backlinks-dropdown .backlinks-list { margin: 0; }
+.code-block-backlinks-dropdown .backlink-item { padding: 4px 2px; }
 
 .settings-unit {
   font-size: 11px;
@@ -4043,7 +4082,7 @@ code {
 .print-preview-pages .backlinks-panel,
 .print-preview-pages .outline-panel,
 .print-preview-pages .search-overlay,
-.print-preview-pages .code-block-open-in-ide,
+.print-preview-pages .code-block-open-in-ide-group,
 .print-preview-pages .code-block-actions,
 .print-preview-pages .code-run-panel,
 .print-preview-pages .note-find-bar {

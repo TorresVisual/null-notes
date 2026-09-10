@@ -39,6 +39,8 @@ export const api = {
       invoke<NoteMetadata[]>('backlinks_for', { workspace, title }),
     backlinksForWithContext: (workspace: string, title: string) =>
       invoke<BacklinkEntry[]>('backlinks_for_with_context', { workspace, title }),
+    codeBacklinksForWithContext: (workspace: string, target: string) =>
+      invoke<BacklinkEntry[]>('code_backlinks_for_with_context', { workspace, target }),
     createFolder: (parent: string, name: string) =>
       invoke<string>('create_folder', { parent, name }),
     splitIntoTasks: (markdown: string) =>
