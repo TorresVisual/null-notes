@@ -13,8 +13,21 @@ pub const SPIKE_CLSID: GUID = GUID::from_u128(0x7C1E2B4A_5D3F_4A6E_9C21_0B1F2E3D
 #[implement()]
 pub struct SpikeObject;
 
+// `DllGetClassObject`'s own `riid` is always `IID_IClassFactory` (or
+// `IID_IClassFactory2`) per the COM contract, never the caller's real target
+// interface — that only shows up later, in `CreateInstance`'s own `riid`.
+// A class factory that carries which CLSID it was created for is what makes
+// the final `CreateInstance` produce the right concrete object.
 #[implement(IClassFactory)]
-pub struct ClassFactory;
+pub struct ClassFactory {
+    clsid: GUID,
+}
+
+impl ClassFactory {
+    pub fn new(clsid: GUID) -> Self {
+        Self { clsid }
+    }
+}
 
 impl IClassFactory_Impl for ClassFactory_Impl {
     fn CreateInstance(
@@ -29,7 +42,11 @@ impl IClassFactory_Impl for ClassFactory_Impl {
                 windows::Win32::Foundation::CLASS_E_NOAGGREGATION,
             ));
         }
-        let unknown: IUnknown = SpikeObject.into();
+        let unknown: IUnknown = if self.clsid == COMMAND_CLSID {
+            OpenInNullNotesCommand.into()
+        } else {
+            SpikeObject.into()
+        };
         unsafe { unknown.query(&*riid, ppv).ok() }
     }
 
@@ -51,19 +68,12 @@ pub unsafe fn class_object(clsid: &GUID, riid: &GUID, ppv: *mut *mut c_void) -> 
     }
     unsafe { *ppv = std::ptr::null_mut() };
 
-    if *clsid == COMMAND_CLSID {
-        let command: IUnknown = OpenInNullNotesCommand.into();
-        return match unsafe { command.query(riid, ppv).ok() } {
-            Ok(()) => S_OK,
-            Err(e) => e.code(),
-        };
+    if *clsid != COMMAND_CLSID && *clsid != SPIKE_CLSID {
+        return CLASS_E_CLASSNOTAVAILABLE;
     }
-    if *clsid == SPIKE_CLSID {
-        let factory: IClassFactory = ClassFactory.into();
-        return match unsafe { factory.query(riid, ppv).ok() } {
-            Ok(()) => S_OK,
-            Err(e) => e.code(),
-        };
+    let factory: IClassFactory = ClassFactory::new(*clsid).into();
+    match unsafe { factory.query(riid, ppv).ok() } {
+        Ok(()) => S_OK,
+        Err(e) => e.code(),
     }
-    CLASS_E_CLASSNOTAVAILABLE
 }

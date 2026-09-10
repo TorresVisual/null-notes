@@ -9,7 +9,8 @@ use windows::Win32::System::Registry::{
     KEY_WRITE, REG_OPTION_NON_VOLATILE, REG_SZ,
 };
 
-use null_notes_context_menu::SPIKE_CLSID;
+use null_notes_context_menu::{COMMAND_CLSID, SPIKE_CLSID};
+use windows::Win32::UI::Shell::IExplorerCommand;
 
 fn clsid_key_path(clsid: &GUID) -> String {
     format!(r"Software\Classes\CLSID\{{{clsid:?}}}\InprocServer32")
@@ -80,5 +81,27 @@ fn test_dllgetclassobject_chain_activates_through_real_com() {
         drop(obj);
         CoUninitialize();
         unregister_test_dll(&SPIKE_CLSID);
+    }
+}
+
+#[test]
+fn test_command_clsid_activates_as_iexplorercommand_through_real_com() {
+    register_test_dll(&COMMAND_CLSID);
+
+    unsafe {
+        CoInitializeEx(None, COINIT_APARTMENTTHREADED).ok().unwrap();
+        let result: windows::core::Result<IExplorerCommand> =
+            CoCreateInstance(&COMMAND_CLSID, None, CLSCTX_INPROC_SERVER);
+        let obj = result.map_err(|e| {
+            CoUninitialize();
+            unregister_test_dll(&COMMAND_CLSID);
+            e
+        });
+        let obj = obj.expect(
+            "CoCreateInstance must succeed against the real command CLSID, requesting IExplorerCommand directly",
+        );
+        drop(obj);
+        CoUninitialize();
+        unregister_test_dll(&COMMAND_CLSID);
     }
 }
