@@ -67,6 +67,39 @@ pub fn initial_workspace_from_args<I: IntoIterator<Item = String>>(args: I) -> O
         .find_map(|arg| arg.strip_prefix("--workspace=").map(str::to_string))
 }
 
+// Sibling to `--workspace=`: the Explorer "Open in null-notes" file handler
+// (the context-menu-handler COM DLL's Invoke()) sends this for a single
+// file, since a lone file isn't a workspace. The caller copies it into a
+// temp workspace, then treats that the same as any other `--workspace=`
+// launch.
+pub fn open_file_from_args<I: IntoIterator<Item = String>>(args: I) -> Option<String> {
+    args.into_iter()
+        .find_map(|arg| arg.strip_prefix("--open-file=").map(str::to_string))
+}
+
+// Creates a fresh temp directory and copies `file_path` into it, so the file
+// can be opened through the same `--workspace=` startup path as a folder.
+//
+// ponytail: temp dirs under `%TEMP%\null-notes` are never cleaned up here —
+// the OS reclaims `%TEMP%` on its own schedule. Add explicit GC if stale
+// dirs are ever reported as a problem.
+pub fn temp_workspace_for_file(file_path: &str) -> std::io::Result<String> {
+    let file_path = Path::new(file_path);
+    let file_name = file_path
+        .file_name()
+        .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::InvalidInput, "no file name"))?;
+
+    let nanos = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos();
+    let dir = std::env::temp_dir().join("null-notes").join(nanos.to_string());
+    std::fs::create_dir_all(&dir)?;
+    std::fs::copy(file_path, dir.join(file_name))?;
+
+    Ok(dir.to_string_lossy().into_owned())
+}
+
 pub struct InitialWorkspace(pub Option<String>);
 
 #[tauri::command]
@@ -296,5 +329,37 @@ mod tests {
             initial_workspace_from_args(args),
             Some("/tmp/ws".to_string())
         );
+    }
+
+    #[test]
+    fn test_open_file_from_args_finds_the_flag() {
+        let args = vec!["--open-file=/tmp/Lecture 7.pdf".to_string()];
+        assert_eq!(
+            open_file_from_args(args),
+            Some("/tmp/Lecture 7.pdf".to_string())
+        );
+    }
+
+    #[test]
+    fn test_open_file_from_args_ignores_the_workspace_flag() {
+        let args = vec!["--workspace=/tmp/ws".to_string()];
+        assert_eq!(open_file_from_args(args), None);
+    }
+
+    #[test]
+    fn test_temp_workspace_for_file_copies_the_file_in() {
+        let src_dir = tempdir().unwrap();
+        let src = src_dir.path().join("Lecture 7.pdf");
+        std::fs::write(&src, b"pdf bytes").unwrap();
+
+        let workspace = temp_workspace_for_file(&src.to_string_lossy()).unwrap();
+
+        let copied = std::path::Path::new(&workspace).join("Lecture 7.pdf");
+        assert_eq!(std::fs::read(copied).unwrap(), b"pdf bytes");
+    }
+
+    #[test]
+    fn test_temp_workspace_for_file_rejects_a_path_with_no_file_name() {
+        assert!(temp_workspace_for_file("/").is_err());
     }
 }
