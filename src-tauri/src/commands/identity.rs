@@ -23,7 +23,8 @@ pub fn has_current_package_identity(msix_path: &Path) -> bool {
             "-NoProfile",
             "-Command",
             &format!(
-                "$m = [System.IO.Compression.ZipFile]::OpenRead('{msix}'); \
+                "Add-Type -AssemblyName System.IO.Compression.FileSystem; \
+                 $m = [System.IO.Compression.ZipFile]::OpenRead('{msix}'); \
                  $r = New-Object System.IO.StreamReader($m.GetEntry('AppxManifest.xml').Open()); \
                  $bundled = ([xml]$r.ReadToEnd()).Package.Identity.Version; \
                  $r.Close(); $m.Dispose(); \
@@ -39,10 +40,19 @@ pub fn has_current_package_identity(msix_path: &Path) -> bool {
     }
 }
 
-/// Registers the identity package pointed at `exe_dir` (the directory
-/// containing both `null-notes.exe` and the context-menu handler DLL — see
-/// Task 5's manifest, whose `com:Class/@Path` is relative to this same
-/// directory) and relaunches the app with the original arguments.
+/// Registers the identity package pointed at `exe_dir`'s `shell-integration`
+/// subdirectory (which holds only the context-menu handler DLL — see Task
+/// 5's manifest, whose `com:Class/@Path` is relative to this directory) and
+/// relaunches the app with the original arguments.
+///
+/// `null-notes.exe` lives one level up from that subdirectory as a matter of
+/// tidy layout, not identity: a plain exe does not pick up package identity
+/// by living inside (or being spawned from inside) a sparse package's
+/// external-location directory — identity is granted per-process based on
+/// the launched image's *own* embedded manifest (build.rs deliberately
+/// carries no `<msix>` fusion element for this exe; see its comment for why
+/// one there breaks the taskbar icon). Only the COM surrogate hosting the
+/// context-menu DLL needs identity; the app itself must not have it.
 ///
 /// Unregisters any existing `NullNotes.ShellIntegration*` package first —
 /// re-registering over an already-registered *same* version is a no-op per
@@ -59,6 +69,7 @@ pub fn register_and_relaunch(msix_path: &Path, exe_dir: &Path, original_args: &[
         ])
         .status();
 
+    let external_location = exe_dir.join("shell-integration");
     let status = Command::new("powershell")
         .args([
             "-NoProfile",
@@ -66,7 +77,7 @@ pub fn register_and_relaunch(msix_path: &Path, exe_dir: &Path, original_args: &[
             &format!(
                 "Add-AppxPackage -Path '{}' -ExternalLocation '{}'",
                 msix_path.display(),
-                exe_dir.display()
+                external_location.display()
             ),
         ])
         .status();

@@ -45,7 +45,7 @@
     ],
     "resources": {
       "../identity-package/null-notes-identity.msix": "",
-      "context-menu-handler/target/release/null_notes_context_menu.dll": ""
+      "context-menu-handler/target/release/null_notes_context_menu.dll": "shell-integration/null_notes_context_menu.dll"
     },
     "windows": {
       "nsis": {

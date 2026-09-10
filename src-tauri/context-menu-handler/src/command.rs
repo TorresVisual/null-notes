@@ -39,11 +39,15 @@ impl IExplorerCommand_Impl for OpenInNullNotesCommand_Impl {
         // MS docs: "If this method succeeds, it returns S_OK" and ppszIcon
         // "receives the resource string that identifies the icon source" —
         // S_OK asserts a real string, it isn't a valid way to say "no icon".
-        // E_NOTIMPL is what signals that here; Explorer's own renderer
-        // dereferences the string unconditionally on S_OK.
-        Err(windows::core::Error::from(
-            windows::Win32::Foundation::E_NOTIMPL,
-        ))
+        // Point at null-notes.exe's own embedded icon (index 0) rather than
+        // going without one; E_NOTIMPL remains correct if that path can't
+        // be resolved.
+        let Some(exe) = null_notes_exe_path() else {
+            return Err(windows::core::Error::from(
+                windows::Win32::Foundation::E_NOTIMPL,
+            ));
+        };
+        cotaskmem_wide(&format!("{},0", exe.display()))
     }
 
     fn GetToolTip(&self, _psiitemarray: Ref<'_, IShellItemArray>) -> Result<PWSTR> {
@@ -122,18 +126,24 @@ fn this_dll_directory() -> Option<std::path::PathBuf> {
     }
 }
 
+/// This DLL is deployed to `shell-integration/`, one level below the main
+/// install directory, so the exe is found via this DLL's parent directory,
+/// not alongside it. That split is layout hygiene, not an identity
+/// workaround — a plain exe (no `<msix>` fusion element in its manifest,
+/// see build.rs) never picks up package identity regardless of what
+/// directory it's launched from or spawned inside of.
+fn null_notes_exe_path() -> Option<std::path::PathBuf> {
+    this_dll_directory()?
+        .parent()
+        .map(|p| p.join("null-notes.exe"))
+}
+
 /// Launches the main app pointed at `path` — a folder becomes the workspace
 /// directly; a file goes through `--open-file=`, matching the flags
 /// `commands::workspace::initial_workspace_from_args`/`open_file_from_args`
 /// already parse in `src-tauri` (Task 1, Task 6).
-///
-/// ponytail: locates the app exe next to this DLL (both live in the same
-/// install/ExternalLocation directory per Task 4's manifest) rather than
-/// reading it from the registry — one less moving part, since the
-/// manifest's ExternalLocation already guarantees this DLL only ever loads
-/// from that directory.
 fn launch_null_notes(path: &str) {
-    let Some(dir) = this_dll_directory() else {
+    let Some(exe) = null_notes_exe_path() else {
         return;
     };
     let flag = if std::path::Path::new(path).is_dir() {
@@ -141,7 +151,5 @@ fn launch_null_notes(path: &str) {
     } else {
         format!("--open-file={path}")
     };
-    let _ = std::process::Command::new(dir.join("null-notes.exe"))
-        .arg(flag)
-        .spawn();
+    let _ = std::process::Command::new(exe).arg(flag).spawn();
 }
