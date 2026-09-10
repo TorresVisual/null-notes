@@ -28,6 +28,8 @@ coverage
 src-tauri/target/
 src-tauri/context-menu-handler/target/
 
+scripts/windows/.dev-cert/
+
 # Workspace state
 .workspace.json
 *.workspace.json
