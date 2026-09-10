@@ -14,7 +14,10 @@ static ERROR_LOG_DIR: OnceLock<PathBuf> = OnceLock::new();
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let initial_workspace =
-        commands::workspace::initial_workspace_from_args(std::env::args().skip(1));
+        commands::workspace::initial_workspace_from_args(std::env::args().skip(1)).or_else(|| {
+            commands::workspace::open_file_from_args(std::env::args().skip(1))
+                .and_then(|file| commands::workspace::temp_workspace_for_file(&file).ok())
+        });
 
     #[cfg(windows)]
     unsafe {
@@ -38,6 +41,17 @@ pub fn run() {
             let data_dir = app.path().app_data_dir()?;
             #[cfg(windows)]
             {
+                if !commands::identity::has_package_identity() {
+                    if let Ok(exe_dir) =
+                        std::env::current_exe().map(|p| p.parent().unwrap().to_path_buf())
+                    {
+                        let msix = exe_dir.join("null-notes-identity.msix");
+                        if msix.exists() {
+                            let args: Vec<String> = std::env::args().skip(1).collect();
+                            commands::identity::register_and_relaunch(&msix, &exe_dir, &args);
+                        }
+                    }
+                }
                 let recents =
                     tauri::async_runtime::block_on(commands::workspace::present_recents(&data_dir))
                         .unwrap_or_default();

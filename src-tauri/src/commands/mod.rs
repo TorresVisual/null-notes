@@ -5,6 +5,7 @@ pub mod diagrams;
 pub mod editor_launch;
 pub mod error_log;
 pub mod git;
+pub mod identity;
 pub mod ink;
 pub mod jumplist;
 pub mod notes;
