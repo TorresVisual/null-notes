@@ -3499,6 +3499,19 @@ code {
   gap: var(--space-md);
 }
 
+.graph-view-filter-input {
+  width: 100%;
+  padding: 10px 12px;
+  background: var(--bg-sunken);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-size: 14px;
+  outline: none;
+}
+
+.graph-view-filter-input:focus { border-color: var(--border-strong); }
+
 .graph-svg {
   flex: 1;
   width: 100%;

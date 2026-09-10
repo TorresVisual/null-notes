@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { buildGraph } from './graph'
+import { buildGraph, scopeNotes } from './graph'
 import type { NoteMetadata } from '../types'
 
 function note(title: string, path: string): NoteMetadata {
@@ -80,5 +80,40 @@ describe('buildGraph', () => {
     )
     expect(edges).toHaveLength(2)
     expect(edges.map((e) => e.kind).sort()).toEqual(['link', 'tag'])
+  })
+})
+
+describe('scopeNotes', () => {
+  const notes = [
+    note('A', '/ws/Course101/a.md'),
+    note('B', '/ws/Course101/b.md'),
+    note('C', '/ws/Course202/c.md'),
+  ]
+  const tags = [
+    { notePath: '/ws/Course101/a.md', tag: 'midterm' },
+    { notePath: '/ws/Course202/c.md', tag: 'final' },
+  ]
+
+  it('returns every note for a blank query', () => {
+    expect(scopeNotes(notes, tags, '')).toEqual(notes)
+  })
+
+  it('filters by folder: substring match on path', () => {
+    const scoped = scopeNotes(notes, tags, 'folder:Course101')
+    expect(scoped.map((n) => n.title)).toEqual(['A', 'B'])
+  })
+
+  it('filters by tag: case-insensitively', () => {
+    const scoped = scopeNotes(notes, tags, 'tag:MIDTERM')
+    expect(scoped.map((n) => n.title)).toEqual(['A'])
+  })
+
+  it('combines folder: and tag: as AND', () => {
+    const scoped = scopeNotes(notes, tags, 'folder:Course202 tag:final')
+    expect(scoped.map((n) => n.title)).toEqual(['C'])
+  })
+
+  it('ignores free text and type:, which do not apply at the note level', () => {
+    expect(scopeNotes(notes, tags, 'something type:code')).toEqual(notes)
   })
 })

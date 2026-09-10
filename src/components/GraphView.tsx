@@ -6,7 +6,7 @@ import { LoadingStatus } from './LoadingStatus'
 import { useNotesStore } from '../store/notes'
 import { useWorkspaceStore } from '../store/workspace'
 import { api } from '../lib/tauri'
-import { buildGraph } from '../lib/graph'
+import { buildGraph, scopeNotes } from '../lib/graph'
 import type { GraphNode, GraphEdge } from '../lib/graph'
 import type { GraphLink, GraphTag } from '../types'
 
@@ -77,6 +77,7 @@ export function GraphView({ onClose }: GraphViewProps) {
   const [links, setLinks] = useState<GraphLink[]>([])
   const [tags, setTags] = useState<GraphTag[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [query, setQuery] = useState('')
 
   useEffect(() => {
     if (!workspacePath) return
@@ -88,7 +89,11 @@ export function GraphView({ onClose }: GraphViewProps) {
     })
   }, [workspacePath])
 
-  const { nodes: rawNodes, edges: rawEdges } = useMemo(() => buildGraph(notes, links, tags), [notes, links, tags])
+  const scopedNotes = useMemo(() => scopeNotes(notes, tags, query), [notes, tags, query])
+  const { nodes: rawNodes, edges: rawEdges } = useMemo(
+    () => buildGraph(scopedNotes, links, tags),
+    [scopedNotes, links, tags],
+  )
   const { nodes, edges, viewBox } = useMemo(() => layoutGraph(rawNodes, rawEdges), [rawNodes, rawEdges])
 
   function open(path: string) {
@@ -105,15 +110,27 @@ export function GraphView({ onClose }: GraphViewProps) {
             <X size={16} />
           </button>
         </div>
+        <input
+          type="text"
+          className="graph-view-filter-input"
+          value={query}
+          placeholder="folder:Course101 or tag:midterm — leave blank for the whole workspace"
+          onChange={(e) => setQuery(e.target.value)}
+        />
         {isLoading ? (
           <LoadingStatus />
-        ) : nodes.length === 0 ? (
+        ) : notes.length === 0 ? (
           <p className="empty-state">
             No notes yet.
             <span className="empty-state-detail">
               This graphs [[wiki-links]] and shared #tags between notes — create a couple of notes
               and link or tag them to see connections here.
             </span>
+          </p>
+        ) : nodes.length === 0 ? (
+          <p className="empty-state">
+            No notes match this filter.
+            <span className="empty-state-detail">Try a different folder: or tag:, or clear the field.</span>
           </p>
         ) : (
           <svg className="graph-svg" viewBox={viewBox} role="img" aria-label="Note connections graph">

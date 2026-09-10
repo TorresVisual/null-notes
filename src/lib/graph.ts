@@ -1,4 +1,5 @@
 import type { NoteMetadata, GraphLink, GraphTag } from '../types'
+import { parseSearchQuery } from './searchQuery'
 
 export interface GraphNode {
   id: string
@@ -57,4 +58,22 @@ export function buildGraph(
   }
 
   return { nodes, edges }
+}
+
+// Scopes which notes buildGraph sees to folder:/tag: (P6-5's parseSearchQuery,
+// same convention as FormulaSheetPrompt) — free text and type: are accepted
+// but ignored, neither applies at the note level. Edges to notes this filters
+// out are dropped for free: buildGraph only wires an edge between notes that
+// are both in the passed-in `notes` list.
+export function scopeNotes(notes: NoteMetadata[], tags: GraphTag[], query: string): NoteMetadata[] {
+  const { folder, tag } = parseSearchQuery(query)
+  if (!folder && !tag) return notes
+  const taggedPaths = tag
+    ? new Set(tags.filter((t) => t.tag.toLowerCase() === tag.toLowerCase()).map((t) => t.notePath))
+    : null
+  return notes.filter((n) => {
+    if (folder && !n.path.toLowerCase().includes(folder.toLowerCase())) return false
+    if (taggedPaths && !taggedPaths.has(n.path)) return false
+    return true
+  })
 }
