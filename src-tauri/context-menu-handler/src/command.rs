@@ -36,12 +36,20 @@ impl IExplorerCommand_Impl for OpenInNullNotesCommand_Impl {
     }
 
     fn GetIcon(&self, _psiitemarray: Ref<'_, IShellItemArray>) -> Result<PWSTR> {
-        // No icon: an empty PWSTR is the documented "no icon" signal.
-        Ok(PWSTR::null())
+        // MS docs: "If this method succeeds, it returns S_OK" and ppszIcon
+        // "receives the resource string that identifies the icon source" —
+        // S_OK asserts a real string, it isn't a valid way to say "no icon".
+        // E_NOTIMPL is what signals that here; Explorer's own renderer
+        // dereferences the string unconditionally on S_OK.
+        Err(windows::core::Error::from(
+            windows::Win32::Foundation::E_NOTIMPL,
+        ))
     }
 
     fn GetToolTip(&self, _psiitemarray: Ref<'_, IShellItemArray>) -> Result<PWSTR> {
-        Ok(PWSTR::null())
+        Err(windows::core::Error::from(
+            windows::Win32::Foundation::E_NOTIMPL,
+        ))
     }
 
     fn GetCanonicalName(&self) -> Result<GUID> {
