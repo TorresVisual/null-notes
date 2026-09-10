@@ -1,5 +1,6 @@
+use crate::command::{OpenInNullNotesCommand, COMMAND_CLSID};
 use std::ffi::c_void;
-use windows::core::{implement, GUID, HRESULT, Interface, IUnknown};
+use windows::core::{implement, IUnknown, Interface, GUID, HRESULT};
 use windows::Win32::Foundation::{CLASS_E_CLASSNOTAVAILABLE, E_POINTER, S_OK};
 use windows::Win32::System::Com::{IClassFactory, IClassFactory_Impl};
 
@@ -13,15 +14,7 @@ pub const SPIKE_CLSID: GUID = GUID::from_u128(0x7C1E2B4A_5D3F_4A6E_9C21_0B1F2E3D
 pub struct SpikeObject;
 
 #[implement(IClassFactory)]
-pub struct ClassFactory {
-    clsid: GUID,
-}
-
-impl ClassFactory {
-    pub fn new(clsid: GUID) -> Self {
-        Self { clsid }
-    }
-}
+pub struct ClassFactory;
 
 impl IClassFactory_Impl for ClassFactory_Impl {
     fn CreateInstance(
@@ -48,17 +41,29 @@ impl IClassFactory_Impl for ClassFactory_Impl {
 /// The actual `DllGetClassObject` dispatch logic, factored out so the real
 /// export (in `lib.rs`) stays a thin `extern "system"` wrapper and this part
 /// stays unit/integration-testable without loading a compiled DLL.
-pub fn class_object(clsid: &GUID, riid: &GUID, ppv: *mut *mut c_void) -> HRESULT {
+///
+/// # Safety
+/// `ppv` must be a valid, writable `*mut *mut c_void` per the
+/// `DllGetClassObject` contract — callers pass it straight through.
+pub unsafe fn class_object(clsid: &GUID, riid: &GUID, ppv: *mut *mut c_void) -> HRESULT {
     if ppv.is_null() {
         return E_POINTER;
     }
     unsafe { *ppv = std::ptr::null_mut() };
-    if *clsid != SPIKE_CLSID {
-        return CLASS_E_CLASSNOTAVAILABLE;
+
+    if *clsid == COMMAND_CLSID {
+        let command: IUnknown = OpenInNullNotesCommand.into();
+        return match unsafe { command.query(riid, ppv).ok() } {
+            Ok(()) => S_OK,
+            Err(e) => e.code(),
+        };
     }
-    let factory: IClassFactory = ClassFactory::new(*clsid).into();
-    match unsafe { factory.query(riid, ppv).ok() } {
-        Ok(()) => S_OK,
-        Err(e) => e.code(),
+    if *clsid == SPIKE_CLSID {
+        let factory: IClassFactory = ClassFactory.into();
+        return match unsafe { factory.query(riid, ppv).ok() } {
+            Ok(()) => S_OK,
+            Err(e) => e.code(),
+        };
     }
+    CLASS_E_CLASSNOTAVAILABLE
 }

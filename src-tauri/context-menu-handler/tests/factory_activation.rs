@@ -1,4 +1,5 @@
 use windows::core::GUID;
+use windows::core::HSTRING;
 use windows::Win32::System::Com::{
     CoCreateInstance, CoInitializeEx, CoUninitialize, CLSCTX_INPROC_SERVER,
     COINIT_APARTMENTTHREADED,
@@ -7,7 +8,6 @@ use windows::Win32::System::Registry::{
     RegCloseKey, RegCreateKeyExW, RegDeleteTreeW, RegSetValueExW, HKEY, HKEY_CURRENT_USER,
     KEY_WRITE, REG_OPTION_NON_VOLATILE, REG_SZ,
 };
-use windows::core::HSTRING;
 
 use null_notes_context_menu::SPIKE_CLSID;
 
@@ -42,9 +42,15 @@ fn register_test_dll(clsid: &GUID) {
         .unwrap();
         let data = wide_null(&dll_path.to_string_lossy());
         let bytes = std::slice::from_raw_parts(data.as_ptr().cast::<u8>(), data.len() * 2);
-        RegSetValueExW(hkey, windows::core::PCWSTR::null(), None, REG_SZ, Some(bytes))
-            .ok()
-            .unwrap();
+        RegSetValueExW(
+            hkey,
+            windows::core::PCWSTR::null(),
+            None,
+            REG_SZ,
+            Some(bytes),
+        )
+        .ok()
+        .unwrap();
         RegCloseKey(hkey).ok().unwrap();
     }
 }
@@ -69,7 +75,8 @@ fn test_dllgetclassobject_chain_activates_through_real_com() {
         // The COM object must be released before CoUninitialize() tears down
         // the apartment — dropping it after would call Release() into a
         // torn-down apartment and access-violate.
-        let obj = result.expect("CoCreateInstance must succeed against the just-registered spike DLL");
+        let obj =
+            result.expect("CoCreateInstance must succeed against the just-registered spike DLL");
         drop(obj);
         CoUninitialize();
         unregister_test_dll(&SPIKE_CLSID);

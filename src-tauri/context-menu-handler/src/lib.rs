@@ -1,5 +1,7 @@
+mod command;
 mod factory;
 
+pub use command::{OpenInNullNotesCommand, COMMAND_CLSID};
 pub use factory::{class_object, SPIKE_CLSID};
 
 use std::ffi::c_void;
