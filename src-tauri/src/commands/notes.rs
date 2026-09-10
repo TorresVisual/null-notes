@@ -1,7 +1,8 @@
 use crate::db::{self, DbPool};
 use crate::models::{
-    BacklinkEntry, CardKind, CardSummary, DueCard, ExtractedCard, ExtractedFormula, ExtractedTask,
-    GraphLink, GraphTag, McGradeResult, NoteMetadata, OpenTask, SearchResult, WorkspaceTree,
+    BacklinkEntry, CardKind, CardSummary, DueCard, ExtractedCallout, ExtractedCard,
+    ExtractedFormula, ExtractedTask, GraphLink, GraphTag, McGradeResult, NoteMetadata, OpenTask,
+    SearchResult, WorkspaceTree,
 };
 use crate::sm2;
 use regex::Regex;
@@ -269,6 +270,86 @@ pub fn extract_formulas(content: &str) -> Vec<ExtractedFormula> {
     }
 
     formulas
+}
+
+// Same heading-tracking, fence-skipping shape as `extract_formulas` — the
+// two are meant to run side by side over the same content for #35 — but
+// looks for a Callout's `> [!TYPE NUM] Title` marker line (the on-disk form
+// `Callout.tsx`'s `addStorage().markdown.serialize` writes) instead of a
+// `$...$` fence. Only the five numbered exam-content kinds P6-1/P6-2 added
+// match; `note`/`tip`/`warning`/… are commentary and never extracted.
+pub fn extract_callouts(content: &str) -> Vec<ExtractedCallout> {
+    let heading_re = match Regex::new(r"^#{2,6}\s+(.+?)\s*$") {
+        Ok(re) => re,
+        Err(_) => return Vec::new(),
+    };
+    let marker_re = match Regex::new(
+        r"(?i)^>\s?\[!(THEOREM|LEMMA|COROLLARY|DEFINITION|ALGORITHM)(?:\s+([\w.]+))?\]\s*(.*)$",
+    ) {
+        Ok(re) => re,
+        Err(_) => return Vec::new(),
+    };
+
+    let lines: Vec<&str> = content.lines().collect();
+    let mut in_fence = false;
+    let mut current_heading: Option<String> = None;
+    let mut callouts = Vec::new();
+    let mut i = 0;
+
+    while i < lines.len() {
+        let trimmed = lines[i].trim();
+
+        if trimmed.starts_with("```") {
+            in_fence = !in_fence;
+            i += 1;
+            continue;
+        }
+        if in_fence {
+            i += 1;
+            continue;
+        }
+
+        if let Some(caps) = heading_re.captures(trimmed) {
+            current_heading = Some(caps[1].to_string());
+            i += 1;
+            continue;
+        }
+
+        if let Some(caps) = marker_re.captures(trimmed) {
+            let kind = caps[1].to_uppercase();
+            let number = caps.get(2).map(|m| m.as_str().to_string());
+            let title = match caps[3].trim() {
+                "" => None,
+                t => Some(t.to_string()),
+            };
+
+            // A blockquote continues for as long as lines keep starting with
+            // `>` — the same rule `Callout.tsx`'s `wrapBlock` writes it with,
+            // including a bare `>` for a blank paragraph-separator line.
+            let mut j = i + 1;
+            let mut body_lines = Vec::new();
+            while j < lines.len() && lines[j].trim_start().starts_with('>') {
+                let after_marker = &lines[j].trim_start()[1..];
+                let rest = after_marker.strip_prefix(' ').unwrap_or(after_marker);
+                body_lines.push(rest.to_string());
+                j += 1;
+            }
+
+            callouts.push(ExtractedCallout {
+                kind,
+                number,
+                title,
+                body: body_lines.join("\n").trim().to_string(),
+                heading: current_heading.clone(),
+            });
+            i = j;
+            continue;
+        }
+
+        i += 1;
+    }
+
+    callouts
 }
 
 // due, ease, interval, reps, grade, streak
@@ -1603,26 +1684,75 @@ fn formula_sheet_title(folder: Option<&str>, tag: Option<&str>) -> String {
 
 /// Groups consecutively by (note, heading) — the input is already in scope
 /// order, so a run of entries sharing a note or heading is always contiguous
-/// — and emits a `## Note Title` / `### Heading` pair only when either
-/// changes, rather than once per formula.
-fn render_formula_sheet(title: &str, entries: &[(String, Option<String>, String)]) -> String {
-    let mut out = format!("# {title}\n");
+/// — and emits a `{note_level} Note Title` / `{heading_level} Heading` pair
+/// only when either changes, rather than once per entry. Shared by both the
+/// formula list and the #35 callout list, one level of heading deeper for
+/// the latter since it nests under its own "Definitions & Theorems" section.
+fn render_grouped_entries(
+    out: &mut String,
+    entries: &[(String, Option<String>, String)],
+    note_level: &str,
+    heading_level: &str,
+) {
     let mut last_note: Option<String> = None;
     let mut last_heading: Option<Option<String>> = None;
 
-    for (note_title, heading, latex) in entries {
+    for (note_title, heading, body) in entries {
         if last_note.as_deref() != Some(note_title.as_str()) {
-            out.push_str(&format!("\n## {note_title}\n"));
+            out.push_str(&format!("\n{note_level} {note_title}\n"));
             last_note = Some(note_title.clone());
             last_heading = None;
         }
         if last_heading.as_ref() != Some(heading) {
             if let Some(h) = heading {
-                out.push_str(&format!("\n### {h}\n"));
+                out.push_str(&format!("\n{heading_level} {h}\n"));
             }
             last_heading = Some(heading.clone());
         }
-        out.push_str(&format!("\n$\n{latex}\n$\n"));
+        out.push_str(&format!("\n{body}\n"));
+    }
+}
+
+/// Reconstructs a callout's `> [!TYPE NUM] Title` / `> body` markdown —
+/// the same shape `Callout.tsx`'s serializer writes — from an
+/// `ExtractedCallout`, so #35's formula-sheet entries can drop straight in
+/// as a formatted block, the same way a formula entry is `$\n{latex}\n$`.
+fn render_callout_block(callout: &ExtractedCallout) -> String {
+    let marker = match &callout.number {
+        Some(n) if !n.is_empty() => format!("{} {}", callout.kind, n),
+        _ => callout.kind.clone(),
+    };
+    let mut out = match &callout.title {
+        Some(t) => format!("> [!{marker}] {t}\n"),
+        None => format!("> [!{marker}]\n"),
+    };
+    for line in callout.body.lines() {
+        if line.is_empty() {
+            out.push('>');
+        } else {
+            out.push_str("> ");
+            out.push_str(line);
+        }
+        out.push('\n');
+    }
+    out.trim_end().to_string()
+}
+
+fn render_formula_sheet(
+    title: &str,
+    formulas: &[(String, Option<String>, String)],
+    callouts: &[(String, Option<String>, String)],
+) -> String {
+    let mut out = format!("# {title}\n");
+    let formula_bodies: Vec<_> = formulas
+        .iter()
+        .map(|(note, heading, latex)| (note.clone(), heading.clone(), format!("$\n{latex}\n$")))
+        .collect();
+    render_grouped_entries(&mut out, &formula_bodies, "##", "###");
+
+    if !callouts.is_empty() {
+        out.push_str("\n## Definitions & Theorems\n");
+        render_grouped_entries(&mut out, callouts, "###", "####");
     }
     out
 }
@@ -1646,6 +1776,8 @@ async fn generate_formula_sheet_at(
 
     let mut seen = HashSet::new();
     let mut entries = Vec::new();
+    let mut seen_callouts = HashSet::new();
+    let mut callout_entries = Vec::new();
     for note in &scoped {
         // Same posture as `reindex_from_disk`: an indexed path whose file is
         // gone (deleted outside the app, or an index that's drifted) is a
@@ -1659,10 +1791,16 @@ async fn generate_formula_sheet_at(
                 entries.push((note.title.clone(), formula.heading, formula.latex));
             }
         }
+        for callout in extract_callouts(&content) {
+            let block = render_callout_block(&callout);
+            if seen_callouts.insert(block.clone()) {
+                callout_entries.push((note.title.clone(), callout.heading, block));
+            }
+        }
     }
 
     let title = formula_sheet_title(folder, tag);
-    let body = render_formula_sheet(&title, &entries);
+    let body = render_formula_sheet(&title, &entries, &callout_entries);
     let path = create_note_file_with_content(workspace, &title, &body).await?;
 
     let meta = NoteMetadata {
@@ -2282,6 +2420,42 @@ mod tests {
     #[test]
     fn test_extract_formulas_empty_content() {
         assert!(extract_formulas("").is_empty());
+    }
+
+    #[test]
+    fn test_extract_callouts_reads_a_numbered_theorem() {
+        let content =
+            "> [!THEOREM 3.2] Fixed point\n> Every contraction has one.\n> Second line.\n";
+        let callouts = extract_callouts(content);
+        assert_eq!(callouts.len(), 1);
+        assert_eq!(callouts[0].kind, "THEOREM");
+        assert_eq!(callouts[0].number.as_deref(), Some("3.2"));
+        assert_eq!(callouts[0].title.as_deref(), Some("Fixed point"));
+        assert_eq!(callouts[0].body, "Every contraction has one.\nSecond line.");
+    }
+
+    #[test]
+    fn test_extract_callouts_ignores_non_numbered_kinds() {
+        let content = "> [!NOTE] Just a note\n> body\n";
+        assert!(extract_callouts(content).is_empty());
+    }
+
+    #[test]
+    fn test_extract_callouts_captures_the_nearest_heading_above() {
+        let content = "## Induction\n\n> [!DEFINITION] Base case\n> The starting point.\n";
+        let callouts = extract_callouts(content);
+        assert_eq!(callouts[0].heading.as_deref(), Some("Induction"));
+    }
+
+    #[test]
+    fn test_extract_callouts_skips_fenced_code_blocks() {
+        let content = "```\n> [!THEOREM] not real\n```\n";
+        assert!(extract_callouts(content).is_empty());
+    }
+
+    #[test]
+    fn test_extract_callouts_empty_content() {
+        assert!(extract_callouts("").is_empty());
     }
 
     #[test]
@@ -3301,6 +3475,35 @@ mod save_tests {
         assert_eq!(
             body,
             "# Formula Sheet\n\n## Analysis\n\n### Eigenvalues\n\n$\nAv = \\lambda v\n$\n\n## Networks\n\n$\nE=mc^2\n$\n"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_generate_formula_sheet_at_includes_numbered_callouts() {
+        let tmp = tempdir().unwrap();
+        let ws = tmp.path().to_string_lossy().into_owned();
+        let pool = sqlx::sqlite::SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect("sqlite::memory:")
+            .await
+            .unwrap();
+        run_migrations(&pool).await.unwrap();
+
+        let note = tmp.path().join("c.md");
+        let content = "# Analysis\n## Fixed Points\n> [!THEOREM 3.2] Banach\n> Every contraction has one.\n\n$$E=mc^2$$\n";
+        std::fs::write(&note, content).unwrap();
+        index_note_at(&note.to_string_lossy(), &ws, content, &pool)
+            .await
+            .unwrap();
+
+        let meta = generate_formula_sheet_at(&ws, None, None, &pool)
+            .await
+            .unwrap();
+
+        let body = std::fs::read_to_string(&meta.path).unwrap();
+        assert_eq!(
+            body,
+            "# Formula Sheet\n\n## Analysis\n\n### Fixed Points\n\n$\nE=mc^2\n$\n\n## Definitions & Theorems\n\n### Analysis\n\n#### Fixed Points\n\n> [!THEOREM 3.2] Banach\n> Every contraction has one.\n"
         );
     }
 

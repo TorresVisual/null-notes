@@ -186,6 +186,21 @@ pub struct ExtractedFormula {
     pub heading: Option<String>,
 }
 
+/// A numbered Theorem/Lemma/Corollary/Definition/Algorithm `Callout` block
+/// (P6-1/P6-2) extracted from a note's raw markdown, for the same
+/// formula-sheet use as `ExtractedFormula` (#35) — the un-numbered callout
+/// kinds (note/tip/warning/…) are commentary, not exam content, so they're
+/// never extracted. `body` is the blockquote content with each line's `> `
+/// marker already stripped, ready to be re-wrapped on render.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ExtractedCallout {
+    pub kind: String,
+    pub number: Option<String>,
+    pub title: Option<String>,
+    pub body: String,
+    pub heading: Option<String>,
+}
+
 /// A `- [ ]` / `- [x]` checkbox line extracted from a note's raw markdown
 /// (P9-1), mirroring how `extract_tags` feeds `note_tags`. `position` is the
 /// 0-indexed line number within the note's content — also the key
