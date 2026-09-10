@@ -93,7 +93,9 @@ pub fn temp_workspace_for_file(file_path: &str) -> std::io::Result<String> {
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap_or_default()
         .as_nanos();
-    let dir = std::env::temp_dir().join("null-notes").join(nanos.to_string());
+    let dir = std::env::temp_dir()
+        .join("null-notes")
+        .join(nanos.to_string());
     std::fs::create_dir_all(&dir)?;
     std::fs::copy(file_path, dir.join(file_name))?;
 
