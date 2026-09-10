@@ -41,15 +41,13 @@ pub fn run() {
             let data_dir = app.path().app_data_dir()?;
             #[cfg(windows)]
             {
-                if !commands::identity::has_package_identity() {
-                    if let Ok(exe_dir) =
-                        std::env::current_exe().map(|p| p.parent().unwrap().to_path_buf())
-                    {
-                        let msix = exe_dir.join("null-notes-identity.msix");
-                        if msix.exists() {
-                            let args: Vec<String> = std::env::args().skip(1).collect();
-                            commands::identity::register_and_relaunch(&msix, &exe_dir, &args);
-                        }
+                if let Ok(exe_dir) =
+                    std::env::current_exe().map(|p| p.parent().unwrap().to_path_buf())
+                {
+                    let msix = exe_dir.join("null-notes-identity.msix");
+                    if msix.exists() && !commands::identity::has_current_package_identity(&msix) {
+                        let args: Vec<String> = std::env::args().skip(1).collect();
+                        commands::identity::register_and_relaunch(&msix, &exe_dir, &args);
                     }
                 }
                 let recents =
