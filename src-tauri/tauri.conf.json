@@ -46,6 +46,11 @@
     "resources": {
       "../identity-package/null-notes-identity.msix": "",
       "context-menu-handler/target/release/null_notes_context_menu.dll": ""
+    },
+    "windows": {
+      "nsis": {
+        "installerHooks": "./windows/hooks.nsh"
+      }
     }
   }
 }
