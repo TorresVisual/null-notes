@@ -2587,6 +2587,45 @@ code {
   margin: 0 0 var(--space-sm);
 }
 
+.note-history-diff {
+  font-family: var(--font-mono);
+}
+
+.note-history-diff > div {
+  padding-left: var(--space-xs);
+}
+
+.note-history-diff-same {
+  color: var(--text-tertiary);
+  border-left: 2px solid transparent;
+}
+
+.note-history-diff-marker {
+  display: inline-block;
+  width: 1.5ch;
+  color: var(--text-tertiary);
+}
+
+.note-history-diff-add {
+  background: color-mix(in srgb, var(--accent) 28%, transparent);
+  border-left: 2px solid var(--accent);
+  color: var(--text-primary);
+}
+
+.note-history-diff-add .note-history-diff-marker {
+  color: var(--accent);
+}
+
+.note-history-diff-remove {
+  background: color-mix(in srgb, var(--danger) 28%, transparent);
+  border-left: 2px solid var(--danger);
+  color: var(--text-primary);
+}
+
+.note-history-diff-remove .note-history-diff-marker {
+  color: var(--danger);
+}
+
 .note-history-restore {
   background: none;
   border: 1px solid var(--border-strong);

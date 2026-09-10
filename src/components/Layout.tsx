@@ -534,6 +534,7 @@ export function Layout() {
                 <NoteHistoryPanel
                   notePath={activeTab}
                   saveState={saveState}
+                  currentContent={content}
                   onRestore={(content) => void save(content)}
                 />
               )}

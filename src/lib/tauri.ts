@@ -118,8 +118,8 @@ export const api = {
       invoke<RepoInitOutcome>('init_notes_repo', { workspace, createGithubRemote }),
     listNoteHistory: (workspace: string, notePath: string) =>
       invoke<NoteHistoryEntry[]>('list_note_history', { workspace, notePath }),
-    readNoteAtCommit: (workspace: string, notePath: string, sha: string) =>
-      invoke<string>('read_note_at_commit', { workspace, notePath, sha }),
+    readNoteAtCommit: (workspace: string, relativePath: string, sha: string) =>
+      invoke<string>('read_note_at_commit', { workspace, relativePath, sha }),
   },
   settings: {
     load: () =>

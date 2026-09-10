@@ -441,6 +441,27 @@ pub struct NoteHistoryEntry {
     pub sha: String,
     pub timestamp_ms: i64,
     pub message: String,
+    /// The note's path *as of this commit*, repo-root-relative. `--follow`
+    /// means older entries can predate a rename — reading their content
+    /// needs the name they had then, not the note's current name, or
+    /// `git show` fails with "exists on disk, but not in <sha>" for any
+    /// commit before the rename. Feed this straight into
+    /// `read_note_at_commit_at`.
+    pub path: String,
+}
+
+/// A `--format=%H%x1f%at%x1f%s` line: two `\u{1f}` field separators, which
+/// a `--name-only` filename line (the line that follows each of these) never
+/// contains.
+fn parse_commit_meta(line: &str) -> Option<(String, i64, String)> {
+    if !line.contains('\u{1f}') {
+        return None;
+    }
+    let mut fields = line.splitn(3, '\u{1f}');
+    let sha = fields.next()?.to_string();
+    let timestamp_s: i64 = fields.next()?.parse().ok()?;
+    let message = fields.next().unwrap_or_default().to_string();
+    Some((sha, timestamp_s, message))
 }
 
 /// The commits touching `note_path`, newest first, capped at
@@ -449,7 +470,9 @@ pub struct NoteHistoryEntry {
 /// story restarted. `note_path` is the note's ordinary absolute path: a git
 /// pathspec resolves an absolute path correctly regardless of `-C`, the
 /// same assumption `checked_auto_commit`'s own `paths` argument already
-/// relies on — unlike `read_note_at_commit_at` below, no relativizing here.
+/// relies on. `--name-only` recovers each commit's path-at-that-time (see
+/// `NoteHistoryEntry::path`) — already repo-root-relative, exactly what
+/// `read_note_at_commit_at`'s `<rev>:<path>` needs, no relativizing here.
 pub fn list_note_history_at(
     workspace: &str,
     note_path: &str,
@@ -459,6 +482,7 @@ pub fn list_note_history_at(
         .arg(workspace)
         .arg("log")
         .arg("--follow")
+        .arg("--name-only")
         .arg(format!("-n{NOTE_HISTORY_LIMIT}"))
         .arg("--format=%H%x1f%at%x1f%s")
         .arg("--")
@@ -474,16 +498,20 @@ pub fn list_note_history_at(
 
     let text = String::from_utf8_lossy(&output.stdout);
     let mut entries = Vec::new();
+    let mut pending: Option<(String, i64, String)> = None;
     for line in text.lines() {
-        let mut fields = line.splitn(3, '\u{1f}');
-        let sha = fields.next().unwrap_or_default().to_string();
-        let timestamp_s: i64 = fields.next().unwrap_or_default().parse().unwrap_or(0);
-        let message = fields.next().unwrap_or_default().to_string();
-        entries.push(NoteHistoryEntry {
-            sha,
-            timestamp_ms: timestamp_s * 1000,
-            message,
-        });
+        if let Some(meta) = parse_commit_meta(line) {
+            pending = Some(meta);
+        } else if !line.is_empty() {
+            if let Some((sha, timestamp_s, message)) = pending.take() {
+                entries.push(NoteHistoryEntry {
+                    sha,
+                    timestamp_ms: timestamp_s * 1000,
+                    message,
+                    path: line.to_string(),
+                });
+            }
+        }
     }
     Ok(entries)
 }
@@ -499,14 +527,14 @@ pub async fn list_note_history(
         .map_err(|e| e.to_string())
 }
 
-/// Reads `note_path`'s content as of `sha`. Unlike `list_note_history_at`'s
-/// pathspec, `git show <rev>:<path>` always resolves `<path>` relative to
-/// the repo root, never to `-C`'s working directory — the one place this
-/// feature must not treat `workspace` as if it were the repo root, since
-/// `RepoMode::CodeRepo` means it can be a subtree of one.
+/// Reads `relative_path`'s content as of `sha`. `relative_path` must already
+/// be repo-root-relative — the exact form `NoteHistoryEntry::path` returns —
+/// since `git show <rev>:<path>` always resolves `<path>` relative to the
+/// repo root, never to `-C`'s working directory, regardless of `workspace`
+/// being a subtree of the repo (`RepoMode::CodeRepo`).
 pub fn read_note_at_commit_at(
     workspace: &str,
-    note_path: &str,
+    relative_path: &str,
     sha: &str,
 ) -> anyhow::Result<String> {
     // sha is interpolated straight into a single `<rev>:<path>` argument below.
@@ -516,41 +544,17 @@ pub fn read_note_at_commit_at(
     if sha.len() < 7 || sha.len() > 40 || !sha.bytes().all(|b| b.is_ascii_hexdigit()) {
         anyhow::bail!("invalid commit sha: {sha}");
     }
-    let toplevel_output = no_window_command("git")
-        .arg("-C")
-        .arg(workspace)
-        .arg("rev-parse")
-        .arg("--show-toplevel")
-        .output()?;
-    if !toplevel_output.status.success() {
-        anyhow::bail!("{workspace} is not a Git repository");
-    }
-    let root = String::from_utf8_lossy(&toplevel_output.stdout)
-        .trim()
-        .to_string();
-    let root_canon = std::fs::canonicalize(Path::new(&root))?;
-    let note_canon = std::fs::canonicalize(Path::new(note_path))?;
-    let relative = note_canon.strip_prefix(&root_canon).map_err(|_| {
-        anyhow::anyhow!(
-            "{note_path} is not inside repo root {}",
-            root_canon.display()
-        )
-    })?;
-    // git's <rev>:<path> syntax wants forward slashes even on Windows,
-    // matching how detect_repo_mode already normalises rev-parse
-    // --show-toplevel's own output before comparing paths.
-    let relative_git = relative.to_string_lossy().replace('\\', "/");
 
     let output = no_window_command("git")
         .arg("-C")
         .arg(workspace)
         .arg("show")
-        .arg(format!("{sha}:{relative_git}"))
+        .arg(format!("{sha}:{relative_path}"))
         .output()?;
 
     if !output.status.success() {
         anyhow::bail!(
-            "git show failed for {sha}:{relative_git}: {}",
+            "git show failed for {sha}:{relative_path}: {}",
             String::from_utf8_lossy(&output.stderr)
         );
     }
@@ -560,10 +564,10 @@ pub fn read_note_at_commit_at(
 #[tauri::command]
 pub async fn read_note_at_commit(
     workspace: String,
-    note_path: String,
+    relative_path: String,
     sha: String,
 ) -> Result<String, String> {
-    tokio::task::spawn_blocking(move || read_note_at_commit_at(&workspace, &note_path, &sha))
+    tokio::task::spawn_blocking(move || read_note_at_commit_at(&workspace, &relative_path, &sha))
         .await
         .map_err(|e| e.to_string())?
         .map_err(|e| e.to_string())
@@ -977,7 +981,9 @@ mod tests {
         assert_eq!(entries.len(), 2);
         assert_eq!(entries[0].sha, second_sha, "newest first");
         assert_eq!(entries[0].message, "notes: update Todo");
+        assert_eq!(entries[0].path, "Todo.md");
         assert_eq!(entries[1].sha, first_sha);
+        assert_eq!(entries[1].path, "Todo.md");
     }
 
     #[test]
@@ -1031,7 +1037,12 @@ mod tests {
 
         assert_eq!(entries.len(), 2, "history must survive the rename");
         assert_eq!(entries[0].sha, rename_sha);
+        assert_eq!(entries[0].path, "New.md");
         assert_eq!(entries[1].sha, old_sha);
+        assert_eq!(
+            entries[1].path, "Old.md",
+            "the pre-rename commit's path must be its name at that commit, not the note's current name"
+        );
     }
 
     #[test]
@@ -1050,7 +1061,6 @@ mod tests {
     fn read_note_at_commit_returns_the_historical_content() {
         let tmp = tempdir().unwrap();
         git_init(tmp.path());
-        let note_path = tmp.path().join("Todo.md").to_string_lossy().into_owned();
         let first_sha = commit_note_file(
             tmp.path(),
             "Todo.md",
@@ -1065,22 +1075,21 @@ mod tests {
         );
 
         let content =
-            read_note_at_commit_at(&tmp.path().to_string_lossy(), &note_path, &first_sha).unwrap();
+            read_note_at_commit_at(&tmp.path().to_string_lossy(), "Todo.md", &first_sha).unwrap();
 
         assert_eq!(content, "# Todo\n\n- one\n");
     }
 
     #[test]
-    fn read_note_at_commit_resolves_the_path_relative_to_repo_root_not_workspace() {
+    fn read_note_at_commit_resolves_relative_to_repo_root_regardless_of_workspace() {
         // A RepoMode::CodeRepo shape: the workspace is a subdirectory of the
-        // repo, not the repo root itself — the exact case
-        // read_note_at_commit_at must handle correctly, unlike
-        // list_note_history_at's plain pathspec matching.
+        // repo, not the repo root itself. `relative_path` is always
+        // repo-root-relative (what list_note_history_at hands back), and
+        // `-C workspace` must not change how it resolves.
         let tmp = tempdir().unwrap();
         git_init(tmp.path());
         let notes_dir = tmp.path().join("notes");
         std::fs::create_dir(&notes_dir).unwrap();
-        let note_path = notes_dir.join("Todo.md").to_string_lossy().into_owned();
 
         let sha = commit_note_file(
             tmp.path(),
@@ -1090,21 +1099,59 @@ mod tests {
         );
 
         let content =
-            read_note_at_commit_at(&notes_dir.to_string_lossy(), &note_path, &sha).unwrap();
+            read_note_at_commit_at(&notes_dir.to_string_lossy(), "notes/Todo.md", &sha).unwrap();
 
         assert_eq!(content, "# Todo\n\n- one\n");
+    }
+
+    #[test]
+    fn read_note_at_commit_uses_the_historical_path_from_before_a_rename() {
+        // Reproduces the reported bug: selecting a history entry from
+        // before a rename must not try to read the note's *current* name at
+        // that old sha — list_note_history_at's per-entry `path` is what
+        // makes that possible.
+        let tmp = tempdir().unwrap();
+        git_init(tmp.path());
+        let old_sha = commit_note_file(tmp.path(), "Old.md", "# Old\n", "notes: update Old");
+        no_window_command("git")
+            .arg("-C")
+            .arg(tmp.path())
+            .arg("mv")
+            .arg("Old.md")
+            .arg("New.md")
+            .status()
+            .unwrap();
+        no_window_command("git")
+            .arg("-C")
+            .arg(tmp.path())
+            .arg("commit")
+            .arg("-m")
+            .arg("rename Old to New")
+            .status()
+            .unwrap();
+        let new_path = tmp.path().join("New.md").to_string_lossy().into_owned();
+
+        let entries = list_note_history_at(&tmp.path().to_string_lossy(), &new_path).unwrap();
+        let pre_rename_entry = entries.iter().find(|e| e.sha == old_sha).unwrap();
+
+        let content = read_note_at_commit_at(
+            &tmp.path().to_string_lossy(),
+            &pre_rename_entry.path,
+            &old_sha,
+        )
+        .unwrap();
+
+        assert_eq!(content, "# Old\n");
     }
 
     #[test]
     fn read_note_at_commit_rejects_a_sha_that_looks_like_a_flag() {
         let tmp = tempdir().unwrap();
         git_init(tmp.path());
-        let note_path = tmp.path().join("Todo.md").to_string_lossy().into_owned();
         commit_note_file(tmp.path(), "Todo.md", "# Todo\n", "notes: update Todo");
 
-        let err =
-            read_note_at_commit_at(&tmp.path().to_string_lossy(), &note_path, "--output=evil")
-                .unwrap_err();
+        let err = read_note_at_commit_at(&tmp.path().to_string_lossy(), "Todo.md", "--output=evil")
+            .unwrap_err();
 
         assert!(err.to_string().contains("invalid commit sha"));
     }

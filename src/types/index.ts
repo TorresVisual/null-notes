@@ -86,6 +86,7 @@ export interface NoteHistoryEntry {
   sha: string
   timestampMs: number
   message: string
+  path: string
 }
 
 export type PdfImportMode = 'pages' | 'markdown'

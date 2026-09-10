@@ -1,18 +1,20 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { ChevronRight, ChevronDown } from 'lucide-react'
 import { confirm } from '@tauri-apps/plugin-dialog'
 import { useWorkspaceStore } from '../store/workspace'
 import { api } from '../lib/tauri'
+import { diffLines } from '../lib/lineDiff'
 import type { SaveState } from '../hooks/useNote'
 import type { NoteHistoryEntry } from '../types'
 
 interface NoteHistoryPanelProps {
   notePath: string
   saveState: SaveState
+  currentContent: string
   onRestore: (content: string) => void
 }
 
-export function NoteHistoryPanel({ notePath, saveState, onRestore }: NoteHistoryPanelProps) {
+export function NoteHistoryPanel({ notePath, saveState, currentContent, onRestore }: NoteHistoryPanelProps) {
   const workspacePath = useWorkspaceStore((s) => s.path)
   const [entries, setEntries] = useState<NoteHistoryEntry[]>([])
   const [collapsed, setCollapsed] = useState(true)
@@ -35,11 +37,17 @@ export function NoteHistoryPanel({ notePath, saveState, onRestore }: NoteHistory
 
   async function handleSelect(entry: NoteHistoryEntry) {
     if (!workspacePath) return
+    if (selected?.sha === entry.sha) {
+      setSelected(null)
+      setPreview(null)
+      setPreviewError(null)
+      return
+    }
     setSelected(entry)
     setPreview(null)
     setPreviewError(null)
     try {
-      const content = await api.git.readNoteAtCommit(workspacePath, notePath, entry.sha)
+      const content = await api.git.readNoteAtCommit(workspacePath, entry.path, entry.sha)
       setPreview(content)
     } catch (e) {
       setPreviewError(`Couldn't load that version: ${String(e)}`)
@@ -54,6 +62,11 @@ export function NoteHistoryPanel({ notePath, saveState, onRestore }: NoteHistory
     }
     onRestore(preview)
   }
+
+  const diff = useMemo(
+    () => (preview === null ? null : diffLines(preview, currentContent)),
+    [preview, currentContent]
+  )
 
   return (
     <div className="note-history-panel">
@@ -81,20 +94,29 @@ export function NoteHistoryPanel({ notePath, saveState, onRestore }: NoteHistory
                     </span>
                     <span className="note-history-message">{entry.message}</span>
                   </button>
+                  {selected?.sha === entry.sha && previewError && (
+                    <p className="note-history-error">{previewError}</p>
+                  )}
+                  {selected?.sha === entry.sha && diff && (
+                    <div className="note-history-preview">
+                      <pre className="note-history-diff">
+                        {diff.map((line, i) => (
+                          <div key={i} className={`note-history-diff-${line.type}`}>
+                            <span className="note-history-diff-marker">
+                              {line.type === 'add' ? '+' : line.type === 'remove' ? '-' : ' '}
+                            </span>
+                            {line.text}
+                          </div>
+                        ))}
+                      </pre>
+                      <button className="note-history-restore" onClick={() => void handleRestore()}>
+                        Restore this version
+                      </button>
+                    </div>
+                  )}
                 </li>
               ))}
             </ul>
-            {selected && previewError && (
-              <p className="note-history-error">{previewError}</p>
-            )}
-            {selected && preview !== null && (
-              <div className="note-history-preview">
-                <pre>{preview}</pre>
-                <button className="note-history-restore" onClick={() => void handleRestore()}>
-                  Restore this version
-                </button>
-              </div>
-            )}
           </>
         )
       )}
