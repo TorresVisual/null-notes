@@ -711,7 +711,7 @@ const SIDECAR_SUFFIXES: [&str; 4] = [".ink", ".pdf", ".assets", ".diagrams"];
 /// business showing up in the tree or the search index.
 const TEMPLATES_DIR: &str = "templates";
 
-fn is_excluded_dir(name: &str) -> bool {
+pub(crate) fn is_excluded_dir(name: &str) -> bool {
     name.starts_with('.')
         || SIDECAR_SUFFIXES.iter().any(|suffix| name.ends_with(suffix))
         || EXCLUDED_DIRS.contains(&name)

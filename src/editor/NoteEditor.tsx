@@ -23,6 +23,9 @@ interface NoteEditorProps {
   spellcheckLanguage: string
   onChange: (markdown: string) => void
   onFlashcardCommand: (editor: Editor, range: Range) => void
+  // Optional — tests that don't exercise diagram insertion can omit it;
+  // storage is only wired up when a caller (Layout) actually provides one.
+  onDiagramCommand?: (editor: Editor, range: Range | null) => void
 }
 
 // `lang` is the only thing that tells the WebView which dictionary to check
@@ -43,6 +46,7 @@ export function NoteEditor({
   spellcheckLanguage,
   onChange,
   onFlashcardCommand,
+  onDiagramCommand,
 }: NoteEditorProps) {
   const isProgrammaticUpdate = useRef(false)
   const [, setEditorVersion] = useState(0)
@@ -99,7 +103,8 @@ export function NoteEditor({
     if (!editor) return
     editor.storage.noteContext.notePath = notePath
     editor.storage.noteContext.openFlashcardDialog = onFlashcardCommand
-  }, [editor, notePath, onFlashcardCommand])
+    editor.storage.noteContext.openDiagramDialog = onDiagramCommand ?? null
+  }, [editor, notePath, onFlashcardCommand, onDiagramCommand])
 
   // Recording on selectionUpdate rather than on unmount: the editor is already
   // destroyed by the time an unmount cleanup could read its state.

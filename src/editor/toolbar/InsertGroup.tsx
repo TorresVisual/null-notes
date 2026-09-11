@@ -2,7 +2,6 @@ import { useRef, useState } from 'react'
 import { PenLine, Sigma, Omega, Table, Code, Info, Shapes } from 'lucide-react'
 import type { Editor } from '@tiptap/core'
 import { insertInk } from './insertInk'
-import { insertDiagram } from './insertDiagram'
 import { report } from '../splitIntoTasks'
 import { SymbolPalette } from '../extensions/SymbolPalette'
 import { focusLeftMathEditingSurface } from '../../lib/mathEditorFocus'
@@ -47,7 +46,7 @@ export function InsertGroup({ editor, notePath }: InsertGroupProps) {
         <PenLine size={15} />
       </button>
       <button className="toolbar-button" aria-label="Insert diagram" title="Insert diagram"
-        onClick={() => void insertDiagram(editor, notePath).catch(report)}>
+        onClick={() => editor.storage.noteContext.openDiagramDialog?.(editor, null)}>
         <Shapes size={15} />
       </button>
       <button className="toolbar-button" aria-label="Insert equation" title="Insert equation"

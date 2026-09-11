@@ -29,6 +29,7 @@ import { FormulaSheetPrompt } from './FormulaSheetPrompt'
 import { ExportPdfDialog } from './ExportPdfDialog'
 import { PrintDialog } from './PrintDialog'
 import { FlashcardTypeDialog } from './FlashcardTypeDialog'
+import { DiagramPickerDialog } from './DiagramPickerDialog'
 import { TerminalPane } from './TerminalPane'
 import { ToastStack } from './ToastStack'
 import { useWorkspaceStore } from '../store/workspace'
@@ -50,6 +51,10 @@ import { useGitConfig } from '../hooks/useGitConfig'
 import { useGitAutoCommit } from '../hooks/useGitAutoCommit'
 import { promptText } from '../store/promptDialog'
 import { api } from '../lib/tauri'
+import { diagramApi } from '../lib/diagram'
+import { insertDiagram } from '../editor/toolbar/insertDiagram'
+import { report } from '../editor/splitIntoTasks'
+import type { DiagramMetadata } from '../types'
 import { goBack, goForward } from '../lib/navigationHistory'
 import { useFocusModeStore } from '../store/focusMode'
 
@@ -101,6 +106,9 @@ export function Layout() {
   const [terminalOpen, setTerminalOpen] = useState(false)
   const [pendingFlashcardInsert, setPendingFlashcardInsert] = useState<
     { editor: Editor; range: Range } | null
+  >(null)
+  const [pendingDiagramInsert, setPendingDiagramInsert] = useState<
+    { editor: Editor; range: Range | null; diagrams: DiagramMetadata[] } | null
   >(null)
   const [pendingCramStreak, setPendingCramStreak] = useState<number | null>(null)
   const settings = useSettingsStore((s) => s.settings)
@@ -277,6 +285,26 @@ export function Layout() {
     [openOverlay],
   )
 
+  // Skips the picker entirely when there's nothing yet to reuse — same
+  // zero-click "just insert" behavior as before #39, until a workspace
+  // actually has a diagram worth offering.
+  const handleDiagramCommand = useCallback(
+    (editor: Editor, range: Range | null) => {
+      if (!workspacePath) return
+      void diagramApi.list(workspacePath).then((diagrams) => {
+        if (diagrams.length === 0) {
+          const notePath = editor.storage.noteContext.notePath
+          if (range) editor.chain().focus().deleteRange(range).run()
+          void insertDiagram(editor, notePath).catch(report)
+          return
+        }
+        setPendingDiagramInsert({ editor, range, diagrams })
+        openOverlay('diagramPicker')
+      })
+    },
+    [workspacePath, openOverlay],
+  )
+
   useEffect(() => {
     const unlisten = listen<string>('menu-action', (event) => void runCommand(event.payload))
     return () => void unlisten.then((off) => off())
@@ -438,6 +466,17 @@ export function Layout() {
           }}
         />
       )}
+      {activeOverlay === 'diagramPicker' && pendingDiagramInsert && (
+        <DiagramPickerDialog
+          editor={pendingDiagramInsert.editor}
+          range={pendingDiagramInsert.range}
+          diagrams={pendingDiagramInsert.diagrams}
+          onClose={() => {
+            setPendingDiagramInsert(null)
+            closeOverlay()
+          }}
+        />
+      )}
       {!focusMode && (
         <Sidebar
           onSearchOpen={() => openOverlay('search')}
@@ -498,6 +537,7 @@ export function Layout() {
                   spellcheckLanguage={settings.spellcheckLanguage}
                   onChange={(md) => void save(md)}
                   onFlashcardCommand={handleFlashcardCommand}
+                  onDiagramCommand={handleDiagramCommand}
                 />
               )}
               {!isLoading && activeTab && viewMode === 'raw' && (

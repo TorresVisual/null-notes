@@ -1,8 +1,11 @@
 import { invoke } from '@tauri-apps/api/core'
 import { useWorkspaceStore } from '../store/workspace'
+import type { DiagramMetadata } from '../types'
 
 export const diagramApi = {
   ensureDir: (notePath: string) => invoke<string>('ensure_diagrams_dir', { notePath }),
+
+  list: (workspace: string) => invoke<DiagramMetadata[]>('list_diagrams', { workspace }),
 
   read: (path: string) => invoke<string>('read_diagram', { path }),
 

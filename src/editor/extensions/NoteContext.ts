@@ -10,6 +10,10 @@ declare module '@tiptap/core' {
       // Layout's overlay — the same shape notePath already bridges for
       // Ink Block/Diagram, but for a callback instead of a plain value.
       openFlashcardDialog: ((editor: Editor, range: Range) => void) | null
+      // Same bridge as openFlashcardDialog, for the "reuse existing diagram"
+      // picker (#39). range is null for the toolbar button, which inserts at
+      // the cursor rather than replacing a slash-command range.
+      openDiagramDialog: ((editor: Editor, range: Range | null) => void) | null
     }
   }
 }
@@ -17,6 +21,6 @@ declare module '@tiptap/core' {
 export const NoteContext = Extension.create({
   name: 'noteContext',
   addStorage() {
-    return { notePath: '' as string, openFlashcardDialog: null }
+    return { notePath: '' as string, openFlashcardDialog: null, openDiagramDialog: null }
   },
 })

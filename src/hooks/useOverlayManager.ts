@@ -13,6 +13,7 @@ export type OverlayKind =
   | 'exportPdf'
   | 'print'
   | 'flashcard'
+  | 'diagramPicker'
   | 'deck'
 
 /**

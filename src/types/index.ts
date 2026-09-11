@@ -142,6 +142,12 @@ export interface TemplateMetadata {
   path: string
 }
 
+export interface DiagramMetadata {
+  jsonPath: string
+  svgPath: string
+  noteTitle: string
+}
+
 export interface CrossRefTarget {
   calloutType: string
   number: string

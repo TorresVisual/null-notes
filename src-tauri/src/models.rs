@@ -44,6 +44,18 @@ pub struct TemplateMetadata {
     pub path: String,
 }
 
+/// One `.excalidraw`/`.svg` pair found under some note's `*.diagrams/`
+/// sidecar, for the "reuse existing diagram" picker (#39). `note_title` is
+/// the owning note's sidecar-dir stem, not a DB lookup — this scan doesn't
+/// touch the notes table.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DiagramMetadata {
+    pub json_path: String,
+    pub svg_path: String,
+    pub note_title: String,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 #[serde(rename_all = "camelCase")]
 pub struct SearchResult {

@@ -166,6 +166,7 @@ pub fn run() {
             commands::diagrams::ensure_diagrams_dir,
             commands::diagrams::read_diagram,
             commands::diagrams::write_diagram,
+            commands::diagrams::list_diagrams,
             commands::pdf::ensure_pdf_dir,
             commands::pdf::import_pdf_pages,
             commands::pdf::read_pdf_page,
