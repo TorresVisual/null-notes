@@ -4133,9 +4133,19 @@ code {
 .print-preview-pages .code-block-open-in-ide-group,
 .print-preview-pages .code-block-actions,
 .print-preview-pages .code-run-panel,
-.print-preview-pages .note-find-bar {
+.print-preview-pages .note-find-bar,
+.print-preview-pages .note-history-panel,
+.print-preview-pages .drag-handle {
   display: none !important;
 }
+
+/* Code folding is a screen-only editing affordance too: the fold toggle
+   itself must go, and any line hidden by an in-progress fold has to come
+   back — a printed note can't silently drop code its author folded away
+   while editing. Same principle as the collapsed-section rule above. */
+.print-preview-pages .code-line-number.foldable::before { display: none; }
+.print-preview-pages .code-fold-placeholder { display: none !important; }
+.print-preview-pages .code-fold-hidden { display: inline !important; }
 
 .print-preview-pages .pagedjs_page {
   background: #fff;
@@ -4261,6 +4271,17 @@ code {
   .print-preview-pages .pagedjs_page {
     box-shadow: none;
     margin: 0;
+  }
+  /* Paged.js's own inserted stylesheet puts `break-after: page` on every
+     `.pagedjs_page`, including the last one — Chromium's print/PrintToPdf
+     honors that literally and emits a trailing blank page after it. Only
+     the last page needs the break suppressed; every other page still
+     needs its break to separate it from the next. Must out-specificity
+     Paged.js's own `!important` rule, which is appended to `<head>` after
+     ours and would otherwise win on source order. */
+  .print-preview-pages .pagedjs_page:last-of-type {
+    break-after: auto !important;
+    page-break-after: auto !important;
   }
 }
 
