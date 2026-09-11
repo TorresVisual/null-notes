@@ -1,7 +1,7 @@
 import { Node } from '@tiptap/core'
 import { ReactNodeViewRenderer, NodeViewWrapper } from '@tiptap/react'
 import type { ReactNodeViewProps } from '@tiptap/react'
-import { useEffect, useId, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import mermaid from 'mermaid'
 
 mermaid.initialize({ startOnLoad: false, theme: 'default' })
@@ -10,12 +10,15 @@ interface MermaidAttrs {
   code: string
 }
 
-function MermaidView({ node }: ReactNodeViewProps) {
+function MermaidView({ node, editor, updateAttributes }: ReactNodeViewProps) {
   const { code } = node.attrs as unknown as MermaidAttrs
   const uid = useId().replace(/[^a-z0-9]/gi, '')
   const id = `md${uid}`
   const [svg, setSvg] = useState('')
   const [error, setError] = useState(false)
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState(code)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => {
     setError(false)
@@ -26,15 +29,66 @@ function MermaidView({ node }: ReactNodeViewProps) {
       .catch(() => setError(true))
   }, [code, id])
 
+  useEffect(() => {
+    if (editing) textareaRef.current?.focus()
+  }, [editing])
+
+  function open() {
+    if (!editor.isEditable) return
+    setDraft(code)
+    setEditing(true)
+  }
+
+  function commit() {
+    setEditing(false)
+    const next = draft.trim()
+    if (next !== code) updateAttributes({ code: next })
+  }
+
+  function cancel() {
+    setDraft(code)
+    setEditing(false)
+  }
+
   return (
     <NodeViewWrapper className="mermaid-block" spellCheck={false}>
-      {svg && !error ? (
-        // Mermaid's own rendered output (H-3 fixed the raw-source fallback
-        // below, not this).
-        // eslint-disable-next-line react/no-danger
-        <div dangerouslySetInnerHTML={{ __html: svg }} />
+      {editing ? (
+        <textarea
+          ref={textareaRef}
+          className="mermaid-block-editor"
+          value={draft}
+          spellCheck={false}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={commit}
+          onKeyDown={(e) => {
+            e.stopPropagation()
+            if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+              e.preventDefault()
+              commit()
+            } else if (e.key === 'Escape') {
+              e.preventDefault()
+              cancel()
+            }
+          }}
+        />
       ) : (
-        <pre className={error ? 'mermaid-error' : undefined}>{code}</pre>
+        <div className="mermaid-block-preview" onClick={open}>
+          {svg && !error ? (
+            // Mermaid's own rendered output (H-3 fixed the raw-source fallback
+            // below, not this).
+            // eslint-disable-next-line react/no-danger
+            <div dangerouslySetInnerHTML={{ __html: svg }} />
+          ) : (
+            <pre className={error ? 'mermaid-error' : undefined}>{code}</pre>
+          )}
+          {editor.isEditable && (
+            <div className="diagram-block-actions">
+              <button type="button" className="diagram-block-edit" aria-label="Edit diagram" onClick={open}>
+                Edit
+              </button>
+            </div>
+          )}
+        </div>
       )}
     </NodeViewWrapper>
   )

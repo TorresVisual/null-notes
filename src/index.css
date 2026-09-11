@@ -1845,6 +1845,28 @@ code {
 .mermaid-block svg { max-width: 100%; height: auto; }
 .mermaid-error { color: var(--danger); font-family: var(--font-mono); font-size: 13px; }
 
+.mermaid-block-preview {
+  position: relative;
+  cursor: text;
+}
+
+.mermaid-block-preview:hover .diagram-block-actions {
+  opacity: 1;
+}
+
+.mermaid-block-editor {
+  width: 100%;
+  min-height: 120px;
+  background: var(--bg-raised);
+  color: var(--text-primary);
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  padding: 10px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  resize: vertical;
+}
+
 /* Callout blocks */
 .callout {
   border-left: 4px solid var(--callout-color, var(--accent));
