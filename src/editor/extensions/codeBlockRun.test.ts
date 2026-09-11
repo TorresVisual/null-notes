@@ -1,6 +1,12 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest'
-import { applyCodeRunMeta, decodeBase64Text } from './CodeBlockRun'
+import { applyCodeRunMeta, decodeBase64Text, formatRunOutput } from './CodeBlockRun'
 import type { RunEntry } from './CodeBlockRun'
+import { api } from '../../lib/tauri'
+import { useWorkspaceStore } from '../../store/workspace'
+
+const { listenCallbacks } = vi.hoisted(() => ({
+  listenCallbacks: new Map<string, (event: { payload: unknown }) => void>(),
+}))
 
 vi.mock('../../lib/tauri', () => ({
   api: { codeRun: { run: vi.fn(), sendInput: vi.fn(), stop: vi.fn() } },
@@ -9,7 +15,10 @@ vi.mock('../../store/codeRunConfirm', () => ({
   useCodeRunConfirmStore: { getState: () => ({ confirmNote: vi.fn().mockResolvedValue(true) }) },
 }))
 vi.mock('@tauri-apps/api/event', () => ({
-  listen: vi.fn().mockResolvedValue(() => {}),
+  listen: vi.fn((event: string, cb: (e: { payload: unknown }) => void) => {
+    listenCallbacks.set(event, cb)
+    return Promise.resolve(() => {})
+  }),
 }))
 
 const { Editor } = await import('@tiptap/core')
@@ -30,12 +39,14 @@ function codeBlock(language: string, text = 'print(1)'): string {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  listenCallbacks.clear()
 })
 
 afterEach(() => {
   editor?.destroy()
   editor = null
   document.body.innerHTML = ''
+  useWorkspaceStore.getState().setActiveTab(null)
 })
 
 describe('CodeBlockRun panel visibility', () => {
@@ -55,9 +66,61 @@ describe('CodeBlockRun panel visibility', () => {
   })
 })
 
+describe('formatRunOutput', () => {
+  it('joins output chunks and appends the exit code', () => {
+    const entry: RunEntry = {
+      runId: 'r1',
+      status: 'exited',
+      exitCode: 0,
+      output: [
+        { stream: 'stdout', text: 'hi' },
+        { stream: 'stdout', text: '\n' },
+      ],
+    }
+    expect(formatRunOutput(entry)).toBe('hi\n\n[exited with code 0]')
+  })
+
+  it('notes a timeout with no exit code', () => {
+    const entry: RunEntry = { runId: 'r1', status: 'timeout', exitCode: null, output: [] }
+    expect(formatRunOutput(entry)).toBe('\n[stopped: exceeded the run timeout]')
+  })
+})
+
 describe('decodeBase64Text', () => {
   it('round-trips plain ASCII', () => {
     expect(decodeBase64Text(btoa('hello\n'))).toBe('hello\n')
+  })
+})
+
+describe('Pin output', () => {
+  it('writes the finished run into the note and closes the panel', async () => {
+    useWorkspaceStore.getState().setActiveTab('note.md')
+    mount(codeBlock('python'))
+    const run = editor!.view.dom.querySelector('.code-run-run')
+    expect(run).not.toBeNull()
+    run!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+
+    await vi.waitFor(() => expect(api.codeRun.run).toHaveBeenCalled())
+    const runId = vi.mocked(api.codeRun.run).mock.calls[0]![0] as string
+
+    listenCallbacks.get('code-run-output')?.({ payload: { runId, stream: 'stdout', data: btoa('42\n') } })
+    listenCallbacks.get('code-run-exit')?.({ payload: { runId, code: 0 } })
+
+    const pin = editor!.view.dom.querySelector('.code-run-pin')
+    expect(pin).not.toBeNull()
+    expect((pin as HTMLElement).hidden).toBe(false)
+    pin!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+
+    const codeBlocks: string[] = []
+    editor!.state.doc.descendants((node) => {
+      if (node.type.name === 'codeBlock') codeBlocks.push(node.textContent)
+      return true
+    })
+    expect(codeBlocks).toEqual(['print(1)', '42\n\n[exited with code 0]'])
+
+    // Panel entry closed: back to the pre-run Run button, output panel hidden again.
+    expect((editor!.view.dom.querySelector('.code-run-run') as HTMLElement).hidden).toBe(false)
+    expect((editor!.view.dom.querySelector('.code-run-output') as HTMLElement).hidden).toBe(true)
   })
 })
 

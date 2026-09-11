@@ -11,11 +11,13 @@ import { useWorkspaceStore } from '../../store/workspace'
 
 /**
  * Run button + output panel on every `python`/`cpp`/`c++`/`c` code block
- * (P10-2). No sandbox — see docs/specs/code-execution-design.md. Nothing
- * here is written to the note: the panel is a widget decoration, and its
- * content lives entirely in this plugin's own state, the same
- * presentation-only shape as `CodeBlockToolbar`'s fold state and
- * `CodeBlockSearch`'s query state.
+ * (P10-2). No sandbox — see docs/specs/code-execution-design.md. The panel
+ * itself is a widget decoration and its live output lives entirely in this
+ * plugin's own state, the same presentation-only shape as
+ * `CodeBlockToolbar`'s fold state and `CodeBlockSearch`'s query state —
+ * "Pin output" is the one escape hatch, writing a snapshot of that state
+ * into the doc as a plain (language `''`, so it's never itself runnable)
+ * code block, through the normal save path.
  */
 
 export const RUNNABLE_LANGUAGES = new Set(['python', 'cpp', 'c++', 'c'])
@@ -127,6 +129,7 @@ function runPanel(pos: number): HTMLElement {
   panel.innerHTML = `
     <button type="button" class="code-run-run" data-action="run">Run</button>
     <button type="button" class="code-run-stop" data-action="stop" hidden>Stop</button>
+    <button type="button" class="code-run-pin" data-action="pin" hidden>Pin output</button>
     <button type="button" class="code-run-close" data-action="close" hidden>Dismiss</button>
     <pre class="code-run-output" hidden></pre>
     <div class="code-run-stdin-row" hidden>
@@ -135,6 +138,15 @@ function runPanel(pos: number): HTMLElement {
   `
 
   return panel
+}
+
+/** Text pinned into the note and shown in the live panel — kept identical so what you pin is what you saw. */
+export function formatRunOutput(entry: RunEntry): string {
+  let text = entry.output.map((chunk) => chunk.text).join('')
+  if (entry.status === 'exited') text += `\n[exited with code ${entry.exitCode ?? 'unknown'}]`
+  if (entry.status === 'timeout') text += '\n[stopped: exceeded the run timeout]'
+  if (entry.status === 'stopped') text += '\n[stopped]'
+  return text
 }
 
 function decorate(state: EditorState): DecorationSet {
@@ -166,12 +178,14 @@ function syncRunPanelUi(view: EditorView) {
 
     const run = el.querySelector('.code-run-run')
     const stop = el.querySelector('.code-run-stop')
+    const pin = el.querySelector('.code-run-pin')
     const close = el.querySelector('.code-run-close')
     const output = el.querySelector('.code-run-output')
     const stdinRow = el.querySelector('.code-run-stdin-row')
     if (
       !(run instanceof HTMLElement) ||
       !(stop instanceof HTMLElement) ||
+      !(pin instanceof HTMLElement) ||
       !(close instanceof HTMLElement) ||
       !(output instanceof HTMLElement) ||
       !(stdinRow instanceof HTMLElement)
@@ -182,6 +196,7 @@ function syncRunPanelUi(view: EditorView) {
     if (!entry) {
       run.hidden = false
       stop.hidden = true
+      pin.hidden = true
       close.hidden = true
       output.hidden = true
       stdinRow.hidden = true
@@ -191,15 +206,12 @@ function syncRunPanelUi(view: EditorView) {
     const running = entry.status === 'starting' || entry.status === 'running'
     run.hidden = true
     stop.hidden = !running
+    pin.hidden = running
     close.hidden = running
     output.hidden = false
     stdinRow.hidden = !running
 
-    let text = entry.output.map((chunk) => chunk.text).join('')
-    if (entry.status === 'exited') text += `\n[exited with code ${entry.exitCode ?? 'unknown'}]`
-    if (entry.status === 'timeout') text += '\n[stopped: exceeded the run timeout]'
-    if (entry.status === 'stopped') text += '\n[stopped]'
-    output.textContent = text
+    output.textContent = formatRunOutput(entry)
     output.scrollTop = output.scrollHeight
   })
 }
@@ -315,6 +327,18 @@ export const CodeBlockRun = Extension.create({
               view.dispatch(view.state.tr.setMeta(codeRunKey, { type: 'stopped', runId: entry.runId }))
             } else if (action === 'close') {
               view.dispatch(view.state.tr.setMeta(codeRunKey, { type: 'close', pos }))
+            } else if (action === 'pin') {
+              const node = view.state.doc.nodeAt(pos)
+              if (!node) return
+              const text = formatRunOutput(entry)
+              const schema = view.state.schema
+              const outputNode = schema.nodes['codeBlock']!.create(
+                { language: '' },
+                text ? schema.text(text) : undefined,
+              )
+              view.dispatch(
+                view.state.tr.insert(pos + node.nodeSize, outputNode).setMeta(codeRunKey, { type: 'close', pos }),
+              )
             }
           }
 
