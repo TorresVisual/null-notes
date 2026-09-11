@@ -4080,6 +4080,9 @@ code {
 
 .print-preview-dialog {
   width: min(900px, calc(100vw - 80px));
+  /* DialogContent ships a `sm:max-w-sm` utility; a bare `width` loses to it
+     and the preview collapses to a 384px sliver. */
+  max-width: min(900px, calc(100vw - 80px));
   max-height: 85vh;
 }
 
@@ -4140,6 +4143,28 @@ code {
   margin: 0 auto 16px;
 }
 
+/* Paged.js, not Chromium, decides page breaks now, and it does that by
+   reading computed styles off the clone *while it sits in this container*,
+   on screen. Scoped here rather than left in `@media print`, where the real
+   print job — which only ever prints already-paginated `.pagedjs_page`
+   boxes — would apply them far too late to move a break. */
+.print-preview-pages h1, .print-preview-pages h2, .print-preview-pages h3,
+.print-preview-pages h4, .print-preview-pages h5, .print-preview-pages h6 {
+  break-after: avoid;
+}
+.print-preview-pages pre, .print-preview-pages .pdf-page-block,
+.print-preview-pages .ink-block-wrapper, .print-preview-pages table,
+.print-preview-pages .note-image, .print-preview-pages .callout,
+.print-preview-pages .details-wrapper, .print-preview-pages .block-math,
+.print-preview-pages .mermaid-block, .print-preview-pages .diagram-block-preview {
+  break-inside: avoid;
+}
+
+/* A collapsed section is a screen-only affordance — a printed note must show
+   every section's content regardless of its current open/closed state. */
+.print-preview-pages .details-body { display: block !important; }
+.print-preview-pages .details-chevron { display: none; }
+
 /* Export to PDF (File > Export to PDF, or the OS print dialog directly)
    leans on the WebView's own print pipeline rather than a custom renderer —
    math, Mermaid, ink and code all print exactly as they're already shown on
@@ -4184,10 +4209,17 @@ code {
   /* Printing only ever goes through Export to PDF / Print now, both of
      which render a Paged.js clone into `.print-preview-pages` (its own
      chrome-hiding rules above apply here too, print or not) inside a
-     dialog portaled to document.body — the live `.layout` behind it never
-     needs to print and, left visible, bleeds its full-bleed, unpaginated
-     content in behind/around the real paginated pages. */
-  .layout, [data-slot="dialog-overlay"] { display: none !important; }
+     dialog portaled to document.body — the live app behind it never needs
+     to print and, left visible, bleeds its full-bleed, unpaginated content
+     in behind/around the real paginated pages.
+
+     `#root`, not `.layout`: the title bar is a *sibling* of `.layout`, so
+     hiding `.layout` alone printed the window chrome, and both `.app-shell`
+     and `#root` carry their own full-height rule, which still reserved a
+     blank viewport-tall block above the first page once the children were
+     hidden. `#root` is the one node the whole live app hangs off, and the
+     dialog is portaled to `body` outside it. */
+  #root, [data-slot="dialog-overlay"] { display: none !important; }
   [data-slot="dialog-content"]:not(:has(.print-preview-pages)) { display: none !important; }
   [data-slot="dialog-content"]:has(.print-preview-pages) > *:not(.print-preview-pages) { display: none !important; }
 
@@ -4198,7 +4230,14 @@ code {
   [data-slot="dialog-content"]:has(.print-preview-pages) {
     position: static;
     inset: auto;
+    /* Tailwind v4's `-translate-x-1/2`/`-translate-y-1/2` compile to the
+       standalone `translate` property, and `zoom-in-95` to `scale` — neither
+       is reset by `transform: none`. Left set, the centring offset survives
+       into the print job and drags the page boxes off the top-left of the
+       sheet, clipping every page. */
     transform: none;
+    translate: none;
+    scale: none;
     width: auto;
     max-width: none;
     max-height: none;
@@ -4223,18 +4262,6 @@ code {
     box-shadow: none;
     margin: 0;
   }
-
-  .note-editor h1, .note-editor h2, .note-editor h3, .note-editor h4, .note-editor h5, .note-editor h6 { break-after: avoid; }
-  .note-editor pre, .pdf-page-block, .ink-block-wrapper, .note-editor table,
-  .note-image, .callout, .details-wrapper, .block-math, .mermaid-block,
-  .diagram-block-preview {
-    break-inside: avoid;
-  }
-
-  /* A collapsed section is a screen-only affordance — printing must show
-     every section's content regardless of its current open/closed state. */
-  .details-body { display: block !important; }
-  .details-chevron { display: none; }
 }
 
 /* ── Block Handle ──────────────────────────────────────────────── */

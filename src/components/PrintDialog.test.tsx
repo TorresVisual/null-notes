@@ -20,7 +20,7 @@ const previewHook = vi.mocked(usePrintPreview)
 
 function makePreviewResult(overrides: Partial<ReturnType<typeof usePrintPreview>> = {}) {
   return {
-    containerRef: { current: null },
+    containerRef: () => {},
     showPageNumber: false,
     setShowPageNumber: vi.fn(),
     showTitle: false,

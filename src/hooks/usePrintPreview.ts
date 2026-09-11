@@ -15,7 +15,13 @@ function stripScreenClasses(el: HTMLElement): void {
 }
 
 interface UsePrintPreviewResult {
-  containerRef: RefObject<HTMLDivElement | null>
+  /** A *callback* ref, not an object ref. `DialogContent` renders through a
+   *  Radix portal, whose children commit after this hook's own effect has
+   *  already run — an object ref would still read `null` on that first pass,
+   *  and nothing in the dependency list changes when the node later attaches,
+   *  so the preview would never render until an unrelated re-render (ticking
+   *  a checkbox) happened to retrigger the effect. */
+  containerRef: (node: HTMLDivElement | null) => void
   showPageNumber: boolean
   setShowPageNumber: (value: boolean) => void
   showTitle: boolean
@@ -29,6 +35,18 @@ interface UsePrintPreviewResult {
 // Re-rendering on every keystroke-speed checkbox toggle would thrash
 // Paged.js's real layout pass; this waits for toggling to settle first.
 const RERENDER_DEBOUNCE_MS = 250
+
+/** A `Previewer` outlives the promise `preview()` returns: every page it
+ *  built keeps a `ResizeObserver` on its own wrapper, and its `Polisher`
+ *  keeps the `<style>` tags it appended to `<head>`. Emptying the container
+ *  without this fires those observers against pages whose content is gone —
+ *  `checkUnderflowAfterResize` then walks off the end of the tree and throws
+ *  `Cannot read properties of null (reading 'nextSibling')`. */
+function teardown(previewer: Previewer): void {
+  previewer.chunker.stop()
+  previewer.chunker.removePages()
+  previewer.polisher.destroy()
+}
 
 /**
  * Clones `contentRef.current` and paginates it through Paged.js into
@@ -49,7 +67,7 @@ export function usePrintPreview(
   contentRef: RefObject<HTMLElement | null>,
   noteTitle: string,
 ): UsePrintPreviewResult {
-  const containerRef = useRef<HTMLDivElement>(null)
+  const [container, setContainer] = useState<HTMLDivElement | null>(null)
   const [showPageNumber, setShowPageNumber] = useState(false)
   const [showTitle, setShowTitle] = useState(false)
   const [showDate, setShowDate] = useState(false)
@@ -82,28 +100,35 @@ export function usePrintPreview(
 
   useEffect(() => {
     const contentEl = contentRef.current
-    const container = containerRef.current
     if (!contentEl || !container) return
 
-    const styleEl = document.createElement('style')
-    styleEl.textContent = buildPageCss({
+    // Handed to Paged.js rather than appended to `<head>`: Paged.js only
+    // scrapes the document's own stylesheets when the argument is *omitted*,
+    // and that path deletes them from the page. An empty array means it
+    // parses nothing, so a `<head>` `@page` rule reaches neither Paged.js
+    // (page-number/title/date margin boxes silently never render) nor,
+    // reliably, the real print job — where a stray `margin: 1in` landing
+    // after Paged.js's own `@page { margin: 0 }` shrinks the printable area
+    // below the 8.5x11in sheet Paged.js laid out, clipping every page.
+    const pageCss = { [window.location.href]: buildPageCss({
       showPageNumber,
       showTitle,
       showDate,
       title: noteTitle,
       date: formatPrintDate(new Date()),
-    })
-    document.head.appendChild(styleEl)
+    }) }
 
     let cancelled = false
+    let previewer: Previewer | null = null
     setIsRendering(true)
     setError(null)
     const timer = setTimeout(() => {
       container.innerHTML = ''
       const clone = contentEl.cloneNode(true) as HTMLElement
       stripScreenClasses(clone)
-      new Previewer()
-        .preview(clone, [], container)
+      previewer = new Previewer()
+      previewer
+        .preview(clone, [pageCss], container)
         .then(() => {
           if (!cancelled) setIsRendering(false)
         })
@@ -117,12 +142,12 @@ export function usePrintPreview(
     return () => {
       cancelled = true
       clearTimeout(timer)
-      document.head.removeChild(styleEl)
+      if (previewer) teardown(previewer)
     }
-  }, [contentRef, showPageNumber, showTitle, showDate, noteTitle, contentVersion])
+  }, [contentRef, container, showPageNumber, showTitle, showDate, noteTitle, contentVersion])
 
   return {
-    containerRef,
+    containerRef: setContainer,
     showPageNumber,
     setShowPageNumber,
     showTitle,
