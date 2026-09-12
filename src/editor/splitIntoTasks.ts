@@ -38,7 +38,7 @@ export function markdownOf(editor: Editor): string {
   return storage.markdown.getMarkdown()
 }
 
-function notePathOf(editor: Editor): string {
+export function notePathOf(editor: Editor): string {
   const storage = editor.storage as unknown as { noteContext?: { notePath?: string } }
   const notePath = storage.noteContext?.notePath
   // The sibling Ink Block command carries the same guard, silently. An ink

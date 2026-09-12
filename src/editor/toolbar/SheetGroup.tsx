@@ -1,8 +1,16 @@
-import { SplitSquareVertical, Plus } from 'lucide-react'
+import { SplitSquareVertical, Plus, Layers } from 'lucide-react'
 import type { Editor } from '@tiptap/core'
 import { message } from '@tauri-apps/plugin-dialog'
 import { splitIntoTasks, addNextTask, report, markdownOf } from '../splitIntoTasks'
 import { nextTaskLabel } from '../../lib/taskScaffold'
+import { insertFlashcardFromLastTask } from '../../lib/taskToFlashcard'
+
+const FLASHCARD_OUTCOME_MESSAGE: Record<string, string> = {
+  'no-task': 'No Task section found in this note.',
+  'no-solution': 'That task has no worked Solution yet.',
+  'no-drawing': "That task's Solution has no hand-drawn ink yet.",
+  'already-exists': 'That task already has a flashcard.',
+}
 
 interface SheetGroupProps {
   editor: Editor
@@ -36,6 +44,22 @@ export function SheetGroup({ editor }: SheetGroupProps) {
         }}
       >
         <Plus size={15} />
+      </button>
+      <button
+        className="toolbar-button"
+        aria-label="Make flashcard from last task"
+        title="Turn the last Task's hand-drawn Solution into a review flashcard"
+        onClick={() => {
+          try {
+            const outcome = insertFlashcardFromLastTask(editor)
+            const detail = FLASHCARD_OUTCOME_MESSAGE[outcome]
+            if (detail) void message(detail)
+          } catch (error) {
+            report(error)
+          }
+        }}
+      >
+        <Layers size={15} />
       </button>
     </div>
   )

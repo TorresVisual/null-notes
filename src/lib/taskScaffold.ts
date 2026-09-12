@@ -10,6 +10,9 @@
 /** Task headings as the importer writes them: `## Task 3`, `## Task 9.1`. */
 const TASK_HEADING = /^##\s+Task\s+(\d+(?:\.\d+)*)\s*$/gm
 
+/** Same pattern, non-global, for matching one line at a time. */
+export const TASK_HEADING_LINE = /^##\s+Task\s+(\d+(?:\.\d+)*)\s*$/
+
 /**
  * The label for the task after the last one in `markdown`.
  *
