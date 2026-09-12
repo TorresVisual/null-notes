@@ -28,14 +28,25 @@ export function groupCardsByNote(cards: CardSummary[]): CardGroup[] {
 export interface CardStreakGroup {
   streak: number
   count: number
+  // A card at streak 0 that has lapsed before (graded Again on a card it had
+  // already reviewed, see sm2::next_lapses) is a repeat failure, not a fresh
+  // card — its own bucket keeps it out of "New" (issue #42).
+  struggling: boolean
 }
 
 export function groupCardsByStreak(cards: CardSummary[]): CardStreakGroup[] {
-  const counts = new Map<number, number>()
+  const groups = new Map<string, CardStreakGroup>()
   for (const card of cards) {
-    counts.set(card.streak, (counts.get(card.streak) ?? 0) + 1)
+    const struggling = card.streak === 0 && card.lapses > 0
+    const key = struggling ? 'struggling' : String(card.streak)
+    const existing = groups.get(key)
+    if (existing) {
+      existing.count++
+    } else {
+      groups.set(key, { streak: card.streak, count: 1, struggling })
+    }
   }
-  return Array.from(counts.entries())
-    .sort(([a], [b]) => a - b)
-    .map(([streak, count]) => ({ streak, count }))
+  return Array.from(groups.values()).sort(
+    (a, b) => a.streak - b.streak || Number(a.struggling) - Number(b.struggling),
+  )
 }

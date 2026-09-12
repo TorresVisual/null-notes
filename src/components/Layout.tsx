@@ -112,7 +112,9 @@ export function Layout() {
   const [pendingDiagramInsert, setPendingDiagramInsert] = useState<
     { editor: Editor; range: Range | null; diagrams: DiagramMetadata[] } | null
   >(null)
-  const [pendingCramStreak, setPendingCramStreak] = useState<number | null>(null)
+  const [pendingCram, setPendingCram] = useState<{ streak: number; struggling: boolean } | null>(
+    null,
+  )
   const settings = useSettingsStore((s) => s.settings)
   const setSettings = useSettingsStore((s) => s.setSettings)
   const scrollRef = useScrollRestoration(activeTab, isLoading, viewMode)
@@ -223,7 +225,7 @@ export function Layout() {
           break
         case 'review':
           if (workspacePath) {
-            setPendingCramStreak(null)
+            setPendingCram(null)
             openOverlay('review')
           }
           break
@@ -430,19 +432,19 @@ export function Layout() {
       {activeOverlay === 'task' && <TaskView onClose={closeOverlay} />}
       {activeOverlay === 'review' && (
         <ReviewSession
-          mode={pendingCramStreak !== null ? { kind: 'cram', streak: pendingCramStreak } : { kind: 'due' }}
+          mode={pendingCram !== null ? { kind: 'cram', ...pendingCram } : { kind: 'due' }}
           onClose={() => {
-            setPendingCramStreak(null)
+            setPendingCram(null)
             closeOverlay()
           }}
-          onSwitchCategory={(streak) => setPendingCramStreak(streak)}
+          onSwitchCategory={(streak, struggling) => setPendingCram({ streak, struggling })}
         />
       )}
       {activeOverlay === 'deck' && (
         <DeckView
           onClose={closeOverlay}
-          onOpenCram={(streak) => {
-            setPendingCramStreak(streak)
+          onOpenCram={(streak, struggling) => {
+            setPendingCram({ streak, struggling })
             openOverlay('review')
           }}
         />
@@ -487,7 +489,7 @@ export function Layout() {
           onGraphOpen={() => openOverlay('graph')}
           onTaskOpen={() => openOverlay('task')}
           onReviewOpen={() => {
-            setPendingCramStreak(null)
+            setPendingCram(null)
             openOverlay('review')
           }}
           onFormulaSheetOpen={() => openOverlay('formulaSheet')}
@@ -567,7 +569,7 @@ export function Layout() {
                 <HomeView
                   onOpenTaskView={() => openOverlay('task')}
                   onOpenReview={() => {
-                    setPendingCramStreak(null)
+                    setPendingCram(null)
                     openOverlay('review')
                   }}
                   onOpenDeckView={() => openOverlay('deck')}

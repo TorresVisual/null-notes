@@ -270,6 +270,7 @@ pub struct ExtractedCard {
     pub reps: Option<i64>,
     pub grade: Option<sm2::Grade>,
     pub streak: Option<i64>,
+    pub lapses: Option<i64>,
     /// MC option text, in source order. Empty for `Qa`/`Cloze`.
     pub options: Vec<String>,
     /// 0-based indices of the `[x]` lines. Empty for `Qa`/`Cloze`. Never
@@ -310,6 +311,7 @@ pub struct CardSummary {
     pub due: String,
     pub interval: i64,
     pub streak: i64,
+    pub lapses: i64,
     pub tags: Vec<String>,
 }
 

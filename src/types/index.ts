@@ -188,6 +188,7 @@ export interface CardSummary {
   due: string
   interval: number
   streak: number
+  lapses: number
   tags: string[]
 }
 

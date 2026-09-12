@@ -142,6 +142,20 @@ pub fn next_streak(streak: i64, grade: Grade) -> i64 {
     }
 }
 
+/// A lapse is a clean streak breaking on a card that had actually been
+/// reviewed before — `reps` is the pre-grading rep count, so a card's very
+/// first grade (however it goes) is never counted as a lapse, only a repeat
+/// failure is. This is what lets the "New" and "Struggling" deck-view
+/// buckets tell apart a card that has never been reviewed from one stuck at
+/// `streak: 0` from being graded Again over and over.
+pub fn next_lapses(lapses: i64, reps: i64, grade: Grade) -> i64 {
+    if grade == Grade::Again && reps > 0 {
+        lapses + 1
+    } else {
+        lapses
+    }
+}
+
 /// Today's date as an ISO `YYYY-MM-DD` string — day granularity throughout,
 /// since reviews are a once-or-twice-a-day activity, not something needing
 /// sub-day scheduling.
@@ -328,5 +342,23 @@ mod tests {
     fn test_next_streak_easy_increments() {
         assert_eq!(next_streak(0, Grade::Easy), 1);
         assert_eq!(next_streak(3, Grade::Easy), 4);
+    }
+
+    #[test]
+    fn test_next_lapses_again_on_a_reviewed_card_increments() {
+        assert_eq!(next_lapses(0, 3, Grade::Again), 1);
+        assert_eq!(next_lapses(2, 1, Grade::Again), 3);
+    }
+
+    #[test]
+    fn test_next_lapses_again_on_a_never_reviewed_card_stays_zero() {
+        assert_eq!(next_lapses(0, 0, Grade::Again), 0);
+    }
+
+    #[test]
+    fn test_next_lapses_unaffected_by_hard_good_easy() {
+        assert_eq!(next_lapses(1, 3, Grade::Hard), 1);
+        assert_eq!(next_lapses(1, 3, Grade::Good), 1);
+        assert_eq!(next_lapses(1, 3, Grade::Easy), 1);
     }
 }

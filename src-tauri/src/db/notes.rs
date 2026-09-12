@@ -353,14 +353,15 @@ pub async fn set_cards(pool: &SqlitePool, note_path: &str, cards: &[ExtractedCar
         let reps = card.reps.unwrap_or(0);
         let grade = card.grade.map(sm2::Grade::as_str);
         let streak = card.streak.unwrap_or(0);
+        let lapses = card.lapses.unwrap_or(0);
         let options = if card.options.is_empty() {
             None
         } else {
             Some(serde_json::to_string(&card.options)?)
         };
         sqlx::query(
-            "INSERT INTO review_cards (note_path, kind, front, back, position, due, ease, interval, reps, options, grade, streak)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO review_cards (note_path, kind, front, back, position, due, ease, interval, reps, options, grade, streak, lapses)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         )
         .bind(note_path)
         .bind(kind)
@@ -374,6 +375,7 @@ pub async fn set_cards(pool: &SqlitePool, note_path: &str, cards: &[ExtractedCar
         .bind(options)
         .bind(grade)
         .bind(streak)
+        .bind(lapses)
         .execute(pool)
         .await?;
     }
@@ -425,20 +427,28 @@ pub async fn due_cards(pool: &SqlitePool, workspace: &str, today: &str) -> Resul
     Ok(cards)
 }
 
+// `struggling` only distinguishes anything at `streak = 0`, where "New"
+// (never lapsed) and "Struggling" (lapsed before, see sm2::next_lapses)
+// would otherwise be the same category — at any other streak the
+// `rc.streak != 0` short-circuit makes it a no-op, so callers outside that
+// bucket always pass `false`.
 pub async fn list_cards_by_category(
     pool: &SqlitePool,
     workspace: &str,
     streak: i64,
+    struggling: bool,
 ) -> Result<Vec<DueCard>> {
     let rows = sqlx::query_as::<_, DueCardRow>(
         "SELECT rc.note_path, n.title as note_title, rc.kind, rc.front, rc.back, rc.position, rc.options, rc.streak
          FROM review_cards rc
          JOIN notes n ON n.path = rc.note_path
          WHERE n.workspace = ? AND rc.streak = ?
+           AND (rc.streak != 0 OR (COALESCE(rc.lapses, 0) > 0) = ?)
          ORDER BY n.title COLLATE NOCASE, rc.position",
     )
     .bind(workspace)
     .bind(streak)
+    .bind(struggling)
     .fetch_all(pool)
     .await?;
 
@@ -473,13 +483,14 @@ struct CardSummaryRow {
     due: String,
     interval: i64,
     streak: i64,
+    lapses: i64,
     tags: Option<String>,
 }
 
 pub async fn list_all_cards(pool: &SqlitePool, workspace: &str) -> Result<Vec<CardSummary>> {
     let rows = sqlx::query_as::<_, CardSummaryRow>(
         "SELECT rc.note_path, n.title as note_title, rc.kind, rc.front, rc.back,
-                rc.position, rc.due, rc.interval, rc.streak,
+                rc.position, rc.due, rc.interval, rc.streak, rc.lapses,
                 GROUP_CONCAT(DISTINCT nt.tag) as tags
          FROM review_cards rc
          JOIN notes n ON n.path = rc.note_path
@@ -504,6 +515,7 @@ pub async fn list_all_cards(pool: &SqlitePool, workspace: &str) -> Result<Vec<Ca
             due: r.due,
             interval: r.interval,
             streak: r.streak,
+            lapses: r.lapses,
             tags: r
                 .tags
                 .map(|t| t.split(',').map(String::from).collect())
@@ -1473,6 +1485,7 @@ mod tests {
             reps: None,
             grade: None,
             streak: None,
+            lapses: None,
             options: Vec::new(),
             correct: Vec::new(),
         }
@@ -1642,6 +1655,7 @@ mod tests {
             reps: None,
             grade: None,
             streak: None,
+            lapses: None,
             options: vec!["a".into(), "b".into()],
             correct: vec![1],
         }];
@@ -1679,6 +1693,7 @@ mod tests {
             reps: None,
             grade: None,
             streak: None,
+            lapses: None,
             options: Vec::new(),
             correct: Vec::new(),
         }];
@@ -1739,9 +1754,57 @@ mod tests {
             .await
             .unwrap();
 
-        let category = list_cards_by_category(&pool, "/ws", 2).await.unwrap();
+        let category = list_cards_by_category(&pool, "/ws", 2, false)
+            .await
+            .unwrap();
         assert_eq!(category.len(), 1);
         assert_eq!(category[0].front, "in category");
+    }
+
+    #[tokio::test]
+    async fn test_list_cards_by_category_splits_streak_zero_by_struggling() {
+        let pool = make_pool().await;
+        index_note(&pool, &note("a", "A", "/ws/a.md", "/ws"))
+            .await
+            .unwrap();
+
+        let mut brand_new = card(CardKind::Qa, "new", "back", 0);
+        brand_new.streak = Some(0);
+        brand_new.lapses = Some(0);
+        let mut struggling = card(CardKind::Qa, "struggling", "back", 1);
+        struggling.streak = Some(0);
+        struggling.lapses = Some(3);
+        set_cards(&pool, "/ws/a.md", &[brand_new, struggling])
+            .await
+            .unwrap();
+
+        let new_only = list_cards_by_category(&pool, "/ws", 0, false)
+            .await
+            .unwrap();
+        assert_eq!(new_only.len(), 1);
+        assert_eq!(new_only[0].front, "new");
+
+        let struggling_only = list_cards_by_category(&pool, "/ws", 0, true).await.unwrap();
+        assert_eq!(struggling_only.len(), 1);
+        assert_eq!(struggling_only[0].front, "struggling");
+    }
+
+    #[tokio::test]
+    async fn test_list_cards_by_category_struggling_flag_is_a_no_op_off_streak_zero() {
+        let pool = make_pool().await;
+        index_note(&pool, &note("a", "A", "/ws/a.md", "/ws"))
+            .await
+            .unwrap();
+
+        let mut streak_two = card(CardKind::Qa, "in category", "back", 0);
+        streak_two.streak = Some(2);
+        streak_two.lapses = Some(1);
+        set_cards(&pool, "/ws/a.md", &[streak_two]).await.unwrap();
+
+        let category = list_cards_by_category(&pool, "/ws", 2, false)
+            .await
+            .unwrap();
+        assert_eq!(category.len(), 1, "streak != 0 ignores the struggling flag");
     }
 
     #[tokio::test]
@@ -1773,6 +1836,7 @@ mod tests {
             reps: Some(2),
             grade: Some(sm2::Grade::Good),
             streak: None,
+            lapses: None,
             options: Vec::new(),
             correct: Vec::new(),
         }];

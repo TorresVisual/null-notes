@@ -7,12 +7,12 @@ import { CardText } from './CardText'
 import { groupCardsByStreak, type CardStreakGroup } from '../lib/cardGroups'
 import type { DueCard, Grade } from '../types'
 
-export type ReviewMode = { kind: 'due' } | { kind: 'cram'; streak: number }
+export type ReviewMode = { kind: 'due' } | { kind: 'cram'; streak: number; struggling: boolean }
 
 interface ReviewSessionProps {
   onClose: () => void
   mode?: ReviewMode
-  onSwitchCategory?: (streak: number) => void
+  onSwitchCategory?: (streak: number, struggling: boolean) => void
 }
 
 const GRADES: Array<{ grade: Grade; label: string }> = [
@@ -42,6 +42,7 @@ function shuffledIndices(length: number): number[] {
 export function ReviewSession({ onClose, mode = { kind: 'due' }, onSwitchCategory }: ReviewSessionProps) {
   const workspacePath = useWorkspaceStore((s) => s.path)
   const cramStreak = mode.kind === 'cram' ? mode.streak : null
+  const cramStruggling = mode.kind === 'cram' && mode.struggling
   const [queue, setQueue] = useState<DueCard[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -68,13 +69,13 @@ export function ReviewSession({ onClose, mode = { kind: 'due' }, onSwitchCategor
     setError(null)
     const request =
       cramStreak !== null
-        ? api.notes.listCramCards(workspacePath, cramStreak)
+        ? api.notes.listCramCards(workspacePath, cramStreak, cramStruggling)
         : api.notes.listDueCards(workspacePath)
     request
       .then((fetched) => setQueue(cramStreak !== null ? shuffleCards(fetched) : fetched))
       .catch((e: unknown) => setError(`Couldn't load the review queue: ${String(e)}`))
       .finally(() => setIsLoading(false))
-  }, [workspacePath, cramStreak])
+  }, [workspacePath, cramStreak, cramStruggling])
 
   const current = queue[0]
   const optionOrder = useMemo(
@@ -94,7 +95,7 @@ export function ReviewSession({ onClose, mode = { kind: 'due' }, onSwitchCategor
     if (!workspacePath) return
     const request =
       cramStreak !== null
-        ? api.notes.listCramCards(workspacePath, cramStreak)
+        ? api.notes.listCramCards(workspacePath, cramStreak, cramStruggling)
         : api.notes.listDueCards(workspacePath)
     request.then((fetched) => {
       setQueue(cramStreak !== null ? shuffleCards(fetched) : fetched)
@@ -166,7 +167,7 @@ export function ReviewSession({ onClose, mode = { kind: 'due' }, onSwitchCategor
         <div className="settings-panel-header">
           <h2>
             {cramStreak !== null
-              ? `Cram — Category ${cramStreak}${queue.length > 0 ? ` (${queue.length} left)` : ''}`
+              ? `Cram — ${cramStruggling ? 'Struggling' : cramStreak === 0 ? 'New' : `Category ${cramStreak}`}${queue.length > 0 ? ` (${queue.length} left)` : ''}`
               : `Review${queue.length > 0 ? ` (${queue.length} due)` : ''}`}
           </h2>
           <button className="settings-panel-close" onClick={onClose} aria-label="Close review" title="Close review">
@@ -175,13 +176,13 @@ export function ReviewSession({ onClose, mode = { kind: 'due' }, onSwitchCategor
         </div>
         {cramStreak !== null && categories.length > 1 && onSwitchCategory && (
           <div className="review-cram-categories">
-            {categories.map(({ streak, count }) => (
+            {categories.map(({ streak, count, struggling }) => (
               <button
-                key={streak}
-                className={`review-cram-category${streak === cramStreak ? ' review-cram-category-active' : ''}`}
-                onClick={() => onSwitchCategory(streak)}
+                key={struggling ? 'struggling' : streak}
+                className={`review-cram-category${streak === cramStreak && struggling === cramStruggling ? ' review-cram-category-active' : ''}`}
+                onClick={() => onSwitchCategory(streak, struggling)}
               >
-                {streak === 0 ? 'New' : `Category ${streak}`} ({count})
+                {struggling ? 'Struggling' : streak === 0 ? 'New' : `Category ${streak}`} ({count})
               </button>
             ))}
           </div>

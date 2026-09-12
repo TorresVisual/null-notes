@@ -403,15 +403,23 @@ pub fn extract_callouts(content: &str) -> Vec<ExtractedCallout> {
     callouts
 }
 
-// due, ease, interval, reps, grade, streak
-type SrComment = (String, f64, i64, i64, Option<sm2::Grade>, Option<i64>);
+// due, ease, interval, reps, grade, streak, lapses
+type SrComment = (
+    String,
+    f64,
+    i64,
+    i64,
+    Option<sm2::Grade>,
+    Option<i64>,
+    Option<i64>,
+);
 
 // A schedule comment is never itself a card, even though it starts a fresh
 // line right after one — checked first so the loop below never has to
 // special-case it.
 fn parse_sr_comment(line: &str) -> Option<SrComment> {
     let re = match Regex::new(
-        r"^<!--\s+sr\s+due=(\S+)\s+ease=(\S+)\s+interval=(\S+)\s+reps=(\S+)(?:\s+grade=(\S+))?(?:\s+streak=(\S+))?\s+-->$",
+        r"^<!--\s+sr\s+due=(\S+)\s+ease=(\S+)\s+interval=(\S+)\s+reps=(\S+)(?:\s+grade=(\S+))?(?:\s+streak=(\S+))?(?:\s+lapses=(\S+))?\s+-->$",
     ) {
         Ok(re) => re,
         Err(_) => return None,
@@ -429,7 +437,8 @@ fn parse_sr_comment(line: &str) -> Option<SrComment> {
         _ => None,
     });
     let streak = caps.get(6).and_then(|m| m.as_str().parse::<i64>().ok());
-    Some((due, ease, interval, reps, grade, streak))
+    let lapses = caps.get(7).and_then(|m| m.as_str().parse::<i64>().ok());
+    Some((due, ease, interval, reps, grade, streak, lapses))
 }
 
 // The schedule comment sits either directly after a card's content (a note
@@ -620,11 +629,11 @@ pub fn extract_cards(content: &str) -> Vec<ExtractedCard> {
             let option_count = mc_block_option_count(&lines, i);
             if let Some((front, options, correct)) = parse_mc_block(&lines, i) {
                 let comment_idx = sr_comment_idx(&lines, i + 1 + option_count);
-                let (due, ease, interval, reps, grade, streak) = lines
+                let (due, ease, interval, reps, grade, streak, lapses) = lines
                     .get(comment_idx)
                     .and_then(|l| parse_sr_comment(l))
-                    .map(|(d, e, iv, r, g, s)| (Some(d), Some(e), Some(iv), Some(r), g, s))
-                    .unwrap_or((None, None, None, None, None, None));
+                    .map(|(d, e, iv, r, g, s, l)| (Some(d), Some(e), Some(iv), Some(r), g, s, l))
+                    .unwrap_or((None, None, None, None, None, None, None));
                 cards.push(ExtractedCard {
                     kind: CardKind::Mc,
                     front,
@@ -636,6 +645,7 @@ pub fn extract_cards(content: &str) -> Vec<ExtractedCard> {
                     reps,
                     grade,
                     streak,
+                    lapses,
                     options,
                     correct,
                 });
@@ -653,11 +663,11 @@ pub fn extract_cards(content: &str) -> Vec<ExtractedCard> {
         };
 
         let comment_idx = sr_comment_idx(&lines, i + 1);
-        let (due, ease, interval, reps, grade, streak) = lines
+        let (due, ease, interval, reps, grade, streak, lapses) = lines
             .get(comment_idx)
             .and_then(|l| parse_sr_comment(l))
-            .map(|(d, e, iv, r, g, s)| (Some(d), Some(e), Some(iv), Some(r), g, s))
-            .unwrap_or((None, None, None, None, None, None));
+            .map(|(d, e, iv, r, g, s, l)| (Some(d), Some(e), Some(iv), Some(r), g, s, l))
+            .unwrap_or((None, None, None, None, None, None, None));
 
         cards.push(ExtractedCard {
             kind,
@@ -670,6 +680,7 @@ pub fn extract_cards(content: &str) -> Vec<ExtractedCard> {
             reps,
             grade,
             streak,
+            lapses,
             options: Vec::new(),
             correct: Vec::new(),
         });
@@ -1067,10 +1078,10 @@ pub fn grade_card_line(
         sr_comment_idx(&borrowed, idx + 1)
     };
 
-    let (current, current_streak) = lines
+    let (current, current_streak, current_lapses) = lines
         .get(comment_idx)
         .and_then(|l| parse_sr_comment(l))
-        .map(|(_, ease, interval, reps, _, streak)| {
+        .map(|(_, ease, interval, reps, _, streak, lapses)| {
             (
                 sm2::CardState {
                     ease,
@@ -1078,20 +1089,23 @@ pub fn grade_card_line(
                     reps,
                 },
                 streak.unwrap_or(0),
+                lapses.unwrap_or(0),
             )
         })
-        .unwrap_or((sm2::CardState::default(), 0));
+        .unwrap_or((sm2::CardState::default(), 0, 0));
 
     let next = sm2::next_state(current, grade, today);
     let next_streak = sm2::next_streak(current_streak, grade);
+    let next_lapses = sm2::next_lapses(current_lapses, current.reps, grade);
     let comment = format!(
-        "<!-- sr due={} ease={:.2} interval={} reps={} grade={} streak={} -->",
+        "<!-- sr due={} ease={:.2} interval={} reps={} grade={} streak={} lapses={} -->",
         next.due,
         next.ease,
         next.interval,
         next.reps,
         grade.as_str(),
-        next_streak
+        next_streak,
+        next_lapses
     );
 
     let has_comment_line = lines
@@ -1175,7 +1189,7 @@ async fn grade_mc_card_at(
     let last_grade = lines
         .get(idx + 1 + option_count)
         .and_then(|l| parse_sr_comment(l))
-        .and_then(|(_, _, _, _, grade, _)| grade);
+        .and_then(|(_, _, _, _, grade, _, _)| grade);
     let resolved = sm2::mc_auto_grade(last_grade, is_correct);
 
     grade_card_at(path, position, resolved, workspace, db).await?;
@@ -1523,9 +1537,10 @@ pub async fn list_all_cards(
 pub async fn list_cram_cards(
     workspace: String,
     streak: i64,
+    struggling: bool,
     db: State<'_, DbPool>,
 ) -> Result<Vec<DueCard>, String> {
-    db::notes::list_cards_by_category(&db, &workspace, streak)
+    db::notes::list_cards_by_category(&db, &workspace, streak, struggling)
         .await
         .map_err(|e| e.to_string())
 }
@@ -2644,7 +2659,7 @@ mod tests {
         let result = grade_card_line("Q :: A\n", 0, sm2::Grade::Good, grade_today()).unwrap();
         assert_eq!(
             result,
-            "Q :: A\n<!-- sr due=2026-08-21 ease=2.50 interval=1 reps=1 grade=good streak=1 -->\n"
+            "Q :: A\n<!-- sr due=2026-08-21 ease=2.50 interval=1 reps=1 grade=good streak=1 lapses=0 -->\n"
         );
     }
 
@@ -2654,7 +2669,7 @@ mod tests {
         let result = grade_card_line(content, 0, sm2::Grade::Good, grade_today()).unwrap();
         assert_eq!(
             result,
-            "Q :: A\n<!-- sr due=2026-09-04 ease=2.50 interval=15 reps=3 grade=good streak=1 -->\n"
+            "Q :: A\n<!-- sr due=2026-09-04 ease=2.50 interval=15 reps=3 grade=good streak=1 lapses=0 -->\n"
         );
     }
 
@@ -2696,6 +2711,28 @@ mod tests {
         let content = "Q :: A\n<!-- sr due=2026-08-20 ease=2.50 interval=1 reps=1 grade=good -->\n";
         let result = grade_card_line(content, 0, sm2::Grade::Good, grade_today()).unwrap();
         assert!(result.contains("streak=1"));
+    }
+
+    #[test]
+    fn test_grade_card_line_again_on_a_reviewed_card_increments_lapses() {
+        let content =
+            "Q :: A\n<!-- sr due=2026-08-20 ease=2.50 interval=6 reps=2 grade=good streak=3 lapses=1 -->\n";
+        let result = grade_card_line(content, 0, sm2::Grade::Again, grade_today()).unwrap();
+        assert!(result.contains("lapses=2"));
+    }
+
+    #[test]
+    fn test_grade_card_line_again_on_a_never_reviewed_card_leaves_lapses_at_zero() {
+        let result = grade_card_line("Q :: A\n", 0, sm2::Grade::Again, grade_today()).unwrap();
+        assert!(result.contains("lapses=0"));
+    }
+
+    #[test]
+    fn test_grade_card_line_good_leaves_lapses_unchanged() {
+        let content =
+            "Q :: A\n<!-- sr due=2026-08-20 ease=2.50 interval=6 reps=2 grade=good streak=2 lapses=1 -->\n";
+        let result = grade_card_line(content, 0, sm2::Grade::Good, grade_today()).unwrap();
+        assert!(result.contains("lapses=1"));
     }
 
     #[test]

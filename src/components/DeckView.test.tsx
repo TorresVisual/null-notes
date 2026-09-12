@@ -20,6 +20,7 @@ const cards: CardSummary[] = [
     due: '2026-01-01',
     interval: 0,
     streak: 0,
+    lapses: 0,
     tags: ['cs'],
   },
   {
@@ -32,6 +33,7 @@ const cards: CardSummary[] = [
     due: '2026-01-01',
     interval: 25,
     streak: 2,
+    lapses: 0,
     tags: ['algo'],
   },
 ]
@@ -78,7 +80,7 @@ describe('DeckView — cram categories', () => {
     const chip = screen.getByText('Category 2 (1)').closest('.deck-view-category')
     if (!chip) throw new Error('chip not found')
     fireEvent.click(chip.querySelector('.deck-view-category-cram') as HTMLElement)
-    expect(onOpenCram).toHaveBeenCalledWith(2)
+    expect(onOpenCram).toHaveBeenCalledWith(2, false)
   })
 
   it('respects the active tag filter', async () => {
@@ -87,5 +89,30 @@ describe('DeckView — cram categories', () => {
     fireEvent.click(screen.getByLabelText('cs'))
     expect(screen.getByText('New (1)')).toBeInTheDocument()
     expect(screen.queryByText('Category 2 (1)')).not.toBeInTheDocument()
+  })
+
+  it('labels a streak-0 card with prior lapses as Struggling, separate from New', async () => {
+    vi.mocked(api.notes.listAllCards).mockResolvedValue([
+      ...cards,
+      { ...cards[0]!, front: 'Q3', position: 1, lapses: 4 },
+    ])
+    render(<DeckView onClose={vi.fn()} onOpenCram={vi.fn()} />)
+    await waitFor(() => screen.getByText('Q1'))
+    expect(screen.getByText('New (1)')).toBeInTheDocument()
+    expect(screen.getByText('Struggling (1)')).toBeInTheDocument()
+  })
+
+  it('calls onOpenCram with struggling=true when the Struggling chip is clicked', async () => {
+    vi.mocked(api.notes.listAllCards).mockResolvedValue([
+      ...cards,
+      { ...cards[0]!, front: 'Q3', position: 1, lapses: 4 },
+    ])
+    const onOpenCram = vi.fn()
+    render(<DeckView onClose={vi.fn()} onOpenCram={onOpenCram} />)
+    await waitFor(() => screen.getByText('Struggling (1)'))
+    const chip = screen.getByText('Struggling (1)').closest('.deck-view-category')
+    if (!chip) throw new Error('chip not found')
+    fireEvent.click(chip.querySelector('.deck-view-category-cram') as HTMLElement)
+    expect(onOpenCram).toHaveBeenCalledWith(0, true)
   })
 })

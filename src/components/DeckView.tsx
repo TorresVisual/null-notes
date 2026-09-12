@@ -8,7 +8,7 @@ import type { CardSummary } from '../types'
 
 interface DeckViewProps {
   onClose: () => void
-  onOpenCram: (streak: number) => void
+  onOpenCram: (streak: number, struggling: boolean) => void
 }
 
 // The conventional SRS "graduated" threshold — a display bucket only, not a
@@ -112,10 +112,15 @@ export function DeckView({ onClose, onOpenCram }: DeckViewProps) {
             )}
             {categories.length > 0 && (
               <div className="deck-view-categories">
-                {categories.map(({ streak, count }) => (
-                  <div key={streak} className="deck-view-category">
-                    <span>{streak === 0 ? 'New' : `Category ${streak}`} ({count})</span>
-                    <button className="deck-view-category-cram" onClick={() => onOpenCram(streak)}>
+                {categories.map(({ streak, count, struggling }) => (
+                  <div key={struggling ? 'struggling' : streak} className="deck-view-category">
+                    <span>
+                      {struggling ? 'Struggling' : streak === 0 ? 'New' : `Category ${streak}`} ({count})
+                    </span>
+                    <button
+                      className="deck-view-category-cram"
+                      onClick={() => onOpenCram(streak, struggling)}
+                    >
                       Cram
                     </button>
                   </div>

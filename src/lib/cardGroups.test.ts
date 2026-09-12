@@ -12,6 +12,7 @@ const card = (over: Partial<CardSummary>): CardSummary => ({
   due: '2026-01-01',
   interval: 0,
   streak: 0,
+  lapses: 0,
   tags: [],
   ...over,
 })
@@ -39,9 +40,22 @@ describe('groupCardsByStreak', () => {
       card({ streak: 1 }),
     ]
     expect(groupCardsByStreak(cards)).toEqual([
-      { streak: 0, count: 1 },
-      { streak: 1, count: 1 },
-      { streak: 2, count: 2 },
+      { streak: 0, count: 1, struggling: false },
+      { streak: 1, count: 1, struggling: false },
+      { streak: 2, count: 2, struggling: false },
+    ])
+  })
+
+  it('splits streak-0 cards with prior lapses into their own struggling bucket', () => {
+    const cards = [
+      card({ streak: 0, lapses: 0 }), // brand new
+      card({ streak: 0, lapses: 3 }), // repeatedly failed
+      card({ streak: 1, lapses: 2 }), // lapsed before but currently on a streak
+    ]
+    expect(groupCardsByStreak(cards)).toEqual([
+      { streak: 0, count: 1, struggling: false },
+      { streak: 0, count: 1, struggling: true },
+      { streak: 1, count: 1, struggling: false },
     ])
   })
 })

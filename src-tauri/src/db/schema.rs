@@ -132,6 +132,13 @@ pub async fn run_migrations(pool: &SqlitePool) -> Result<()> {
     // drills by. NULL for a never-graded card, same posture as grade.
     add_column_if_missing(pool, "ALTER TABLE review_cards ADD COLUMN streak INTEGER").await?;
 
+    // Third column addition. `lapses` counts how many times a card's clean
+    // streak has broken on an *already-reviewed* card (see sm2::next_lapses)
+    // — what tells a repeatedly-failed card apart from a brand-new one once
+    // both sit at streak 0. NULL for a never-graded card, same posture as
+    // grade/streak.
+    add_column_if_missing(pool, "ALTER TABLE review_cards ADD COLUMN lapses INTEGER").await?;
+
     Ok(())
 }
 
@@ -140,7 +147,7 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn test_run_migrations_adds_options_and_grade_and_streak_columns() {
+    async fn test_run_migrations_adds_options_and_grade_and_streak_and_lapses_columns() {
         // See db::notes::tests::make_pool for why this pool is capped at
         // one connection against `:memory:`.
         let pool = sqlx::sqlite::SqlitePoolOptions::new()
@@ -150,13 +157,13 @@ mod tests {
             .unwrap();
         run_migrations(&pool).await.unwrap();
 
-        // A row insert naming all three added columns is the simplest proof
+        // A row insert naming all four added columns is the simplest proof
         // they exist and accept NULL — sqlx has no schema-introspection
         // helper exposed here, and this exercises exactly what set_cards
         // will do.
         sqlx::query(
-            "INSERT INTO review_cards (note_path, kind, front, back, position, due, ease, interval, reps, options, grade, streak)
-             VALUES ('/a.md', 'mc', 'Q', '', 0, '2026-01-01', 2.5, 0, 0, NULL, NULL, NULL)",
+            "INSERT INTO review_cards (note_path, kind, front, back, position, due, ease, interval, reps, options, grade, streak, lapses)
+             VALUES ('/a.md', 'mc', 'Q', '', 0, '2026-01-01', 2.5, 0, 0, NULL, NULL, NULL, NULL)",
         )
         .execute(&pool)
         .await
