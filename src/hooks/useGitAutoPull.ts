@@ -39,16 +39,20 @@ export function useGitAutoPull() {
       // point — checkForUpdates already runs on open, a 5-min interval, and
       // window focus, so a push that failed offline lands on whichever of
       // those comes first instead of sitting silent until the user notices.
-      if (outcome.kind === 'ahead') {
+      // #83: `noUpstream` (remote configured, no tracking branch yet) is the
+      // same situation — `checked_push`'s `push -u origin HEAD` both pushes
+      // and establishes the tracking branch, so the same retry covers it.
+      if (outcome.kind === 'ahead' || outcome.kind === 'noUpstream') {
+        const ahead = outcome.ahead
         const { repoMode, git } = useWorkspaceStore.getState()
         if (!canAutoPush(repoMode, git)) {
-          setGitAhead(outcome.ahead)
+          setGitAhead(ahead)
         } else {
           try {
             const pushOutcome = await api.git.pushNotes(workspace, repoMode!, git.allowCodeRepoPush)
-            setGitAhead(pushOutcome.kind === 'pushed' ? null : outcome.ahead)
+            setGitAhead(pushOutcome.kind === 'pushed' ? null : ahead)
           } catch (e) {
-            setGitAhead(outcome.ahead)
+            setGitAhead(ahead)
             console.error('git retry-push failed', e)
           }
         }

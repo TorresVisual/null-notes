@@ -85,6 +85,7 @@ export type PullOutcome =
   | { kind: 'diverged'; ahead: number; behind: number; localPaths: string[]; remotePaths: string[] }
   | { kind: 'ahead'; ahead: number }
   | { kind: 'noRemote' }
+  | { kind: 'noUpstream'; ahead: number }
   | { kind: 'blocked'; output: string; paths: string[] }
 
 export type RebaseOutcome =

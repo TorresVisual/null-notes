@@ -120,6 +120,20 @@ describe('useGitAutoPull', () => {
     expect(useWorkspaceStore.getState().gitAhead).toBe(2)
   })
 
+  // #83: a remote with no tracking branch yet (before the first push lands)
+  // retries the same as `ahead` — `pushNotes`'s `-u origin HEAD` both pushes
+  // and sets the tracking branch.
+  it('retries the push and clears gitAhead on a remote with no tracking branch yet', async () => {
+    git.fetchAndCompare.mockResolvedValue({ kind: 'noUpstream', ahead: 1 })
+    git.pushNotes.mockResolvedValue({ kind: 'pushed' })
+    const { result } = renderHook(() => useGitAutoPull())
+
+    await result.current.checkForUpdates('/ws')
+
+    expect(git.pushNotes).toHaveBeenCalledWith('/ws', 'notesOnly', false)
+    expect(useWorkspaceStore.getState().gitAhead).toBeNull()
+  })
+
   it('surfaces gitAhead without pushing a CodeRepo workspace that never opted in', async () => {
     useWorkspaceStore.setState({ repoMode: 'codeRepo' })
     git.fetchAndCompare.mockResolvedValue({ kind: 'ahead', ahead: 1 })

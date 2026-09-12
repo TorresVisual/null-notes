@@ -721,6 +721,15 @@ pub enum PullOutcome {
         ahead: u32,
     },
     NoRemote,
+    /// Remote exists but `@{u}` doesn't resolve — `checked_init_notes_repo`
+    /// can leave `origin` configured with no tracking branch until the first
+    /// successful push sets one (see `checked_push`'s `-u`). Distinct from
+    /// `NoRemote` so a `fetchAndCompare` run before that first push (#83)
+    /// reports something instead of falling into the generic error path
+    /// `useGitAutoPull` treats as "offline."
+    NoUpstream {
+        ahead: u32,
+    },
     /// `merge --ff-only` itself refused — most commonly an uncommitted local
     /// change to a file the incoming commits also touch, which `--ff-only`
     /// declines to overwrite rather than merging. The working tree is
@@ -747,6 +756,21 @@ fn parse_conflicting_paths(output: &str) -> Vec<String> {
         .filter_map(|line| line.strip_prefix('\t'))
         .map(|s| s.to_string())
         .collect()
+}
+
+/// Whether `@{u}` resolves at all — false for a remote that's configured but
+/// has no tracking branch yet (#83), as opposed to `has_remote`'s "is there a
+/// remote configured" check.
+fn has_upstream(workspace: &str) -> anyhow::Result<bool> {
+    let output = no_window_command("git")
+        .arg("-C")
+        .arg(workspace)
+        .arg("rev-parse")
+        .arg("--verify")
+        .arg("-q")
+        .arg("@{u}")
+        .output()?;
+    Ok(output.status.success())
 }
 
 fn count_commits(workspace: &str, range: &str) -> anyhow::Result<u32> {
@@ -803,6 +827,11 @@ pub fn checked_pull(workspace: &str) -> anyhow::Result<PullOutcome> {
         .status()?;
     if !fetch_status.success() {
         anyhow::bail!("git fetch failed for {workspace}");
+    }
+
+    if !has_upstream(workspace)? {
+        let ahead = count_commits(workspace, "HEAD")?;
+        return Ok(PullOutcome::NoUpstream { ahead });
     }
 
     let ahead = count_commits(workspace, "@{u}..HEAD")?;
@@ -2199,6 +2228,39 @@ mod tests {
         let outcome = checked_pull(&clone.path().to_string_lossy()).unwrap();
 
         assert_eq!(outcome, PullOutcome::Ahead { ahead: 1 });
+    }
+
+    // #83: the same pre-first-push window `pushes_and_sets_upstream_on_a_
+    // repo_with_no_tracking_branch_yet` covers for push — `fetchAndCompare`
+    // hitting a remote with no tracking branch yet must not fall into the
+    // generic error path (`@{u}` failing to resolve inside `rev-list`).
+    #[test]
+    fn reports_no_upstream_when_remote_has_no_tracking_branch_yet() {
+        let remote = tempdir().unwrap();
+        no_window_command("git")
+            .arg("init")
+            .arg("--bare")
+            .arg("-q")
+            .arg(remote.path())
+            .status()
+            .unwrap();
+
+        let workspace = tempdir().unwrap();
+        git_init(workspace.path());
+        commit_file(workspace.path(), "note.md", "# Note\n");
+        no_window_command("git")
+            .arg("-C")
+            .arg(workspace.path())
+            .arg("remote")
+            .arg("add")
+            .arg("origin")
+            .arg(remote.path())
+            .status()
+            .unwrap();
+
+        let outcome = checked_pull(&workspace.path().to_string_lossy()).unwrap();
+
+        assert_eq!(outcome, PullOutcome::NoUpstream { ahead: 1 });
     }
 
     #[test]
