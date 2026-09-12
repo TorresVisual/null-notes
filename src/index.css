@@ -3758,10 +3758,31 @@ code {
   padding: var(--space-xl) 0;
 }
 
+.review-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
 .review-card-note {
   color: var(--text-tertiary);
   font-size: 12px;
   margin: 0;
+}
+
+.review-card-suspend {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  font-size: 12px;
+  padding: 2px 8px;
+}
+
+.review-card-suspend:hover {
+  border-color: var(--warning, #d29922);
+  color: var(--warning, #d29922);
 }
 
 .review-card-front, .review-card-back {
@@ -3834,9 +3855,59 @@ code {
 
 .deck-view-stats {
   display: flex;
+  align-items: center;
   gap: var(--space-lg);
   font-size: 12px;
   color: var(--text-tertiary);
+}
+
+.deck-view-suspended-filter {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  font-size: 12px;
+  padding: 1px 6px;
+}
+
+.deck-view-suspended-filter:hover,
+.deck-view-suspended-filter-active {
+  border-color: var(--warning, #d29922);
+  color: var(--warning, #d29922);
+}
+
+.deck-view-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.deck-view-suspended-badge {
+  font-size: 11px;
+  color: var(--warning, #d29922);
+  border: 1px solid var(--warning, #d29922);
+  border-radius: 3px;
+  padding: 0 4px;
+  white-space: nowrap;
+}
+
+.deck-view-suspend-btn {
+  background: none;
+  border: none;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  font-size: 12px;
+  padding: 2px 6px;
+  opacity: 0.6;
+}
+
+.deck-view-item:hover .deck-view-suspend-btn {
+  opacity: 1;
+}
+
+.deck-view-suspend-btn:hover {
+  color: var(--text-secondary);
 }
 
 .deck-view-tags {

@@ -6,7 +6,7 @@ import { useWorkspaceStore } from '../store/workspace'
 import type { CardSummary } from '../types'
 
 vi.mock('../lib/tauri', () => ({
-  api: { notes: { listAllCards: vi.fn() } },
+  api: { notes: { listAllCards: vi.fn(), setCardSuspended: vi.fn() } },
 }))
 
 const cards: CardSummary[] = [
@@ -21,6 +21,7 @@ const cards: CardSummary[] = [
     interval: 0,
     streak: 0,
     lapses: 0,
+    suspended: false,
     tags: ['cs'],
   },
   {
@@ -34,6 +35,7 @@ const cards: CardSummary[] = [
     interval: 25,
     streak: 2,
     lapses: 0,
+    suspended: false,
     tags: ['algo'],
   },
 ]
@@ -114,5 +116,43 @@ describe('DeckView — cram categories', () => {
     if (!chip) throw new Error('chip not found')
     fireEvent.click(chip.querySelector('.deck-view-category-cram') as HTMLElement)
     expect(onOpenCram).toHaveBeenCalledWith(0, true)
+  })
+})
+
+describe('DeckView — suspended cards', () => {
+  it('displays suspended count filter when suspended cards exist', async () => {
+    vi.mocked(api.notes.listAllCards).mockResolvedValue([
+      cards[0]!,
+      { ...cards[1]!, suspended: true },
+    ])
+    render(<DeckView onClose={vi.fn()} onOpenCram={vi.fn()} />)
+    await waitFor(() => screen.getByText('Q1'))
+    expect(screen.getByText('1 suspended')).toBeInTheDocument()
+  })
+
+  it('filters to suspended cards when suspended filter chip is clicked', async () => {
+    vi.mocked(api.notes.listAllCards).mockResolvedValue([
+      cards[0]!,
+      { ...cards[1]!, suspended: true },
+    ])
+    render(<DeckView onClose={vi.fn()} onOpenCram={vi.fn()} />)
+    await waitFor(() => screen.getByText('Q1'))
+    fireEvent.click(screen.getByText('1 suspended'))
+    expect(screen.queryByText('Q1')).not.toBeInTheDocument()
+    expect(screen.getByText('Q2')).toBeInTheDocument()
+    expect(screen.getByText('Suspended')).toBeInTheDocument()
+  })
+
+  it('toggles card suspension on button click', async () => {
+    vi.mocked(api.notes.setCardSuspended).mockResolvedValue(undefined)
+    vi.mocked(api.notes.listAllCards).mockResolvedValue(cards)
+    render(<DeckView onClose={vi.fn()} onOpenCram={vi.fn()} />)
+    await waitFor(() => screen.getByText('Q1'))
+
+    fireEvent.click(screen.getByLabelText('Suspend card Q1'))
+    await waitFor(() =>
+      expect(api.notes.setCardSuspended).toHaveBeenCalledWith('/ws/a.md', 0, true, '/ws'),
+    )
+    expect(useWorkspaceStore.getState().gitPendingPaths).toContain('/ws/a.md')
   })
 })

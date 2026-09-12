@@ -13,6 +13,7 @@ vi.mock('../lib/tauri', () => ({
       listAllCards: vi.fn(),
       gradeCard: vi.fn(),
       gradeMcCard: vi.fn(),
+      setCardSuspended: vi.fn(),
     },
   },
 }))
@@ -109,6 +110,22 @@ describe('ReviewSession', () => {
     vi.mocked(api.notes.listDueCards).mockResolvedValue([])
     render(<ReviewSession onClose={vi.fn()} />)
     await waitFor(() => expect(screen.getByText(/all done/i)).toBeInTheDocument())
+  })
+
+  it('suspends the card, re-fetches the queue, and advances to the next card', async () => {
+    let suspended = false
+    vi.mocked(api.notes.listDueCards).mockImplementation(async () => (suspended ? [cards[1]!] : cards))
+    vi.mocked(api.notes.setCardSuspended).mockImplementation(async () => {
+      suspended = true
+    })
+
+    render(<ReviewSession onClose={vi.fn()} />)
+    await waitFor(() => screen.getByText('Q1'))
+    fireEvent.click(screen.getByText('Suspend'))
+
+    expect(api.notes.setCardSuspended).toHaveBeenCalledWith('/ws/a.md', 0, true, '/ws')
+    await waitFor(() => expect(screen.getByText('Q2 [...]')).toBeInTheDocument())
+    expect(useWorkspaceStore.getState().gitPendingPaths).toContain('/ws/a.md')
   })
 })
 
@@ -219,8 +236,8 @@ describe('ReviewSession — cram mode', () => {
 
   it('shows a category switcher when more than one category has cards', async () => {
     const allCards: CardSummary[] = [
-      { notePath: '/ws/a.md', noteTitle: 'A', kind: 'qa', front: 'Q1', back: 'A1', position: 0, due: '2026-01-01', interval: 0, streak: 0, lapses: 0, tags: [] },
-      { notePath: '/ws/b.md', noteTitle: 'B', kind: 'qa', front: 'Q2', back: 'A2', position: 0, due: '2026-01-01', interval: 0, streak: 2, lapses: 0, tags: [] },
+      { notePath: '/ws/a.md', noteTitle: 'A', kind: 'qa', front: 'Q1', back: 'A1', position: 0, due: '2026-01-01', interval: 0, streak: 0, lapses: 0, suspended: false, tags: [] },
+      { notePath: '/ws/b.md', noteTitle: 'B', kind: 'qa', front: 'Q2', back: 'A2', position: 0, due: '2026-01-01', interval: 0, streak: 2, lapses: 0, suspended: false, tags: [] },
     ]
     vi.mocked(api.notes.listAllCards).mockResolvedValue(allCards)
     render(<ReviewSession onClose={vi.fn()} mode={{ kind: 'cram', streak: 2, struggling: false }} onSwitchCategory={vi.fn()} />)
@@ -231,8 +248,8 @@ describe('ReviewSession — cram mode', () => {
 
   it('switches category on chip click without closing the session', async () => {
     const allCards: CardSummary[] = [
-      { notePath: '/ws/a.md', noteTitle: 'A', kind: 'qa', front: 'Q1', back: 'A1', position: 0, due: '2026-01-01', interval: 0, streak: 0, lapses: 0, tags: [] },
-      { notePath: '/ws/b.md', noteTitle: 'B', kind: 'qa', front: 'Q2', back: 'A2', position: 0, due: '2026-01-01', interval: 0, streak: 2, lapses: 0, tags: [] },
+      { notePath: '/ws/a.md', noteTitle: 'A', kind: 'qa', front: 'Q1', back: 'A1', position: 0, due: '2026-01-01', interval: 0, streak: 0, lapses: 0, suspended: false, tags: [] },
+      { notePath: '/ws/b.md', noteTitle: 'B', kind: 'qa', front: 'Q2', back: 'A2', position: 0, due: '2026-01-01', interval: 0, streak: 2, lapses: 0, suspended: false, tags: [] },
     ]
     vi.mocked(api.notes.listAllCards).mockResolvedValue(allCards)
     const onSwitchCategory = vi.fn()
@@ -248,8 +265,8 @@ describe('ReviewSession — cram mode', () => {
 
   it('shows separate New/Struggling chips and switches with the right streak/struggling pair', async () => {
     const allCards: CardSummary[] = [
-      { notePath: '/ws/a.md', noteTitle: 'A', kind: 'qa', front: 'Q1', back: 'A1', position: 0, due: '2026-01-01', interval: 0, streak: 0, lapses: 0, tags: [] },
-      { notePath: '/ws/b.md', noteTitle: 'B', kind: 'qa', front: 'Q2', back: 'A2', position: 1, due: '2026-01-01', interval: 0, streak: 0, lapses: 3, tags: [] },
+      { notePath: '/ws/a.md', noteTitle: 'A', kind: 'qa', front: 'Q1', back: 'A1', position: 0, due: '2026-01-01', interval: 0, streak: 0, lapses: 0, suspended: false, tags: [] },
+      { notePath: '/ws/b.md', noteTitle: 'B', kind: 'qa', front: 'Q2', back: 'A2', position: 1, due: '2026-01-01', interval: 0, streak: 0, lapses: 3, suspended: false, tags: [] },
     ]
     vi.mocked(api.notes.listAllCards).mockResolvedValue(allCards)
     const onSwitchCategory = vi.fn()
@@ -271,7 +288,7 @@ describe('ReviewSession — cram mode', () => {
   it('hides the category switcher when only one category has cards', async () => {
     vi.mocked(api.notes.listCramCards).mockResolvedValue([cards[0]!])
     vi.mocked(api.notes.listAllCards).mockResolvedValue([
-      { notePath: '/ws/a.md', noteTitle: 'A', kind: 'qa', front: 'Q1', back: 'A1', position: 0, due: '2026-01-01', interval: 0, streak: 2, lapses: 0, tags: [] },
+      { notePath: '/ws/a.md', noteTitle: 'A', kind: 'qa', front: 'Q1', back: 'A1', position: 0, due: '2026-01-01', interval: 0, streak: 2, lapses: 0, suspended: false, tags: [] },
     ])
     render(<ReviewSession onClose={vi.fn()} mode={{ kind: 'cram', streak: 2, struggling: false }} onSwitchCategory={vi.fn()} />)
 

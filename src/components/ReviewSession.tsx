@@ -122,6 +122,16 @@ export function ReviewSession({ onClose, mode = { kind: 'due' }, onSwitchCategor
       .finally(refetch)
   }
 
+  function suspend() {
+    if (!workspacePath || !current) return
+    const notePath = current.notePath
+    void api.notes
+      .setCardSuspended(notePath, current.position, true, workspacePath)
+      .then(() => useWorkspaceStore.getState().addGitPendingPath(notePath))
+      .catch(() => {})
+      .finally(refetch)
+  }
+
   function togglePick(i: number) {
     setPicked((prev) => {
       const next = new Set(prev)
@@ -197,7 +207,17 @@ export function ReviewSession({ onClose, mode = { kind: 'due' }, onSwitchCategor
           </p>
         ) : (
           <div className="review-card">
-            <p className="review-card-note">{current.noteTitle}</p>
+            <div className="review-card-header">
+              <p className="review-card-note">{current.noteTitle}</p>
+              <button
+                className="review-card-suspend"
+                onClick={suspend}
+                aria-label="Suspend card"
+                title="Suspend card from review queue"
+              >
+                Suspend
+              </button>
+            </div>
             <p className="review-card-front">
               <CardText text={current.front} notePath={current.notePath} />
             </p>

@@ -27,6 +27,7 @@ export function DeckView({ onClose, onOpenCram }: DeckViewProps) {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [activeTags, setActiveTags] = useState<Set<string>>(new Set())
+  const [suspendedFilter, setSuspendedFilter] = useState<'all' | 'suspended'>('all')
 
   useEffect(() => {
     if (!workspacePath) return
@@ -46,19 +47,37 @@ export function DeckView({ onClose, onOpenCram }: DeckViewProps) {
 
   const filtered = useMemo(
     () =>
-      activeTags.size === 0
-        ? cards
-        : cards.filter((c) => c.tags.some((t) => activeTags.has(t))),
-    [cards, activeTags],
+      cards.filter((c) => {
+        if (suspendedFilter === 'suspended' && !c.suspended) return false
+        if (activeTags.size > 0 && !c.tags.some((t) => activeTags.has(t))) return false
+        return true
+      }),
+    [cards, suspendedFilter, activeTags],
   )
 
   const groups = useMemo(() => groupCardsByNote(filtered), [filtered])
-  const categories = useMemo(() => groupCardsByStreak(filtered), [filtered])
-  const dueCount = useMemo(() => cards.filter((c) => isDueToday(c.due)).length, [cards])
-  const masteredCount = useMemo(
-    () => cards.filter((c) => c.interval >= MASTERED_INTERVAL_DAYS).length,
+
+  const activeCardsForCategories = useMemo(
+    () =>
+      cards.filter(
+        (c) => !c.suspended && (activeTags.size === 0 || c.tags.some((t) => activeTags.has(t))),
+      ),
+    [cards, activeTags],
+  )
+  const categories = useMemo(
+    () => groupCardsByStreak(activeCardsForCategories),
+    [activeCardsForCategories],
+  )
+
+  const dueCount = useMemo(
+    () => cards.filter((c) => !c.suspended && isDueToday(c.due)).length,
     [cards],
   )
+  const masteredCount = useMemo(
+    () => cards.filter((c) => !c.suspended && c.interval >= MASTERED_INTERVAL_DAYS).length,
+    [cards],
+  )
+  const suspendedCount = useMemo(() => cards.filter((c) => c.suspended).length, [cards])
 
   function toggleTag(tag: string) {
     setActiveTags((prev) => {
@@ -84,6 +103,20 @@ export function DeckView({ onClose, onOpenCram }: DeckViewProps) {
         next.add(newTag)
         return next
       })
+      const refreshed = await api.notes.listAllCards(workspacePath)
+      setCards(refreshed)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    }
+  }
+
+  async function toggleSuspend(e: React.MouseEvent, c: CardSummary) {
+    e.preventDefault()
+    e.stopPropagation()
+    if (!workspacePath) return
+    try {
+      await api.notes.setCardSuspended(c.notePath, c.position, !c.suspended, workspacePath)
+      useWorkspaceStore.getState().addGitPendingPath(c.notePath)
       const refreshed = await api.notes.listAllCards(workspacePath)
       setCards(refreshed)
     } catch (err) {
@@ -117,6 +150,14 @@ export function DeckView({ onClose, onOpenCram }: DeckViewProps) {
               <span>{cards.length}</span>
               <span>{dueCount} due</span>
               <span>{masteredCount} mastered</span>
+              {suspendedCount > 0 && (
+                <button
+                  className={`deck-view-suspended-filter${suspendedFilter === 'suspended' ? ' deck-view-suspended-filter-active' : ''}`}
+                  onClick={() => setSuspendedFilter((prev) => (prev === 'suspended' ? 'all' : 'suspended'))}
+                >
+                  {suspendedCount} suspended
+                </button>
+              )}
             </div>
             {allTags.length > 0 && (
               <div className="deck-view-tags">
@@ -166,9 +207,18 @@ export function DeckView({ onClose, onOpenCram }: DeckViewProps) {
                   </button>
                   <ul>
                     {group.cards.map((c) => (
-                      <li key={c.position} className="task-view-item">
+                      <li key={c.position} className="task-view-item deck-view-item">
                         <button className="task-view-item-text" onClick={() => openNote(group.notePath)}>
                           {c.front}
+                        </button>
+                        {c.suspended && <span className="deck-view-suspended-badge">Suspended</span>}
+                        <button
+                          className="deck-view-suspend-btn"
+                          onClick={(e) => toggleSuspend(e, c)}
+                          aria-label={c.suspended ? `Unsuspend card ${c.front}` : `Suspend card ${c.front}`}
+                          title={c.suspended ? 'Unsuspend card' : 'Suspend card'}
+                        >
+                          {c.suspended ? 'Unsuspend' : 'Suspend'}
                         </button>
                       </li>
                     ))}
