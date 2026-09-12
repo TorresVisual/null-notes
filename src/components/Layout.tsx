@@ -534,12 +534,24 @@ export function Layout() {
           <GitDivergedBar
             ahead={gitDiverged.ahead}
             behind={gitDiverged.behind}
+            localPaths={gitDiverged.localPaths}
+            remotePaths={gitDiverged.remotePaths}
+            onSync={async () => {
+              if (!workspacePath) return
+              try {
+                await api.git.rebaseOntoRemote(workspacePath)
+              } catch (e) {
+                console.error('git rebase-onto-remote failed', e)
+              }
+              await checkForUpdates(workspacePath)
+            }}
             onDismiss={() => useWorkspaceStore.getState().setGitDiverged(null)}
           />
         )}
         {gitPullBlocked && (
           <GitPullBlockedBar
-            output={gitPullBlocked}
+            output={gitPullBlocked.output}
+            paths={gitPullBlocked.paths}
             onDismiss={() => useWorkspaceStore.getState().setGitPullBlocked(null)}
           />
         )}

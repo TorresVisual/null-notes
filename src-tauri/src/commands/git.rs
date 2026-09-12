@@ -706,6 +706,12 @@ pub enum PullOutcome {
     Diverged {
         ahead: u32,
         behind: u32,
+        /// Notes touched only by the local commits since the merge-base,
+        /// named via `git diff --name-only` (#82) so the bar can say which
+        /// notes are actually involved instead of only a commit count.
+        local_paths: Vec<String>,
+        /// Notes touched only by the remote's incoming commits.
+        remote_paths: Vec<String>,
     },
     /// Not behind, but `ahead` local commits never made it to the remote —
     /// a prior push failed (offline, auth) and nothing has retried it since.
@@ -722,7 +728,25 @@ pub enum PullOutcome {
     /// instead of being swallowed as a generic error (see `checked_pull`).
     Blocked {
         output: String,
+        /// Note paths parsed out of `output`'s own file list — git indents
+        /// each conflicting path with a tab in this message, so this is free
+        /// (#82): it names the note instead of leaving only the raw stderr
+        /// behind a tooltip.
+        paths: Vec<String>,
     },
+}
+
+/// Pulls the tab-indented file list out of `git merge --ff-only`'s own
+/// refusal message (e.g. "error: Your local changes to the following files
+/// would be overwritten by merge:\n\tFoo.md\n"). Not a general-purpose git
+/// output parser — only meaningful for the specific message shape that
+/// refusal produces.
+fn parse_conflicting_paths(output: &str) -> Vec<String> {
+    output
+        .lines()
+        .filter_map(|line| line.strip_prefix('\t'))
+        .map(|s| s.to_string())
+        .collect()
 }
 
 fn count_commits(workspace: &str, range: &str) -> anyhow::Result<u32> {
@@ -737,6 +761,29 @@ fn count_commits(workspace: &str, range: &str) -> anyhow::Result<u32> {
         anyhow::bail!("git rev-list --count {range} failed for {workspace}");
     }
     Ok(String::from_utf8_lossy(&output.stdout).trim().parse()?)
+}
+
+/// The paths a `<range>` diff touches, repo-root-relative exactly as `git
+/// diff --name-only` reports them (never `-C`-relative) — what
+/// `PullOutcome::Diverged` needs to name the notes actually involved (#82).
+fn changed_note_paths(workspace: &str, range: &str) -> anyhow::Result<Vec<String>> {
+    let output = no_window_command("git")
+        .arg("-C")
+        .arg(workspace)
+        .arg("diff")
+        .arg("--name-only")
+        .arg(range)
+        .output()?;
+    if !output.status.success() {
+        anyhow::bail!(
+            "git diff --name-only {range} failed for {workspace}: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+    Ok(String::from_utf8_lossy(&output.stdout)
+        .lines()
+        .map(|s| s.to_string())
+        .collect())
 }
 
 /// Fetches, then either fast-forwards silently or reports a divergence —
@@ -769,7 +816,27 @@ pub fn checked_pull(workspace: &str) -> anyhow::Result<PullOutcome> {
         });
     }
     if ahead > 0 {
-        return Ok(PullOutcome::Diverged { ahead, behind });
+        let merge_base_output = no_window_command("git")
+            .arg("-C")
+            .arg(workspace)
+            .arg("merge-base")
+            .arg("HEAD")
+            .arg("@{u}")
+            .output()?;
+        if !merge_base_output.status.success() {
+            anyhow::bail!("git merge-base failed for {workspace}");
+        }
+        let base = String::from_utf8_lossy(&merge_base_output.stdout)
+            .trim()
+            .to_string();
+        let local_paths = changed_note_paths(workspace, &format!("{base}..HEAD"))?;
+        let remote_paths = changed_note_paths(workspace, &format!("{base}..@{{u}}"))?;
+        return Ok(PullOutcome::Diverged {
+            ahead,
+            behind,
+            local_paths,
+            remote_paths,
+        });
     }
 
     // `--ff-only`: moves the branch ref if and only if it's a pure
@@ -787,9 +854,9 @@ pub fn checked_pull(workspace: &str) -> anyhow::Result<PullOutcome> {
         .arg("@{u}")
         .output()?;
     if !merge_output.status.success() {
-        return Ok(PullOutcome::Blocked {
-            output: String::from_utf8_lossy(&merge_output.stderr).into_owned(),
-        });
+        let output = String::from_utf8_lossy(&merge_output.stderr).into_owned();
+        let paths = parse_conflicting_paths(&output);
+        return Ok(PullOutcome::Blocked { output, paths });
     }
     Ok(PullOutcome::FastForwarded)
 }
@@ -797,6 +864,61 @@ pub fn checked_pull(workspace: &str) -> anyhow::Result<PullOutcome> {
 #[tauri::command]
 pub async fn fetch_and_compare(workspace: String) -> Result<PullOutcome, String> {
     tokio::task::spawn_blocking(move || checked_pull(&workspace))
+        .await
+        .map_err(|e| e.to_string())?
+        .map_err(|e| e.to_string())
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+pub enum RebaseOutcome {
+    Rebased,
+    /// The rebase itself hit a conflict — the rare case where the remote
+    /// moved between `checked_pull`'s disjoint-paths check and this call,
+    /// since the frontend only offers this action when the two sides'
+    /// changed paths don't overlap. Aborted immediately; working tree and
+    /// history are left exactly as they were before the attempt.
+    Aborted {
+        output: String,
+    },
+}
+
+/// Replays the local commits a `Diverged` outcome found on top of the
+/// remote. Only ever invoked by the frontend once it has confirmed (from
+/// `Diverged`'s `local_paths`/`remote_paths`) that the two sides touch
+/// disjoint notes — a real conflict here would mean state moved since that
+/// check, not the expected case. This is a deliberate, user-clicked action,
+/// never something `checked_pull` triggers itself: the auto-pull cycle in
+/// P5-4 never merges or rebases on its own (#82).
+pub fn checked_rebase_onto_remote(workspace: &str) -> anyhow::Result<RebaseOutcome> {
+    if let Some(state) = unsafe_repo_state(workspace)? {
+        anyhow::bail!("refusing to rebase: {}", state.reason());
+    }
+
+    let output = no_window_command("git")
+        .arg("-C")
+        .arg(workspace)
+        .arg("rebase")
+        .arg("@{u}")
+        .output()?;
+    if output.status.success() {
+        return Ok(RebaseOutcome::Rebased);
+    }
+
+    let stderr = String::from_utf8_lossy(&output.stderr).into_owned();
+    no_window_command("git")
+        .arg("-C")
+        .arg(workspace)
+        .arg("rebase")
+        .arg("--abort")
+        .status()
+        .ok();
+    Ok(RebaseOutcome::Aborted { output: stderr })
+}
+
+#[tauri::command]
+pub async fn rebase_onto_remote(workspace: String) -> Result<RebaseOutcome, String> {
+    tokio::task::spawn_blocking(move || checked_rebase_onto_remote(&workspace))
         .await
         .map_err(|e| e.to_string())?
         .map_err(|e| e.to_string())
@@ -2103,7 +2225,9 @@ mod tests {
             outcome,
             PullOutcome::Diverged {
                 ahead: 1,
-                behind: 1
+                behind: 1,
+                local_paths: vec!["b.md".to_string()],
+                remote_paths: vec!["a.md".to_string()],
             }
         );
         // The whole point of ff-only: a diverged pull must never touch any
@@ -2142,11 +2266,86 @@ mod tests {
 
         let outcome = checked_pull(&clone_b.path().to_string_lossy()).unwrap();
 
-        assert!(matches!(outcome, PullOutcome::Blocked { .. }));
+        let PullOutcome::Blocked { paths, .. } = &outcome else {
+            panic!("expected Blocked, got {outcome:?}");
+        };
+        assert_eq!(
+            paths,
+            &vec!["note.md".to_string()],
+            "the conflicting note's name should be parsed out of git's own refusal message"
+        );
         let content = std::fs::read_to_string(clone_b.path().join("note.md")).unwrap();
         assert_eq!(
             content, "# Note\nfrom b, uncommitted\n",
             "the local uncommitted content must survive untouched"
+        );
+    }
+
+    #[test]
+    fn rebase_onto_remote_replays_disjoint_local_commits() {
+        let (remote, clone_a) = bare_remote_with_clone();
+        let clone_b = tempdir().unwrap();
+        git_clone(remote.path(), clone_b.path());
+
+        commit_file(clone_a.path(), "a.md", "from a\n");
+        no_window_command("git")
+            .arg("-C")
+            .arg(clone_a.path())
+            .arg("push")
+            .arg("-q")
+            .arg("origin")
+            .arg("HEAD")
+            .status()
+            .unwrap();
+        commit_file(clone_b.path(), "b.md", "from b, unpushed\n");
+        checked_pull(&clone_b.path().to_string_lossy()).unwrap();
+
+        let outcome = checked_rebase_onto_remote(&clone_b.path().to_string_lossy()).unwrap();
+
+        assert_eq!(outcome, RebaseOutcome::Rebased);
+        assert!(clone_b.path().join("a.md").exists(), "remote's note landed");
+        assert!(
+            clone_b.path().join("b.md").exists(),
+            "local note survived the rebase"
+        );
+        let final_pull = checked_pull(&clone_b.path().to_string_lossy()).unwrap();
+        assert_eq!(final_pull, PullOutcome::Ahead { ahead: 1 });
+    }
+
+    #[test]
+    fn rebase_onto_remote_aborts_cleanly_on_a_real_conflict() {
+        let (remote, clone_a) = bare_remote_with_clone();
+        let clone_b = tempdir().unwrap();
+        git_clone(remote.path(), clone_b.path());
+
+        commit_file(clone_a.path(), "note.md", "from a\n");
+        no_window_command("git")
+            .arg("-C")
+            .arg(clone_a.path())
+            .arg("push")
+            .arg("-q")
+            .arg("origin")
+            .arg("HEAD")
+            .status()
+            .unwrap();
+        commit_file(clone_b.path(), "note.md", "from b, unpushed\n");
+        checked_pull(&clone_b.path().to_string_lossy()).unwrap();
+
+        let outcome = checked_rebase_onto_remote(&clone_b.path().to_string_lossy()).unwrap();
+
+        assert!(matches!(outcome, RebaseOutcome::Aborted { .. }));
+        let head_message = no_window_command("git")
+            .arg("-C")
+            .arg(clone_b.path())
+            .arg("log")
+            .arg("-1")
+            .arg("--format=%s")
+            .output()
+            .unwrap();
+        assert_eq!(
+            String::from_utf8_lossy(&head_message.stdout).trim(),
+            "add note.md",
+            "an aborted rebase must leave HEAD exactly where it was"
         );
     }
 

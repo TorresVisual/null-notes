@@ -163,7 +163,7 @@ describe('HomeView', () => {
   it('shows the ahead/behind count when diverged, taking priority over pending paths', () => {
     useWorkspaceStore.setState({
       repoMode: 'notesOnly',
-      gitDiverged: { ahead: 1, behind: 3 },
+      gitDiverged: { ahead: 1, behind: 3, localPaths: ['b.md'], remotePaths: ['a.md', 'c.md'] },
       gitPendingPaths: ['/ws/a.md'],
     })
     const { getByText } = render(<HomeView onOpenTaskView={() => {}} onOpenReview={() => {}} onOpenDeckView={() => {}} onOpenSettings={() => {}} />)

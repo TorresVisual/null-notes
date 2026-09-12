@@ -33,12 +33,23 @@ describe('useGitAutoPull', () => {
   })
 
   it('sets gitDiverged when histories have diverged', async () => {
-    git.fetchAndCompare.mockResolvedValue({ kind: 'diverged', ahead: 1, behind: 2 })
+    git.fetchAndCompare.mockResolvedValue({
+      kind: 'diverged',
+      ahead: 1,
+      behind: 2,
+      localPaths: ['b.md'],
+      remotePaths: ['a.md'],
+    })
     const { result } = renderHook(() => useGitAutoPull())
 
     await result.current.checkForUpdates('/ws')
 
-    expect(useWorkspaceStore.getState().gitDiverged).toEqual({ ahead: 1, behind: 2 })
+    expect(useWorkspaceStore.getState().gitDiverged).toEqual({
+      ahead: 1,
+      behind: 2,
+      localPaths: ['b.md'],
+      remotePaths: ['a.md'],
+    })
   })
 
   it('leaves gitDiverged null on a silent fast-forward', async () => {
@@ -60,16 +71,23 @@ describe('useGitAutoPull', () => {
   })
 
   it('sets gitPullBlocked when the ff-only merge itself refuses', async () => {
-    git.fetchAndCompare.mockResolvedValue({ kind: 'blocked', output: 'would be overwritten by merge' })
+    git.fetchAndCompare.mockResolvedValue({
+      kind: 'blocked',
+      output: 'would be overwritten by merge',
+      paths: ['note.md'],
+    })
     const { result } = renderHook(() => useGitAutoPull())
 
     await result.current.checkForUpdates('/ws')
 
-    expect(useWorkspaceStore.getState().gitPullBlocked).toBe('would be overwritten by merge')
+    expect(useWorkspaceStore.getState().gitPullBlocked).toEqual({
+      output: 'would be overwritten by merge',
+      paths: ['note.md'],
+    })
   })
 
   it('clears a stale gitPullBlocked once a later check succeeds', async () => {
-    useWorkspaceStore.setState({ gitPullBlocked: 'stale' })
+    useWorkspaceStore.setState({ gitPullBlocked: { output: 'stale', paths: [] } })
     git.fetchAndCompare.mockResolvedValue({ kind: 'fastForwarded' })
     const { result } = renderHook(() => useGitAutoPull())
 

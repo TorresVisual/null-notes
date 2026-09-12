@@ -140,6 +140,7 @@ pub fn run() {
             commands::git::auto_commit,
             commands::git::push_notes,
             commands::git::fetch_and_compare,
+            commands::git::rebase_onto_remote,
             commands::git::init_notes_repo,
             commands::git::list_note_history,
             commands::git::read_note_at_commit,

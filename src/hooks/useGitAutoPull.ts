@@ -15,7 +15,16 @@ export function useGitAutoPull() {
     const { setGitDiverged, setGitPullBlocked, setGitAhead } = useWorkspaceStore.getState()
     try {
       const outcome = await api.git.fetchAndCompare(workspace)
-      setGitDiverged(outcome.kind === 'diverged' ? { ahead: outcome.ahead, behind: outcome.behind } : null)
+      setGitDiverged(
+        outcome.kind === 'diverged'
+          ? {
+              ahead: outcome.ahead,
+              behind: outcome.behind,
+              localPaths: outcome.localPaths,
+              remotePaths: outcome.remotePaths,
+            }
+          : null,
+      )
       // `blocked` means the ff-only merge itself refused — most likely an
       // uncommitted local change conflicting with an incoming one. The
       // working tree is untouched, but staying silent here (the old
@@ -23,7 +32,9 @@ export function useGitAutoPull() {
       // to notice short of opening a terminal. Every other outcome clears
       // it, including a thrown error below — a later successful check
       // supersedes a stale blocked notice.
-      setGitPullBlocked(outcome.kind === 'blocked' ? outcome.output : null)
+      setGitPullBlocked(
+        outcome.kind === 'blocked' ? { output: outcome.output, paths: outcome.paths } : null,
+      )
       // #81: purely ahead (a prior push never landed) is this cycle's retry
       // point — checkForUpdates already runs on open, a 5-min interval, and
       // window focus, so a push that failed offline lands on whichever of

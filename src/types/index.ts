@@ -82,10 +82,14 @@ export type PushOutcome =
 export type PullOutcome =
   | { kind: 'upToDate' }
   | { kind: 'fastForwarded' }
-  | { kind: 'diverged'; ahead: number; behind: number }
+  | { kind: 'diverged'; ahead: number; behind: number; localPaths: string[]; remotePaths: string[] }
   | { kind: 'ahead'; ahead: number }
   | { kind: 'noRemote' }
-  | { kind: 'blocked'; output: string }
+  | { kind: 'blocked'; output: string; paths: string[] }
+
+export type RebaseOutcome =
+  | { kind: 'rebased' }
+  | { kind: 'aborted'; output: string }
 
 export type RepoInitOutcome =
   | { kind: 'initializedWithRemote' }

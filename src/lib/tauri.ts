@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core'
-import type { NoteMetadata, WorkspaceState, WorkspaceTree, SearchResult, AppSettings, GraphLink, GraphTag, RepoMode, CommitOutcome, PushOutcome, PullOutcome, RepoInitOutcome, TemplateMetadata, CrossRefTarget, OpenTask, DueCard, Grade, NoteHistoryEntry, GithubRepo, BacklinkEntry, PrinterInfo, McGradeResult, CardSummary, ErrorLogEntry, CodeLinkStatus, CodeLinkTarget } from '../types'
+import type { NoteMetadata, WorkspaceState, WorkspaceTree, SearchResult, AppSettings, GraphLink, GraphTag, RepoMode, CommitOutcome, PushOutcome, PullOutcome, RebaseOutcome, RepoInitOutcome, TemplateMetadata, CrossRefTarget, OpenTask, DueCard, Grade, NoteHistoryEntry, GithubRepo, BacklinkEntry, PrinterInfo, McGradeResult, CardSummary, ErrorLogEntry, CodeLinkStatus, CodeLinkTarget } from '../types'
 import type { PdfPage, PdfMarkdownImport } from '../pdf/types'
 import { useWorkspaceStore } from '../store/workspace'
 import { sidecarDir } from './pathPrefix'
@@ -123,6 +123,8 @@ export const api = {
       invoke<PushOutcome>('push_notes', { workspace, mode, allowCodeRepoPush }),
     fetchAndCompare: (workspace: string) =>
       invoke<PullOutcome>('fetch_and_compare', { workspace }),
+    rebaseOntoRemote: (workspace: string) =>
+      invoke<RebaseOutcome>('rebase_onto_remote', { workspace }),
     initNotesRepo: (workspace: string, createGithubRemote: boolean) =>
       invoke<RepoInitOutcome>('init_notes_repo', { workspace, createGithubRemote }),
     listNoteHistory: (workspace: string, notePath: string) =>

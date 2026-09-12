@@ -83,13 +83,15 @@ interface WorkspaceStore {
   // badge's own short label, which stays a fixed, glanceable phrase.
   gitCommitDetail: string | null
   setGitCommitDetail: (detail: string | null) => void
-  gitDiverged: { ahead: number; behind: number } | null
-  setGitDiverged: (d: { ahead: number; behind: number } | null) => void
+  gitDiverged: { ahead: number; behind: number; localPaths: string[]; remotePaths: string[] } | null
+  setGitDiverged: (
+    d: { ahead: number; behind: number; localPaths: string[]; remotePaths: string[] } | null,
+  ) => void
   // A fast-forward-only pull refused because it would overwrite an
   // uncommitted local change — the working tree is untouched, but the
   // workspace is now silently behind the remote until this is resolved.
-  gitPullBlocked: string | null
-  setGitPullBlocked: (output: string | null) => void
+  gitPullBlocked: { output: string; paths: string[] } | null
+  setGitPullBlocked: (blocked: { output: string; paths: string[] } | null) => void
   // #81: local commits that are ahead of the remote and never made it there
   // (a push failed offline/auth and nothing retried it since). Re-derived
   // from `checked_pull`'s ahead count on every checkForUpdates cycle, so —
@@ -229,7 +231,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   setGitCommitStatus: (status) => set({ gitCommitStatus: status }),
   setGitCommitDetail: (detail) => set({ gitCommitDetail: detail }),
   setGitDiverged: (d) => set({ gitDiverged: d }),
-  setGitPullBlocked: (output) => set({ gitPullBlocked: output }),
+  setGitPullBlocked: (blocked) => set({ gitPullBlocked: blocked }),
   setGitAhead: (ahead) => set({ gitAhead: ahead }),
   setFlashTabPath: (path) => set({ flashTabPath: path }),
 
