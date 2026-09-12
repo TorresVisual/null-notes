@@ -139,6 +139,14 @@ pub async fn run_migrations(pool: &SqlitePool) -> Result<()> {
     // grade/streak.
     add_column_if_missing(pool, "ALTER TABLE review_cards ADD COLUMN lapses INTEGER").await?;
 
+    // Fourth column addition. `suspended` indicates whether a card has been
+    // suspended from the due/cram review queue (0 = active, 1 = suspended).
+    add_column_if_missing(
+        pool,
+        "ALTER TABLE review_cards ADD COLUMN suspended INTEGER",
+    )
+    .await?;
+
     Ok(())
 }
 
@@ -147,7 +155,8 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn test_run_migrations_adds_options_and_grade_and_streak_and_lapses_columns() {
+    async fn test_run_migrations_adds_options_and_grade_and_streak_and_lapses_and_suspended_columns(
+    ) {
         // See db::notes::tests::make_pool for why this pool is capped at
         // one connection against `:memory:`.
         let pool = sqlx::sqlite::SqlitePoolOptions::new()
@@ -157,13 +166,13 @@ mod tests {
             .unwrap();
         run_migrations(&pool).await.unwrap();
 
-        // A row insert naming all four added columns is the simplest proof
-        // they exist and accept NULL — sqlx has no schema-introspection
+        // A row insert naming all added columns is the simplest proof
+        // they exist and accept NULL/default values — sqlx has no schema-introspection
         // helper exposed here, and this exercises exactly what set_cards
         // will do.
         sqlx::query(
-            "INSERT INTO review_cards (note_path, kind, front, back, position, due, ease, interval, reps, options, grade, streak, lapses)
-             VALUES ('/a.md', 'mc', 'Q', '', 0, '2026-01-01', 2.5, 0, 0, NULL, NULL, NULL, NULL)",
+            "INSERT INTO review_cards (note_path, kind, front, back, position, due, ease, interval, reps, options, grade, streak, lapses, suspended)
+             VALUES ('/a.md', 'mc', 'Q', '', 0, '2026-01-01', 2.5, 0, 0, NULL, NULL, NULL, NULL, 0)",
         )
         .execute(&pool)
         .await

@@ -354,14 +354,15 @@ pub async fn set_cards(pool: &SqlitePool, note_path: &str, cards: &[ExtractedCar
         let grade = card.grade.map(sm2::Grade::as_str);
         let streak = card.streak.unwrap_or(0);
         let lapses = card.lapses.unwrap_or(0);
+        let suspended = if card.suspended { 1 } else { 0 };
         let options = if card.options.is_empty() {
             None
         } else {
             Some(serde_json::to_string(&card.options)?)
         };
         sqlx::query(
-            "INSERT INTO review_cards (note_path, kind, front, back, position, due, ease, interval, reps, options, grade, streak, lapses)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO review_cards (note_path, kind, front, back, position, due, ease, interval, reps, options, grade, streak, lapses, suspended)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         )
         .bind(note_path)
         .bind(kind)
@@ -376,6 +377,7 @@ pub async fn set_cards(pool: &SqlitePool, note_path: &str, cards: &[ExtractedCar
         .bind(grade)
         .bind(streak)
         .bind(lapses)
+        .bind(suspended)
         .execute(pool)
         .await?;
     }
@@ -399,7 +401,7 @@ pub async fn due_cards(pool: &SqlitePool, workspace: &str, today: &str) -> Resul
         "SELECT rc.note_path, n.title as note_title, rc.kind, rc.front, rc.back, rc.position, rc.options, rc.streak
          FROM review_cards rc
          JOIN notes n ON n.path = rc.note_path
-         WHERE n.workspace = ? AND rc.due <= ?
+         WHERE n.workspace = ? AND rc.due <= ? AND COALESCE(rc.suspended, 0) = 0
          ORDER BY rc.due, n.title COLLATE NOCASE, rc.position",
     )
     .bind(workspace)
@@ -442,7 +444,7 @@ pub async fn list_cards_by_category(
         "SELECT rc.note_path, n.title as note_title, rc.kind, rc.front, rc.back, rc.position, rc.options, rc.streak
          FROM review_cards rc
          JOIN notes n ON n.path = rc.note_path
-         WHERE n.workspace = ? AND rc.streak = ?
+         WHERE n.workspace = ? AND rc.streak = ? AND COALESCE(rc.suspended, 0) = 0
            AND (rc.streak != 0 OR (COALESCE(rc.lapses, 0) > 0) = ?)
          ORDER BY n.title COLLATE NOCASE, rc.position",
     )
@@ -484,6 +486,7 @@ struct CardSummaryRow {
     interval: i64,
     streak: i64,
     lapses: i64,
+    suspended: Option<i64>,
     tags: Option<String>,
 }
 
@@ -491,6 +494,7 @@ pub async fn list_all_cards(pool: &SqlitePool, workspace: &str) -> Result<Vec<Ca
     let rows = sqlx::query_as::<_, CardSummaryRow>(
         "SELECT rc.note_path, n.title as note_title, rc.kind, rc.front, rc.back,
                 rc.position, rc.due, rc.interval, rc.streak, rc.lapses,
+                COALESCE(rc.suspended, 0) as suspended,
                 GROUP_CONCAT(DISTINCT nt.tag) as tags
          FROM review_cards rc
          JOIN notes n ON n.path = rc.note_path
@@ -516,6 +520,7 @@ pub async fn list_all_cards(pool: &SqlitePool, workspace: &str) -> Result<Vec<Ca
             interval: r.interval,
             streak: r.streak,
             lapses: r.lapses,
+            suspended: r.suspended == Some(1),
             tags: r
                 .tags
                 .map(|t| t.split(',').map(String::from).collect())
@@ -1555,6 +1560,7 @@ mod tests {
             grade: None,
             streak: None,
             lapses: None,
+            suspended: false,
             options: Vec::new(),
             correct: Vec::new(),
         }
@@ -1725,6 +1731,7 @@ mod tests {
             grade: None,
             streak: None,
             lapses: None,
+            suspended: false,
             options: vec!["a".into(), "b".into()],
             correct: vec![1],
         }];
@@ -1763,6 +1770,7 @@ mod tests {
             grade: None,
             streak: None,
             lapses: None,
+            suspended: false,
             options: Vec::new(),
             correct: Vec::new(),
         }];
@@ -1906,6 +1914,7 @@ mod tests {
             grade: Some(sm2::Grade::Good),
             streak: None,
             lapses: None,
+            suspended: false,
             options: Vec::new(),
             correct: Vec::new(),
         }];
@@ -1919,5 +1928,39 @@ mod tests {
         let mut tags = all[0].tags.clone();
         tags.sort();
         assert_eq!(tags, vec!["algo", "cs"]);
+    }
+
+    #[tokio::test]
+    async fn test_due_cards_and_cram_cards_exclude_suspended_cards() {
+        let pool = make_pool().await;
+        index_note(&pool, &note("a", "A", "/ws/a.md", "/ws"))
+            .await
+            .unwrap();
+
+        let mut normal = card(CardKind::Qa, "active", "ans", 0);
+        normal.due = Some("2020-01-01".into());
+
+        let mut suspended = card(CardKind::Qa, "suspended", "ans", 1);
+        suspended.due = Some("2020-01-01".into());
+        suspended.suspended = true;
+
+        set_cards(&pool, "/ws/a.md", &[normal, suspended])
+            .await
+            .unwrap();
+
+        let due = due_cards(&pool, "/ws", "9999-12-31").await.unwrap();
+        assert_eq!(due.len(), 1);
+        assert_eq!(due[0].front, "active");
+
+        let cram = list_cards_by_category(&pool, "/ws", 0, false)
+            .await
+            .unwrap();
+        assert_eq!(cram.len(), 1);
+        assert_eq!(cram[0].front, "active");
+
+        let all = list_all_cards(&pool, "/ws").await.unwrap();
+        assert_eq!(all.len(), 2);
+        assert_eq!(all[0].suspended, false);
+        assert_eq!(all[1].suspended, true);
     }
 }

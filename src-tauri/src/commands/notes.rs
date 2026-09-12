@@ -403,7 +403,7 @@ pub fn extract_callouts(content: &str) -> Vec<ExtractedCallout> {
     callouts
 }
 
-// due, ease, interval, reps, grade, streak, lapses
+// due, ease, interval, reps, grade, streak, lapses, suspended
 type SrComment = (
     String,
     f64,
@@ -412,6 +412,7 @@ type SrComment = (
     Option<sm2::Grade>,
     Option<i64>,
     Option<i64>,
+    bool,
 );
 
 // A schedule comment is never itself a card, even though it starts a fresh
@@ -419,7 +420,7 @@ type SrComment = (
 // special-case it.
 fn parse_sr_comment(line: &str) -> Option<SrComment> {
     let re = match Regex::new(
-        r"^<!--\s+sr\s+due=(\S+)\s+ease=(\S+)\s+interval=(\S+)\s+reps=(\S+)(?:\s+grade=(\S+))?(?:\s+streak=(\S+))?(?:\s+lapses=(\S+))?\s+-->$",
+        r"^<!--\s+sr\s+due=(\S+)\s+ease=(\S+)\s+interval=(\S+)\s+reps=(\S+)(?:\s+grade=(\S+))?(?:\s+streak=(\S+))?(?:\s+lapses=(\S+))?(?:\s+suspended=(\S+))?\s+-->$",
     ) {
         Ok(re) => re,
         Err(_) => return None,
@@ -438,7 +439,11 @@ fn parse_sr_comment(line: &str) -> Option<SrComment> {
     });
     let streak = caps.get(6).and_then(|m| m.as_str().parse::<i64>().ok());
     let lapses = caps.get(7).and_then(|m| m.as_str().parse::<i64>().ok());
-    Some((due, ease, interval, reps, grade, streak, lapses))
+    let suspended = caps
+        .get(8)
+        .map(|m| m.as_str().eq_ignore_ascii_case("true"))
+        .unwrap_or(false);
+    Some((due, ease, interval, reps, grade, streak, lapses, suspended))
 }
 
 // The schedule comment sits either directly after a card's content (a note
@@ -629,11 +634,13 @@ pub fn extract_cards(content: &str) -> Vec<ExtractedCard> {
             let option_count = mc_block_option_count(&lines, i);
             if let Some((front, options, correct)) = parse_mc_block(&lines, i) {
                 let comment_idx = sr_comment_idx(&lines, i + 1 + option_count);
-                let (due, ease, interval, reps, grade, streak, lapses) = lines
+                let (due, ease, interval, reps, grade, streak, lapses, suspended) = lines
                     .get(comment_idx)
                     .and_then(|l| parse_sr_comment(l))
-                    .map(|(d, e, iv, r, g, s, l)| (Some(d), Some(e), Some(iv), Some(r), g, s, l))
-                    .unwrap_or((None, None, None, None, None, None, None));
+                    .map(|(d, e, iv, r, g, s, l, sub)| {
+                        (Some(d), Some(e), Some(iv), Some(r), g, s, l, sub)
+                    })
+                    .unwrap_or((None, None, None, None, None, None, None, false));
                 cards.push(ExtractedCard {
                     kind: CardKind::Mc,
                     front,
@@ -646,6 +653,7 @@ pub fn extract_cards(content: &str) -> Vec<ExtractedCard> {
                     grade,
                     streak,
                     lapses,
+                    suspended,
                     options,
                     correct,
                 });
@@ -663,11 +671,11 @@ pub fn extract_cards(content: &str) -> Vec<ExtractedCard> {
         };
 
         let comment_idx = sr_comment_idx(&lines, i + 1);
-        let (due, ease, interval, reps, grade, streak, lapses) = lines
+        let (due, ease, interval, reps, grade, streak, lapses, suspended) = lines
             .get(comment_idx)
             .and_then(|l| parse_sr_comment(l))
-            .map(|(d, e, iv, r, g, s, l)| (Some(d), Some(e), Some(iv), Some(r), g, s, l))
-            .unwrap_or((None, None, None, None, None, None, None));
+            .map(|(d, e, iv, r, g, s, l, sub)| (Some(d), Some(e), Some(iv), Some(r), g, s, l, sub))
+            .unwrap_or((None, None, None, None, None, None, None, false));
 
         cards.push(ExtractedCard {
             kind,
@@ -681,6 +689,7 @@ pub fn extract_cards(content: &str) -> Vec<ExtractedCard> {
             grade,
             streak,
             lapses,
+            suspended,
             options: Vec::new(),
             correct: Vec::new(),
         });
@@ -1078,10 +1087,10 @@ pub fn grade_card_line(
         sr_comment_idx(&borrowed, idx + 1)
     };
 
-    let (current, current_streak, current_lapses) = lines
+    let (current, current_streak, current_lapses, current_suspended) = lines
         .get(comment_idx)
         .and_then(|l| parse_sr_comment(l))
-        .map(|(_, ease, interval, reps, _, streak, lapses)| {
+        .map(|(_, ease, interval, reps, _, streak, lapses, suspended)| {
             (
                 sm2::CardState {
                     ease,
@@ -1090,22 +1099,29 @@ pub fn grade_card_line(
                 },
                 streak.unwrap_or(0),
                 lapses.unwrap_or(0),
+                suspended,
             )
         })
-        .unwrap_or((sm2::CardState::default(), 0, 0));
+        .unwrap_or((sm2::CardState::default(), 0, 0, false));
 
     let next = sm2::next_state(current, grade, today);
     let next_streak = sm2::next_streak(current_streak, grade);
     let next_lapses = sm2::next_lapses(current_lapses, current.reps, grade);
+    let suspended_part = if current_suspended {
+        " suspended=true"
+    } else {
+        ""
+    };
     let comment = format!(
-        "<!-- sr due={} ease={:.2} interval={} reps={} grade={} streak={} lapses={} -->",
+        "<!-- sr due={} ease={:.2} interval={} reps={} grade={} streak={} lapses={}{} -->",
         next.due,
         next.ease,
         next.interval,
         next.reps,
         grade.as_str(),
         next_streak,
-        next_lapses
+        next_lapses,
+        suspended_part
     );
 
     let has_comment_line = lines
@@ -1123,6 +1139,70 @@ pub fn grade_card_line(
         rewritten.push('\n');
     }
     Some(rewritten)
+}
+
+pub fn set_card_suspended_line(content: &str, position: i64, suspended: bool) -> Option<String> {
+    let mut lines: Vec<String> = content.lines().map(str::to_string).collect();
+    let idx = usize::try_from(position).ok()?;
+    let trimmed = lines.get(idx)?.trim().to_string();
+
+    let borrowed: Vec<&str> = lines.iter().map(String::as_str).collect();
+    let comment_idx = if is_mc_question_line(&trimmed) {
+        let option_count = mc_block_option_count(&borrowed, idx);
+        if option_count == 0 {
+            return None;
+        }
+        sr_comment_idx(&borrowed, idx + 1 + option_count)
+    } else {
+        classify_card_line(&trimmed)?;
+        sr_comment_idx(&borrowed, idx + 1)
+    };
+
+    let (due, ease, interval, reps, grade, streak, lapses, _old_suspended) = lines
+        .get(comment_idx)
+        .and_then(|l| parse_sr_comment(l))
+        .unwrap_or_else(|| (sm2::today(), 2.5, 0, 0, None, None, None, false));
+
+    let grade_part = grade
+        .map(|g| format!(" grade={}", g.as_str()))
+        .unwrap_or_default();
+    let streak_part = streak.map(|s| format!(" streak={s}")).unwrap_or_default();
+    let lapses_part = lapses.map(|l| format!(" lapses={l}")).unwrap_or_default();
+    let suspended_part = if suspended { " suspended=true" } else { "" };
+    let comment = format!(
+        "<!-- sr due={due} ease={ease:.2} interval={interval} reps={reps}{grade_part}{streak_part}{lapses_part}{suspended_part} -->"
+    );
+
+    let has_comment_line = lines
+        .get(comment_idx)
+        .map(|l| parse_sr_comment(l).is_some())
+        .unwrap_or(false);
+    if has_comment_line {
+        lines[comment_idx] = comment;
+    } else {
+        lines.insert(comment_idx, comment);
+    }
+
+    let mut rewritten = lines.join("\n");
+    if content.ends_with('\n') {
+        rewritten.push('\n');
+    }
+    Some(rewritten)
+}
+
+async fn set_card_suspended_at(
+    path: &str,
+    position: i64,
+    suspended: bool,
+    workspace: &str,
+    db: &DbPool,
+) -> anyhow::Result<()> {
+    let content = read_note_or_forget(path, db).await?;
+    let new_content = set_card_suspended_line(&content, position, suspended)
+        .ok_or_else(|| anyhow::anyhow!("no card at line {position} in {path}"))?;
+    write_atomic(Path::new(path), &new_content).await?;
+    index_note_at(path, workspace, &new_content, db).await?;
+    Ok(())
 }
 
 // A card can outlive its note in the index: nothing purges a workspace
@@ -1189,7 +1269,7 @@ async fn grade_mc_card_at(
     let last_grade = lines
         .get(idx + 1 + option_count)
         .and_then(|l| parse_sr_comment(l))
-        .and_then(|(_, _, _, _, grade, _, _)| grade);
+        .and_then(|(_, _, _, _, grade, _, _, _)| grade);
     let resolved = sm2::mc_auto_grade(last_grade, is_correct);
 
     grade_card_at(path, position, resolved, workspace, db).await?;
@@ -1604,6 +1684,19 @@ pub async fn grade_mc_card(
     db: State<'_, DbPool>,
 ) -> Result<McGradeResult, String> {
     grade_mc_card_at(&path, position, &picked, &workspace, &db)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn set_card_suspended(
+    path: String,
+    position: i64,
+    suspended: bool,
+    workspace: String,
+    db: State<'_, DbPool>,
+) -> Result<(), String> {
+    set_card_suspended_at(&path, position, suspended, &workspace, &db)
         .await
         .map_err(|e| e.to_string())
 }
@@ -4415,5 +4508,24 @@ mod folder_tests {
             .await
             .unwrap();
         assert!(notes.is_empty());
+    }
+
+    #[test]
+    fn test_set_card_suspended_line_toggles_suspended_flag() {
+        let note = "What is 2+2? :: 4\n<!-- sr due=2026-01-01 ease=2.50 interval=0 reps=0 -->\n";
+        let suspended = set_card_suspended_line(note, 0, true).unwrap();
+        assert!(suspended.contains("suspended=true"));
+
+        let unsuspended = set_card_suspended_line(&suspended, 0, false).unwrap();
+        assert!(!unsuspended.contains("suspended=true"));
+        assert!(unsuspended.contains("<!-- sr due=2026-01-01 ease=2.50 interval=0 reps=0 -->"));
+    }
+
+    #[test]
+    fn test_grade_card_line_preserves_suspended_status() {
+        let note = "What is 2+2? :: 4\n<!-- sr due=2026-01-01 ease=2.50 interval=0 reps=0 suspended=true -->\n";
+        let today = chrono::NaiveDate::from_ymd_opt(2026, 1, 1).unwrap();
+        let graded = grade_card_line(note, 0, sm2::Grade::Good, today).unwrap();
+        assert!(graded.contains("suspended=true"));
     }
 }
