@@ -12,7 +12,7 @@ const git = vi.mocked(api.git)
 
 describe('useGitAutoPull', () => {
   beforeEach(() => {
-    useWorkspaceStore.setState({ gitDiverged: null })
+    useWorkspaceStore.setState({ gitDiverged: null, gitPullBlocked: null })
   })
 
   afterEach(() => {
@@ -43,5 +43,25 @@ describe('useGitAutoPull', () => {
 
     await expect(result.current.checkForUpdates('/ws')).resolves.toBeUndefined()
     expect(useWorkspaceStore.getState().gitDiverged).toBeNull()
+    expect(useWorkspaceStore.getState().gitPullBlocked).toBeNull()
+  })
+
+  it('sets gitPullBlocked when the ff-only merge itself refuses', async () => {
+    git.fetchAndCompare.mockResolvedValue({ kind: 'blocked', output: 'would be overwritten by merge' })
+    const { result } = renderHook(() => useGitAutoPull())
+
+    await result.current.checkForUpdates('/ws')
+
+    expect(useWorkspaceStore.getState().gitPullBlocked).toBe('would be overwritten by merge')
+  })
+
+  it('clears a stale gitPullBlocked once a later check succeeds', async () => {
+    useWorkspaceStore.setState({ gitPullBlocked: 'stale' })
+    git.fetchAndCompare.mockResolvedValue({ kind: 'fastForwarded' })
+    const { result } = renderHook(() => useGitAutoPull())
+
+    await result.current.checkForUpdates('/ws')
+
+    expect(useWorkspaceStore.getState().gitPullBlocked).toBeNull()
   })
 })

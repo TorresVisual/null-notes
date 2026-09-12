@@ -47,6 +47,7 @@ import { useOverlayManager } from '../hooks/useOverlayManager'
 import { ConflictBar } from './ConflictBar'
 import { GitAutoCommitPrompt } from './GitAutoCommitPrompt'
 import { GitDivergedBar } from './GitDivergedBar'
+import { GitPullBlockedBar } from './GitPullBlockedBar'
 import { useGitConfig } from '../hooks/useGitConfig'
 import { useGitAutoCommit } from '../hooks/useGitAutoCommit'
 import { promptText } from '../store/promptDialog'
@@ -94,6 +95,7 @@ export function Layout() {
   const gitCommitStatus = useWorkspaceStore((s) => s.gitCommitStatus)
   const gitCommitDetail = useWorkspaceStore((s) => s.gitCommitDetail)
   const gitDiverged = useWorkspaceStore((s) => s.gitDiverged)
+  const gitPullBlocked = useWorkspaceStore((s) => s.gitPullBlocked)
   useExternalChanges()
   const createNote = useCreateNote()
   const createFolder = useCreateFolder()
@@ -512,6 +514,12 @@ export function Layout() {
             ahead={gitDiverged.ahead}
             behind={gitDiverged.behind}
             onDismiss={() => useWorkspaceStore.getState().setGitDiverged(null)}
+          />
+        )}
+        {gitPullBlocked && (
+          <GitPullBlockedBar
+            output={gitPullBlocked}
+            onDismiss={() => useWorkspaceStore.getState().setGitPullBlocked(null)}
           />
         )}
         {repoMode && !gitPrompted && (

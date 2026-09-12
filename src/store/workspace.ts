@@ -80,6 +80,11 @@ interface WorkspaceStore {
   setGitCommitDetail: (detail: string | null) => void
   gitDiverged: { ahead: number; behind: number } | null
   setGitDiverged: (d: { ahead: number; behind: number } | null) => void
+  // A fast-forward-only pull refused because it would overwrite an
+  // uncommitted local change — the working tree is untouched, but the
+  // workspace is now silently behind the remote until this is resolved.
+  gitPullBlocked: string | null
+  setGitPullBlocked: (output: string | null) => void
   // Ephemeral, UI-only: the tab that should show a brief "just created"
   // highlight. Never persisted — TabBar clears it itself once the CSS
   // animation finishes (see .tab-flash's onAnimationEnd).
@@ -105,6 +110,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   gitCommitStatus: 'idle',
   gitCommitDetail: null,
   gitDiverged: null,
+  gitPullBlocked: null,
   flashTabPath: null,
 
   setPath: (path) => set({ path, selectedFolder: path }),
@@ -208,6 +214,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   setGitCommitStatus: (status) => set({ gitCommitStatus: status }),
   setGitCommitDetail: (detail) => set({ gitCommitDetail: detail }),
   setGitDiverged: (d) => set({ gitDiverged: d }),
+  setGitPullBlocked: (output) => set({ gitPullBlocked: output }),
   setFlashTabPath: (path) => set({ flashTabPath: path }),
 
   resetForNewWorkspace: () =>
@@ -226,6 +233,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
       gitCommitStatus: 'idle',
       gitCommitDetail: null,
       gitDiverged: null,
+      gitPullBlocked: null,
       flashTabPath: null,
     }),
 }))

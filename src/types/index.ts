@@ -77,6 +77,7 @@ export type PullOutcome =
   | { kind: 'fastForwarded' }
   | { kind: 'diverged'; ahead: number; behind: number }
   | { kind: 'noRemote' }
+  | { kind: 'blocked'; output: string }
 
 export type RepoInitOutcome =
   | { kind: 'initializedWithRemote' }

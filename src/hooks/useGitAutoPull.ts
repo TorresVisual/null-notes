@@ -11,14 +11,25 @@ import { api } from '../lib/tauri'
  */
 export function useGitAutoPull() {
   const checkForUpdates = useCallback(async (workspace: string) => {
-    const { setGitDiverged } = useWorkspaceStore.getState()
+    const { setGitDiverged, setGitPullBlocked } = useWorkspaceStore.getState()
     try {
       const outcome = await api.git.fetchAndCompare(workspace)
       setGitDiverged(outcome.kind === 'diverged' ? { ahead: outcome.ahead, behind: outcome.behind } : null)
+      // `blocked` means the ff-only merge itself refused — most likely an
+      // uncommitted local change conflicting with an incoming one. The
+      // working tree is untouched, but staying silent here (the old
+      // behavior) left the workspace quietly behind the remote with no way
+      // to notice short of opening a terminal. Every other outcome clears
+      // it, including a thrown error below — a later successful check
+      // supersedes a stale blocked notice.
+      setGitPullBlocked(outcome.kind === 'blocked' ? outcome.output : null)
     } catch (e) {
       // Best-effort, same posture as P5-1's repo detection: never blocks
-      // opening the workspace.
+      // opening the workspace. Genuine fetch failures (most commonly no
+      // network) stay silent rather than surfacing an error on every offline
+      // open — only the ff-only refusal above is worth interrupting for.
       setGitDiverged(null)
+      setGitPullBlocked(null)
       console.error('git fetch/compare failed', e)
     }
   }, [])

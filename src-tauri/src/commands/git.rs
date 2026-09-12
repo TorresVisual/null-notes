@@ -657,8 +657,19 @@ pub async fn push_notes(
 pub enum PullOutcome {
     UpToDate,
     FastForwarded,
-    Diverged { ahead: u32, behind: u32 },
+    Diverged {
+        ahead: u32,
+        behind: u32,
+    },
     NoRemote,
+    /// `merge --ff-only` itself refused — most commonly an uncommitted local
+    /// change to a file the incoming commits also touch, which `--ff-only`
+    /// declines to overwrite rather than merging. The working tree is
+    /// untouched either way; this exists so that fact reaches the user
+    /// instead of being swallowed as a generic error (see `checked_pull`).
+    Blocked {
+        output: String,
+    },
 }
 
 fn count_commits(workspace: &str, range: &str) -> anyhow::Result<u32> {
@@ -706,16 +717,22 @@ pub fn checked_pull(workspace: &str) -> anyhow::Result<PullOutcome> {
 
     // `--ff-only`: moves the branch ref if and only if it's a pure
     // fast-forward, and refuses (rather than merging) if a local
-    // uncommitted change would be overwritten.
-    let merge_status = no_window_command("git")
+    // uncommitted change would be overwritten. That refusal is expected,
+    // safety-relevant behavior, not a bug — so it's reported as an outcome
+    // rather than an error the caller has no reason to expect and (per
+    // useGitAutoPull's best-effort posture toward genuine failures like
+    // being offline) would otherwise swallow silently.
+    let merge_output = no_window_command("git")
         .arg("-C")
         .arg(workspace)
         .arg("merge")
         .arg("--ff-only")
         .arg("@{u}")
-        .status()?;
-    if !merge_status.success() {
-        anyhow::bail!("fast-forward merge unexpectedly failed for {workspace}");
+        .output()?;
+    if !merge_output.status.success() {
+        return Ok(PullOutcome::Blocked {
+            output: String::from_utf8_lossy(&merge_output.stderr).into_owned(),
+        });
     }
     Ok(PullOutcome::FastForwarded)
 }
@@ -1850,6 +1867,45 @@ mod tests {
         // The whole point of ff-only: a diverged pull must never touch any
         // file's content, so there is nothing to search for a marker in.
         assert!(!clone_b.path().join("a.md").exists());
+    }
+
+    // The case that used to `anyhow::bail!` and get swallowed as a generic,
+    // console-only error by the frontend: an uncommitted local change (e.g.
+    // saved to disk but not yet auto-committed) conflicts with an incoming
+    // commit to the same file, so `merge --ff-only` refuses. That refusal is
+    // expected — the assertion here is that it comes back as a reportable
+    // outcome, and that the local content is untouched either way.
+    #[test]
+    fn blocked_when_ff_only_would_overwrite_an_uncommitted_local_change() {
+        let (remote, clone_a) = bare_remote_with_clone();
+        let clone_b = tempdir().unwrap();
+        git_clone(remote.path(), clone_b.path());
+
+        commit_file(clone_a.path(), "note.md", "# Note\nfrom a\n");
+        no_window_command("git")
+            .arg("-C")
+            .arg(clone_a.path())
+            .arg("push")
+            .arg("-q")
+            .arg("origin")
+            .arg("HEAD")
+            .status()
+            .unwrap();
+
+        std::fs::write(
+            clone_b.path().join("note.md"),
+            "# Note\nfrom b, uncommitted\n",
+        )
+        .unwrap();
+
+        let outcome = checked_pull(&clone_b.path().to_string_lossy()).unwrap();
+
+        assert!(matches!(outcome, PullOutcome::Blocked { .. }));
+        let content = std::fs::read_to_string(clone_b.path().join("note.md")).unwrap();
+        assert_eq!(
+            content, "# Note\nfrom b, uncommitted\n",
+            "the local uncommitted content must survive untouched"
+        );
     }
 
     #[test]
