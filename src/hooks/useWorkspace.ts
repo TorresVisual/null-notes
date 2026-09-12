@@ -4,6 +4,7 @@ import { api } from '../lib/tauri'
 import { useWorkspaceStore } from '../store/workspace'
 import { useNotesStore } from '../store/notes'
 import { useGitAutoPull } from './useGitAutoPull'
+import { useGitAutoCommit } from './useGitAutoCommit'
 import { clearNavigationHistory } from '../lib/navigationHistory'
 
 export async function refreshTree(): Promise<void> {
@@ -29,6 +30,7 @@ export function useWorkspace() {
   const { setPath, openTab, setExpandedFolders, resetForNewWorkspace } = useWorkspaceStore()
   const { setNotes, setFolders } = useNotesStore()
   const { checkForUpdates } = useGitAutoPull()
+  const { flushGitCommit } = useGitAutoCommit()
 
   const saveSession = useCallback(async () => {
     const { path, openTabs, activeTab, expandedFolders, recentSearches, git } = useWorkspaceStore.getState()
@@ -38,12 +40,13 @@ export function useWorkspace() {
 
   const closeWorkspace = useCallback(async () => {
     await saveSession()
+    await flushGitCommit()
     resetForNewWorkspace()
     clearNavigationHistory()
     setNotes([])
     setFolders([])
     setPath(null)
-  }, [saveSession, resetForNewWorkspace, setNotes, setFolders, setPath])
+  }, [saveSession, flushGitCommit, resetForNewWorkspace, setNotes, setFolders, setPath])
 
   // Read the folder before touching any state: a recent workspace can be gone
   // by the time it's clicked, and a failed scan must leave the current one open.
@@ -66,6 +69,7 @@ export function useWorkspace() {
       }
 
       await saveSession()
+      await flushGitCommit()
       resetForNewWorkspace()
       clearNavigationHistory()
 
@@ -95,7 +99,17 @@ export function useWorkspace() {
       }
       setFolderLoading(false)
     },
-    [setPath, setNotes, setFolders, setExpandedFolders, openTab, resetForNewWorkspace, saveSession, checkForUpdates],
+    [
+      setPath,
+      setNotes,
+      setFolders,
+      setExpandedFolders,
+      openTab,
+      resetForNewWorkspace,
+      saveSession,
+      flushGitCommit,
+      checkForUpdates,
+    ],
   )
 
   const openWorkspace = useCallback(async () => {

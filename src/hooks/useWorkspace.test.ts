@@ -10,7 +10,7 @@ vi.mock('../lib/tauri', () => ({
   api: {
     notes: { scan: vi.fn(), listTags: vi.fn() },
     workspace: { load: vi.fn(), save: vi.fn(), watch: vi.fn(), remember: vi.fn() },
-    git: { detectRepo: vi.fn(), fetchAndCompare: vi.fn() },
+    git: { detectRepo: vi.fn(), fetchAndCompare: vi.fn(), autoCommit: vi.fn() },
   },
 }))
 
@@ -48,6 +48,7 @@ describe('useWorkspace', () => {
     workspace.remember.mockResolvedValue([])
     git.detectRepo.mockResolvedValue(null)
     git.fetchAndCompare.mockResolvedValue({ kind: 'upToDate' })
+    git.autoCommit.mockResolvedValue({ kind: 'nothingToCommit' })
   })
 
   afterEach(() => {
@@ -172,5 +173,35 @@ describe('useWorkspace', () => {
     expect(useWorkspaceStore.getState().openTabs).toEqual([])
     expect(useNotesStore.getState().notes).toEqual([])
     expect(useNotesStore.getState().folders).toEqual([])
+  })
+
+  // Regression for #76: closing/switching workspaces used to clear
+  // gitPendingPaths via resetForNewWorkspace without ever committing them.
+  it('closeWorkspace flushes a pending auto-commit batch before resetting', async () => {
+    useWorkspaceStore.setState({
+      path: '/ws',
+      repoMode: 'notesOnly',
+      git: { prompted: false, autoCommit: true, idleMinutes: 10, skipHooks: false, autoPush: false, allowCodeRepoPush: false },
+      gitPendingPaths: ['/ws/a.md'],
+    })
+    const { result } = renderHook(() => useWorkspace())
+
+    await result.current.closeWorkspace()
+
+    expect(git.autoCommit).toHaveBeenCalledWith('/ws', 'notesOnly', ['/ws/a.md'], false)
+  })
+
+  it('openWorkspaceAt flushes a pending auto-commit batch from the old workspace before switching', async () => {
+    useWorkspaceStore.setState({
+      path: '/old',
+      repoMode: 'notesOnly',
+      git: { prompted: false, autoCommit: true, idleMinutes: 10, skipHooks: false, autoPush: false, allowCodeRepoPush: false },
+      gitPendingPaths: ['/old/a.md'],
+    })
+    const { result } = renderHook(() => useWorkspace())
+
+    await result.current.openWorkspaceAt('/new')
+
+    expect(git.autoCommit).toHaveBeenCalledWith('/old', 'notesOnly', ['/old/a.md'], false)
   })
 })
