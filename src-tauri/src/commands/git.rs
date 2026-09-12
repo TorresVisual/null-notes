@@ -68,14 +68,24 @@ pub fn detect_repo_mode(workspace: &str) -> anyhow::Result<Option<RepoMode>> {
     }))
 }
 
-/// A directory counts as its own note workspace if it directly carries the
-/// marker `.workspace.json` P3-4 already gitignores — the same file
-/// `useGitConfig` persists into. Written lazily (first session-state save,
-/// not on the folder's very first open), so a course folder opened for the
-/// first time ever still reads as a plain `CodeRepo` this once; it detects
-/// as `NotesMonorepo` from its next open onward.
+/// A directory counts as its own note workspace if it carries the marker
+/// `.workspace.json` P3-4 already gitignores (the same file `useGitConfig`
+/// persists into), or — since that marker is gitignored and so never travels
+/// with a clone — if it holds a `.md` note at its own root. The second check
+/// is what lets a freshly cloned course folder detect correctly on the
+/// machine that never wrote the marker: the note files themselves are the
+/// repo-visible signal (see #80). A folder with neither is a folder no one
+/// has ever put a note in yet, so it still reads as a plain `CodeRepo`.
 fn is_workspace_folder(dir: &Path) -> bool {
-    dir.join(".workspace.json").is_file()
+    if dir.join(".workspace.json").is_file() {
+        return true;
+    }
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return false;
+    };
+    entries
+        .flatten()
+        .any(|entry| entry.path().extension().and_then(|e| e.to_str()) == Some("md"))
 }
 
 /// True if every entry in `dir`, other than `except` (the child we walked up
@@ -1416,6 +1426,26 @@ mod tests {
         let mode = detect_repo_mode(&dsa.to_string_lossy()).unwrap();
 
         assert_eq!(mode, Some(RepoMode::CodeRepo));
+    }
+
+    // #80: a freshly cloned monorepo has never had `.workspace.json` written
+    // on this machine — that marker is gitignored, so it can't have traveled
+    // with the clone either. The note files themselves are what's actually
+    // on disk, and must be enough to detect NotesMonorepo on first open.
+    #[test]
+    fn a_freshly_cloned_monorepo_detects_from_note_files_alone() {
+        let tmp = tempdir().unwrap();
+        git_init(tmp.path());
+        let dsa = tmp.path().join("DSA");
+        std::fs::create_dir(&dsa).unwrap();
+        std::fs::write(dsa.join("Lecture 1.md"), "# Lecture 1\n").unwrap();
+        let analysis = tmp.path().join("Analysis_2");
+        std::fs::create_dir(&analysis).unwrap();
+        std::fs::write(analysis.join("Intro.md"), "# Intro\n").unwrap();
+
+        let mode = detect_repo_mode(&dsa.to_string_lossy()).unwrap();
+
+        assert_eq!(mode, Some(RepoMode::NotesMonorepo));
     }
 
     #[test]
