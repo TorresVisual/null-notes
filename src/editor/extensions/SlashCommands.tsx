@@ -91,6 +91,12 @@ const COMMANDS: Cmd[] = [
     run: ({ editor, range }) =>
       editor.chain().focus().deleteRange(range).setCodeBlock().run(),
   },
+  {
+    title: 'Expected Output',
+    description: 'Assert expected output of previous code block',
+    run: ({ editor, range }) =>
+      editor.chain().focus().deleteRange(range).setCodeBlock({ language: 'expect' }).run(),
+  },
   // P14-1/P14-2: one entry per named diagram type, each scaffolding a
   // starting point that renders correctly on insertion rather than an empty
   // fence — `MERMAID_TEMPLATES` is the editable table, this just wires each

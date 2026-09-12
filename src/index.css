@@ -1431,17 +1431,45 @@ code {
   font-family: var(--font-mono);
   font-size: 12px;
 }
-.code-run-run, .code-run-stop, .code-run-pin, .code-run-close {
+.code-run-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.code-run-run, .code-run-stop, .code-run-expect, .code-run-pin, .code-run-close {
   padding: 3px 10px;
   background: var(--bg-hover);
   border: 1px solid var(--border);
   border-radius: 4px;
   color: var(--text-tertiary);
   cursor: pointer;
+  font-family: inherit;
+  font-size: inherit;
 }
-.code-run-run:hover, .code-run-stop:hover, .code-run-pin:hover, .code-run-close:hover { color: var(--accent); border-color: var(--accent); }
+.code-run-run:hover, .code-run-stop:hover, .code-run-expect:hover, .code-run-pin:hover, .code-run-close:hover { color: var(--accent); border-color: var(--accent); }
 .code-run-stop { color: var(--danger); border-color: var(--danger); }
 .code-run-stop:hover { color: var(--danger); border-color: var(--danger); background: color-mix(in srgb, var(--danger) 15%, transparent); }
+
+.code-run-assertion {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-weight: 500;
+  font-size: 11px;
+}
+.code-run-assertion.pass {
+  color: var(--accent);
+  background: var(--accent-bg);
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+}
+.code-run-assertion.fail {
+  color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 15%, transparent);
+  border: 1px solid color-mix(in srgb, var(--danger) 30%, transparent);
+}
+
 .code-run-output {
   margin: 6px 0 0;
   padding: 8px 10px;
@@ -1467,6 +1495,24 @@ code {
   color: var(--text-primary);
 }
 .code-run-stdin:focus-visible { outline: none; box-shadow: var(--focus-ring); border-color: var(--accent); }
+
+/* Expected output code blocks (Issue 50) */
+pre:has(code.language-expect), pre:has(code.language-expected) {
+  border-left: 3px solid var(--accent);
+  position: relative;
+}
+pre:has(code.language-expect)::before, pre:has(code.language-expected)::before {
+  content: 'EXPECTED OUTPUT';
+  position: absolute;
+  top: 6px;
+  right: 10px;
+  font-size: 9px;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+  color: var(--text-tertiary);
+  pointer-events: none;
+  user-select: none;
+}
 
 /* Note-wide find/replace. Lives OUTSIDE the ProseMirror document as a
    sibling of `.editor-scroll` inside `.editor-body` (see FindReplace.ts's

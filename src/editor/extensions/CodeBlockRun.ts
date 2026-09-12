@@ -2,6 +2,7 @@ import { Extension } from '@tiptap/core'
 import { Plugin, PluginKey } from '@tiptap/pm/state'
 import { Decoration, DecorationSet } from '@tiptap/pm/view'
 import type { EditorState } from '@tiptap/pm/state'
+import type { Node as ProseMirrorNode } from '@tiptap/pm/model'
 import type { EditorView } from '@tiptap/pm/view'
 import { listen } from '@tauri-apps/api/event'
 import { api } from '../../lib/tauri'
@@ -18,6 +19,10 @@ import { useWorkspaceStore } from '../../store/workspace'
  * "Pin output" is the one escape hatch, writing a snapshot of that state
  * into the doc as a plain (language `''`, so it's never itself runnable)
  * code block, through the normal save path.
+ *
+ * Issue 50 adds expected output assertions: if a code block is followed by
+ * an `expect` (or `expected`) code block, the captured stdout is diffed against
+ * the expected output, showing a pass/fail indicator and comparison diff.
  */
 
 export const RUNNABLE_LANGUAGES = new Set(['python', 'cpp', 'c++', 'c'])
@@ -27,10 +32,11 @@ export interface RunEntry {
   status: 'starting' | 'running' | 'exited' | 'timeout' | 'stopped'
   exitCode: number | null
   output: { stream: 'stdout' | 'stderr'; text: string }[]
+  expectedOutput?: string | null
 }
 
 export type CodeRunMeta =
-  | { type: 'start'; pos: number; runId: string }
+  | { type: 'start'; pos: number; runId: string; expectedOutput?: string | null }
   | { type: 'output'; runId: string; stream: 'stdout' | 'stderr'; text: string }
   | { type: 'exit'; runId: string; code: number | null }
   | { type: 'timeout'; runId: string }
@@ -45,6 +51,77 @@ function posForRunId(entries: Map<number, RunEntry>, runId: string): number | nu
 }
 
 /**
+ * Normalizes output and expected text for comparison:
+ * standardizes CRLF to LF, trims trailing whitespace per line,
+ * and strips trailing newlines.
+ */
+export function normalizeOutput(text: string): string {
+  return text
+    .replace(/\r\n/g, '\n')
+    .split('\n')
+    .map((line) => line.trimEnd())
+    .join('\n')
+    .trimEnd()
+}
+
+/**
+ * Finds a sibling `expect` or `expected` code block immediately following the code block at `pos`.
+ * Skips intervening empty paragraphs if present.
+ */
+export function findExpectedOutput(doc: ProseMirrorNode, pos: number): { pos: number; text: string } | null {
+  const node = doc.nodeAt(pos)
+  if (!node || node.type.name !== 'codeBlock') return null
+  let nextPos = pos + node.nodeSize
+  if (nextPos >= doc.content.size) return null
+
+  let nextNode = doc.nodeAt(nextPos)
+  if (nextNode && nextNode.type.name === 'paragraph' && nextNode.textContent.trim() === '') {
+    nextPos += nextNode.nodeSize
+    nextNode = nextPos < doc.content.size ? doc.nodeAt(nextPos) : null
+  }
+
+  if (nextNode && nextNode.type.name === 'codeBlock') {
+    const lang = String(nextNode.attrs['language'] ?? '').toLowerCase()
+    if (lang === 'expect' || lang === 'expected') {
+      return { pos: nextPos, text: nextNode.textContent }
+    }
+  }
+  return null
+}
+
+export interface AssertionStatus {
+  result: 'pass' | 'fail' | null
+  reason?: string
+}
+
+/** Evaluates the pass/fail assertion status of a run against its expected output. */
+export function assertionStatus(entry: RunEntry): AssertionStatus {
+  if (entry.expectedOutput === undefined || entry.expectedOutput === null) {
+    return { result: null }
+  }
+  if (entry.status === 'starting' || entry.status === 'running' || entry.status === 'stopped') {
+    return { result: null }
+  }
+  if (entry.status === 'timeout') {
+    return { result: 'fail', reason: 'timeout' }
+  }
+  if (entry.status === 'exited') {
+    if (entry.exitCode !== 0) {
+      return { result: 'fail', reason: `exit code ${entry.exitCode ?? 'unknown'}` }
+    }
+    const actualStdout = entry.output
+      .filter((chunk) => chunk.stream === 'stdout')
+      .map((chunk) => chunk.text)
+      .join('')
+    if (normalizeOutput(actualStdout) === normalizeOutput(entry.expectedOutput)) {
+      return { result: 'pass' }
+    }
+    return { result: 'fail', reason: 'output mismatch' }
+  }
+  return { result: null }
+}
+
+/**
  * Pure reducer backing `CodeBlockRun`'s ProseMirror plugin state — kept
  * separate from the plugin itself so the transition logic is unit-testable
  * without mounting an editor, the same split `CodeBlockSearch.ts`'s
@@ -53,7 +130,13 @@ function posForRunId(entries: Map<number, RunEntry>, runId: string): number | nu
 export function applyCodeRunMeta(entries: Map<number, RunEntry>, meta: CodeRunMeta): Map<number, RunEntry> {
   if (meta.type === 'start') {
     const next = new Map(entries)
-    next.set(meta.pos, { runId: meta.runId, status: 'starting', exitCode: null, output: [] })
+    next.set(meta.pos, {
+      runId: meta.runId,
+      status: 'starting',
+      exitCode: null,
+      output: [],
+      expectedOutput: meta.expectedOutput ?? null,
+    })
     return next
   }
 
@@ -127,10 +210,14 @@ function runPanel(pos: number): HTMLElement {
   panel.contentEditable = 'false'
   panel.setAttribute('data-code-run-pos', String(pos))
   panel.innerHTML = `
-    <button type="button" class="code-run-run" data-action="run">Run</button>
-    <button type="button" class="code-run-stop" data-action="stop" hidden>Stop</button>
-    <button type="button" class="code-run-pin" data-action="pin" hidden>Pin output</button>
-    <button type="button" class="code-run-close" data-action="close" hidden>Dismiss</button>
+    <div class="code-run-bar">
+      <button type="button" class="code-run-run" data-action="run">Run</button>
+      <button type="button" class="code-run-stop" data-action="stop" hidden>Stop</button>
+      <button type="button" class="code-run-expect" data-action="expect">Add expected</button>
+      <button type="button" class="code-run-pin" data-action="pin" hidden>Pin output</button>
+      <button type="button" class="code-run-close" data-action="close" hidden>Dismiss</button>
+      <span class="code-run-assertion" hidden></span>
+    </div>
     <pre class="code-run-output" hidden></pre>
     <div class="code-run-stdin-row" hidden>
       <input type="text" class="code-run-stdin" placeholder="stdin…">
@@ -146,6 +233,31 @@ export function formatRunOutput(entry: RunEntry): string {
   if (entry.status === 'exited') text += `\n[exited with code ${entry.exitCode ?? 'unknown'}]`
   if (entry.status === 'timeout') text += '\n[stopped: exceeded the run timeout]'
   if (entry.status === 'stopped') text += '\n[stopped]'
+
+  if (entry.expectedOutput !== undefined && entry.expectedOutput !== null) {
+    const assertion = assertionStatus(entry)
+    if (assertion.result === 'pass') {
+      text += '\n[assertion: passed]'
+    } else if (assertion.result === 'fail') {
+      if (assertion.reason === 'output mismatch') {
+        const actualStdout = entry.output
+          .filter((c) => c.stream === 'stdout')
+          .map((c) => c.text)
+          .join('')
+        const stderr = entry.output
+          .filter((c) => c.stream === 'stderr')
+          .map((c) => c.text)
+          .join('')
+        let diff = `Expected:\n${entry.expectedOutput}\n\nActual:\n${actualStdout}`
+        if (stderr) diff += `\nStderr:\n${stderr}`
+        diff += `\n[exited with code ${entry.exitCode ?? 'unknown'}]\n[assertion: failed (output mismatch)]`
+        return diff
+      } else {
+        text += `\n[assertion: failed (${assertion.reason})]`
+      }
+    }
+  }
+
   return text
 }
 
@@ -178,26 +290,38 @@ function syncRunPanelUi(view: EditorView) {
 
     const run = el.querySelector('.code-run-run')
     const stop = el.querySelector('.code-run-stop')
+    const expectBtn = el.querySelector('.code-run-expect')
     const pin = el.querySelector('.code-run-pin')
     const close = el.querySelector('.code-run-close')
+    const assertion = el.querySelector('.code-run-assertion')
     const output = el.querySelector('.code-run-output')
     const stdinRow = el.querySelector('.code-run-stdin-row')
     if (
       !(run instanceof HTMLElement) ||
       !(stop instanceof HTMLElement) ||
+      !(expectBtn instanceof HTMLElement) ||
       !(pin instanceof HTMLElement) ||
       !(close instanceof HTMLElement) ||
+      !(assertion instanceof HTMLElement) ||
       !(output instanceof HTMLElement) ||
       !(stdinRow instanceof HTMLElement)
     ) {
       return
     }
 
+    const hasExpect = findExpectedOutput(view.state.doc, pos) !== null
+
     if (!entry) {
       run.hidden = false
       stop.hidden = true
+      expectBtn.hidden = hasExpect
+      expectBtn.textContent = 'Add expected'
+      expectBtn.title = 'Add an expected output block below'
       pin.hidden = true
       close.hidden = true
+      assertion.hidden = true
+      assertion.textContent = ''
+      assertion.className = 'code-run-assertion'
       output.hidden = true
       stdinRow.hidden = true
       return
@@ -210,6 +334,34 @@ function syncRunPanelUi(view: EditorView) {
     close.hidden = running
     output.hidden = false
     stdinRow.hidden = !running
+
+    if (!running && !hasExpect && entry.output.some((c) => c.stream === 'stdout' && c.text.trim())) {
+      expectBtn.hidden = false
+      expectBtn.textContent = 'Set as expected'
+      expectBtn.title = 'Use this output as the expected output block'
+    } else {
+      expectBtn.hidden = true
+    }
+
+    const assertRes = assertionStatus(entry)
+    if (assertRes.result === 'pass') {
+      assertion.hidden = false
+      assertion.className = 'code-run-assertion pass'
+      assertion.textContent = '✓ Passed'
+    } else if (assertRes.result === 'fail') {
+      assertion.hidden = false
+      assertion.className = 'code-run-assertion fail'
+      assertion.textContent =
+        assertRes.reason === 'timeout'
+          ? '✗ Timed out'
+          : assertRes.reason === 'output mismatch'
+            ? '✗ Failed'
+            : `✗ Failed (${assertRes.reason})`
+    } else {
+      assertion.hidden = true
+      assertion.textContent = ''
+      assertion.className = 'code-run-assertion'
+    }
 
     output.textContent = formatRunOutput(entry)
     output.scrollTop = output.scrollHeight
@@ -310,7 +462,9 @@ export const CodeBlockRun = Extension.create({
                   if (!allowed) return
                   return ensureListening().then(() => {
                     const runId = crypto.randomUUID()
-                    view.dispatch(view.state.tr.setMeta(codeRunKey, { type: 'start', pos, runId }))
+                    const expected = findExpectedOutput(view.state.doc, pos)
+                    const expectedOutput = expected ? expected.text : null
+                    view.dispatch(view.state.tr.setMeta(codeRunKey, { type: 'start', pos, runId, expectedOutput }))
                     const settings = useSettingsStore.getState().settings
                     void api.codeRun.run(runId, language, source, settings.codeRunTimeoutSecs)
                   })
@@ -320,6 +474,26 @@ export const CodeBlockRun = Extension.create({
 
             const entries = codeRunKey.getState(view.state) ?? new Map<number, RunEntry>()
             const entry = entries.get(pos)
+
+            if (action === 'expect') {
+              const node = view.state.doc.nodeAt(pos)
+              if (!node) return
+              const text = entry
+                ? entry.output
+                    .filter((c) => c.stream === 'stdout')
+                    .map((c) => c.text)
+                    .join('')
+                    .trimEnd()
+                : ''
+              const schema = view.state.schema
+              const expectNode = schema.nodes['codeBlock']!.create(
+                { language: 'expect' },
+                text ? schema.text(text) : undefined,
+              )
+              view.dispatch(view.state.tr.insert(pos + node.nodeSize, expectNode))
+              return
+            }
+
             if (!entry) return
 
             if (action === 'stop') {
@@ -373,3 +547,4 @@ export const CodeBlockRun = Extension.create({
     ]
   },
 })
+
