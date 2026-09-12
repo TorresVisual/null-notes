@@ -41,10 +41,11 @@ export function ImportButton() {
   const expandFolder = useWorkspaceStore((s) => s.expandFolder)
   const settings = useSettingsStore((s) => s.settings)
   const setSettings = useSettingsStore((s) => s.setSettings)
-  const [pending, setPending] = useState<PickedPdf | null>(null)
+  const [pending, setPending] = useState<PickedPdf[] | null>(null)
   const [scanned, setScanned] = useState<PickedPdf | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [isConverting, setIsConverting] = useState(false)
+  const [batchProgress, setBatchProgress] = useState<{ index: number; total: number } | null>(null)
 
   async function handleClick() {
     if (!workspacePath) return
@@ -57,17 +58,11 @@ export function ImportButton() {
   // as a viewable block. Markdown: the PDF's own text layer is reconstructed
   // into an ordinary editable note, equations included — no OCR, no image
   // crops, so the note stays plain, copyable Markdown throughout.
-  async function runImport(picked: PickedPdf, mode: PdfImportMode) {
-    if (!workspacePath) return
-    setPending(null)
-    setScanned(null)
-    setError(null)
-
-    if (mode !== settings.pdfImportMode) {
-      const next = { ...settings, pdfImportMode: mode }
-      setSettings(next)
-      void api.settings.save(next)
-    }
+  // Returns 'scanned' instead of throwing when a markdown-mode PDF has no text
+  // layer, so callers can offer the interactive Pages fallback for a single
+  // file and just skip-and-report it when importing a batch.
+  async function importOne(picked: PickedPdf, mode: PdfImportMode): Promise<'ok' | 'scanned'> {
+    if (!workspacePath) return 'ok'
 
     try {
       // Markdown mode converts before the note exists, so a PDF with nothing
@@ -81,8 +76,7 @@ export function ImportButton() {
           setIsConverting(false)
         })
         if (!convertible) {
-          setScanned(picked)
-          return
+          return 'scanned'
         }
         setIsConverting(true)
         const result = await api.pdf.importMarkdown(picked.path).finally(() => setIsConverting(false))
@@ -118,6 +112,7 @@ export function ImportButton() {
       // folder would otherwise leave the freshly imported note invisible.
       expandFolder(folder)
       showToast(`Imported "${picked.title}"`)
+      return 'ok'
     } catch (e) {
       // Names the file, states what's provably true regardless of which step
       // failed (the source PDF is only ever read, never written to), and
@@ -127,20 +122,55 @@ export function ImportButton() {
       // doesn't roll that back, so the guidance covers it rather than
       // silently implying nothing happened at all.
       const detail = e instanceof Error ? e.message : String(e)
-      setError(
+      throw new Error(
         `Couldn't import "${picked.title}": ${detail}. Your PDF file wasn't changed — if a ` +
           'note was partly created, delete it and try again.',
       )
     }
   }
 
-  const busy = isImporting || isConverting
+  // A single file keeps the old interactive "no text layer" fallback; a
+  // batch just skips that file and reports it alongside any real failures
+  // once the whole batch is done, so N picks never means N confirm clicks.
+  async function runImport(files: PickedPdf[], mode: PdfImportMode) {
+    if (!workspacePath) return
+    setPending(null)
+    setScanned(null)
+    setError(null)
+
+    if (mode !== settings.pdfImportMode) {
+      const next = { ...settings, pdfImportMode: mode }
+      setSettings(next)
+      void api.settings.save(next)
+    }
+
+    const failures: string[] = []
+    for (const [i, file] of files.entries()) {
+      if (files.length > 1) setBatchProgress({ index: i + 1, total: files.length })
+      try {
+        const result = await importOne(file, mode)
+        if (result === 'scanned') {
+          if (files.length === 1) {
+            setScanned(file)
+          } else {
+            failures.push(`${file.title}: no text layer — import as pages instead`)
+          }
+        }
+      } catch (e) {
+        failures.push(e instanceof Error ? e.message : String(e))
+      }
+    }
+    setBatchProgress(null)
+    if (failures.length) setError(failures.join('\n'))
+  }
+
+  const busy = isImporting || isConverting || batchProgress !== null
 
   return (
     <div className="import-pdf">
       {pending && (
         <ImportModeDialog
-          fileName={pending.title}
+          fileName={pending.length === 1 ? pending[0]!.title : `${pending.length} files`}
           initialMode={settings.pdfImportMode}
           onChoose={(mode) => void runImport(pending, mode)}
           onCancel={() => setPending(null)}
@@ -158,10 +188,15 @@ export function ImportButton() {
             is nothing to convert.
           </p>
           <div className="import-fallback-actions">
-            <button onClick={() => void runImport(scanned, 'pages')}>Import as pages</button>
+            <button onClick={() => void runImport([scanned], 'pages')}>Import as pages</button>
             <button onClick={() => setScanned(null)}>Cancel</button>
           </div>
         </div>
+      )}
+      {batchProgress && (
+        <p className="import-progress">
+          Importing {batchProgress.index}/{batchProgress.total}…
+        </p>
       )}
       {isConverting && <p className="import-progress">Reading text layer…</p>}
       {isImporting && progress && (

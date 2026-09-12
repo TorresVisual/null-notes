@@ -21,13 +21,14 @@ export function usePdfImport() {
   const [progress, setProgress] = useState<PdfImportProgress | null>(null)
   const [isImporting, setIsImporting] = useState(false)
 
-  const pickPdf = useCallback(async (): Promise<PickedPdf | null> => {
+  const pickPdf = useCallback(async (): Promise<PickedPdf[] | null> => {
     const selected = await open({
       filters: [{ name: 'PDF', extensions: ['pdf'] }],
-      multiple: false,
+      multiple: true,
     })
-    if (!selected || Array.isArray(selected)) return null
-    return { path: selected, title: titleFromPdfPath(selected) }
+    if (!selected) return null
+    const paths = Array.isArray(selected) ? selected : [selected]
+    return paths.map((path) => ({ path, title: titleFromPdfPath(path) }))
   }, [])
 
   const importPages = useCallback(async (pdfPath: string, notePath: string): Promise<PdfPage[]> => {

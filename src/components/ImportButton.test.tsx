@@ -6,6 +6,7 @@ import { useWorkspaceStore } from '../store/workspace'
 import { useNotesStore } from '../store/notes'
 import { api } from '../lib/tauri'
 import { showToast } from '../store/toast'
+import { usePdfImport } from '../pdf/usePdfImport'
 
 vi.mock('../lib/tauri', () => ({
   api: {
@@ -24,12 +25,12 @@ vi.mock('../lib/tauri', () => ({
   },
 }))
 vi.mock('../pdf/usePdfImport', () => ({
-  usePdfImport: () => ({
-    pickPdf: vi.fn().mockResolvedValue({ path: '/tmp/Lecture 7.pdf', title: 'Lecture 7' }),
+  usePdfImport: vi.fn(() => ({
+    pickPdf: vi.fn().mockResolvedValue([{ path: '/tmp/Lecture 7.pdf', title: 'Lecture 7' }]),
     importPages: vi.fn(),
     isImporting: false,
     progress: null,
-  }),
+  })),
 }))
 vi.mock('../store/toast', () => ({ showToast: vi.fn() }))
 
@@ -61,5 +62,34 @@ describe('ImportButton', () => {
     await user.click(await screen.findByRole('button', { name: /As Markdown/ }))
 
     await waitFor(() => expect(showToast).toHaveBeenCalledWith('Imported "Lecture 7"'))
+  })
+
+  it('imports every picked file in a batch and reports the one that fails', async () => {
+    vi.mocked(usePdfImport).mockReturnValue({
+      pickPdf: vi.fn().mockResolvedValue([
+        { path: '/tmp/Lecture 7.pdf', title: 'Lecture 7' },
+        { path: '/tmp/Lecture 8.pdf', title: 'Lecture 8' },
+      ]),
+      importPages: vi.fn(),
+      isImporting: false,
+      progress: null,
+    })
+    vi.mocked(api.notes.create).mockResolvedValueOnce({
+      id: '1',
+      path: '/ws/Lecture 7.md',
+      title: 'Lecture 7',
+      workspace: '/ws',
+      updatedAt: 0,
+    })
+    vi.mocked(api.notes.create).mockRejectedValueOnce(new Error('disk full'))
+
+    const user = userEvent.setup()
+    render(<ImportButton />)
+
+    await user.click(screen.getByRole('button', { name: /Import PDF/ }))
+    await user.click(await screen.findByRole('button', { name: /As Markdown/ }))
+
+    await waitFor(() => expect(showToast).toHaveBeenCalledWith('Imported "Lecture 7"'))
+    expect(await screen.findByText(/Lecture 8.*disk full/)).toBeInTheDocument()
   })
 })
