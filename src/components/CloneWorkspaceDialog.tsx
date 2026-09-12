@@ -94,17 +94,21 @@ export function CloneWorkspaceDialog({ onClose }: CloneWorkspaceDialogProps) {
             </CommandGroup>
           )}
           {reposState === 'available' && filtered.length > 0 && (
-            <CommandGroup heading="Your repositories">
+            <CommandGroup heading="Your repositories" className="clone-repo-group">
               {filtered.map((r) => (
                 <CommandItem
                   key={r.url}
                   value={r.nameWithOwner}
-                  className="clone-repo-item"
+                  className="clone-repo-item [&>svg]:hidden"
                   disabled={cloning}
                   onSelect={() => void cloneFrom(r.url)}
                 >
                   <span className="clone-repo-name">{r.nameWithOwner}</span>
-                  {r.isPrivate && <Lock size={12} className="clone-repo-private" />}
+                  {r.isPrivate && (
+                    <span className="clone-repo-private">
+                      <Lock size={12} />
+                    </span>
+                  )}
                 </CommandItem>
               ))}
             </CommandGroup>

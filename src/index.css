@@ -2288,8 +2288,24 @@ pre:has(code.language-expect)::before, pre:has(code.language-expected)::before {
 .workspace-picker-clone:focus-visible { outline: none; box-shadow: var(--focus-ring); }
 
 /* Clone workspace dialog (#79) — rows inside the shared .search-modal/
-   .search-results chrome; CommandItem already lays them out as a flex row,
-   only the row-internal content styling below is new. */
+   .search-results chrome. CommandItem's own Tailwind defaults (px-2 py-1.5,
+   i.e. 8px/6px) are tighter than every other row in this dialog family
+   (.search-result's 10px/18px), which left list text sitting closer to the
+   edge than the search icon/placeholder above it. CommandGroup itself also
+   carries a 4px p-1 wrapper around its heading+items, so these use 14px
+   (not 18px) to land on the same 18px total inset as the input row. */
+.clone-url-item, .clone-repo-item {
+  padding: 10px 14px;
+}
+
+/* "Your repositories" — same tightness problem as the rows above: cmdk's
+   own heading padding (px-2 py-1.5) reads cramped against this dialog's
+   18px-total inset, with no top gap separating it from the input's bottom
+   border. */
+.clone-repo-group [cmdk-group-heading] {
+  padding: 12px 14px 6px;
+}
+
 .clone-url-value {
   color: var(--accent);
   overflow: hidden;
@@ -2297,9 +2313,9 @@ pre:has(code.language-expect)::before, pre:has(code.language-expected)::before {
   white-space: nowrap;
 }
 
-.clone-repo-item { justify-content: space-between; }
-
 .clone-repo-name {
+  flex: 1;
+  min-width: 0;
   font-size: 14px;
   color: var(--text-primary);
   overflow: hidden;
