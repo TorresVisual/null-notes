@@ -856,6 +856,47 @@ async fn pdf_search_text_for(note_path: &str) -> String {
         .unwrap_or_default()
 }
 
+// A ```diagram block's `jsonSrc` (DiagramBlock.tsx's markdown serializer)
+// points at the `.excalidraw` sidecar holding the actual scene — the only
+// place a diagram's typed text elements (state/node labels) exist as
+// machine-readable text (issue #41). Pulls just those `text`-type elements'
+// strings out, skipping anything that doesn't parse rather than failing the
+// whole reindex over one malformed or missing diagram.
+async fn diagram_search_text_for(content: &str) -> String {
+    let re = match Regex::new(r"(?s)```diagram\n(.*?)\n```") {
+        Ok(re) => re,
+        Err(_) => return String::new(),
+    };
+    let mut texts = Vec::new();
+    for caps in re.captures_iter(content) {
+        let Some(json_src) = caps
+            .get(1)
+            .and_then(|g| serde_json::from_str::<serde_json::Value>(g.as_str()).ok())
+            .and_then(|block| block.get("jsonSrc")?.as_str().map(str::to_string))
+        else {
+            continue;
+        };
+        let Ok(raw) = tokio::fs::read_to_string(&json_src).await else {
+            continue;
+        };
+        let Ok(scene) = serde_json::from_str::<serde_json::Value>(&raw) else {
+            continue;
+        };
+        let Some(elements) = scene.get("elements").and_then(|e| e.as_array()) else {
+            continue;
+        };
+        for element in elements {
+            if element.get("type").and_then(|t| t.as_str()) != Some("text") {
+                continue;
+            }
+            if let Some(text) = element.get("text").and_then(|t| t.as_str()) {
+                texts.push(text.to_string());
+            }
+        }
+    }
+    texts.join("\n")
+}
+
 async fn index_note_at(
     path: &str,
     workspace: &str,
@@ -872,11 +913,14 @@ async fn index_note_at(
     };
     db::notes::index_note(db, &meta).await?;
     let pdf_text = pdf_search_text_for(path).await;
-    let fts_body = if pdf_text.is_empty() {
-        content.to_string()
-    } else {
-        format!("{content}\n\n{pdf_text}")
-    };
+    let diagram_text = diagram_search_text_for(content).await;
+    let mut fts_body = content.to_string();
+    for extra in [&pdf_text, &diagram_text] {
+        if !extra.is_empty() {
+            fts_body.push_str("\n\n");
+            fts_body.push_str(extra);
+        }
+    }
     db::notes::index_note_content(db, path, &title, &fts_body).await?;
     db::notes::set_tags(db, path, &extract_tags(content)).await?;
     db::notes::set_links(db, path, &extract_links(content)).await?;
@@ -3371,6 +3415,46 @@ mod save_tests {
             .unwrap();
 
         let results = db::notes::search_notes(&pool, &ws, Some("quicksort"), None, None, None)
+            .await
+            .unwrap();
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].path, note.to_string_lossy());
+    }
+
+    #[tokio::test]
+    async fn test_reindex_note_picks_up_diagram_text_elements() {
+        // A diagram's typed labels live in the `.excalidraw` JSON the
+        // ```diagram block's jsonSrc points at, not in the note's own
+        // Markdown (issue #41). This confirms `index_note_at` finds them.
+        let tmp = tempdir().unwrap();
+        let ws = tmp.path().to_string_lossy().into_owned();
+        let note = tmp.path().join("Lecture 7.md");
+        let sidecar = tmp.path().join("Lecture 7.diagrams");
+        std::fs::create_dir_all(&sidecar).unwrap();
+        let json_path = sidecar.join("diagram-1.excalidraw");
+        std::fs::write(
+            &json_path,
+            r#"{"elements":[{"type":"text","text":"deterministic finite automaton"},{"type":"rectangle"}]}"#,
+        )
+        .unwrap();
+
+        let json_src = json_path.to_string_lossy().replace('\\', "\\\\");
+        let content = format!(
+            "# Lecture 7\n\n```diagram\n{{\"jsonSrc\":\"{json_src}\",\"svgSrc\":\"x\",\"width\":700,\"height\":500}}\n```\n"
+        );
+        std::fs::write(&note, &content).unwrap();
+
+        let pool = sqlx::sqlite::SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect("sqlite::memory:")
+            .await
+            .unwrap();
+        run_migrations(&pool).await.unwrap();
+        index_note_at(&note.to_string_lossy(), &ws, &content, &pool)
+            .await
+            .unwrap();
+
+        let results = db::notes::search_notes(&pool, &ws, Some("automaton"), None, None, None)
             .await
             .unwrap();
         assert_eq!(results.len(), 1);
