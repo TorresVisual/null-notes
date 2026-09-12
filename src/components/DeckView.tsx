@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
-import { X } from 'lucide-react'
+import { Pencil, X } from 'lucide-react'
 import { LoadingStatus } from './LoadingStatus'
 import { api } from '../lib/tauri'
 import { useWorkspaceStore } from '../store/workspace'
+import { promptText } from '../store/promptDialog'
 import { groupCardsByNote, groupCardsByStreak } from '../lib/cardGroups'
 import type { CardSummary } from '../types'
 
@@ -68,6 +69,28 @@ export function DeckView({ onClose, onOpenCram }: DeckViewProps) {
     })
   }
 
+  async function handleRenameTag(e: React.MouseEvent, tag: string) {
+    e.preventDefault()
+    e.stopPropagation()
+    if (!workspacePath) return
+    const newTag = await promptText('Rename tag:', tag)
+    if (!newTag || newTag === tag) return
+    try {
+      await api.notes.renameTag(tag, newTag, workspacePath)
+      setActiveTags((prev) => {
+        if (!prev.has(tag)) return prev
+        const next = new Set(prev)
+        next.delete(tag)
+        next.add(newTag)
+        return next
+      })
+      const refreshed = await api.notes.listAllCards(workspacePath)
+      setCards(refreshed)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    }
+  }
+
   function openNote(path: string) {
     openTab(path)
     onClose()
@@ -106,6 +129,14 @@ export function DeckView({ onClose, onOpenCram }: DeckViewProps) {
                       aria-label={tag}
                     />
                     {tag}
+                    <button
+                      className="deck-view-tag-rename"
+                      onClick={(e) => handleRenameTag(e, tag)}
+                      aria-label={`Rename tag ${tag}`}
+                      title={`Rename tag ${tag}`}
+                    >
+                      <Pencil size={11} />
+                    </button>
                   </label>
                 ))}
               </div>

@@ -1347,6 +1347,101 @@ pub async fn rename_note(
         .map_err(|e| e.to_string())
 }
 
+// Same-length stand-in for `strip_code`: fenced and inline code spans are
+// blanked out (newlines kept) rather than removed, so match byte offsets
+// found in the masked copy line up exactly with `content`.
+fn mask_code(content: &str) -> String {
+    let mask = |s: &str| -> String {
+        s.chars()
+            .map(|c| if c == '\n' { '\n' } else { 'x' })
+            .collect()
+    };
+    let fenced = Regex::new(r"(?s)```.*?```")
+        .map(|re| {
+            re.replace_all(content, |caps: &regex::Captures| mask(&caps[0]))
+                .into_owned()
+        })
+        .unwrap_or_else(|_| content.to_string());
+    Regex::new(r"`[^`\n]*`")
+        .map(|re| {
+            re.replace_all(&fenced, |caps: &regex::Captures| mask(&caps[0]))
+                .into_owned()
+        })
+        .unwrap_or(fenced)
+}
+
+// Rewrites only the tag word itself (the capture group), not the leading `#`
+// or whitespace `extract_tags`'s own pattern anchors on — same match, smaller
+// replacement. Matched against `mask_code(content)` so a tag name that also
+// appears inside a fenced or inline code span (`#include`, `#define`) is left
+// alone, consistent with `extract_tags` never counting those as tags either.
+fn rewrite_tag(content: &str, old_tag: &str, new_tag: &str) -> anyhow::Result<String> {
+    let masked = mask_code(content);
+    let re = Regex::new(r"(?:^|\s)#([A-Za-z][\w-]*)")?;
+    let old_lower = old_tag.to_lowercase();
+    let mut result = String::with_capacity(content.len());
+    let mut last_end = 0;
+    for caps in re.captures_iter(&masked) {
+        let m = caps
+            .get(1)
+            .expect("group 1 always matches with the outer alternation");
+        if m.as_str().to_lowercase() != old_lower {
+            continue;
+        }
+        result.push_str(&content[last_end..m.start()]);
+        result.push_str(new_tag);
+        last_end = m.end();
+    }
+    result.push_str(&content[last_end..]);
+    Ok(result)
+}
+
+async fn rename_tag_at(
+    old_tag: &str,
+    new_tag: &str,
+    workspace: &str,
+    db: &DbPool,
+) -> anyhow::Result<usize> {
+    let mut renamed = 0;
+    for note in db::notes::notes_with_tag(db, workspace, old_tag).await? {
+        let content = tokio::fs::read_to_string(&note.path).await?;
+        let rewritten = rewrite_tag(&content, old_tag, new_tag)?;
+        if rewritten != content {
+            write_atomic(Path::new(&note.path), &rewritten).await?;
+            index_note_at(&note.path, workspace, &rewritten, db).await?;
+            renamed += 1;
+        }
+    }
+    Ok(renamed)
+}
+
+// `new_tag` has to match the shape `extract_tags` recognizes, or the rewrite
+// silently drops the tag from the index instead of renaming it.
+fn is_valid_tag(tag: &str) -> bool {
+    Regex::new(r"^[A-Za-z][\w-]*$")
+        .map(|re| re.is_match(tag))
+        .unwrap_or(false)
+}
+
+/// Finds every note tagged `#old_tag` and rewrites it to `#new_tag`, the same
+/// "find every note, rewrite text, reindex" shape `rename_note_at` uses for
+/// title/link renames, keyed on tag text instead of a note title. Returns the
+/// number of notes touched.
+#[tauri::command]
+pub async fn rename_tag(
+    old_tag: String,
+    new_tag: String,
+    workspace: String,
+    db: State<'_, DbPool>,
+) -> Result<usize, String> {
+    if !is_valid_tag(&new_tag) {
+        return Err(format!("\"{new_tag}\" isn't a valid tag name"));
+    }
+    rename_tag_at(&old_tag, &new_tag, &workspace, &db)
+        .await
+        .map_err(|e| e.to_string())
+}
+
 async fn forget_note(path: &str, db: &DbPool) -> anyhow::Result<()> {
     db::notes::remove_note(db, path).await?;
     db::notes::remove_from_fts(db, path).await?;
@@ -3426,6 +3521,51 @@ mod save_tests {
         );
     }
 
+    #[test]
+    fn test_rewrite_tag_renames_matching_hashtags_case_insensitively() {
+        let content = "Notes on #CS101 today. Revisit #cs101 before the exam.";
+        assert_eq!(
+            rewrite_tag(content, "cs101", "cs201").unwrap(),
+            "Notes on #cs201 today. Revisit #cs201 before the exam."
+        );
+    }
+
+    #[test]
+    fn test_rewrite_tag_leaves_a_different_tag_untouched() {
+        let content = "See #dynamic-programming for context.";
+        assert_eq!(
+            rewrite_tag(content, "recursion", "iteration").unwrap(),
+            content
+        );
+    }
+
+    #[test]
+    fn test_rewrite_tag_does_not_match_a_longer_tag_sharing_a_prefix() {
+        let content = "#cs is not the same tag as #cs101.";
+        assert_eq!(
+            rewrite_tag(content, "cs", "cs201").unwrap(),
+            "#cs201 is not the same tag as #cs101."
+        );
+    }
+
+    #[test]
+    fn test_rewrite_tag_ignores_fenced_code() {
+        let content = "```c\n#include <stdio.h>\n```\nSee #include for context.";
+        assert_eq!(
+            rewrite_tag(content, "include", "import").unwrap(),
+            "```c\n#include <stdio.h>\n```\nSee #import for context."
+        );
+    }
+
+    #[test]
+    fn test_rewrite_tag_ignores_inline_code() {
+        let content = "Use `#define` for macros, but #define is also a real tag here.";
+        assert_eq!(
+            rewrite_tag(content, "define", "macro").unwrap(),
+            "Use `#define` for macros, but #macro is also a real tag here."
+        );
+    }
+
     #[tokio::test]
     async fn test_reindex_note_picks_up_pdf_sidecar_search_text() {
         // Pages-mode notes hold only `pdf-page` blocks — the PDF's own text
@@ -3597,6 +3737,46 @@ mod save_tests {
             std::fs::read_to_string(&other).unwrap(),
             "# Other\nSee [[Something Else]].\n"
         );
+    }
+
+    #[tokio::test]
+    async fn test_rename_tag_at_rewrites_every_tagged_note_and_reindexes_it() {
+        let tmp = tempdir().unwrap();
+        let ws = tmp.path().to_string_lossy().into_owned();
+        let tagged = tmp.path().join("tagged.md");
+        let other = tmp.path().join("other.md");
+        let tagged_content = "# Tagged\nStudy #agorithms tonight.\n";
+        let other_content = "# Other\nNo relevant tags here.\n";
+        std::fs::write(&tagged, tagged_content).unwrap();
+        std::fs::write(&other, other_content).unwrap();
+
+        let pool = sqlx::sqlite::SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect("sqlite::memory:")
+            .await
+            .unwrap();
+        run_migrations(&pool).await.unwrap();
+        index_note_at(&tagged.to_string_lossy(), &ws, tagged_content, &pool)
+            .await
+            .unwrap();
+        index_note_at(&other.to_string_lossy(), &ws, other_content, &pool)
+            .await
+            .unwrap();
+
+        let renamed = rename_tag_at("agorithms", "algorithms", &ws, &pool)
+            .await
+            .unwrap();
+
+        assert_eq!(renamed, 1);
+        assert_eq!(
+            std::fs::read_to_string(&tagged).unwrap(),
+            "# Tagged\nStudy #algorithms tonight.\n"
+        );
+        assert_eq!(std::fs::read_to_string(&other).unwrap(), other_content);
+
+        let tags = db::notes::list_tags(&pool, &ws).await.unwrap();
+        assert!(!tags.iter().any(|t| t.eq_ignore_ascii_case("agorithms")));
+        assert!(tags.iter().any(|t| t.eq_ignore_ascii_case("algorithms")));
     }
 
     #[tokio::test]

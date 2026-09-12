@@ -3854,6 +3854,22 @@ code {
   cursor: pointer;
 }
 
+.deck-view-tag-rename {
+  display: flex;
+  align-items: center;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  opacity: 0;
+}
+
+.deck-view-tag:hover .deck-view-tag-rename {
+  opacity: 1;
+}
+
+.deck-view-tag-rename:hover {
+  color: var(--text-secondary);
+}
+
 .deck-view-categories {
   display: flex;
   flex-wrap: wrap;

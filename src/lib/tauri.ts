@@ -35,6 +35,8 @@ export const api = {
       invoke<string[]>('list_tags', { workspace }),
     notesWithTag: (workspace: string, tag: string) =>
       invoke<NoteMetadata[]>('notes_with_tag', { workspace, tag }),
+    renameTag: (oldTag: string, newTag: string, workspace: string) =>
+      invoke<number>('rename_tag', { oldTag, newTag, workspace }),
     backlinksFor: (workspace: string, title: string) =>
       invoke<NoteMetadata[]>('backlinks_for', { workspace, title }),
     backlinksForWithContext: (workspace: string, title: string) =>
