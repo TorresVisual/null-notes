@@ -583,6 +583,14 @@ pub fn equation_marker_like_pattern(number: &str) -> String {
     format!("%${}\n%", escape_like(number))
 }
 
+/// The LIKE pattern for an exercise task's own serialized heading line (see
+/// `exercises.rs`: `## Task N`). Used by cross-references to find which note
+/// defines a given `Task 9.2` — mirrors `equation_marker_like_pattern`'s
+/// shape. The trailing newline disambiguates task 3 from task 34.
+pub fn task_marker_like_pattern(number: &str) -> String {
+    format!("%## Task {}\n%", escape_like(number))
+}
+
 /// The path of a note in `workspace` whose raw content matches
 /// `like_pattern` (built by [`marker_like_pattern`]), or `None` if no note
 /// defines it.
@@ -1238,6 +1246,67 @@ mod tests {
             .unwrap();
 
         let pattern = equation_marker_like_pattern("9.9");
+        let found = note_containing_marker(&pool, "/ws", &pattern)
+            .await
+            .unwrap();
+
+        assert_eq!(found, None);
+    }
+
+    // Exercise sheets produced by exercises.rs serialize tasks as `## Task N`
+    // headings; cross-references resolve against that heading line.
+    #[tokio::test]
+    async fn test_task_marker_finds_the_defining_note() {
+        let pool = make_pool().await;
+        index_note(&pool, &note("a", "Sheet 9", "/ws/a.md", "/ws"))
+            .await
+            .unwrap();
+        index_note_content(
+            &pool,
+            "/ws/a.md",
+            "Sheet 9",
+            "## Task 9.2\n\nLet G be a graph.\n\n### Solution\n\n",
+        )
+        .await
+        .unwrap();
+
+        let pattern = task_marker_like_pattern("9.2");
+        let found = note_containing_marker(&pool, "/ws", &pattern)
+            .await
+            .unwrap();
+
+        assert_eq!(found, Some("/ws/a.md".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_task_marker_does_not_match_a_longer_number() {
+        let pool = make_pool().await;
+        index_note(&pool, &note("a", "A", "/ws/a.md", "/ws"))
+            .await
+            .unwrap();
+        index_note_content(&pool, "/ws/a.md", "A", "## Task 34\n\nbody\n")
+            .await
+            .unwrap();
+
+        let pattern = task_marker_like_pattern("3");
+        let found = note_containing_marker(&pool, "/ws", &pattern)
+            .await
+            .unwrap();
+
+        assert_eq!(found, None);
+    }
+
+    #[tokio::test]
+    async fn test_task_marker_is_none_when_no_note_defines_it() {
+        let pool = make_pool().await;
+        index_note(&pool, &note("a", "A", "/ws/a.md", "/ws"))
+            .await
+            .unwrap();
+        index_note_content(&pool, "/ws/a.md", "A", "## Task 3\n\nbody\n")
+            .await
+            .unwrap();
+
+        let pattern = task_marker_like_pattern("9.9");
         let found = note_containing_marker(&pool, "/ws", &pattern)
             .await
             .unwrap();

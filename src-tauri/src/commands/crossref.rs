@@ -30,6 +30,8 @@ pub async fn resolve_cross_refs(
     for target in &targets {
         let pattern = if target.callout_type == "equation" {
             db::notes::equation_marker_like_pattern(&target.number)
+        } else if target.callout_type == "task" {
+            db::notes::task_marker_like_pattern(&target.number)
         } else {
             db::notes::marker_like_pattern(&target.callout_type, &target.number)
         };

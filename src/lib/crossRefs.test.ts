@@ -19,9 +19,9 @@ describe('findCrossRefs', () => {
   })
 
   it('matches every supported keyword', () => {
-    const text = 'Theorem 1, Lemma 2, Corollary 3, Proof 4, Definition 5, Example 6, Algorithm 7'
+    const text = 'Theorem 1, Lemma 2, Corollary 3, Proof 4, Definition 5, Example 6, Algorithm 7, Task 8'
     const found = findCrossRefs(text).map((r) => r.calloutType)
-    expect(found).toEqual(['theorem', 'lemma', 'corollary', 'proof', 'definition', 'example', 'algorithm'])
+    expect(found).toEqual(['theorem', 'lemma', 'corollary', 'proof', 'definition', 'example', 'algorithm', 'task'])
   })
 
   it('finds several references in one line', () => {
@@ -41,5 +41,16 @@ describe('findCrossRefs', () => {
 
   it('does not match a plain wiki-link to a theorem note', () => {
     expect(findCrossRefs('[[Theorem: Squeeze Theorem]]')).toEqual([])
+  })
+  it('recognises a Task mention with a dotted number', () => {
+    expect(findCrossRefs('as in Task 9.2')).toEqual([
+      { calloutType: 'task', number: '9.2', from: 6, to: 14 },
+    ])
+  })
+
+  it('recognises a Task mention with a plain number', () => {
+    expect(findCrossRefs('see Task 3 for the setup')).toEqual([
+      { calloutType: 'task', number: '3', from: 4, to: 10 },
+    ])
   })
 })

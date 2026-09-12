@@ -110,11 +110,19 @@ function decorate(state: EditorState, workspace: string | null): DecorationSet {
  * first miss. `equation` is P12-2's one non-`Callout` block kind this
  * resolves against — `BlockMath`'s own `data-number`, not a callout type. */
 function scrollToBlock(calloutType: string, number: string, attempt = 0): void {
-  const selector =
-    calloutType === 'equation'
-      ? `.block-math[data-number="${number}"]`
-      : `.callout[data-callout-type="${calloutType}"][data-callout-number="${number}"]`
-  const el = document.querySelector<HTMLElement>(selector)
+  let el: HTMLElement | null
+  if (calloutType === 'equation') {
+    el = document.querySelector<HTMLElement>(`.block-math[data-number="${number}"]`)
+  } else if (calloutType === 'task') {
+    el =
+      Array.from(document.querySelectorAll<HTMLElement>('h2')).find(
+        (h) => h.textContent?.trim() === `Task ${number}`,
+      ) ?? null
+  } else {
+    el = document.querySelector<HTMLElement>(
+      `.callout[data-callout-type="${calloutType}"][data-callout-number="${number}"]`,
+    )
+  }
   if (el) {
     // Optional chaining on the method itself, not just the element: jsdom
     // (this codebase's test environment) has no scrollIntoView implementation.

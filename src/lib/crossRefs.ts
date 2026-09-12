@@ -21,7 +21,7 @@ export interface CrossRef {
   to: number
 }
 
-const KEYWORDS = ['Theorem', 'Lemma', 'Corollary', 'Proof', 'Definition', 'Example', 'Algorithm', 'Equation']
+const KEYWORDS = ['Theorem', 'Lemma', 'Corollary', 'Proof', 'Definition', 'Example', 'Algorithm', 'Equation', 'Task']
 
 // A number is digits, optionally dotted ("3", "3.2", "3.2.1") — the same
 // shape `> [!THEOREM 3.2]` accepts as its own `number` attribute. Parens are
