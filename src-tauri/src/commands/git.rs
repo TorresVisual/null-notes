@@ -707,6 +707,13 @@ pub enum PullOutcome {
         ahead: u32,
         behind: u32,
     },
+    /// Not behind, but `ahead` local commits never made it to the remote —
+    /// a prior push failed (offline, auth) and nothing has retried it since.
+    /// Distinct from `UpToDate` so the caller can retry the push instead of
+    /// reporting the workspace as synced (see #81).
+    Ahead {
+        ahead: u32,
+    },
     NoRemote,
     /// `merge --ff-only` itself refused — most commonly an uncommitted local
     /// change to a file the incoming commits also touch, which `--ff-only`
@@ -755,7 +762,11 @@ pub fn checked_pull(workspace: &str) -> anyhow::Result<PullOutcome> {
     let behind = count_commits(workspace, "HEAD..@{u}")?;
 
     if behind == 0 {
-        return Ok(PullOutcome::UpToDate);
+        return Ok(if ahead > 0 {
+            PullOutcome::Ahead { ahead }
+        } else {
+            PullOutcome::UpToDate
+        });
     }
     if ahead > 0 {
         return Ok(PullOutcome::Diverged { ahead, behind });
@@ -2054,6 +2065,18 @@ mod tests {
         let outcome = checked_pull(&clone.path().to_string_lossy()).unwrap();
 
         assert_eq!(outcome, PullOutcome::UpToDate);
+    }
+
+    // #81: purely ahead (a prior push never landed) must not be reported as
+    // UpToDate — the caller relies on this to know a retry is needed.
+    #[test]
+    fn ahead_when_purely_ahead_and_unpushed() {
+        let (_remote, clone) = bare_remote_with_clone();
+        commit_file(clone.path(), "unpushed.md", "never pushed\n");
+
+        let outcome = checked_pull(&clone.path().to_string_lossy()).unwrap();
+
+        assert_eq!(outcome, PullOutcome::Ahead { ahead: 1 });
     }
 
     #[test]

@@ -83,6 +83,7 @@ export type PullOutcome =
   | { kind: 'upToDate' }
   | { kind: 'fastForwarded' }
   | { kind: 'diverged'; ahead: number; behind: number }
+  | { kind: 'ahead'; ahead: number }
   | { kind: 'noRemote' }
   | { kind: 'blocked'; output: string }
 

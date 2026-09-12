@@ -5,14 +5,27 @@ import { useWorkspaceStore } from '../store/workspace'
 import { api } from '../lib/tauri'
 
 vi.mock('../lib/tauri', () => ({
-  api: { git: { fetchAndCompare: vi.fn() } },
+  api: { git: { fetchAndCompare: vi.fn(), pushNotes: vi.fn() } },
 }))
 
 const git = vi.mocked(api.git)
 
 describe('useGitAutoPull', () => {
   beforeEach(() => {
-    useWorkspaceStore.setState({ gitDiverged: null, gitPullBlocked: null })
+    useWorkspaceStore.setState({
+      gitDiverged: null,
+      gitPullBlocked: null,
+      gitAhead: null,
+      repoMode: 'notesOnly',
+      git: {
+        prompted: true,
+        autoCommit: true,
+        idleMinutes: 10,
+        skipHooks: false,
+        autoPush: true,
+        allowCodeRepoPush: false,
+      },
+    })
   })
 
   afterEach(() => {
@@ -63,5 +76,40 @@ describe('useGitAutoPull', () => {
     await result.current.checkForUpdates('/ws')
 
     expect(useWorkspaceStore.getState().gitPullBlocked).toBeNull()
+  })
+
+  // #81: purely ahead retries the push right away rather than waiting for
+  // the next auto-commit, since a stalled push may have no new edit to
+  // trigger one for a long time.
+  it('retries the push and clears gitAhead when purely ahead and the retry lands', async () => {
+    git.fetchAndCompare.mockResolvedValue({ kind: 'ahead', ahead: 3 })
+    git.pushNotes.mockResolvedValue({ kind: 'pushed' })
+    const { result } = renderHook(() => useGitAutoPull())
+
+    await result.current.checkForUpdates('/ws')
+
+    expect(git.pushNotes).toHaveBeenCalledWith('/ws', 'notesOnly', false)
+    expect(useWorkspaceStore.getState().gitAhead).toBeNull()
+  })
+
+  it('surfaces gitAhead when the retried push still fails', async () => {
+    git.fetchAndCompare.mockResolvedValue({ kind: 'ahead', ahead: 2 })
+    git.pushNotes.mockResolvedValue({ kind: 'authFailed', output: 'denied' })
+    const { result } = renderHook(() => useGitAutoPull())
+
+    await result.current.checkForUpdates('/ws')
+
+    expect(useWorkspaceStore.getState().gitAhead).toBe(2)
+  })
+
+  it('surfaces gitAhead without pushing a CodeRepo workspace that never opted in', async () => {
+    useWorkspaceStore.setState({ repoMode: 'codeRepo' })
+    git.fetchAndCompare.mockResolvedValue({ kind: 'ahead', ahead: 1 })
+    const { result } = renderHook(() => useGitAutoPull())
+
+    await result.current.checkForUpdates('/ws')
+
+    expect(git.pushNotes).not.toHaveBeenCalled()
+    expect(useWorkspaceStore.getState().gitAhead).toBe(1)
   })
 })

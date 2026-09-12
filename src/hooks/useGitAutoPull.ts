@@ -1,6 +1,7 @@
 import { useCallback } from 'react'
 import { useWorkspaceStore } from '../store/workspace'
 import { api } from '../lib/tauri'
+import { canAutoPush } from '../lib/git'
 
 /**
  * Fetch-and-compare on workspace open (P5-4). A fast-forward is silent — the
@@ -11,7 +12,7 @@ import { api } from '../lib/tauri'
  */
 export function useGitAutoPull() {
   const checkForUpdates = useCallback(async (workspace: string) => {
-    const { setGitDiverged, setGitPullBlocked } = useWorkspaceStore.getState()
+    const { setGitDiverged, setGitPullBlocked, setGitAhead } = useWorkspaceStore.getState()
     try {
       const outcome = await api.git.fetchAndCompare(workspace)
       setGitDiverged(outcome.kind === 'diverged' ? { ahead: outcome.ahead, behind: outcome.behind } : null)
@@ -23,6 +24,26 @@ export function useGitAutoPull() {
       // it, including a thrown error below — a later successful check
       // supersedes a stale blocked notice.
       setGitPullBlocked(outcome.kind === 'blocked' ? outcome.output : null)
+      // #81: purely ahead (a prior push never landed) is this cycle's retry
+      // point — checkForUpdates already runs on open, a 5-min interval, and
+      // window focus, so a push that failed offline lands on whichever of
+      // those comes first instead of sitting silent until the user notices.
+      if (outcome.kind === 'ahead') {
+        const { repoMode, git } = useWorkspaceStore.getState()
+        if (!canAutoPush(repoMode, git)) {
+          setGitAhead(outcome.ahead)
+        } else {
+          try {
+            const pushOutcome = await api.git.pushNotes(workspace, repoMode!, git.allowCodeRepoPush)
+            setGitAhead(pushOutcome.kind === 'pushed' ? null : outcome.ahead)
+          } catch (e) {
+            setGitAhead(outcome.ahead)
+            console.error('git retry-push failed', e)
+          }
+        }
+      } else {
+        setGitAhead(null)
+      }
     } catch (e) {
       // Best-effort, same posture as P5-1's repo detection: never blocks
       // opening the workspace. Genuine fetch failures (most commonly no

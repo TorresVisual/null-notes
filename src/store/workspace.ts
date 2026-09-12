@@ -90,6 +90,13 @@ interface WorkspaceStore {
   // workspace is now silently behind the remote until this is resolved.
   gitPullBlocked: string | null
   setGitPullBlocked: (output: string | null) => void
+  // #81: local commits that are ahead of the remote and never made it there
+  // (a push failed offline/auth and nothing retried it since). Re-derived
+  // from `checked_pull`'s ahead count on every checkForUpdates cycle, so —
+  // unlike gitCommitStatus's transient 'pushFailed' chip — it survives an
+  // app restart and clears itself once a retry actually lands.
+  gitAhead: number | null
+  setGitAhead: (ahead: number | null) => void
   // Ephemeral, UI-only: the tab that should show a brief "just created"
   // highlight. Never persisted — TabBar clears it itself once the CSS
   // animation finishes (see .tab-flash's onAnimationEnd).
@@ -117,6 +124,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   gitCommitDetail: null,
   gitDiverged: null,
   gitPullBlocked: null,
+  gitAhead: null,
   flashTabPath: null,
 
   setPath: (path) => set({ path, selectedFolder: path }),
@@ -222,6 +230,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   setGitCommitDetail: (detail) => set({ gitCommitDetail: detail }),
   setGitDiverged: (d) => set({ gitDiverged: d }),
   setGitPullBlocked: (output) => set({ gitPullBlocked: output }),
+  setGitAhead: (ahead) => set({ gitAhead: ahead }),
   setFlashTabPath: (path) => set({ flashTabPath: path }),
 
   resetForNewWorkspace: () =>
@@ -242,6 +251,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
       gitCommitDetail: null,
       gitDiverged: null,
       gitPullBlocked: null,
+      gitAhead: null,
       flashTabPath: null,
     }),
 }))

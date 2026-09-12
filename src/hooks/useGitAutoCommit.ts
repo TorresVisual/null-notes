@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef } from 'react'
 import { useWorkspaceStore } from '../store/workspace'
 import { api } from '../lib/tauri'
+import { canAutoPush } from '../lib/git'
 
 /**
  * Batches note saves into one commit per idle window (P5-2) — never per
@@ -55,18 +56,13 @@ export function useGitAutoCommit() {
             setGitCommitStatus('idle')
           }
         }, COMMITTED_DISPLAY_MS)
-        // The only call site for pushNotes in the app — this is what makes
-        // "never for a code repo, unless explicitly allowed" true on the
-        // frontend side too, on top of the Rust-level guard in checked_push.
         // notesMonorepo gets the same treatment as notesOnly: is_notes_monorepo
         // already confirmed the whole repo is nothing but sibling note
         // workspaces. codeRepo only ever pushes once the user has opted this
-        // specific workspace in via the Settings panel's confirm dialog.
-        const canPushHere =
-          repoMode === 'notesOnly' ||
-          repoMode === 'notesMonorepo' ||
-          (repoMode === 'codeRepo' && git.allowCodeRepoPush)
-        if (canPushHere && git.autoPush) {
+        // specific workspace in via the Settings panel's confirm dialog —
+        // canAutoPush is what makes that true on the frontend side too, on
+        // top of the Rust-level guard in checked_push.
+        if (canAutoPush(repoMode, git)) {
           try {
             const pushOutcome = await api.git.pushNotes(path, repoMode, git.allowCodeRepoPush)
             // Most outcomes here are a resolved Ok value, not a thrown
