@@ -143,6 +143,8 @@ pub fn run() {
             commands::git::init_notes_repo,
             commands::git::list_note_history,
             commands::git::read_note_at_commit,
+            commands::git::list_github_repos,
+            commands::git::clone_repo,
             commands::terminal::terminal_open,
             commands::terminal::terminal_write,
             commands::terminal::terminal_resize,

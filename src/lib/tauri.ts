@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core'
-import type { NoteMetadata, WorkspaceState, WorkspaceTree, SearchResult, AppSettings, GraphLink, GraphTag, RepoMode, CommitOutcome, PushOutcome, PullOutcome, RepoInitOutcome, TemplateMetadata, CrossRefTarget, OpenTask, DueCard, Grade, NoteHistoryEntry, BacklinkEntry, PrinterInfo, McGradeResult, CardSummary, ErrorLogEntry, CodeLinkStatus, CodeLinkTarget } from '../types'
+import type { NoteMetadata, WorkspaceState, WorkspaceTree, SearchResult, AppSettings, GraphLink, GraphTag, RepoMode, CommitOutcome, PushOutcome, PullOutcome, RepoInitOutcome, TemplateMetadata, CrossRefTarget, OpenTask, DueCard, Grade, NoteHistoryEntry, GithubRepo, BacklinkEntry, PrinterInfo, McGradeResult, CardSummary, ErrorLogEntry, CodeLinkStatus, CodeLinkTarget } from '../types'
 import type { PdfPage, PdfMarkdownImport } from '../pdf/types'
 import { useWorkspaceStore } from '../store/workspace'
 import { sidecarDir } from './pathPrefix'
@@ -129,6 +129,10 @@ export const api = {
       invoke<NoteHistoryEntry[]>('list_note_history', { workspace, notePath }),
     readNoteAtCommit: (workspace: string, relativePath: string, sha: string) =>
       invoke<string>('read_note_at_commit', { workspace, relativePath, sha }),
+    listGithubRepos: () =>
+      invoke<GithubRepo[]>('list_github_repos'),
+    cloneRepo: (url: string, parentDir: string) =>
+      invoke<string>('clone_repo', { url, parentDir }),
   },
   settings: {
     load: () =>

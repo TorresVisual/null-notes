@@ -1,12 +1,15 @@
-import { FolderOpen, History } from 'lucide-react'
+import { useState } from 'react'
+import { FolderOpen, GitBranch, History } from 'lucide-react'
 import { useWorkspaceStore } from '../store/workspace'
 import { useWorkspace } from '../hooks/useWorkspace'
 import { folderName } from '../lib/pathPrefix'
+import { CloneWorkspaceDialog } from './CloneWorkspaceDialog'
 
 export function WorkspacePicker() {
   const recents = useWorkspaceStore((s) => s.recentWorkspaces)
   const folderLoading = useWorkspaceStore((s) => s.folderLoading)
   const { openWorkspace, openWorkspaceAt } = useWorkspace()
+  const [cloning, setCloning] = useState(false)
 
   return (
     <div className="workspace-picker">
@@ -42,6 +45,11 @@ export function WorkspacePicker() {
       <button className="workspace-picker-browse" onClick={() => void openWorkspace()} disabled={folderLoading}>
         <FolderOpen size={14} /> {folderLoading ? 'Opening…' : 'Choose a folder…'}
       </button>
+      <button className="workspace-picker-clone" onClick={() => setCloning(true)} disabled={folderLoading}>
+        <GitBranch size={14} /> Clone workspace…
+      </button>
+
+      {cloning && <CloneWorkspaceDialog onClose={() => setCloning(false)} />}
     </div>
   )
 }

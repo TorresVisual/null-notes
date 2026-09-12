@@ -917,6 +917,107 @@ pub async fn init_notes_repo(
         .map_err(|e| e.to_string())
 }
 
+/// One entry from `gh repo list --json nameWithOwner,url,isPrivate` — the
+/// three fields the "Clone workspace…" picker needs to list and label a repo
+/// without a second round trip.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GithubRepo {
+    pub name_with_owner: String,
+    pub url: String,
+    pub is_private: bool,
+}
+
+/// The signed-in user's own repos, for the "Clone workspace…" picker (#79).
+/// Bails with a distinct, greppable message when `gh` isn't on `PATH` so the
+/// frontend can fall back to a plain URL field — `gh` stays opt-in machinery
+/// here exactly as it is in `checked_init_notes_repo`, never a hard
+/// dependency for cloning.
+pub fn list_own_github_repos() -> anyhow::Result<Vec<GithubRepo>> {
+    if !has_gh() {
+        anyhow::bail!("gh not available");
+    }
+    let output = no_window_command("gh")
+        .arg("repo")
+        .arg("list")
+        .arg("--json")
+        .arg("nameWithOwner,url,isPrivate")
+        .arg("--limit")
+        .arg("200")
+        .output()?;
+    if !output.status.success() {
+        anyhow::bail!(
+            "gh repo list failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+    Ok(serde_json::from_slice(&output.stdout)?)
+}
+
+#[tauri::command]
+pub async fn list_github_repos() -> Result<Vec<GithubRepo>, String> {
+    tokio::task::spawn_blocking(list_own_github_repos)
+        .await
+        .map_err(|e| e.to_string())?
+        .map_err(|e| e.to_string())
+}
+
+/// The directory name `git clone <url>` picks on its own: the URL's last
+/// path segment with a trailing `.git` stripped. Handles both a plain
+/// `https://host/user/repo.git` and the scp-like
+/// `git@host:user/repo.git` form, where the last segment is separated by
+/// `:` rather than `/`.
+fn derive_clone_dir_name(url: &str) -> &str {
+    let last_segment = url.rsplit(['/', ':']).next().unwrap_or(url);
+    last_segment.strip_suffix(".git").unwrap_or(last_segment)
+}
+
+/// Clones `url` into a new directory under `parent_dir`, named the same way
+/// plain `git clone <url>` would name it. This is #79's inbound half of the
+/// two-machine story — `checked_init_notes_repo` only ever pushes a local
+/// folder out to a new remote; this pulls an existing one down.
+pub fn checked_clone_repo(url: &str, parent_dir: &str) -> anyhow::Result<PathBuf> {
+    // `url` comes straight from the "Clone workspace…" dialog (pasted text,
+    // or a `gh repo list` URL) — never shell-escaped, so a value starting
+    // with `-` would otherwise be parsed by git as a flag rather than a
+    // clone source (M-6, same class of bug `read_note_at_commit_at` guards
+    // against for `sha`). The `--` below stops that regardless, but reject
+    // it explicitly too so the error names the actual problem.
+    if url.starts_with('-') {
+        anyhow::bail!("refusing suspicious repository URL: {url}");
+    }
+    let dir_name = derive_clone_dir_name(url);
+    if dir_name.is_empty() || dir_name.starts_with('-') {
+        anyhow::bail!("could not determine a folder name from {url}");
+    }
+
+    let output = no_window_command("git")
+        .arg("-C")
+        .arg(parent_dir)
+        .arg("clone")
+        .arg("--")
+        .arg(url)
+        .arg(dir_name)
+        .output()?;
+    if !output.status.success() {
+        anyhow::bail!(
+            "git clone failed for {url}: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+
+    Ok(Path::new(parent_dir).join(dir_name))
+}
+
+#[tauri::command]
+pub async fn clone_repo(url: String, parent_dir: String) -> Result<String, String> {
+    tokio::task::spawn_blocking(move || checked_clone_repo(&url, &parent_dir))
+        .await
+        .map_err(|e| e.to_string())?
+        .map_err(|e| e.to_string())
+        .map(|p| p.to_string_lossy().into_owned())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2187,5 +2288,96 @@ mod tests {
     fn slugify_trims_leading_and_trailing_dashes() {
         assert_eq!(slugify("  DSA  "), "DSA");
         assert_eq!(slugify("(DSA)"), "DSA");
+    }
+
+    #[test]
+    fn derive_clone_dir_name_strips_git_suffix_from_an_https_url() {
+        assert_eq!(
+            derive_clone_dir_name("https://github.com/user/DSA-Notes.git"),
+            "DSA-Notes"
+        );
+        assert_eq!(
+            derive_clone_dir_name("https://github.com/user/DSA-Notes"),
+            "DSA-Notes"
+        );
+    }
+
+    #[test]
+    fn derive_clone_dir_name_handles_scp_like_ssh_urls() {
+        assert_eq!(
+            derive_clone_dir_name("git@github.com:user/DSA-Notes.git"),
+            "DSA-Notes"
+        );
+    }
+
+    #[test]
+    fn checked_clone_repo_rejects_a_url_that_looks_like_a_flag() {
+        let parent = tempdir().unwrap();
+
+        let err = checked_clone_repo(
+            "--upload-pack=touch pwned",
+            &parent.path().to_string_lossy(),
+        )
+        .unwrap_err();
+
+        assert!(err.to_string().contains("suspicious repository URL"));
+    }
+
+    #[test]
+    fn checked_clone_repo_rejects_a_url_whose_derived_dir_name_looks_like_a_flag() {
+        let parent = tempdir().unwrap();
+
+        let err = checked_clone_repo(
+            "https://example.com/--upload-pack=touch-pwned",
+            &parent.path().to_string_lossy(),
+        )
+        .unwrap_err();
+
+        assert!(err
+            .to_string()
+            .contains("could not determine a folder name"));
+    }
+
+    // Git URLs — https://, ssh, and scp-like alike — always use forward
+    // slashes, even for a local path on Windows; `derive_clone_dir_name`
+    // is written against that convention, so these fixtures normalize a
+    // tempdir's native (possibly backslash) path to match what a real URL
+    // looks like rather than what `Path::display` happens to print.
+    fn as_url(path: &Path) -> String {
+        path.to_string_lossy().replace('\\', "/")
+    }
+
+    #[test]
+    fn checked_clone_repo_clones_into_a_url_derived_folder_name() {
+        let origin = tempdir().unwrap();
+        git_init(origin.path());
+        commit_file(origin.path(), "Todo.md", "# Todo\n");
+
+        let parent = tempdir().unwrap();
+        let origin_url = as_url(origin.path());
+        let result = checked_clone_repo(&origin_url, &parent.path().to_string_lossy()).unwrap();
+
+        assert_eq!(
+            result,
+            parent.path().join(derive_clone_dir_name(&origin_url))
+        );
+        assert!(result.join("Todo.md").is_file());
+    }
+
+    #[test]
+    fn checked_clone_repo_fails_for_an_unreachable_url() {
+        let parent = tempdir().unwrap();
+
+        // Nested two levels deep so the derived dest dir name ("Missing")
+        // never collides with a path component of the (nonexistent) source
+        // itself — a same-named collision would make git clone the freshly
+        // created empty dest right back out of itself and "succeed".
+        let err = checked_clone_repo(
+            &as_url(&parent.path().join("no-such-host").join("Missing.git")),
+            &parent.path().to_string_lossy(),
+        )
+        .unwrap_err();
+
+        assert!(err.to_string().contains("git clone failed"));
     }
 }

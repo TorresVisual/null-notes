@@ -97,6 +97,12 @@ export interface NoteHistoryEntry {
   path: string
 }
 
+export interface GithubRepo {
+  nameWithOwner: string
+  url: string
+  isPrivate: boolean
+}
+
 export type PdfImportMode = 'pages' | 'markdown'
 
 export type CodeIndentChar = 'space' | 'tab'

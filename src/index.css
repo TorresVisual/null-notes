@@ -2264,6 +2264,51 @@ pre:has(code.language-expect)::before, pre:has(code.language-expected)::before {
 .workspace-picker-browse:active { background: var(--accent); transform: translateY(0) scale(0.97); }
 .workspace-picker-browse:focus-visible { outline: none; box-shadow: var(--focus-ring); }
 
+/* Secondary action next to the primary "Choose a folder…" — ghost outline
+   rather than a second filled-accent button, so it reads as the alternate
+   path (#79) rather than competing with it. */
+.workspace-picker-clone {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+  margin-top: var(--space-xs);
+  width: 100%;
+  padding: 10px 16px;
+  background: none;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.workspace-picker-clone:hover { color: var(--text-primary); border-color: var(--text-tertiary); }
+.workspace-picker-clone:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+
+/* Clone workspace dialog (#79) — rows inside the shared .search-modal/
+   .search-results chrome; CommandItem already lays them out as a flex row,
+   only the row-internal content styling below is new. */
+.clone-url-value {
+  color: var(--accent);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.clone-repo-item { justify-content: space-between; }
+
+.clone-repo-name {
+  font-size: 14px;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.clone-repo-private { color: var(--text-tertiary); flex-shrink: 0; }
+
 /* Slash command menu */
 .slash-menu {
   background: var(--bg-raised);
