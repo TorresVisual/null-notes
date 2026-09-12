@@ -94,6 +94,7 @@ export function Layout() {
   const { checkForUpdates } = useGitAutoPull()
   const repoMode = useWorkspaceStore((s) => s.repoMode)
   const gitPrompted = useWorkspaceStore((s) => s.git.prompted)
+  const gitPriorAutomation = useWorkspaceStore((s) => s.gitPriorAutomation)
   const gitCommitStatus = useWorkspaceStore((s) => s.gitCommitStatus)
   const gitCommitDetail = useWorkspaceStore((s) => s.gitCommitDetail)
   const gitDiverged = useWorkspaceStore((s) => s.gitDiverged)
@@ -543,6 +544,7 @@ export function Layout() {
         {repoMode && !gitPrompted && (
           <GitAutoCommitPrompt
             mode={repoMode}
+            priorAutomation={gitPriorAutomation}
             onEnable={() => void updateGit({ prompted: true, autoCommit: true })}
             onDecline={() => void updateGit({ prompted: true })}
           />

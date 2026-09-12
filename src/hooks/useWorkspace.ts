@@ -53,7 +53,7 @@ export function useWorkspace() {
   const openWorkspaceAt = useCallback(
     async (selected: string, opts: { remember?: boolean } = {}) => {
       const { remember = true } = opts
-      const { setFolderError, setFolderLoading, setRecentWorkspaces, setRecentSearches, setGit, setRepoMode } =
+      const { setFolderError, setFolderLoading, setRecentWorkspaces, setRecentSearches, setGit, setRepoMode, setGitPriorAutomation } =
         useWorkspaceStore.getState()
       setFolderLoading(true)
       let tree, session
@@ -90,13 +90,28 @@ export function useWorkspace() {
 
       // Best-effort: a missing `git` binary or any other detection failure
       // just means no repo prompt, never a blocked workspace open.
+      let mode = null
       try {
-        const mode = await api.git.detectRepo(selected)
+        mode = await api.git.detectRepo(selected)
         setRepoMode(mode)
         if (mode) await checkForUpdates(selected)
       } catch {
         setRepoMode(null)
       }
+
+      // Only worth asking (#78) while the one-time prompt hasn't been
+      // answered yet on this machine — same best-effort posture as detection
+      // above, never blocks the open.
+      let priorAutomation = false
+      if (mode && !session.git.prompted) {
+        try {
+          priorAutomation = await api.git.detectPriorAutomation(selected)
+        } catch {
+          priorAutomation = false
+        }
+      }
+      setGitPriorAutomation(priorAutomation)
+
       setFolderLoading(false)
     },
     [

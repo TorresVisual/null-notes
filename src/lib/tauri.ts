@@ -115,6 +115,8 @@ export const api = {
   git: {
     detectRepo: (workspace: string) =>
       invoke<RepoMode | null>('detect_repo', { workspace }),
+    detectPriorAutomation: (workspace: string) =>
+      invoke<boolean>('detect_prior_automation', { workspace }),
     autoCommit: (workspace: string, mode: RepoMode, paths: string[], skipHooks: boolean) =>
       invoke<CommitOutcome>('auto_commit', { workspace, mode, paths, skipHooks }),
     pushNotes: (workspace: string, mode: RepoMode, allowCodeRepoPush: boolean) =>

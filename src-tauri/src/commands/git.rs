@@ -144,6 +144,42 @@ pub async fn detect_repo(workspace: String) -> Result<Option<RepoMode>, String> 
         .map_err(|e| e.to_string())
 }
 
+/// Matches only `build_commit_message`'s own `"notes: update "` prefix —
+/// deliberately not the broader `"notes: "` that `checked_init_notes_repo`'s
+/// one-time `.gitignore` bookkeeping commit also starts with. That commit is
+/// made by *this* machine the moment a repo is created, before the enable
+/// prompt is even answered, so treating it as automation evidence would
+/// misreport a fresh same-machine init as "already enabled elsewhere".
+fn has_notes_commits(workspace: &str) -> anyhow::Result<bool> {
+    let output = no_window_command("git")
+        .arg("-C")
+        .arg(workspace)
+        .arg("log")
+        .arg("--grep=^notes: update ")
+        .arg("-n1")
+        .arg("--oneline")
+        .output()?;
+    Ok(!output.stdout.is_empty())
+}
+
+/// Evidence (#78) that this app's auto-commit is already in use for this
+/// workspace from another machine: a remote to sync through, plus at least
+/// one commit this app's own `checked_auto_commit` made (the `notes: update `
+/// prefix `build_commit_message` always uses). Lets the one-time enable
+/// prompt say so, instead of presenting a workspace that's really already
+/// opted in as a first-time question.
+pub fn detect_prior_git_automation(workspace: &str) -> anyhow::Result<bool> {
+    Ok(has_remote(workspace)? && has_notes_commits(workspace)?)
+}
+
+#[tauri::command]
+pub async fn detect_prior_automation(workspace: String) -> Result<bool, String> {
+    tokio::task::spawn_blocking(move || detect_prior_git_automation(&workspace))
+        .await
+        .map_err(|e| e.to_string())?
+        .map_err(|e| e.to_string())
+}
+
 /// The pieces of Git state that make committing unsafe to attempt right
 /// now. "Back off, never repair" (ROADMAP.md §Phase 5) — this only reads
 /// state, never fixes it.
@@ -1279,6 +1315,58 @@ mod tests {
         let mode = detect_repo_mode(&dsa.to_string_lossy()).unwrap();
 
         assert_eq!(mode, Some(RepoMode::CodeRepo));
+    }
+
+    #[test]
+    fn prior_automation_needs_both_a_remote_and_a_notes_commit() {
+        let origin = tempdir().unwrap();
+        git_init(origin.path());
+        commit_note_file(origin.path(), "Todo.md", "# Todo\n", "notes: update Todo");
+
+        let clone = tempdir().unwrap();
+        git_clone(origin.path(), clone.path());
+
+        assert!(detect_prior_git_automation(&clone.path().to_string_lossy()).unwrap());
+
+        let no_remote = tempdir().unwrap();
+        git_init(no_remote.path());
+        commit_note_file(
+            no_remote.path(),
+            "Todo.md",
+            "# Todo\n",
+            "notes: update Todo",
+        );
+        assert!(!detect_prior_git_automation(&no_remote.path().to_string_lossy()).unwrap());
+
+        let no_notes_commit = tempdir().unwrap();
+        git_init(no_notes_commit.path());
+        commit_file(no_notes_commit.path(), "a.md", "hello");
+        let clone2 = tempdir().unwrap();
+        git_clone(no_notes_commit.path(), clone2.path());
+        assert!(!detect_prior_git_automation(&clone2.path().to_string_lossy()).unwrap());
+    }
+
+    // A fresh `checked_init_notes_repo` call makes its own `.gitignore`
+    // bookkeeping commit (also `notes: `-prefixed) and can add a remote in
+    // the same call — on the very machine that just ran it, before the
+    // enable prompt is ever answered. That must not be mistaken for evidence
+    // of automation enabled on some other machine.
+    #[test]
+    fn a_fresh_repo_init_commit_is_not_mistaken_for_prior_automation() {
+        let origin = tempdir().unwrap();
+        git_init(origin.path());
+        commit_file(origin.path(), "seed.md", "seed");
+
+        let workspace = tempdir().unwrap();
+        git_clone(origin.path(), workspace.path());
+        commit_note_file(
+            workspace.path(),
+            ".gitignore",
+            NOTES_GITIGNORE,
+            "notes: ignore workspace state and temp files",
+        );
+
+        assert!(!detect_prior_git_automation(&workspace.path().to_string_lossy()).unwrap());
     }
 
     fn commit_file(dir: &Path, name: &str, content: &str) {

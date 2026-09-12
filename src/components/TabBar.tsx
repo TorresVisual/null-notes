@@ -30,6 +30,8 @@ export function TabBar({
 }: TabBarProps) {
   const { openTabs, activeTab, setActiveTab, closeTab, flashTabPath, setFlashTabPath, reorderTabs } =
     useWorkspaceStore()
+  const repoMode = useWorkspaceStore((s) => s.repoMode)
+  const autoCommit = useWorkspaceStore((s) => s.git.autoCommit)
   const notes = useNotesStore((s) => s.notes)
   const [draggedPath, setDraggedPath] = useState<string | null>(null)
   if (openTabs.length === 0) return null
@@ -76,6 +78,14 @@ export function TabBar({
             onDismiss={onDismissSaveError}
           />
           <GitCommitStatus status={gitCommitStatus} detail={gitCommitDetail} />
+          {repoMode && !autoCommit && (
+            <span
+              className="git-commit-status"
+              title="This machine isn't auto-committing this workspace — enable it in Settings to keep it in sync with other machines."
+            >
+              Auto-commit off
+            </span>
+          )}
           <button
             className={`view-toggle${viewMode === 'raw' ? ' active' : ''}`}
             onClick={onToggleView}

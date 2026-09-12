@@ -136,6 +136,7 @@ pub fn run() {
             commands::editor_launch::resolve_code_links,
             commands::crossref::resolve_cross_refs,
             commands::git::detect_repo,
+            commands::git::detect_prior_automation,
             commands::git::auto_commit,
             commands::git::push_notes,
             commands::git::fetch_and_compare,

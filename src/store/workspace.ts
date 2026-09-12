@@ -66,6 +66,11 @@ interface WorkspaceStore {
   setRepoMode: (mode: RepoMode | null) => void
   git: GitWorkspaceConfig
   setGit: (git: GitWorkspaceConfig) => void
+  // #78: whether this workspace already has auto-commit history (remote +
+  // a `notes:` commit) from another machine — read once per open, only to
+  // change the one-time enable prompt's wording, never persisted.
+  gitPriorAutomation: boolean
+  setGitPriorAutomation: (detected: boolean) => void
   // P5-2: paths saved since the last auto-commit, deduplicated, in save
   // order — what the next batched commit will touch.
   gitPendingPaths: string[]
@@ -106,6 +111,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   recentSearches: [],
   repoMode: null,
   git: DEFAULT_GIT_CONFIG,
+  gitPriorAutomation: false,
   gitPendingPaths: [],
   gitCommitStatus: 'idle',
   gitCommitDetail: null,
@@ -204,6 +210,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   },
   setRepoMode: (mode) => set({ repoMode: mode }),
   setGit: (git) => set({ git }),
+  setGitPriorAutomation: (detected) => set({ gitPriorAutomation: detected }),
 
   addGitPendingPath: (path) => {
     const { gitPendingPaths } = get()
@@ -229,6 +236,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
       recentSearches: [],
       repoMode: null,
       git: DEFAULT_GIT_CONFIG,
+      gitPriorAutomation: false,
       gitPendingPaths: [],
       gitCommitStatus: 'idle',
       gitCommitDetail: null,
