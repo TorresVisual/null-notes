@@ -13,6 +13,7 @@ const card = (over: Partial<CardSummary>): CardSummary => ({
   interval: 0,
   streak: 0,
   lapses: 0,
+  suspended: false,
   tags: [],
   ...over,
 })

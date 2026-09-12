@@ -189,6 +189,7 @@ export interface CardSummary {
   interval: number
   streak: number
   lapses: number
+  suspended: boolean
   tags: string[]
 }
 

@@ -7,6 +7,7 @@ interface SrStateAttrs {
   reps: string
   grade: string
   streak: string
+  suspended: string
 }
 
 // A card's SM-2 schedule (P9-3), stored in the note as a plain
@@ -36,6 +37,7 @@ export const SrState = Node.create({
       reps: { default: '' },
       grade: { default: '' },
       streak: { default: '' },
+      suspended: { default: '' },
     }
   },
 
@@ -50,6 +52,7 @@ export const SrState = Node.create({
           reps: (el as HTMLElement).getAttribute('data-reps') ?? '',
           grade: (el as HTMLElement).getAttribute('data-grade') ?? '',
           streak: (el as HTMLElement).getAttribute('data-streak') ?? '',
+          suspended: (el as HTMLElement).getAttribute('data-suspended') ?? '',
         }),
       },
     ]
@@ -67,6 +70,7 @@ export const SrState = Node.create({
         'data-reps': attrs.reps,
         'data-grade': attrs.grade,
         'data-streak': attrs.streak,
+        'data-suspended': attrs.suspended,
         style: 'display:none',
         contenteditable: 'false',
       },
@@ -80,11 +84,12 @@ export const SrState = Node.create({
           state: { write: (s: string) => void; ensureNewLine: () => void; closeBlock: (n: unknown) => void },
           node: { attrs: SrStateAttrs },
         ) {
-          const { due, ease, interval, reps, grade, streak } = node.attrs
+          const { due, ease, interval, reps, grade, streak, suspended } = node.attrs
           state.ensureNewLine()
           const gradePart = grade ? ` grade=${grade}` : ''
           const streakPart = streak ? ` streak=${streak}` : ''
-          state.write(`<!-- sr due=${due} ease=${ease} interval=${interval} reps=${reps}${gradePart}${streakPart} -->`)
+          const suspendedPart = suspended === 'true' ? ' suspended=true' : ''
+          state.write(`<!-- sr due=${due} ease=${ease} interval=${interval} reps=${reps}${gradePart}${streakPart}${suspendedPart} -->`)
           state.closeBlock(node)
         },
         parse: {
@@ -96,7 +101,7 @@ export const SrState = Node.create({
               toReplace.push(n as Comment)
               n = walker.nextNode()
             }
-            const pattern = /^sr\s+due=(\S+)\s+ease=(\S+)\s+interval=(\S+)\s+reps=(\S+)(?:\s+grade=(\S+))?(?:\s+streak=(\S+))?$/
+            const pattern = /^sr\s+due=(\S+)\s+ease=(\S+)\s+interval=(\S+)\s+reps=(\S+)(?:\s+grade=(\S+))?(?:\s+streak=(\S+))?(?:\s+lapses=(\S+))?(?:\s+suspended=(\S+))?$/
             for (const comment of toReplace) {
               const match = pattern.exec(comment.data.trim())
               if (!match) continue
@@ -108,6 +113,7 @@ export const SrState = Node.create({
               div.setAttribute('data-reps', match[4]!)
               div.setAttribute('data-grade', match[5] ?? '')
               div.setAttribute('data-streak', match[6] ?? '')
+              div.setAttribute('data-suspended', match[8] ?? '')
               comment.replaceWith(div)
             }
           },

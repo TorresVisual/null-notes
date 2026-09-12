@@ -75,6 +75,8 @@ export const api = {
       invoke<void>('grade_card', { path, position, grade, workspace }),
     gradeMcCard: (path: string, position: number, picked: number[], workspace: string) =>
       invoke<McGradeResult>('grade_mc_card', { path, position, picked, workspace }),
+    setCardSuspended: (path: string, position: number, suspended: boolean, workspace: string) =>
+      invoke<void>('set_card_suspended', { path, position, suspended, workspace }),
     listAllCards: (workspace: string) =>
       invoke<CardSummary[]>('list_all_cards', { workspace }),
     listCramCards: (workspace: string, streak: number, struggling: boolean) =>
