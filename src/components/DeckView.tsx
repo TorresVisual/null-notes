@@ -5,6 +5,7 @@ import { api } from '../lib/tauri'
 import { useWorkspaceStore } from '../store/workspace'
 import { promptText } from '../store/promptDialog'
 import { groupCardsByNote, groupCardsByStreak } from '../lib/cardGroups'
+import { CardText } from './CardText'
 import type { CardSummary } from '../types'
 
 interface DeckViewProps {
@@ -209,7 +210,7 @@ export function DeckView({ onClose, onOpenCram }: DeckViewProps) {
                     {group.cards.map((c) => (
                       <li key={c.position} className="task-view-item deck-view-item">
                         <button className="task-view-item-text" onClick={() => openNote(group.notePath)}>
-                          {c.front}
+                          <CardText text={c.front} notePath={group.notePath} />
                         </button>
                         {c.suspended && <span className="deck-view-suspended-badge">Suspended</span>}
                         <button

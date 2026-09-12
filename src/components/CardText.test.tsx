@@ -46,4 +46,40 @@ describe('CardText', () => {
     render(<CardText text="![gone](Note.assets/missing.png)" notePath="/ws/a.md" />)
     await waitFor(() => expect(screen.getByText(/Missing image/)).toBeInTheDocument())
   })
+
+  it('renders inline math through KaTeX', () => {
+    const { container } = render(<CardText text="Compute $\\int_0^1 x^2\\,dx$ to proceed" notePath="/ws/a.md" />)
+    expect(screen.getByText(/Compute/)).toBeInTheDocument()
+    expect(screen.getByText(/to proceed/)).toBeInTheDocument()
+    const mathSpan = container.querySelector('.inline-math-render')
+    expect(mathSpan).toBeInTheDocument()
+    expect(mathSpan?.querySelector('.katex')).toBeInTheDocument()
+  })
+
+  it('renders display math through KaTeX in display mode', () => {
+    const { container } = render(<CardText text="$$e^{i\\pi} + 1 = 0$$" notePath="/ws/a.md" />)
+    const mathSpan = container.querySelector('.block-math-render')
+    expect(mathSpan).toBeInTheDocument()
+    expect(mathSpan?.querySelector('.katex-display')).toBeInTheDocument()
+  })
+
+  it('renders mixed math and image spans in the correct order', async () => {
+    vi.mocked(api.assets.read).mockResolvedValue('YmFzZTY0')
+    const { container } = render(
+      <CardText
+        text="Formula: $E = mc^2$ and illustration: ![diagram](Note.assets/diag.png)"
+        notePath="/ws/a.md"
+      />,
+    )
+    expect(screen.getByText(/Formula:/)).toBeInTheDocument()
+    expect(container.querySelector('.inline-math-render')).toBeInTheDocument()
+    await waitFor(() => expect(screen.getByAltText('diagram')).toBeInTheDocument())
+  })
+
+  it('renders multiple inline math equations', () => {
+    const { container } = render(<CardText text="If $a = 1$ and $b = 2$, then $a + b = 3$" notePath="/ws/a.md" />)
+    const mathSpans = container.querySelectorAll('.inline-math-render')
+    expect(mathSpans.length).toBe(3)
+  })
 })
+
