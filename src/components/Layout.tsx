@@ -50,6 +50,7 @@ import { GitDivergedBar } from './GitDivergedBar'
 import { GitPullBlockedBar } from './GitPullBlockedBar'
 import { useGitConfig } from '../hooks/useGitConfig'
 import { useGitAutoCommit } from '../hooks/useGitAutoCommit'
+import { useGitAutoPull } from '../hooks/useGitAutoPull'
 import { promptText } from '../store/promptDialog'
 import { api } from '../lib/tauri'
 import { diagramApi } from '../lib/diagram'
@@ -90,6 +91,7 @@ export function Layout() {
   const { saveSession, openWorkspace, openWorkspaceAt, closeWorkspace } = useWorkspace()
   const { updateGit } = useGitConfig()
   const { flushGitCommit } = useGitAutoCommit()
+  const { checkForUpdates } = useGitAutoPull()
   const repoMode = useWorkspaceStore((s) => s.repoMode)
   const gitPrompted = useWorkspaceStore((s) => s.git.prompted)
   const gitCommitStatus = useWorkspaceStore((s) => s.gitCommitStatus)
@@ -134,6 +136,20 @@ export function Layout() {
     })
     return () => void unlisten.then((off) => off())
   }, [flush, saveSession, flushGitCommit])
+
+  // #77: the open-time check in useWorkspace only ever fires once, so a
+  // workspace left open never learns it fell behind a remote another
+  // machine pushed to. Re-run it on an interval and on window focus.
+  useEffect(() => {
+    if (!repoMode || !workspacePath) return
+    const check = () => void checkForUpdates(workspacePath)
+    const interval = setInterval(check, 5 * 60_000)
+    window.addEventListener('focus', check)
+    return () => {
+      clearInterval(interval)
+      window.removeEventListener('focus', check)
+    }
+  }, [repoMode, workspacePath, checkForUpdates])
 
   // The native menu is the only place these commands are defined, but on
   // Windows its accelerator table doesn't reliably fire `on_menu_event` from
