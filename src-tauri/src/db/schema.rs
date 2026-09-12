@@ -147,6 +147,16 @@ pub async fn run_migrations(pool: &SqlitePool) -> Result<()> {
     )
     .await?;
 
+    // Code deep link drift detection (issue #52). `line` records the line
+    // number written in the link, and `fingerprint` records the trimmed
+    // live content of that line at index time.
+    add_column_if_missing(pool, "ALTER TABLE note_code_links ADD COLUMN line INTEGER").await?;
+    add_column_if_missing(
+        pool,
+        "ALTER TABLE note_code_links ADD COLUMN fingerprint TEXT",
+    )
+    .await?;
+
     Ok(())
 }
 
@@ -173,6 +183,14 @@ mod tests {
         sqlx::query(
             "INSERT INTO review_cards (note_path, kind, front, back, position, due, ease, interval, reps, options, grade, streak, lapses, suspended)
              VALUES ('/a.md', 'mc', 'Q', '', 0, '2026-01-01', 2.5, 0, 0, NULL, NULL, NULL, NULL, 0)",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        sqlx::query(
+            "INSERT INTO note_code_links (source_path, target, line, fingerprint)
+             VALUES ('/a.md', 'src/main.rs', 58, 'fn main() {}')",
         )
         .execute(&pool)
         .await

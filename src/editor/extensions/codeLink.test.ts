@@ -1,12 +1,22 @@
-import { describe, it, expect, afterEach, vi, beforeEach } from 'vitest'
+﻿import { describe, it, expect, afterEach, vi, beforeEach } from 'vitest'
 
-const resolveCodeLinks = vi.fn<(workspace: string, targets: string[]) => Promise<boolean[]>>()
+const resolveCodeLinks = vi.fn<
+  (
+    workspace: string,
+    notePath: string,
+    targets: Array<{ target: string; line: number | null }>,
+  ) => Promise<string[]>
+>()
 const openInEditor = vi.fn()
 
 vi.mock('../../lib/tauri', () => ({
   api: {
     notes: {
-      resolveCodeLinks: (workspace: string, targets: string[]) => resolveCodeLinks(workspace, targets),
+      resolveCodeLinks: (
+        workspace: string,
+        notePath: string,
+        targets: Array<{ target: string; line: number | null }>,
+      ) => resolveCodeLinks(workspace, notePath, targets),
       openInEditor: (...args: unknown[]) => openInEditor(...args),
     },
   },
@@ -50,22 +60,27 @@ afterEach(() => {
 
 describe('code deep links', () => {
   it('asks the backend about the targets it finds, batched', async () => {
-    resolveCodeLinks.mockResolvedValue([true, true])
+    resolveCodeLinks.mockResolvedValue(['ok', 'ok'])
     mount('<p>see src/main.rs:58 and docs/plan.md</p>')
 
     await settle()
 
     expect(resolveCodeLinks).toHaveBeenCalledTimes(1)
-    expect(resolveCodeLinks.mock.calls[0]?.[1]).toEqual(['src/main.rs', 'docs/plan.md'])
+    const targets = resolveCodeLinks.mock.calls[0]?.[2]
+    expect(targets).toEqual([
+      { target: 'src/main.rs', line: 58 },
+      { target: 'docs/plan.md', line: null },
+    ])
   })
 
   it('marks a resolved link clickable and opens it at its line', async () => {
-    resolveCodeLinks.mockResolvedValue([true])
+    resolveCodeLinks.mockResolvedValue(['ok'])
     const e = mount('<p>see src/main.rs:58 here</p>')
     await settle()
 
     const [link] = links(e)
     expect(link?.classList.contains('code-link-missing')).toBe(false)
+    expect(link?.classList.contains('code-link-stale')).toBe(false)
 
     link?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
     await settle()
@@ -73,10 +88,36 @@ describe('code deep links', () => {
     expect(openInEditor).toHaveBeenCalledWith('/ws', 'src/main.rs', 58)
   })
 
+  it('marks a stale link with code-link-stale and still opens it on click', async () => {
+    resolveCodeLinks.mockResolvedValue(['stale'])
+    const e = mount('<p>see src/main.rs:58 here</p>')
+    await settle()
+
+    const [link] = links(e)
+    expect(link?.classList.contains('code-link-stale')).toBe(true)
+    expect(link?.classList.contains('code-link-missing')).toBe(false)
+
+    link?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    await settle()
+
+    // Stale links are still clickable — the user can see what changed.
+    expect(openInEditor).toHaveBeenCalledWith('/ws', 'src/main.rs', 58)
+  })
+
+  it('gives the stale link a warning tooltip mentioning the line', async () => {
+    resolveCodeLinks.mockResolvedValue(['stale'])
+    const e = mount('<p>see src/main.rs:58 here</p>')
+    await settle()
+
+    const [link] = links(e)
+    expect(link?.title).toContain('58')
+    expect(link?.title.toLowerCase()).toContain('changed')
+  })
+
   // The safety property: an unresolved link says what it points at and does
   // nothing — the same answer an unresolved wiki-link already gives.
   it('leaves an unresolved link inert', async () => {
-    resolveCodeLinks.mockResolvedValue([false])
+    resolveCodeLinks.mockResolvedValue(['missing'])
     const e = mount('<p>see src/gone.rs:12 here</p>')
     await settle()
 

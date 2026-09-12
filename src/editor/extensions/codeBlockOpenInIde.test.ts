@@ -1,7 +1,13 @@
-import { describe, it, expect, afterEach, vi, beforeEach } from 'vitest'
+﻿import { describe, it, expect, afterEach, vi, beforeEach } from 'vitest'
 import type { BacklinkEntry } from '../../types'
 
-const resolveCodeLinks = vi.fn<(workspace: string, targets: string[]) => Promise<boolean[]>>()
+const resolveCodeLinks = vi.fn<
+  (
+    workspace: string,
+    notePath: string,
+    targets: Array<{ target: string; line: number | null }>,
+  ) => Promise<string[]>
+>()
 const openInEditor = vi.fn()
 const codeBacklinksForWithContext = vi.fn<
   (workspace: string, target: string) => Promise<BacklinkEntry[]>
@@ -10,7 +16,11 @@ const codeBacklinksForWithContext = vi.fn<
 vi.mock('../../lib/tauri', () => ({
   api: {
     notes: {
-      resolveCodeLinks: (workspace: string, targets: string[]) => resolveCodeLinks(workspace, targets),
+      resolveCodeLinks: (
+        workspace: string,
+        notePath: string,
+        targets: Array<{ target: string; line: number | null }>,
+      ) => resolveCodeLinks(workspace, notePath, targets),
       openInEditor: (...args: unknown[]) => openInEditor(...args),
       codeBacklinksForWithContext: (workspace: string, target: string) =>
         codeBacklinksForWithContext(workspace, target),
@@ -66,16 +76,16 @@ afterEach(() => {
 
 describe('code block "Open in IDE"', () => {
   it('asks the backend about a path named on the block\'s first line', async () => {
-    resolveCodeLinks.mockResolvedValue([true])
+    resolveCodeLinks.mockResolvedValue(['ok'])
     mount(codeBlock('// src/main.rs'))
 
     await settle()
 
-    expect(resolveCodeLinks).toHaveBeenCalledWith('/ws', ['src/main.rs'])
+    expect(resolveCodeLinks).toHaveBeenCalledWith('/ws', '', [{ target: 'src/main.rs', line: null }])
   })
 
   it('shows the button once the path resolves, and opens it on click', async () => {
-    resolveCodeLinks.mockResolvedValue([true])
+    resolveCodeLinks.mockResolvedValue(['ok'])
     const e = mount(codeBlock('// src/main.rs:12'))
     await settle()
 
@@ -91,7 +101,7 @@ describe('code block "Open in IDE"', () => {
   // The DoD: never a dead button. An unresolved path shows nothing to click,
   // unlike the inline CodeLink's "missing" styling.
   it('renders no button when the path does not resolve', async () => {
-    resolveCodeLinks.mockResolvedValue([false])
+    resolveCodeLinks.mockResolvedValue(['missing'])
     const e = mount(codeBlock('// src/gone.rs'))
     await settle()
 
@@ -119,7 +129,7 @@ describe('code block "Open in IDE"', () => {
 
 describe('code block backlinks badge (issue #37)', () => {
   it('shows a badge for notes that reference the same path, and opens one on click', async () => {
-    resolveCodeLinks.mockResolvedValue([true])
+    resolveCodeLinks.mockResolvedValue(['ok'])
     codeBacklinksForWithContext.mockResolvedValue([backlinkEntry('/ws/a.md', 'A', 'see src/main.rs:1')])
     const e = mount(codeBlock('// src/main.rs'))
     await settle()
@@ -137,7 +147,7 @@ describe('code block backlinks badge (issue #37)', () => {
   })
 
   it('excludes the current note itself from the badge', async () => {
-    resolveCodeLinks.mockResolvedValue([true])
+    resolveCodeLinks.mockResolvedValue(['ok'])
     codeBacklinksForWithContext.mockResolvedValue([backlinkEntry('/ws/self.md', 'Self')])
     const e = mount(codeBlock('// src/main.rs'))
     e.storage.noteContext.notePath = '/ws/self.md'
@@ -147,7 +157,7 @@ describe('code block backlinks badge (issue #37)', () => {
   })
 
   it('renders no badge when no other note references the path', async () => {
-    resolveCodeLinks.mockResolvedValue([true])
+    resolveCodeLinks.mockResolvedValue(['ok'])
     codeBacklinksForWithContext.mockResolvedValue([])
     const e = mount(codeBlock('// src/main.rs'))
     await settle()

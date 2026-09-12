@@ -16,7 +16,10 @@
 //!
 //! Design: `docs/specs/code-deep-links-design.md`.
 
+use crate::db::{self, DbPool};
+use crate::models::{CodeLinkStatus, CodeLinkTarget};
 use std::path::{Component, Path, PathBuf};
+use tauri::State;
 
 /// Command templates for the editors worth naming, tried in this order when
 /// the setting is empty. `code` is last as the fallback, not a probe result.
@@ -137,19 +140,56 @@ pub async fn open_in_editor(
         .map_err(|e| format!("could not launch the configured editor: {e}"))
 }
 
-/// Which of `targets` resolve to a real file, in the order given.
+/// Resolution status for each of `targets`, in the order given (issue #52).
 ///
 /// Batched deliberately: a link renders inert unless its file exists, and
 /// asking per link on every render is what would make the feature feel slow.
+///
+/// Three outcomes per link:
+/// - `ok`      — file exists and the stored fingerprint (if any) still matches
+/// - `missing` — file does not exist in the workspace
+/// - `stale`   — file exists but the stored fingerprint no longer matches the
+///               live content at that line, meaning code has drifted since the
+///               note was written
 #[tauri::command]
 pub async fn resolve_code_links(
     workspace: String,
-    targets: Vec<String>,
-) -> Result<Vec<bool>, String> {
-    Ok(targets
-        .iter()
-        .map(|target| resolve_in_workspace(&workspace, target).is_ok())
-        .collect())
+    note_path: String,
+    targets: Vec<CodeLinkTarget>,
+    db: State<'_, DbPool>,
+) -> Result<Vec<CodeLinkStatus>, String> {
+    let mut out = Vec::with_capacity(targets.len());
+    for entry in &targets {
+        let resolved = match resolve_in_workspace(&workspace, &entry.target) {
+            Ok(p) => p,
+            Err(_) => {
+                out.push(CodeLinkStatus::Missing);
+                continue;
+            }
+        };
+        let Some(line) = entry.line else {
+            out.push(CodeLinkStatus::Ok);
+            continue;
+        };
+        // Look up the fingerprint we captured at index time.
+        let stored = db::notes::get_code_link_fingerprint(&db, &note_path, &entry.target, line)
+            .await
+            .unwrap_or(None);
+        let Some(stored_fp) = stored else {
+            // No fingerprint recorded (link without a line at index time, or
+            // file wasn't readable then) — treat as ok, same as no-line links.
+            out.push(CodeLinkStatus::Ok);
+            continue;
+        };
+        // Read the live line and compare.
+        let live = crate::commands::notes::get_line_fingerprint(&resolved, line).await;
+        if live.as_deref() == Some(&stored_fp) {
+            out.push(CodeLinkStatus::Ok);
+        } else {
+            out.push(CodeLinkStatus::Stale);
+        }
+    }
+    Ok(out)
 }
 
 #[cfg(test)]

@@ -32,11 +32,16 @@ A range opens at its first line: an editor command template takes one line numbe
 
 **The path must contain a separator and a file extension.** Without both, `Analysis 2:` in prose, a `10:30` timestamp and a bare `README` all become links. This is the same class of judgement as the PDF pipeline's exercise patterns, and the same answer applies: prefer a miss to a false positive, because a wrong link is worse than no link.
 
-## Resolution and the "not found" affordance
+## Resolution, the "not found" affordance, and drift detection (issue #52)
 
-A link renders inert unless its file actually exists, matching how an unresolved `[[wiki-link]]` already behaves — the app has an established answer for "this points at nothing" and this reuses it rather than inventing a second one.
+A link renders inert (`.code-link-missing`) unless its file actually exists, matching how an unresolved `[[wiki-link]]` already behaves — the app has an established answer for "this points at nothing" and this reuses it rather than inventing a second one.
 
-Existence cannot be answered from the ProseMirror document, so it needs the backend. The check is **batched and cached per workspace**: one `resolve_code_links(workspace, paths)` call answering many paths, its results held in a store, invalidated when the workspace changes. Per-link IPC on every render is what would make this feature feel slow, and it is avoidable at no cost in correctness.
+When a link references a line number (e.g., `src/graph.rs:58`), it can also drift over time as code is added or removed above that line. To detect drift:
+1. When a note is indexed, a trimmed content fingerprint of the target line is captured and stored in `note_code_links(source_path, target, line, fingerprint)`.
+2. When resolving code links (`resolve_code_links`), the live file line is compared against the stored fingerprint.
+3. If the file exists but the content at that line has drifted, the link renders with `.code-link-stale` (amber dashed underline) with an informative tooltip. It remains clickable on user demand.
+
+Existence and staleness cannot be answered from the ProseMirror document, so they need the backend. The check is **batched and cached per workspace**: `resolve_code_links(workspace, note_path, targets)` answering many targets at once, its results held in a store, invalidated when the workspace changes. Per-link IPC on every render is what would make this feature feel slow, and it is avoidable at no cost in correctness.
 
 ## The editor command (P7-4)
 

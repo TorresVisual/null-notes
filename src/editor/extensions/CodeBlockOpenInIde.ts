@@ -211,7 +211,13 @@ export const CodeBlockOpenInIde = Extension.create({
             const workspace = useWorkspaceStore.getState().path
             if (!workspace) return
             const targets = collectTargets(view.state)
-            void resolveMissing(workspace, targets, redraw)
+            // Code blocks are checked for existence only — no line context here.
+            void resolveMissing(
+              workspace,
+              notePath(),
+              targets.map((target) => ({ target, line: null })),
+              redraw,
+            )
             void resolveCodeBacklinks(workspace, targets, redraw)
           }
           ask()

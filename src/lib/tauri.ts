@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core'
-import type { NoteMetadata, WorkspaceState, WorkspaceTree, SearchResult, AppSettings, GraphLink, GraphTag, RepoMode, CommitOutcome, PushOutcome, PullOutcome, RepoInitOutcome, TemplateMetadata, CrossRefTarget, OpenTask, DueCard, Grade, NoteHistoryEntry, BacklinkEntry, PrinterInfo, McGradeResult, CardSummary, ErrorLogEntry } from '../types'
+import type { NoteMetadata, WorkspaceState, WorkspaceTree, SearchResult, AppSettings, GraphLink, GraphTag, RepoMode, CommitOutcome, PushOutcome, PullOutcome, RepoInitOutcome, TemplateMetadata, CrossRefTarget, OpenTask, DueCard, Grade, NoteHistoryEntry, BacklinkEntry, PrinterInfo, McGradeResult, CardSummary, ErrorLogEntry, CodeLinkStatus, CodeLinkTarget } from '../types'
 import type { PdfPage, PdfMarkdownImport } from '../pdf/types'
 import { useWorkspaceStore } from '../store/workspace'
 import { sidecarDir } from './pathPrefix'
@@ -47,8 +47,11 @@ export const api = {
       invoke<string>('create_folder', { parent, name }),
     splitIntoTasks: (markdown: string) =>
       invoke<string>('split_into_tasks', { markdown }),
-    resolveCodeLinks: (workspace: string, targets: string[]) =>
-      invoke<boolean[]>('resolve_code_links', { workspace, targets }),
+    resolveCodeLinks: (
+      workspace: string,
+      notePath: string,
+      targets: CodeLinkTarget[],
+    ) => invoke<CodeLinkStatus[]>('resolve_code_links', { workspace, notePath, targets }),
     openInEditor: (workspace: string, target: string, line: number | null) =>
       invoke<void>('open_in_editor', { workspace, target, line }),
     renameFolder: (oldPath: string, newPath: string) =>

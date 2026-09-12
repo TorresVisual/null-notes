@@ -1,6 +1,6 @@
 use crate::db::{self, DbPool};
 use crate::models::{
-    BacklinkEntry, CardKind, CardSummary, DueCard, ExtractedCallout, ExtractedCard,
+    BacklinkEntry, CardKind, CardSummary, CodeLinkEntry, DueCard, ExtractedCallout, ExtractedCard,
     ExtractedFormula, ExtractedTask, GraphLink, GraphTag, McGradeResult, NoteMetadata, OpenTask,
     SearchResult, WorkspaceTree,
 };
@@ -129,12 +129,11 @@ pub fn extract_links(content: &str) -> Vec<String> {
 }
 
 // Rust port of `src/lib/codeLinks.ts`'s `PATTERN` — kept in sync by hand, not
-// shared, since the two sides have no code-sharing mechanism. Only the
-// target matters here (not the line suffix `findCodeLinks` also parses), and
-// the character class already excludes `:` and `#`, so any match containing
-// either has that suffix and only that suffix to strip.
+// shared, since the two sides have no code-sharing mechanism. Captures the line
+// number in group 1 (from `:58`) or group 2 (from `#L58`), and allows
+// `strip_code_link_suffix` to obtain the bare target path.
 const CODE_LINK_PATTERN: &str =
-    r"(?:[\w.@+-]+/)+[\w.@+-]+\.[A-Za-z0-9]{1,8}(?::\d+(?::\d+)?|#L\d+(?:-L?\d+)?)?";
+    r"(?:[\w.@+-]+/)+[\w.@+-]+\.[A-Za-z0-9]{1,8}(?::(\d+)(?::\d+)?|#L(\d+)(?:-L?\d+)?)?";
 
 fn strip_code_link_suffix(m: &str) -> &str {
     match m.find(['#', ':']) {
@@ -143,23 +142,83 @@ fn strip_code_link_suffix(m: &str) -> &str {
     }
 }
 
-/// The workspace-relative paths a note's prose references as `src/main.cpp`-
-/// or `src/main.cpp:58`-style code links (issue #37) — the reverse of what a
-/// note forward-links to, mirroring `extract_links`' shape for `note_links`.
-pub fn extract_code_link_targets(content: &str) -> Vec<String> {
+/// The workspace-relative paths and optional line numbers a note's prose
+/// references as `src/main.cpp`- or `src/main.cpp:58`-style code links.
+pub fn extract_code_links(content: &str) -> Vec<(String, Option<u32>)> {
     let re = match Regex::new(CODE_LINK_PATTERN) {
         Ok(re) => re,
         Err(_) => return Vec::new(),
     };
     let mut seen = HashSet::new();
+    let mut links = Vec::new();
+    for cap in re.captures_iter(content) {
+        let whole = cap.get(0).map(|m| m.as_str()).unwrap_or("");
+        let target = strip_code_link_suffix(whole).to_string();
+        let line = cap
+            .get(1)
+            .or_else(|| cap.get(2))
+            .and_then(|m| m.as_str().parse::<u32>().ok());
+        if seen.insert((target.clone(), line)) {
+            links.push((target, line));
+        }
+    }
+    links
+}
+
+/// The workspace-relative paths a note's prose references as `src/main.cpp`-
+/// or `src/main.cpp:58`-style code links (issue #37) — the reverse of what a
+/// note forward-links to, mirroring `extract_links`' shape for `note_links`.
+pub fn extract_code_link_targets(content: &str) -> Vec<String> {
+    let mut seen = HashSet::new();
     let mut targets = Vec::new();
-    for m in re.find_iter(content) {
-        let target = strip_code_link_suffix(m.as_str()).to_string();
+    for (target, _) in extract_code_links(content) {
         if seen.insert(target.clone()) {
             targets.push(target);
         }
     }
     targets
+}
+
+/// Reads the trimmed text of line `line` (1-indexed) in `path`, or `None` if
+/// the file cannot be read or `line` is out of bounds (0 or beyond EOF).
+pub async fn get_line_fingerprint(path: &Path, line: u32) -> Option<String> {
+    if line == 0 {
+        return None;
+    }
+    let content = tokio::fs::read_to_string(path).await.ok()?;
+    content
+        .lines()
+        .nth((line - 1) as usize)
+        .map(|l| l.trim().to_string())
+}
+
+/// Extracts all code links from `content`, capturing live line fingerprints
+/// for targets that specify a line and exist in `workspace` (issue #52).
+pub async fn extract_code_links_with_fingerprints(
+    content: &str,
+    workspace: &str,
+) -> Vec<CodeLinkEntry> {
+    let raw_links = extract_code_links(content);
+    let mut entries = Vec::with_capacity(raw_links.len());
+    for (target, line) in raw_links {
+        let fingerprint = if let Some(line_num) = line {
+            if let Ok(resolved) =
+                crate::commands::editor_launch::resolve_in_workspace(workspace, &target)
+            {
+                get_line_fingerprint(&resolved, line_num).await
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+        entries.push(CodeLinkEntry {
+            target,
+            line,
+            fingerprint,
+        });
+    }
+    entries
 }
 
 /// Longest a backlink snippet is shown at before truncating with `…` — long
@@ -944,7 +1003,8 @@ async fn index_note_at(
     db::notes::index_note_content(db, path, &title, &fts_body).await?;
     db::notes::set_tags(db, path, &extract_tags(content)).await?;
     db::notes::set_links(db, path, &extract_links(content)).await?;
-    db::notes::set_code_links(db, path, &extract_code_link_targets(content)).await?;
+    let code_links = extract_code_links_with_fingerprints(content, workspace).await;
+    db::notes::set_code_links(db, path, &code_links).await?;
     db::notes::set_tasks(db, path, &extract_tasks(content)).await?;
     db::notes::set_cards(db, path, &extract_cards(content)).await?;
     Ok(())
@@ -2489,6 +2549,88 @@ mod tests {
     #[test]
     fn test_extract_code_link_targets_empty_content() {
         assert!(extract_code_link_targets("").is_empty());
+    }
+
+    #[test]
+    fn test_extract_code_links_parses_lines_and_ranges() {
+        let links = extract_code_links(
+            "See src/main.cpp:58 and path/to/file.rs#L20-L30 and bare/path.ts here.",
+        );
+        assert_eq!(
+            links,
+            vec![
+                ("src/main.cpp".to_string(), Some(58)),
+                ("path/to/file.rs".to_string(), Some(20)),
+                ("bare/path.ts".to_string(), None),
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn test_get_line_fingerprint_reads_and_trims_target_line() {
+        let tmp = tempfile::tempdir().unwrap();
+        let file = tmp.path().join("main.rs");
+        tokio::fs::write(&file, "line 1\n  fn main() {}  \nline 3\n")
+            .await
+            .unwrap();
+
+        assert_eq!(get_line_fingerprint(&file, 0).await, None);
+        assert_eq!(
+            get_line_fingerprint(&file, 1).await,
+            Some("line 1".to_string())
+        );
+        assert_eq!(
+            get_line_fingerprint(&file, 2).await,
+            Some("fn main() {}".to_string())
+        );
+        assert_eq!(
+            get_line_fingerprint(&file, 3).await,
+            Some("line 3".to_string())
+        );
+        assert_eq!(get_line_fingerprint(&file, 4).await, None);
+    }
+
+    #[tokio::test]
+    async fn test_extract_code_links_with_fingerprints_captures_existing_target_lines() {
+        let tmp = tempfile::tempdir().unwrap();
+        let ws = tmp.path().to_string_lossy().to_string();
+        let src_dir = tmp.path().join("src");
+        tokio::fs::create_dir_all(&src_dir).await.unwrap();
+        tokio::fs::write(src_dir.join("main.rs"), "line 1\n  fn bfs() {}  \n")
+            .await
+            .unwrap();
+
+        let entries = extract_code_links_with_fingerprints(
+            "Look at src/main.rs:2 and src/missing.rs:10 and src/main.rs (no line)",
+            &ws,
+        )
+        .await;
+
+        assert_eq!(entries.len(), 3);
+        assert_eq!(
+            entries[0],
+            CodeLinkEntry {
+                target: "src/main.rs".to_string(),
+                line: Some(2),
+                fingerprint: Some("fn bfs() {}".to_string()),
+            }
+        );
+        assert_eq!(
+            entries[1],
+            CodeLinkEntry {
+                target: "src/missing.rs".to_string(),
+                line: Some(10),
+                fingerprint: None,
+            }
+        );
+        assert_eq!(
+            entries[2],
+            CodeLinkEntry {
+                target: "src/main.rs".to_string(),
+                line: None,
+                fingerprint: None,
+            }
+        );
     }
 
     #[test]

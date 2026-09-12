@@ -16,6 +16,13 @@ export interface BacklinkEntry {
   snippet: string | null
 }
 
+export type CodeLinkStatus = 'ok' | 'missing' | 'stale'
+
+export interface CodeLinkTarget {
+  target: string
+  line: number | null
+}
+
 export interface SearchResult {
   path: string
   title: string

@@ -161,7 +161,7 @@ body {
    of depending on which selector happens to declare it. */
 button, [role="button"], .tree-row, .tab, .search-result, .slash-menu-item,
 .math-snippet-item, .block-handle-menu-item, .tag-item, .tag-pill,
-.wiki-link, .code-link, .cross-ref, input, select {
+.wiki-link, .code-link, .code-link-stale, .cross-ref, input, select {
   transition:
     background-color var(--duration-fast) var(--ease-standard),
     border-color var(--duration-fast) var(--ease-standard),
@@ -3169,6 +3169,16 @@ pre:has(code.language-expect)::before, pre:has(code.language-expected)::before {
   color: var(--text-tertiary);
   border-bottom: 1px dashed var(--text-tertiary);
   cursor: default;
+}
+
+/* A stale link's file still exists but the target line has changed since the
+   note was written (issue #52). Amber rather than grey: it's a soft warning,
+   not a broken reference. Still clickable — worst case is landing on the wrong
+   line, same as before the feature existed. */
+.code-link-stale {
+  color: #c08800;
+  border-bottom: 1px dashed #c08800;
+  cursor: pointer;
 }
 
 /* Cross-references (P6-7) — "Theorem 3.2" in prose, resolved against a

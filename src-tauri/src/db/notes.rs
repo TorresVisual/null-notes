@@ -1,6 +1,6 @@
 use crate::models::{
-    CardKind, CardSummary, DueCard, ExtractedCard, ExtractedTask, NoteMetadata, OpenTask,
-    SearchResult,
+    CardKind, CardSummary, CodeLinkEntry, DueCard, ExtractedCard, ExtractedTask, NoteMetadata,
+    OpenTask, SearchResult,
 };
 use crate::sm2;
 use anyhow::Result;
@@ -289,20 +289,42 @@ pub async fn set_links(pool: &SqlitePool, source_path: &str, targets: &[String])
 pub async fn set_code_links(
     pool: &SqlitePool,
     source_path: &str,
-    targets: &[String],
+    links: &[CodeLinkEntry],
 ) -> Result<()> {
     sqlx::query("DELETE FROM note_code_links WHERE source_path = ?")
         .bind(source_path)
         .execute(pool)
         .await?;
-    for target in targets {
-        sqlx::query("INSERT INTO note_code_links (source_path, target) VALUES (?, ?)")
-            .bind(source_path)
-            .bind(target)
-            .execute(pool)
-            .await?;
+    for link in links {
+        sqlx::query(
+            "INSERT INTO note_code_links (source_path, target, line, fingerprint) VALUES (?, ?, ?, ?)",
+        )
+        .bind(source_path)
+        .bind(&link.target)
+        .bind(link.line.map(|l| l as i64))
+        .bind(&link.fingerprint)
+        .execute(pool)
+        .await?;
     }
     Ok(())
+}
+
+pub async fn get_code_link_fingerprint(
+    pool: &SqlitePool,
+    source_path: &str,
+    target: &str,
+    line: u32,
+) -> Result<Option<String>> {
+    let row: Option<(Option<String>,)> = sqlx::query_as(
+        "SELECT fingerprint FROM note_code_links WHERE source_path = ? AND target = ? AND line = ? LIMIT 1",
+    )
+    .bind(source_path)
+    .bind(target)
+    .bind(line as i64)
+    .fetch_optional(pool)
+    .await?;
+
+    Ok(row.and_then(|(fp,)| fp))
 }
 
 pub async fn set_tasks(pool: &SqlitePool, note_path: &str, tasks: &[ExtractedTask]) -> Result<()> {
@@ -646,7 +668,7 @@ pub async fn code_backlinks_for(
     target: &str,
 ) -> Result<Vec<NoteMetadata>> {
     let rows = sqlx::query_as::<_, NoteMetadata>(
-        "SELECT n.id, n.title, n.path, n.workspace, n.updated_at
+        "SELECT DISTINCT n.id, n.title, n.path, n.workspace, n.updated_at
          FROM notes n
          JOIN note_code_links ncl ON ncl.source_path = n.path
          WHERE n.workspace = ? AND ncl.target = ?
@@ -1112,15 +1134,33 @@ mod tests {
         index_note(&pool, &note("a", "A", "/ws/a.md", "/ws"))
             .await
             .unwrap();
-        set_code_links(&pool, "/ws/a.md", &["src/main.rs".to_string()])
-            .await
-            .unwrap();
+        set_code_links(
+            &pool,
+            "/ws/a.md",
+            &[CodeLinkEntry {
+                target: "src/main.rs".to_string(),
+                line: Some(58),
+                fingerprint: Some("fn main() {}".to_string()),
+            }],
+        )
+        .await
+        .unwrap();
 
         let backlinks = code_backlinks_for(&pool, "/ws", "src/main.rs")
             .await
             .unwrap();
         assert_eq!(backlinks.len(), 1);
         assert_eq!(backlinks[0].id, "a");
+
+        let fp = get_code_link_fingerprint(&pool, "/ws/a.md", "src/main.rs", 58)
+            .await
+            .unwrap();
+        assert_eq!(fp.as_deref(), Some("fn main() {}"));
+
+        let none_fp = get_code_link_fingerprint(&pool, "/ws/a.md", "src/main.rs", 99)
+            .await
+            .unwrap();
+        assert!(none_fp.is_none());
 
         // Unlike a wiki-link title, a path is matched exactly — a different
         // case is a different file on a case-sensitive filesystem.
@@ -1331,9 +1371,17 @@ mod tests {
         set_links(&pool, "/ws/old.md", &["Target".to_string()])
             .await
             .unwrap();
-        set_code_links(&pool, "/ws/old.md", &["src/main.rs".to_string()])
-            .await
-            .unwrap();
+        set_code_links(
+            &pool,
+            "/ws/old.md",
+            &[CodeLinkEntry {
+                target: "src/main.rs".to_string(),
+                line: None,
+                fingerprint: None,
+            }],
+        )
+        .await
+        .unwrap();
 
         update_path(&pool, "/ws/old.md", "/ws/Folder/old.md")
             .await

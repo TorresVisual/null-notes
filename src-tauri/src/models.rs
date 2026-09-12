@@ -34,6 +34,33 @@ pub struct BacklinkEntry {
     pub snippet: Option<String>,
 }
 
+/// A code link reference extracted from a note, including optional line
+/// number and content fingerprint captured at index time (issue #52).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CodeLinkEntry {
+    pub target: String,
+    pub line: Option<u32>,
+    pub fingerprint: Option<String>,
+}
+
+/// A code link target requested for resolution.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CodeLinkTarget {
+    pub target: String,
+    pub line: Option<u32>,
+}
+
+/// The resolution status of a code link (issue #52).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum CodeLinkStatus {
+    Ok,
+    Missing,
+    Stale,
+}
+
 /// A `.md` file under a workspace's `templates/` folder (P6-3). `name` is the
 /// filename stem, not derived from the file's own heading — a template's
 /// first line is typically a placeholder like `{{course}}`, not a title.
