@@ -259,6 +259,7 @@ Open the now-local `src-tauri/gen/apple/*.xcodeproj/project.pbxproj` (or the gen
 - Removed the Task 2 "Regenerate icons" / "Generate iOS Xcode project" / "Upload generated project + icons" steps from the workflow rather than leaving them in place ahead of these new ones. Task 2's project and icons are now committed to the repo, so every future run would otherwise re-run `tauri ios init` against an already-initialized `gen/apple` — undocumented behavior Tauri's own docs only describe via `rm -r src-tauri/gen` first when *intentionally* recreating a project, not as a safe no-op to run unconditionally. `tauri ios build` is designed to operate against an already-generated project, so the checked-out committed one is used directly.
 - Added `if: always()` to the "Upload screenshots" step. The `idb ui tap <X> <Y>` placeholder is expected to fail the first time this runs (Step 3 below explains why), and without `always()` that failure would skip the upload step entirely, losing `before.png` along with it.
 - The `find` for `APP_PATH` originally searched `src-tauri/gen/apple` for a `*Debug-iphonesimulator*` match. The actual first run showed `xcodebuild -configuration debug` puts the built `.app` under `~/Library/Developer/Xcode/DerivedData/null-notes-<hash>/Build/Products/debug-iphonesimulator/` (lowercase `debug`, and outside the repo entirely, in Xcode's own DerivedData cache) — the original path matched nothing, so `APP_PATH` was empty and `simctl install` crashed with `NSInternalInconsistencyException: installURL`. A second attempt broadened the search to all of DerivedData for `*debug-iphonesimulator*`, which found a `.app` — but DerivedData also contains an `ArchiveIntermediates/.../BuildProductsPath/debug-iphonesimulator/null-notes.app` copy alongside the real `Build/Products` one, and `find`'s traversal order picked that one first; installing it failed with "Failed to extract IPA" (domain=IXErrorDomain, code=42), since it's an incomplete intermediate, not the actual build product. Fixed by matching the `Build/Products/debug-iphonesimulator` path segment specifically, excluding the archive-intermediates copy.
+- With that fixed, install + launch succeeded, but `before.png` came back a blank white screen below the status bar — no no-workspace UI rendered in the 3s wait. Bumped the wait to 10s and added a `log show` capture (`app.log`, uploaded alongside the screenshots) to distinguish "just needs longer to cold-start the WebView" from an actual iOS-specific rendering failure before spending another run guessing tap coordinates on a blank screen.
 
 ```yaml
       - name: Build for iOS Simulator
@@ -270,8 +271,9 @@ Open the now-local `src-tauri/gen/apple/*.xcodeproj/project.pbxproj` (or the gen
           APP_PATH=$(find ~/Library/Developer/Xcode/DerivedData -path "*/Build/Products/debug-iphonesimulator/*.app" | head -n1)
           xcrun simctl install "$UDID" "$APP_PATH"
           xcrun simctl launch "$UDID" dev.nullnotes.app
-          sleep 3
+          sleep 10
           xcrun simctl io "$UDID" screenshot before.png
+          xcrun simctl spawn "$UDID" log show --predicate 'process == "null-notes" OR eventMessage CONTAINS "nullnotes"' --last 2m > app.log || true
           echo "UDID=$UDID" >> "$GITHUB_ENV"
       - name: Install idb and send a synthetic tap
         run: |
@@ -293,6 +295,7 @@ Open the now-local `src-tauri/gen/apple/*.xcodeproj/project.pbxproj` (or the gen
           path: |
             before.png
             after.png
+            app.log
 ```
 
 Commit, push, trigger, and watch:

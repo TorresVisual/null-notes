@@ -36,8 +36,9 @@ jobs:
           APP_PATH=$(find ~/Library/Developer/Xcode/DerivedData -path "*/Build/Products/debug-iphonesimulator/*.app" | head -n1)
           xcrun simctl install "$UDID" "$APP_PATH"
           xcrun simctl launch "$UDID" dev.nullnotes.app
-          sleep 3
+          sleep 10
           xcrun simctl io "$UDID" screenshot before.png
+          xcrun simctl spawn "$UDID" log show --predicate 'process == "null-notes" OR eventMessage CONTAINS "nullnotes"' --last 2m > app.log || true
           echo "UDID=$UDID" >> "$GITHUB_ENV"
       - name: Install idb and send a synthetic tap
         run: |
@@ -59,3 +60,4 @@ jobs:
           path: |
             before.png
             after.png
+            app.log
