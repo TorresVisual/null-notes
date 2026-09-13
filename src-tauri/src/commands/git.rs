@@ -998,6 +998,21 @@ fn has_gh() -> bool {
         .unwrap_or(false)
 }
 
+fn has_git_lfs() -> bool {
+    no_window_command("git")
+        .arg("lfs")
+        .arg("version")
+        .output()
+        .map(|o| o.status.success())
+        .unwrap_or(false)
+}
+
+/// LFS tracking for this app's binary sidecar directories: `NoteName.pdf/`
+/// (rendered page images) and `NoteName.assets/` (pasted images). Ink and
+/// diagram sidecars are SVG/Mermaid text, not binary, so they stay out.
+const GIT_LFS_ATTRIBUTES: &str =
+    "*.pdf/** filter=lfs diff=lfs merge=lfs -text\n*.assets/** filter=lfs diff=lfs merge=lfs -text\n";
+
 pub fn checked_init_notes_repo(
     workspace: &str,
     create_github_remote: bool,
@@ -1040,6 +1055,49 @@ pub fn checked_init_notes_repo(
             .status()?;
         if !commit_status.success() {
             anyhow::bail!("git commit of .gitignore failed for {workspace}");
+        }
+    }
+
+    // ponytail: only wires LFS up for a repo this app creates from scratch —
+    // migrating an existing repo's already-committed binaries into LFS needs
+    // `git lfs migrate import` plus a force-push, a destructive history
+    // rewrite this app won't do on its own. Every machine that syncs this
+    // workspace afterward also needs `git-lfs` installed (`git lfs install`
+    // once, globally), or a pull leaves LFS pointer text in place of the real
+    // PDF pages/pasted images — best-effort like `gh`, but the failure mode
+    // if it's missing is sharper here, so worth calling out.
+    if has_git_lfs() {
+        no_window_command("git")
+            .arg("-C")
+            .arg(workspace)
+            .arg("lfs")
+            .arg("install")
+            .arg("--local")
+            .status()
+            .ok();
+
+        let gitattributes_path = Path::new(workspace).join(".gitattributes");
+        if !gitattributes_path.exists() {
+            std::fs::write(&gitattributes_path, GIT_LFS_ATTRIBUTES)?;
+            let add_status = no_window_command("git")
+                .arg("-C")
+                .arg(workspace)
+                .arg("add")
+                .arg("--")
+                .arg(".gitattributes")
+                .status()?;
+            if add_status.success() {
+                no_window_command("git")
+                    .arg("-C")
+                    .arg(workspace)
+                    .arg("commit")
+                    .arg("-m")
+                    .arg("notes: track PDF and pasted-image sidecars via Git LFS")
+                    .arg("--")
+                    .arg(".gitattributes")
+                    .status()
+                    .ok();
+            }
         }
     }
 
@@ -2492,6 +2550,34 @@ mod tests {
 
         let gitignore = std::fs::read_to_string(tmp.path().join(".gitignore")).unwrap();
         assert_eq!(gitignore, "custom\n");
+    }
+
+    #[test]
+    fn init_tracks_binary_sidecars_via_lfs_when_available() {
+        if !has_git_lfs() {
+            eprintln!("skipping: git-lfs not on PATH");
+            return;
+        }
+        let tmp = tempdir().unwrap();
+        git_init(tmp.path());
+
+        checked_init_notes_repo(&tmp.path().to_string_lossy(), false).unwrap();
+
+        let gitattributes = std::fs::read_to_string(tmp.path().join(".gitattributes")).unwrap();
+        assert_eq!(gitattributes, GIT_LFS_ATTRIBUTES);
+        let tracked = no_window_command("git")
+            .arg("-C")
+            .arg(tmp.path())
+            .arg("ls-files")
+            .arg("--")
+            .arg(".gitattributes")
+            .output()
+            .unwrap();
+        assert_eq!(
+            String::from_utf8_lossy(&tracked.stdout).trim(),
+            ".gitattributes",
+            ".gitattributes must be committed, not left untracked"
+        );
     }
 
     // The far more common real-world case P5-1 was built for: the workspace
