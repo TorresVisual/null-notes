@@ -21,14 +21,18 @@ use std::process::Command;
 /// parent console of its own — every `git`/`gh` call this module makes, run
 /// from the built app rather than a terminal, would otherwise pop one.
 fn no_window_command(program: &str) -> Command {
-    let mut cmd = Command::new(program);
     #[cfg(windows)]
     {
         use std::os::windows::process::CommandExt;
         const CREATE_NO_WINDOW: u32 = 0x08000000;
+        let mut cmd = Command::new(program);
         cmd.creation_flags(CREATE_NO_WINDOW);
+        cmd
     }
-    cmd
+    #[cfg(not(windows))]
+    {
+        Command::new(program)
+    }
 }
 
 /// `git -C <workspace> rev-parse --show-toplevel`, classified against the

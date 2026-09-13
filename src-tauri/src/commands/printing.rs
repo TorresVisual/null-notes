@@ -12,6 +12,7 @@ pub struct PrinterInfo {
 /// spooler calls below have no live printer in CI (same shape as
 /// `pdf/dump.rs`'s `#[ignore]`d diagnostics), so this is the one piece of
 /// this file that gets a real, always-running test.
+#[cfg_attr(not(windows), allow(dead_code))]
 fn mark_default(names: Vec<String>, default: Option<&str>) -> Vec<PrinterInfo> {
     names
         .into_iter()
@@ -214,6 +215,7 @@ pub async fn export_pdf(app: tauri::AppHandle, path: String) -> Result<(), Strin
     }
     #[cfg(not(windows))]
     {
+        let _ = (app, path);
         Err("Printing is only supported on Windows.".to_string())
     }
 }
@@ -270,6 +272,7 @@ pub async fn print_document(app: tauri::AppHandle, printer_name: String) -> Resu
     }
     #[cfg(not(windows))]
     {
+        let _ = (app, printer_name);
         Err("Printing is only supported on Windows.".to_string())
     }
 }
