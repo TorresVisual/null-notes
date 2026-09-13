@@ -47,6 +47,7 @@ gix = { version = "0.87.1", default-features = false, features = [
     "worktree-mutation",
     "blob-diff",
     "sha1",
+    "merge",
 ] }
 
 [target.'cfg(windows)'.dependencies]

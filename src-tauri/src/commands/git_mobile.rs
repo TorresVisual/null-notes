@@ -20,7 +20,7 @@
 
 use super::git::{
     build_commit_message, is_notes_monorepo, resolve, CommitOutcome, PullOutcome, PushOutcome,
-    UnsafeRepoState,
+    RebaseOutcome, UnsafeRepoState,
 };
 use crate::models::RepoMode;
 use std::path::Path;
@@ -369,6 +369,66 @@ pub fn checked_push(
     anyhow::bail!(
         "push is not yet implemented on mobile — gix has no reviewed send-pack support (see GitoxideLabs/gitoxide#306)"
     )
+}
+
+/// Replays the local commits a `Diverged` outcome found on top of the
+/// remote — but as a single tree-merge commit rather than a true multi-commit
+/// rebase, since `gix` has no rebase primitive to build one from. The
+/// frontend only ever calls this after `checked_pull`'s `Diverged` outcome
+/// has already confirmed the two sides touch disjoint files, so the
+/// resulting tree is identical to what a real rebase would produce (no hunk
+/// overlaps either way) — this only differs in history shape (one merge
+/// commit vs. a linear replay), and no UI here renders per-commit rebase
+/// history to notice the difference.
+pub fn checked_rebase_onto_remote(workspace: &str) -> anyhow::Result<RebaseOutcome> {
+    if let Some(state) = unsafe_repo_state(workspace)? {
+        anyhow::bail!("refusing to rebase: {}", state.reason());
+    }
+
+    let repo = gix::discover(workspace)?;
+    let head_name = repo
+        .head_name()?
+        .ok_or_else(|| anyhow::anyhow!("HEAD is not a symbolic ref"))?;
+    let head_id = repo.head_id()?.detach();
+    let upstream_id = repo
+        .find_reference(&format!("refs/remotes/origin/{}", head_name.shorten()))?
+        .into_fully_peeled_id()?
+        .detach();
+
+    let base_id = repo.merge_base(head_id, upstream_id)?.detach();
+    let base_tree = repo.find_commit(base_id)?.tree_id()?.detach();
+    let head_tree = repo.find_commit(head_id)?.tree_id()?.detach();
+    let upstream_tree = repo.find_commit(upstream_id)?.tree_id()?.detach();
+
+    let mut outcome = repo.merge_trees(
+        base_tree,
+        head_tree,
+        upstream_tree,
+        Default::default(),
+        repo.tree_merge_options()?,
+    )?;
+    if !outcome.conflicts.is_empty() {
+        return Ok(RebaseOutcome::Aborted {
+            output: format!(
+                "{} unresolved conflict(s) rebasing onto remote",
+                outcome.conflicts.len()
+            ),
+        });
+    }
+
+    let merged_tree_id = outcome.tree.write()?.detach();
+    let message = format!(
+        "rebase (merged tree): local changes onto {}",
+        head_name.shorten()
+    );
+    // `Repository::commit`'s first parent must match `reference`'s current
+    // value, so `head_id` (what "refs/heads/<branch>" points to right now)
+    // comes first — this is a real two-parent merge commit, not a rebase's
+    // linear replay (see this function's doc comment on why that's fine).
+    repo.commit(head_name, &message, merged_tree_id, [head_id, upstream_id])?;
+    checkout_tree_to_worktree(&repo, merged_tree_id)?;
+
+    Ok(RebaseOutcome::Rebased)
 }
 
 #[cfg(test)]
@@ -749,5 +809,51 @@ mod tests {
         assert!(
             checked_push(&tmp.path().to_string_lossy(), RepoMode::CodeRepo, false, "").is_err()
         );
+    }
+
+    #[test]
+    fn rebase_combines_disjoint_local_and_remote_changes() {
+        let origin = tempfile::tempdir().unwrap();
+        git_init(origin.path());
+        commit_file(origin.path(), "shared.md", "base\n", "notes: update shared");
+        let clone = tempfile::tempdir().unwrap();
+        git_clone(origin.path(), clone.path());
+        commit_file(
+            origin.path(),
+            "remote-only.md",
+            "r\n",
+            "notes: update remote-only",
+        );
+        commit_file(
+            clone.path(),
+            "local-only.md",
+            "l\n",
+            "notes: update local-only",
+        );
+        assert!(Command::new("git")
+            .arg("-C")
+            .arg(clone.path())
+            .arg("fetch")
+            .status()
+            .unwrap()
+            .success());
+
+        let outcome = checked_rebase_onto_remote(&clone.path().to_string_lossy()).unwrap();
+
+        assert_eq!(outcome, RebaseOutcome::Rebased);
+        assert!(clone.path().join("remote-only.md").exists());
+        assert!(clone.path().join("local-only.md").exists());
+    }
+
+    #[test]
+    fn refuses_to_rebase_on_an_unsafe_repo_state() {
+        let origin = tempfile::tempdir().unwrap();
+        git_init(origin.path());
+        commit_file(origin.path(), "a.md", "# A\n", "notes: update a");
+        let clone = tempfile::tempdir().unwrap();
+        git_clone(origin.path(), clone.path());
+        std::fs::write(clone.path().join(".git").join("MERGE_HEAD"), "abc123\n").unwrap();
+
+        assert!(checked_rebase_onto_remote(&clone.path().to_string_lossy()).is_err());
     }
 }
