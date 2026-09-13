@@ -1,0 +1,29 @@
+name: iOS scaffold
+on: workflow_dispatch
+jobs:
+  ios:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios-sim,aarch64-apple-ios
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm ci
+      - name: cargo check (iOS)
+        working-directory: src-tauri
+        run: cargo check --target aarch64-apple-ios-sim
+      - name: cargo clippy (iOS)
+        working-directory: src-tauri
+        run: cargo clippy --target aarch64-apple-ios-sim -- -D warnings
+      - name: cargo build (desktop, unaffected)
+        working-directory: src-tauri
+        run: cargo build
+      - name: cargo clippy (desktop)
+        working-directory: src-tauri
+        run: cargo clippy -- -D warnings
+      - name: cargo fmt --check
+        working-directory: src-tauri
+        run: cargo fmt --check
