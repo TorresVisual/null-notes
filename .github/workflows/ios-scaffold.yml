@@ -27,3 +27,14 @@ jobs:
       - name: cargo fmt --check
         working-directory: src-tauri
         run: cargo fmt --check
+      - name: Regenerate icons (adds iOS sizes)
+        run: npx tauri icon src-tauri/icons/icon.png
+      - name: Generate iOS Xcode project
+        run: npx tauri ios init
+      - name: Upload generated project + icons
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-gen
+          path: |
+            src-tauri/gen/apple
+            src-tauri/icons
