@@ -19,7 +19,7 @@
 //! together as one atomic change once the surface is complete.
 
 use super::git::{
-    build_commit_message, is_notes_monorepo, resolve, CommitOutcome, UnsafeRepoState,
+    build_commit_message, is_notes_monorepo, resolve, CommitOutcome, PullOutcome, UnsafeRepoState,
 };
 use crate::models::RepoMode;
 use std::path::Path;
@@ -175,6 +175,163 @@ pub fn checked_auto_commit(
     repo.commit("HEAD", &message, new_tree_id, [head_commit_id])?;
 
     Ok(CommitOutcome::Committed)
+}
+
+/// A credential callback that always answers a `Get` with `token` as an
+/// HTTPS personal-access-token password (the username is ignored by GitHub
+/// for PAT auth, so any non-empty placeholder works) — `Store`/`Erase` are
+/// no-ops since there's no on-disk credential cache to update here. `gix`
+/// has no equivalent of desktop's inherited credential helpers/SSH agent
+/// (see `git.rs`'s module doc), so mobile needs this explicit mechanism
+/// instead; wiring a real token in from iOS Keychain is a separate, later
+/// plan (see docs/plans/git-mobile-gix.md's Global Constraints).
+#[allow(clippy::result_large_err)] // `protocol::Result`'s Err variant is gix's own type, not ours to shrink
+fn basic_auth_credentials(
+    token: String,
+) -> impl FnMut(gix::credentials::helper::Action) -> gix::credentials::protocol::Result {
+    move |action| match action {
+        gix::credentials::helper::Action::Get(ctx) => {
+            Ok(Some(gix::credentials::protocol::Outcome {
+                identity: gix::sec::identity::Account {
+                    username: "x-access-token".to_string(),
+                    password: token.clone(),
+                    oauth_refresh_token: None,
+                },
+                next: ctx.into(),
+            }))
+        }
+        gix::credentials::helper::Action::Store(_) | gix::credentials::helper::Action::Erase(_) => {
+            Ok(None)
+        }
+    }
+}
+
+/// Checks out `tree_id`'s content into `repo`'s worktree and updates the
+/// persisted index to match — the gix-native equivalent of `git checkout
+/// <tree>` or the file-writing half of `git merge --ff-only`. Used by both
+/// `checked_pull`'s fast-forward path and `checked_clone_repo`.
+fn checkout_tree_to_worktree(repo: &gix::Repository, tree_id: gix::ObjectId) -> anyhow::Result<()> {
+    let workdir = repo
+        .workdir()
+        .ok_or_else(|| anyhow::anyhow!("bare repositories are not supported"))?;
+    let index_state =
+        gix::worktree::index::State::from_tree(&tree_id, &repo.objects, Default::default())?;
+    let mut index = gix::index::File::from_state(index_state, repo.index_path());
+    let opts = repo.checkout_options(gix::worktree::stack::state::attributes::Source::IdMapping)?;
+    let should_interrupt = std::sync::atomic::AtomicBool::new(false);
+    gix::worktree::state::checkout(
+        &mut index,
+        workdir,
+        repo.objects.clone().into_arc()?,
+        &gix::progress::Discard,
+        &gix::progress::Discard,
+        &should_interrupt,
+        opts,
+    )?;
+    index.write(Default::default())?;
+    Ok(())
+}
+
+/// `HEAD..other` in git's range syntax: commits reachable from `other` but
+/// not from `head`.
+fn count_commits_between(
+    repo: &gix::Repository,
+    exclude: gix::ObjectId,
+    include: gix::ObjectId,
+) -> anyhow::Result<u32> {
+    Ok(repo
+        .rev_walk([include])
+        .with_hidden([exclude])
+        .all()?
+        .count() as u32)
+}
+
+/// Repo-root-relative changed paths between two commits' trees, matching
+/// desktop's `changed_note_paths`.
+fn changed_paths_between(
+    repo: &gix::Repository,
+    from: gix::ObjectId,
+    to: gix::ObjectId,
+) -> anyhow::Result<Vec<String>> {
+    let from_tree = repo.find_commit(from)?.tree()?;
+    let to_tree = repo.find_commit(to)?.tree()?;
+    let mut paths = Vec::new();
+    from_tree
+        .changes()?
+        .for_each_to_obtain_tree(&to_tree, |change| {
+            paths.push(change.location().to_string());
+            Ok::<_, std::convert::Infallible>(std::ops::ControlFlow::Continue(()))
+        })?;
+    Ok(paths)
+}
+
+/// `token` authenticates over HTTPS when the remote actually requires it —
+/// this module's tests use local filesystem-path remotes, which need no
+/// credential, so an empty token is fine there.
+pub fn checked_pull(workspace: &str, token: &str) -> anyhow::Result<PullOutcome> {
+    let repo = gix::discover(workspace)?;
+    let remote = match repo.find_default_remote(gix::remote::Direction::Fetch) {
+        None => return Ok(PullOutcome::NoRemote),
+        Some(remote) => remote?,
+    };
+
+    let connection = remote
+        .connect(gix::remote::Direction::Fetch)?
+        .with_credentials(basic_auth_credentials(token.to_string()));
+    connection
+        .prepare_fetch(gix::progress::Discard, Default::default())?
+        .receive(gix::progress::Discard, &Default::default())?;
+
+    let head_name = repo
+        .head_name()?
+        .ok_or_else(|| anyhow::anyhow!("HEAD is not a symbolic ref"))?;
+    let head_id = repo.head_id()?.detach();
+    let upstream_id = match repo
+        .find_reference(&format!("refs/remotes/origin/{}", head_name.shorten()))
+        .ok()
+        .and_then(|r| r.into_fully_peeled_id().ok())
+    {
+        None => {
+            let ahead = repo.rev_walk([head_id]).all()?.count() as u32;
+            return Ok(PullOutcome::NoUpstream { ahead });
+        }
+        Some(id) => id.detach(),
+    };
+
+    let ahead = count_commits_between(&repo, upstream_id, head_id)?;
+    let behind = count_commits_between(&repo, head_id, upstream_id)?;
+
+    if behind == 0 {
+        return Ok(if ahead > 0 {
+            PullOutcome::Ahead { ahead }
+        } else {
+            PullOutcome::UpToDate
+        });
+    }
+    if ahead > 0 {
+        let base = repo.merge_base(head_id, upstream_id)?.detach();
+        let local_paths = changed_paths_between(&repo, base, head_id)?;
+        let remote_paths = changed_paths_between(&repo, base, upstream_id)?;
+        return Ok(PullOutcome::Diverged {
+            ahead,
+            behind,
+            local_paths,
+            remote_paths,
+        });
+    }
+
+    // Pure fast-forward: no local commits since the merge-base, so moving
+    // the branch ref (and checking out the new tree) is safe unconditionally
+    // — the same case desktop's `merge --ff-only` always succeeds for.
+    repo.reference(
+        head_name,
+        upstream_id,
+        gix::refs::transaction::PreviousValue::MustExistAndMatch(head_id.into()),
+        "pull --ff-only",
+    )?;
+    let upstream_tree = repo.find_commit(upstream_id)?.tree_id()?.detach();
+    checkout_tree_to_worktree(&repo, upstream_tree)?;
+    Ok(PullOutcome::FastForwarded)
 }
 
 #[cfg(test)]
@@ -426,5 +583,105 @@ mod tests {
         .unwrap();
 
         assert!(matches!(outcome, CommitOutcome::Skipped { .. }));
+    }
+
+    fn git_clone(remote: &Path, dest: &Path) {
+        assert!(Command::new("git")
+            .arg("clone")
+            .arg("-q")
+            .arg(remote)
+            .arg(dest)
+            .status()
+            .unwrap()
+            .success());
+        for (key, value) in [("user.name", "Test"), ("user.email", "test@example.com")] {
+            assert!(Command::new("git")
+                .arg("-C")
+                .arg(dest)
+                .arg("config")
+                .arg(key)
+                .arg(value)
+                .status()
+                .unwrap()
+                .success());
+        }
+    }
+
+    #[test]
+    fn up_to_date_after_fetching_nothing_new() {
+        let origin = tempfile::tempdir().unwrap();
+        git_init(origin.path());
+        commit_file(origin.path(), "a.md", "# A\n", "notes: update a");
+        let clone = tempfile::tempdir().unwrap();
+        git_clone(origin.path(), clone.path());
+
+        let outcome = checked_pull(&clone.path().to_string_lossy(), "").unwrap();
+
+        assert_eq!(outcome, PullOutcome::UpToDate);
+    }
+
+    #[test]
+    fn fast_forwards_when_behind_with_no_local_commits() {
+        let origin = tempfile::tempdir().unwrap();
+        git_init(origin.path());
+        commit_file(origin.path(), "a.md", "# A\n", "notes: update a");
+        let clone = tempfile::tempdir().unwrap();
+        git_clone(origin.path(), clone.path());
+        commit_file(origin.path(), "b.md", "# B\n", "notes: update b");
+
+        let outcome = checked_pull(&clone.path().to_string_lossy(), "").unwrap();
+
+        assert_eq!(outcome, PullOutcome::FastForwarded);
+        assert!(clone.path().join("b.md").exists());
+    }
+
+    #[test]
+    fn reports_diverged_with_the_touched_paths_on_each_side() {
+        let origin = tempfile::tempdir().unwrap();
+        git_init(origin.path());
+        commit_file(origin.path(), "shared.md", "base\n", "notes: update shared");
+        let clone = tempfile::tempdir().unwrap();
+        git_clone(origin.path(), clone.path());
+        commit_file(
+            origin.path(),
+            "remote-only.md",
+            "r\n",
+            "notes: update remote-only",
+        );
+        commit_file(
+            clone.path(),
+            "local-only.md",
+            "l\n",
+            "notes: update local-only",
+        );
+
+        let outcome = checked_pull(&clone.path().to_string_lossy(), "").unwrap();
+
+        match outcome {
+            PullOutcome::Diverged {
+                ahead,
+                behind,
+                local_paths,
+                remote_paths,
+            } => {
+                assert_eq!(ahead, 1);
+                assert_eq!(behind, 1);
+                assert_eq!(local_paths, vec!["local-only.md".to_string()]);
+                assert_eq!(remote_paths, vec!["remote-only.md".to_string()]);
+            }
+            other => panic!("expected Diverged, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn no_remote_when_none_is_configured() {
+        let tmp = tempfile::tempdir().unwrap();
+        git_init(tmp.path());
+        commit_file(tmp.path(), "a.md", "# A\n", "notes: update a");
+
+        assert_eq!(
+            checked_pull(&tmp.path().to_string_lossy(), "").unwrap(),
+            PullOutcome::NoRemote
+        );
     }
 }
