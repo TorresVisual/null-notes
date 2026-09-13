@@ -29,7 +29,13 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
         with:
-          workspaces: src-tauri
+          workspaces: |
+            src-tauri
+            src-tauri/context-menu-handler
+
+      - name: Build context-menu-handler DLL
+        working-directory: src-tauri/context-menu-handler
+        run: cargo build --release
 
       - uses: actions/setup-node@v4
         with:
