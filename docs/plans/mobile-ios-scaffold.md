@@ -259,7 +259,8 @@ Open the now-local `src-tauri/gen/apple/*.xcodeproj/project.pbxproj` (or the gen
 - Removed the Task 2 "Regenerate icons" / "Generate iOS Xcode project" / "Upload generated project + icons" steps from the workflow rather than leaving them in place ahead of these new ones. Task 2's project and icons are now committed to the repo, so every future run would otherwise re-run `tauri ios init` against an already-initialized `gen/apple` — undocumented behavior Tauri's own docs only describe via `rm -r src-tauri/gen` first when *intentionally* recreating a project, not as a safe no-op to run unconditionally. `tauri ios build` is designed to operate against an already-generated project, so the checked-out committed one is used directly.
 - Added `if: always()` to the "Upload screenshots" step. The `idb ui tap <X> <Y>` placeholder is expected to fail the first time this runs (Step 3 below explains why), and without `always()` that failure would skip the upload step entirely, losing `before.png` along with it.
 - The `find` for `APP_PATH` originally searched `src-tauri/gen/apple` for a `*Debug-iphonesimulator*` match. The actual first run showed `xcodebuild -configuration debug` puts the built `.app` under `~/Library/Developer/Xcode/DerivedData/null-notes-<hash>/Build/Products/debug-iphonesimulator/` (lowercase `debug`, and outside the repo entirely, in Xcode's own DerivedData cache) — the original path matched nothing, so `APP_PATH` was empty and `simctl install` crashed with `NSInternalInconsistencyException: installURL`. A second attempt broadened the search to all of DerivedData for `*debug-iphonesimulator*`, which found a `.app` — but DerivedData also contains an `ArchiveIntermediates/.../BuildProductsPath/debug-iphonesimulator/null-notes.app` copy alongside the real `Build/Products` one, and `find`'s traversal order picked that one first; installing it failed with "Failed to extract IPA" (domain=IXErrorDomain, code=42), since it's an incomplete intermediate, not the actual build product. Fixed by matching the `Build/Products/debug-iphonesimulator` path segment specifically, excluding the archive-intermediates copy.
-- With that fixed, install + launch succeeded, but `before.png` came back a blank white screen below the status bar — no no-workspace UI rendered in the 3s wait. Bumped the wait to 10s and added a `log show` capture (`app.log`, uploaded alongside the screenshots) to distinguish "just needs longer to cold-start the WebView" from an actual iOS-specific rendering failure before spending another run guessing tap coordinates on a blank screen.
+- With that fixed, install + launch succeeded, but `before.png` came back a blank white screen below the status bar — no no-workspace UI rendered in the 3s wait. Bumped the wait to 10s and added a `log show` capture (`app.log`, uploaded alongside the screenshots) to distinguish "just needs longer to cold-start the WebView" from an actual iOS-specific rendering failure before spending another run guessing tap coordinates on a blank screen. The 10s wait alone fixed it — `before.png` showed the real no-workspace screen (sidebar, "Choose a folder…"/"Clone workspace…" buttons), confirming the WebView and IPC bridge both work; `app.log` wasn't needed. The two-panel layout overflows the phone's width with text visibly clipped at the right edge, but that's expected — app-shell UI reflow for mobile is explicitly out of scope for this plan (see "Out of scope" below).
+- Filled in the `idb ui tap` placeholder using the sidebar "Note" button rather than "Clone workspace…" — `idb ui tap X Y` takes UIKit *points* (e.g. 393×852 for iPhone 15), not the screenshot's raw pixels (3x that on this device), so the coordinates had to be converted, not read directly off the PNG. Also added `idb ui describe-all` (dumped to `ax-tree.json`, uploaded alongside the screenshots) as a fallback in case the computed guess misses the button, to avoid a further blind round trip.
 
 ```yaml
       - name: Build for iOS Simulator
@@ -281,10 +282,13 @@ Open the now-local `src-tauri/gen/apple/*.xcodeproj/project.pbxproj` (or the gen
           brew install facebook/fb/idb-companion
           pip3 install fb-idb
           idb connect "$UDID"
-          # Coordinates depend on what `before.png` actually shows — read them
-          # off the downloaded screenshot the first time this runs, there is
-          # no way to know them ahead of time without seeing the rendered UI.
-          idb ui tap <X> <Y> --udid "$UDID"
+          idb ui describe-all --udid "$UDID" > ax-tree.json || true
+          # idb's tap coordinates are in UIKit points (device logical size,
+          # e.g. 393x852 for iPhone 15), not the screenshot's raw pixels
+          # (which are 3x that) -- computed from before.png against the
+          # sidebar "Note" button; ax-tree.json is captured above to correct
+          # this if the computed guess turns out to be off.
+          idb ui tap 62 193 --udid "$UDID"
           sleep 1
           xcrun simctl io "$UDID" screenshot after.png
       - name: Upload screenshots
@@ -296,6 +300,7 @@ Open the now-local `src-tauri/gen/apple/*.xcodeproj/project.pbxproj` (or the gen
             before.png
             after.png
             app.log
+            ax-tree.json
 ```
 
 Commit, push, trigger, and watch:

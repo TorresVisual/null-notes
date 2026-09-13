@@ -46,10 +46,13 @@ jobs:
           brew install facebook/fb/idb-companion
           pip3 install fb-idb
           idb connect "$UDID"
-          # Coordinates depend on what `before.png` actually shows — read them
-          # off the downloaded screenshot the first time this runs, there is
-          # no way to know them ahead of time without seeing the rendered UI.
-          idb ui tap <X> <Y> --udid "$UDID"
+          idb ui describe-all --udid "$UDID" > ax-tree.json || true
+          # idb's tap coordinates are in UIKit points (device logical size,
+          # e.g. 393x852 for iPhone 15), not the screenshot's raw pixels
+          # (which are 3x that) -- computed from before.png against the
+          # sidebar "Note" button; ax-tree.json is captured above to correct
+          # this if the computed guess turns out to be off.
+          idb ui tap 62 193 --udid "$UDID"
           sleep 1
           xcrun simctl io "$UDID" screenshot after.png
       - name: Upload screenshots
@@ -61,3 +64,4 @@ jobs:
             before.png
             after.png
             app.log
+            ax-tree.json
