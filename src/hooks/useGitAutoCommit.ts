@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef } from 'react'
 import { useWorkspaceStore } from '../store/workspace'
 import { api } from '../lib/tauri'
-import { canAutoPush } from '../lib/git'
+import { canAutoPush, pushIfAllowed } from '../lib/git'
 
 /**
  * Batches note saves into one commit per idle window (P5-2) — never per
@@ -18,7 +18,11 @@ export function useGitAutoCommit() {
   const idleTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const revertTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const flushGitCommit = useCallback(async () => {
+  // `force` bypasses the autoCommit toggle for #85's manual "Sync now" —
+  // a disabled toggle is exactly when a manual trigger matters most. The
+  // idle timer and close-requested handler call this without it, so
+  // automatic commits still respect the toggle.
+  const flushGitCommit = useCallback(async (force = false) => {
     if (idleTimer.current) {
       clearTimeout(idleTimer.current)
       idleTimer.current = null
@@ -36,7 +40,7 @@ export function useGitAutoCommit() {
       setGitCommitStatus,
       setGitCommitDetail,
     } = useWorkspaceStore.getState()
-    if (!path || !repoMode || !git.autoCommit || gitPendingPaths.length === 0) return
+    if (!path || !repoMode || (!git.autoCommit && !force) || gitPendingPaths.length === 0) return
 
     const paths = gitPendingPaths
     setGitCommitStatus('committing')
@@ -63,25 +67,7 @@ export function useGitAutoCommit() {
         // canAutoPush is what makes that true on the frontend side too, on
         // top of the Rust-level guard in checked_push.
         if (canAutoPush(repoMode, git)) {
-          try {
-            const pushOutcome = await api.git.pushNotes(path, repoMode, git.allowCodeRepoPush)
-            // Most outcomes here are a resolved Ok value, not a thrown
-            // error — only authFailed/rejected are real failures worth
-            // surfacing. noRemote is an expected, non-error state (no
-            // GitHub remote configured yet) and pushed needs no signal.
-            if (pushOutcome.kind === 'authFailed' || pushOutcome.kind === 'rejected') {
-              setGitCommitStatus('pushFailed')
-              setGitCommitDetail(pushOutcome.output)
-            }
-          } catch (e) {
-            // The commit itself already succeeded and is safe in the local
-            // repo — only the push failed, so this is its own status rather
-            // than reusing 'error' (which would misleadingly say the commit
-            // failed) or staying silent (the previous behavior — a failed
-            // push had no visible effect at all beyond a console.error).
-            setGitCommitStatus('pushFailed')
-            setGitCommitDetail(String(e))
-          }
+          await pushIfAllowed(path, repoMode, git)
         }
       } else if (outcome.kind === 'nothingToCommit') {
         clearGitPendingPaths()

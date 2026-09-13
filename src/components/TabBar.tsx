@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { X } from 'lucide-react'
+import { RefreshCw, X } from 'lucide-react'
 import { useWorkspaceStore } from '../store/workspace'
 import { useNotesStore, noteTitle } from '../store/notes'
 import { SaveStatus } from './SaveStatus'
@@ -16,6 +16,8 @@ interface TabBarProps {
   onDismissSaveError: () => void
   gitCommitStatus: GitStatus
   gitCommitDetail: string | null
+  onSyncNow: () => void
+  syncingNow: boolean
 }
 
 export function TabBar({
@@ -27,6 +29,8 @@ export function TabBar({
   onDismissSaveError,
   gitCommitStatus,
   gitCommitDetail,
+  onSyncNow,
+  syncingNow,
 }: TabBarProps) {
   const { openTabs, activeTab, setActiveTab, closeTab, flashTabPath, setFlashTabPath, reorderTabs } =
     useWorkspaceStore()
@@ -78,6 +82,17 @@ export function TabBar({
             onDismiss={onDismissSaveError}
           />
           <GitCommitStatus status={gitCommitStatus} detail={gitCommitDetail} />
+          {repoMode && (
+            <button
+              className="git-sync-now"
+              onClick={onSyncNow}
+              disabled={syncingNow}
+              title="Commit, push, and pull now"
+            >
+              <RefreshCw size={12} className={syncingNow ? 'spin' : ''} />
+              Sync now
+            </button>
+          )}
           {repoMode && !autoCommit && (
             <span
               className="git-commit-status"

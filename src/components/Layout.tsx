@@ -60,6 +60,7 @@ import { report } from '../editor/splitIntoTasks'
 import type { DiagramMetadata } from '../types'
 import { goBack, goForward } from '../lib/navigationHistory'
 import { useFocusModeStore } from '../store/focusMode'
+import { canPushHere, pushIfAllowed } from '../lib/git'
 
 type ViewMode = 'wysiwyg' | 'raw'
 
@@ -153,6 +154,27 @@ export function Layout() {
       window.removeEventListener('focus', check)
     }
   }, [repoMode, workspacePath, checkForUpdates])
+
+  // #85: manual fallback for the multi-machine workflow — commit, push, and
+  // pull right now instead of waiting out the idle timer or the 5-minute
+  // poll. Works even with autoCommit/autoPush off (flushGitCommit's `force`,
+  // and canPushHere's mode-only gating instead of canAutoPush's toggle
+  // check) — a disabled toggle is exactly when a manual trigger matters.
+  const [syncingNow, setSyncingNow] = useState(false)
+  const syncNow = useCallback(async () => {
+    if (!workspacePath || !repoMode) return
+    setSyncingNow(true)
+    try {
+      await flushGitCommit(true)
+      const { git } = useWorkspaceStore.getState()
+      if (canPushHere(repoMode, git)) {
+        await pushIfAllowed(workspacePath, repoMode, git)
+      }
+      await checkForUpdates(workspacePath)
+    } finally {
+      setSyncingNow(false)
+    }
+  }, [workspacePath, repoMode, flushGitCommit, checkForUpdates])
 
   // The native menu is the only place these commands are defined, but on
   // Windows its accelerator table doesn't reliably fire `on_menu_event` from
@@ -528,6 +550,8 @@ export function Layout() {
           onDismissSaveError={dismissError}
           gitCommitStatus={gitCommitStatus}
           gitCommitDetail={gitCommitDetail}
+          onSyncNow={syncNow}
+          syncingNow={syncingNow}
         />
         {conflict && <ConflictBar onKeepMine={keepMine} onReloadTheirs={reloadTheirs} />}
         {gitDiverged && (

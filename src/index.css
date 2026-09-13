@@ -1736,6 +1736,24 @@ pre:has(code.language-expect)::before, pre:has(code.language-expected)::before {
 }
 .git-commit-status.error, .git-commit-status.pushFailed { color: var(--danger); }
 
+.git-sync-now {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: 0 var(--space-md);
+  background: none;
+  border: none;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  font-size: 12px;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.git-sync-now:hover:not(:disabled) { color: var(--text-primary); background: var(--bg-hover); }
+.git-sync-now:disabled { cursor: default; opacity: 0.6; }
+
 /* External-change conflict prompt — never resolves itself */
 .conflict-bar, .git-prompt {
   display: flex;
