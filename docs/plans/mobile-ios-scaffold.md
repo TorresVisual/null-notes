@@ -313,7 +313,7 @@ gh workflow run ios-scaffold.yml
 gh run watch --exit-status
 ```
 
-- [ ] **Step 2: Verify the app launched without crashing**
+- [x] **Step 2: Verify the app launched without crashing**
 
 Expected: the "Boot Simulator and install" step completes without `simctl launch` erroring, and `before.png` isn't blank/black — Xcode finished building the Rust static library plus the Swift shell, and null-notes' existing no-workspace screen (the same one a fresh desktop install with no `initial_workspace` shows) rendered.
 
@@ -322,13 +322,19 @@ Download and look at it:
 gh run download -n ios-smoke-test -D .
 ```
 
-- [ ] **Step 3: Verify basic interaction from the screenshots**
+Confirmed: `before.png` shows the real no-workspace screen (sidebar with New/Note/Folder/Canvas/Template/Import PDF, Home/Search/Settings, and the main panel's "null-notes" intro copy with "Choose a folder…"/"Clone workspace…" buttons).
+
+- [x] **Step 3: Verify basic interaction from the screenshots**
 
 Open `before.png`, find a real tap target on the no-workspace screen (e.g. the "Clone workspace…" button), and fix the `<X> <Y>` placeholder in Step 1 to that pixel location — then re-run. Compare `before.png` and `after.png`: the goal is confirming touch input, rendering, and the WebView bridge all work (the screen visibly changed after the tap), not that any specific feature is functional yet — the git clone itself is git.rs's desktop CLI-based implementation, which won't work on iOS regardless, and is exactly what the next plan replaces.
 
-- [ ] **Step 4: Record the result**
+Confirmed: tapping the sidebar "Note" button (62, 193 in points) changed the screen — an "Open Workspace" banner and the desktop-style File/View menu bar appeared above the sidebar, and the "Note" button shows a pressed/focused state in `after.png`. Touch input, rendering, and the WebView/IPC bridge all work.
+
+- [x] **Step 4: Record the result**
 
 No further code changes for this task once Steps 1–3 pass. Note the outcome (workflow run URL, which simulator/OS version `macos-latest` resolved to) in the PR/commit description for the next plan (`git_mobile.rs`) to reference. If something in Steps 1–3 fails, that failure is the next thing to fix before any later mobile plan can be executed or verified.
+
+**Result:** Final green run: https://github.com/TorresVisual/null-notes/actions/runs/34787469034 (macOS runner resolved `iOS 26.5 (26.5 - 23F77)` on an "iPhone 15" simulator, Xcode 26.6). All three tasks in this plan are complete — the app builds, installs, launches, and responds to touch in the iOS Simulator via CI. Known follow-ups for later plans, observed along the way: the two-panel no-workspace layout overflows the phone's logical width (text clipped at the right edge) — expected, since app-shell UI reflow is explicitly out of scope here; and the desktop window-chrome menu bar (File/View, minimize/maximize/close) rendered in the Simulator, which the mobile UI reflow plan will presumably need to hide.
 
 ---
 
