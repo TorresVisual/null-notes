@@ -5,9 +5,18 @@
 //!
 //! Command names and return types match `git.rs` exactly (reusing its
 //! `pub` types directly) so the frontend never branches on platform for
-//! these calls — only `lib.rs`'s module alias picks which implementation
-//! is registered. `init_notes_repo` and `list_github_repos` are the two
-//! exceptions: explicitly out of mobile v1 scope, stubbed below.
+//! these calls. `init_notes_repo` and `list_github_repos` are the two
+//! exceptions: explicitly out of mobile v1 scope, stubbed once this module's
+//! surface is complete.
+//!
+//! No `#[tauri::command]` wrappers exist here until every one of the 11
+//! operations has a real implementation: `#[tauri::command]` expands to a
+//! crate-global helper macro keyed only on the Rust function's name, so a
+//! `detect_repo` wrapper here would collide with `git.rs`'s the moment both
+//! compile for the same target — regardless of which one `generate_handler!`
+//! actually registers. Wrappers (and the matching `#[cfg(not(target_os =
+//! "ios"))]` on `git.rs`'s own, plus `lib.rs`'s dispatch alias) all land
+//! together as one atomic change once the surface is complete.
 
 use super::git::is_notes_monorepo;
 use crate::models::RepoMode;
@@ -42,15 +51,6 @@ pub fn detect_repo_mode(workspace: &str) -> anyhow::Result<Option<RepoMode>> {
     }))
 }
 
-#[cfg(target_os = "ios")]
-#[tauri::command]
-pub async fn detect_repo(workspace: String) -> Result<Option<RepoMode>, String> {
-    tokio::task::spawn_blocking(move || detect_repo_mode(&workspace))
-        .await
-        .map_err(|e| e.to_string())?
-        .map_err(|e| e.to_string())
-}
-
 /// Same evidence rule as desktop's `detect_prior_git_automation`: a remote
 /// to sync through, plus at least one commit this app's own auto-commit
 /// made.
@@ -58,15 +58,6 @@ pub fn detect_prior_git_automation(workspace: &str) -> anyhow::Result<bool> {
     let repo = gix::discover(workspace)?;
     let has_remote = repo.remote_names().iter().next().is_some();
     Ok(has_remote && has_notes_commit_in_log(&repo)?)
-}
-
-#[cfg(target_os = "ios")]
-#[tauri::command]
-pub async fn detect_prior_automation(workspace: String) -> Result<bool, String> {
-    tokio::task::spawn_blocking(move || detect_prior_git_automation(&workspace))
-        .await
-        .map_err(|e| e.to_string())?
-        .map_err(|e| e.to_string())
 }
 
 /// Walks HEAD's ancestry looking for a commit message starting with

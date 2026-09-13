@@ -9,12 +9,6 @@ use std::path::PathBuf;
 use std::sync::OnceLock;
 use tauri::{Emitter, Manager};
 
-// Task 7 flips this to `#[cfg(target_os = "ios")] use commands::git_mobile as
-// git_impl;` once git_mobile.rs's 11-command surface is complete — until
-// then it stays pointed at desktop's `git` unconditionally so this compiles
-// cleanly mid-migration (see docs/plans/git-mobile-gix.md Task 1 Step 5).
-use commands::git as git_impl;
-
 static ERROR_LOG_DIR: OnceLock<PathBuf> = OnceLock::new();
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -141,17 +135,17 @@ pub fn run() {
             commands::editor_launch::open_in_editor,
             commands::editor_launch::resolve_code_links,
             commands::crossref::resolve_cross_refs,
-            git_impl::detect_repo,
-            git_impl::detect_prior_automation,
-            git_impl::auto_commit,
-            git_impl::push_notes,
-            git_impl::fetch_and_compare,
-            git_impl::rebase_onto_remote,
-            git_impl::init_notes_repo,
-            git_impl::list_note_history,
-            git_impl::read_note_at_commit,
-            git_impl::list_github_repos,
-            git_impl::clone_repo,
+            commands::git::detect_repo,
+            commands::git::detect_prior_automation,
+            commands::git::auto_commit,
+            commands::git::push_notes,
+            commands::git::fetch_and_compare,
+            commands::git::rebase_onto_remote,
+            commands::git::init_notes_repo,
+            commands::git::list_note_history,
+            commands::git::read_note_at_commit,
+            commands::git::list_github_repos,
+            commands::git::clone_repo,
             commands::terminal::terminal_open,
             commands::terminal::terminal_write,
             commands::terminal::terminal_resize,
