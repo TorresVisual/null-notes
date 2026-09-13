@@ -502,6 +502,62 @@ All of these are corroborated by implementer reports (not vendor marketing copy)
 
 12. **Managed-language (C#/.NET) in-proc shell extensions are explicitly discouraged by Microsoft** due to CLR-in-every-Explorer-adjacent-process version conflicts (see §3, WindowsAppSDK issue #1082) — reinforces that the companion DLL should be native (Rust `cdylib`, matching the project's existing Rust toolchain), not a C# DLL, even though this repo's frontend is TypeScript/React and it might be tempting to reach for .NET tooling for a "small" DLL.
 
+13. **`0x800B0109` persists even with a thumbprint-matched cert in `Cert:\CurrentUser\TrustedPeople`.** Confirmed empirically on a real second machine (not vendor docs, which say `TrustedPeople` alone is sufficient — §5 above). `Get-AuthenticodeSignature` on the `.msix` showed `Status: Valid` and a thumbprint matching the imported `.cer`, yet `Add-AppxPackage` still failed, and `Get-AppPackageLog` kept reporting the same untrusted-root failure. What actually fixed it, in order:
+    - Import the same `.cer` into **all four** of `Cert:\CurrentUser\TrustedPeople`, `Cert:\CurrentUser\Root`, `Cert:\LocalMachine\TrustedPeople`, and `Cert:\LocalMachine\Root` (the last three need an elevated PowerShell).
+    - Set `AllowAllTrustedApps` (DWORD, `1`) under `HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock` — present separately from `AllowDevelopmentWithoutDevLicense` (Developer Mode), which was already `1` and did **not** cover sideloading a trusted-but-non-Store package on its own.
+    - **Sign out and back in** (or reboot) after setting that registry key — `AppModelUnlock` is read by `AppXSvc` at logon, so the change is inert for the rest of the current session.
+
+    The secondary `Get-AppPackageLog` line `Error 0x80070002: Opening the Msixvc package ... Please check whether the Msixvc support services are installed` is a **red herring** — it's the deployment stack falling back to the streaming-package code path after the primary signature check already failed, not a real missing-service problem. Don't chase it separately.
+
+---
+
+## 7. Runbook: registering shell integration on a second machine
+
+For a machine that isn't the one where `identity-package/null-notes-identity.msix` was originally built and signed (e.g. a second dev PC, since there is still no public signing pipeline — see §5's "no signing pipeline exists today" and the feasibility summary below):
+
+1. **Generate (or reuse) a dev cert and signed package.**
+   ```powershell
+   .\scripts\windows\dev-cert.ps1        # creates/reuses scripts\windows\.dev-cert\null-notes-dev.{pfx,cer}
+   .\scripts\windows\package-identity.ps1  # signs identity-package\null-notes-identity.msix with it
+   ```
+   Each machine needs its own run (or a copied `.pfx`/`.cer` pair) — `.dev-cert/` is gitignored and machine-specific.
+
+2. **Point the installed app at the newly-signed `.msix`.** The running app reads `null-notes-identity.msix` from its own exe directory (`lib.rs`'s startup check), so replace the one that shipped with the installer:
+   ```powershell
+   Copy-Item "identity-package\null-notes-identity.msix" "<install-dir>\null-notes-identity.msix" -Force
+   ```
+   Find `<install-dir>` via the Start Menu shortcut's "Open file location," typically `%LOCALAPPDATA%\null-notes\`.
+
+3. **Trust the cert everywhere §6.13 requires**, not just the one store the vendor docs mention:
+   ```powershell
+   $cer = "scripts\windows\.dev-cert\null-notes-dev.cer"
+   Import-Certificate -FilePath $cer -CertStoreLocation Cert:\CurrentUser\TrustedPeople
+   Import-Certificate -FilePath $cer -CertStoreLocation Cert:\CurrentUser\Root
+   # then from an elevated PowerShell:
+   Import-Certificate -FilePath $cer -CertStoreLocation Cert:\LocalMachine\TrustedPeople
+   Import-Certificate -FilePath $cer -CertStoreLocation Cert:\LocalMachine\Root
+   ```
+
+4. **Allow sideloading of trusted (non-Store) packages**, from the same elevated PowerShell:
+   ```powershell
+   reg add "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock" /v AllowAllTrustedApps /t REG_DWORD /d 1 /f
+   ```
+   Enabling "Developer Mode" in Settings alone is not equivalent to this — the two registry values are independent, and the app appeared to already have Developer Mode on before this fix worked.
+
+5. **Sign out and back in** so `AppXSvc` re-reads the `AppModelUnlock` policy.
+
+6. **Relaunch `null-notes.exe`.** It compares the bundled `.msix` version against what's registered (`identity.rs`'s `has_current_package_identity`) and calls `Add-AppxPackage` if they don't match. To force a retry without relaunching, run it directly:
+   ```powershell
+   Add-AppxPackage -Path "<install-dir>\null-notes-identity.msix" -ExternalLocation "<install-dir>\shell-integration" -Verbose
+   ```
+
+If it still fails after all of this, get the real reason instead of the generic `0x800B0109` summary:
+```powershell
+Get-AppPackageLog -ActivityID <guid-from-the-Add-AppxPackage-error>
+```
+
+**Updates:** since `identity-package/AppxManifest.xml`'s `Version` is hardcoded independent of the app's own release version, this whole runbook is a **one-time cost per machine** — later app updates that overwrite the installed `.msix` with the CI-signed copy won't trigger a re-registration attempt (and thus won't re-break anything) unless that manifest version number is bumped.
+
 ---
 
 ## Feasibility summary for null-notes
