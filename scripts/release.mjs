@@ -11,6 +11,7 @@ export function updateCargoToml(content, version) {
 // --- CLI entry point (below the Task 1 exports) ---
 import { execSync } from 'node:child_process'
 import { readFileSync, writeFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 
 function run(cmd) {
   execSync(cmd, { stdio: 'inherit' })
@@ -45,6 +46,6 @@ function main() {
   console.log(`Released v${version}`)
 }
 
-if (import.meta.url === `file://${process.argv[1].replace(/\\/g, '/')}`) {
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
   main()
 }
