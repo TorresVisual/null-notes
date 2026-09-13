@@ -27,14 +27,35 @@ jobs:
       - name: cargo fmt --check
         working-directory: src-tauri
         run: cargo fmt --check
-      - name: Regenerate icons (adds iOS sizes)
-        run: npx tauri icon src-tauri/icons/icon.png
-      - name: Generate iOS Xcode project
-        run: npx tauri ios init
-      - name: Upload generated project + icons
+      - name: Build for iOS Simulator
+        run: npx tauri ios build --target aarch64-sim --debug
+      - name: Boot Simulator and install
+        run: |
+          UDID=$(xcrun simctl create nullnotes-ci "iPhone 15")
+          xcrun simctl boot "$UDID"
+          APP_PATH=$(find src-tauri/gen/apple -name "*.app" -path "*Debug-iphonesimulator*" | head -n1)
+          xcrun simctl install "$UDID" "$APP_PATH"
+          xcrun simctl launch "$UDID" dev.nullnotes.app
+          sleep 3
+          xcrun simctl io "$UDID" screenshot before.png
+          echo "UDID=$UDID" >> "$GITHUB_ENV"
+      - name: Install idb and send a synthetic tap
+        run: |
+          brew tap facebook/fb
+          brew install facebook/fb/idb-companion
+          pip3 install fb-idb
+          idb connect "$UDID"
+          # Coordinates depend on what `before.png` actually shows — read them
+          # off the downloaded screenshot the first time this runs, there is
+          # no way to know them ahead of time without seeing the rendered UI.
+          idb ui tap <X> <Y> --udid "$UDID"
+          sleep 1
+          xcrun simctl io "$UDID" screenshot after.png
+      - name: Upload screenshots
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: ios-gen
+          name: ios-smoke-test
           path: |
-            src-tauri/gen/apple
-            src-tauri/icons
+            before.png
+            after.png
