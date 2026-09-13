@@ -38,9 +38,9 @@ function main() {
     updateCargoToml(readFileSync('src-tauri/Cargo.toml', 'utf8'), version),
   )
 
-  run('git add package.json src-tauri/tauri.conf.json src-tauri/Cargo.toml')
+  run('git add package.json package-lock.json src-tauri/tauri.conf.json src-tauri/Cargo.toml')
   run(`git commit -m "chore: release v${version}"`)
-  run(`git tag v${version}`)
+  run(`git tag -a v${version} -m "v${version}"`)
   run('git push --follow-tags')
 
   console.log(`Released v${version}`)
