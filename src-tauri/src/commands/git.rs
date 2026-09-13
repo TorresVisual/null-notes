@@ -1057,6 +1057,11 @@ pub fn checked_init_notes_repo(
 
         // Private by default: lecture notes must not become public by
         // accident.
+        // `--push`: without it `gh repo create --source` only creates the
+        // repo and adds the remote, leaving the just-made `.gitignore`
+        // commit unpushed until the next auto-commit cycle sets up tracking
+        // (`checked_push`'s `-u origin HEAD`) — so `InitializedWithRemote`
+        // would mean "a remote is configured," not "and it's on GitHub."
         let status = no_window_command("gh")
             .arg("repo")
             .arg("create")
@@ -1066,6 +1071,7 @@ pub fn checked_init_notes_repo(
             .arg("--private")
             .arg("--remote")
             .arg("origin")
+            .arg("--push")
             .status()?;
         if status.success() {
             return Ok(RepoInitOutcome::InitializedWithRemote);
