@@ -44,7 +44,7 @@ jobs:
         run: |
           brew tap facebook/fb
           brew install facebook/fb/idb-companion
-          pip3 install fb-idb
+          pip3 install --break-system-packages fb-idb
           idb connect "$UDID"
           idb ui describe-all --udid "$UDID" > ax-tree.json || true
           # idb's tap coordinates are in UIKit points (device logical size,
