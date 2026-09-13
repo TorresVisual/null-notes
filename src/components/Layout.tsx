@@ -60,7 +60,7 @@ import { report } from '../editor/splitIntoTasks'
 import type { DiagramMetadata } from '../types'
 import { goBack, goForward } from '../lib/navigationHistory'
 import { useFocusModeStore } from '../store/focusMode'
-import { canPushHere, pushIfAllowed } from '../lib/git'
+import { canPushHere, pushIfAllowed, withGitLock } from '../lib/git'
 
 type ViewMode = 'wysiwyg' | 'raw'
 
@@ -167,8 +167,12 @@ export function Layout() {
     try {
       await flushGitCommit(true)
       const { git } = useWorkspaceStore.getState()
+      // #86: flushGitCommit and checkForUpdates already lock their own
+      // whole operation; this direct push needs the same guard so it can't
+      // race one of those firing from another trigger (idle timer, interval,
+      // focus) at the same moment.
       if (canPushHere(repoMode, git)) {
-        await pushIfAllowed(workspacePath, repoMode, git)
+        await withGitLock(() => pushIfAllowed(workspacePath, repoMode, git))
       }
       await checkForUpdates(workspacePath)
     } finally {

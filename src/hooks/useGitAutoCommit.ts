@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef } from 'react'
 import { useWorkspaceStore } from '../store/workspace'
 import { api } from '../lib/tauri'
-import { canAutoPush, pushIfAllowed } from '../lib/git'
+import { canAutoPush, pushIfAllowed, withGitLock } from '../lib/git'
 
 /**
  * Batches note saves into one commit per idle window (P5-2) — never per
@@ -31,62 +31,69 @@ export function useGitAutoCommit() {
       clearTimeout(revertTimer.current)
       revertTimer.current = null
     }
-    const {
-      path,
-      repoMode,
-      git,
-      gitPendingPaths,
-      clearGitPendingPaths,
-      setGitCommitStatus,
-      setGitCommitDetail,
-    } = useWorkspaceStore.getState()
-    if (!path || !repoMode || (!git.autoCommit && !force) || gitPendingPaths.length === 0) return
+    // #86: wraps the whole operation (including the post-commit push below)
+    // so it queues behind, and is fully awaited before, any other
+    // git-mutating call — the close-requested handler's own flushGitCommit()
+    // call then always waits out an in-flight "Sync now" instead of racing
+    // the window closing past it.
+    await withGitLock(async () => {
+      const {
+        path,
+        repoMode,
+        git,
+        gitPendingPaths,
+        clearGitPendingPaths,
+        setGitCommitStatus,
+        setGitCommitDetail,
+      } = useWorkspaceStore.getState()
+      if (!path || !repoMode || (!git.autoCommit && !force) || gitPendingPaths.length === 0) return
 
-    const paths = gitPendingPaths
-    setGitCommitStatus('committing')
-    setGitCommitDetail(null)
-    try {
-      const outcome = await api.git.autoCommit(path, repoMode, paths, git.skipHooks)
-      if (outcome.kind === 'committed') {
-        clearGitPendingPaths()
-        setGitCommitStatus('committed')
-        // "Committed" would otherwise sit in the tab bar indefinitely until
-        // the next commit cycle — revert to idle so it reads as a
-        // confirmation rather than a permanent label. Guarded by a status
-        // check so a commit that starts again in the meantime (which already
-        // moves status off 'committed') isn't clobbered by this firing late.
-        revertTimer.current = setTimeout(() => {
-          if (useWorkspaceStore.getState().gitCommitStatus === 'committed') {
-            setGitCommitStatus('idle')
+      const paths = gitPendingPaths
+      setGitCommitStatus('committing')
+      setGitCommitDetail(null)
+      try {
+        const outcome = await api.git.autoCommit(path, repoMode, paths, git.skipHooks)
+        if (outcome.kind === 'committed') {
+          clearGitPendingPaths()
+          setGitCommitStatus('committed')
+          // "Committed" would otherwise sit in the tab bar indefinitely until
+          // the next commit cycle — revert to idle so it reads as a
+          // confirmation rather than a permanent label. Guarded by a status
+          // check so a commit that starts again in the meantime (which already
+          // moves status off 'committed') isn't clobbered by this firing late.
+          revertTimer.current = setTimeout(() => {
+            if (useWorkspaceStore.getState().gitCommitStatus === 'committed') {
+              setGitCommitStatus('idle')
+            }
+          }, COMMITTED_DISPLAY_MS)
+          // notesMonorepo gets the same treatment as notesOnly: is_notes_monorepo
+          // already confirmed the whole repo is nothing but sibling note
+          // workspaces. codeRepo only ever pushes once the user has opted this
+          // specific workspace in via the Settings panel's confirm dialog —
+          // canAutoPush is what makes that true on the frontend side too, on
+          // top of the Rust-level guard in checked_push.
+          if (canAutoPush(repoMode, git)) {
+            await pushIfAllowed(path, repoMode, git)
           }
-        }, COMMITTED_DISPLAY_MS)
-        // notesMonorepo gets the same treatment as notesOnly: is_notes_monorepo
-        // already confirmed the whole repo is nothing but sibling note
-        // workspaces. codeRepo only ever pushes once the user has opted this
-        // specific workspace in via the Settings panel's confirm dialog —
-        // canAutoPush is what makes that true on the frontend side too, on
-        // top of the Rust-level guard in checked_push.
-        if (canAutoPush(repoMode, git)) {
-          await pushIfAllowed(path, repoMode, git)
+        } else if (outcome.kind === 'nothingToCommit') {
+          clearGitPendingPaths()
+          setGitCommitStatus('idle')
+        } else if (outcome.kind === 'hookFailed') {
+          // Leave the batch pending so the next trigger retries rather than
+          // losing it — the pre-commit hook's own output is the detail.
+          setGitCommitStatus('skipped')
+          setGitCommitDetail(outcome.output)
+        } else {
+          // outcome.kind === 'skipped': also leaves the batch pending.
+          setGitCommitStatus('skipped')
+          setGitCommitDetail(outcome.reason)
         }
-      } else if (outcome.kind === 'nothingToCommit') {
-        clearGitPendingPaths()
-        setGitCommitStatus('idle')
-      } else if (outcome.kind === 'hookFailed') {
-        // Leave the batch pending so the next trigger retries rather than
-        // losing it — the pre-commit hook's own output is the detail.
-        setGitCommitStatus('skipped')
-        setGitCommitDetail(outcome.output)
-      } else {
-        // outcome.kind === 'skipped': also leaves the batch pending.
-        setGitCommitStatus('skipped')
-        setGitCommitDetail(outcome.reason)
+      } catch (e) {
+        setGitCommitStatus('error')
+        setGitCommitDetail(String(e))
+        console.error('auto-commit failed', e)
       }
-    } catch (e) {
-      setGitCommitStatus('error')
-      setGitCommitDetail(String(e))
-      console.error('auto-commit failed', e)
-    }
+    })
   }, [])
 
   const gitPendingPaths = useWorkspaceStore((s) => s.gitPendingPaths)

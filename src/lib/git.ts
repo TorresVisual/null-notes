@@ -20,6 +20,24 @@ export function canAutoPush(repoMode: RepoMode | null, git: GitWorkspaceConfig):
   return git.autoPush && canPushHere(repoMode, git)
 }
 
+// #86: every git-mutating call (auto-commit, push, fetch/pull) funnels
+// through here so two never run concurrently against one workspace — a
+// concurrent `git commit`/`git push`/`git merge` pair races on
+// `.git/index.lock`, and closing the window mid-sync can otherwise kill an
+// in-flight git subprocess before it finishes. Each caller wraps its own
+// whole operation (never a piece already run from inside another wrapped
+// call), so queuing here is always sequential, never nested.
+let gitQueue: Promise<unknown> = Promise.resolve()
+
+export function withGitLock<T>(run: () => Promise<T>): Promise<T> {
+  const result = gitQueue.then(run, run)
+  gitQueue = result.then(
+    () => undefined,
+    () => undefined,
+  )
+  return result
+}
+
 // The push step itself, shared by useGitAutoCommit's post-commit push and
 // #85's manual "Sync now" — only their gating (canAutoPush vs. canPushHere)
 // differs. Most outcomes here are a resolved Ok value, not a thrown error —

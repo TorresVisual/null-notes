@@ -1,7 +1,7 @@
 import { useCallback } from 'react'
 import { useWorkspaceStore } from '../store/workspace'
 import { api } from '../lib/tauri'
-import { canAutoPush } from '../lib/git'
+import { canAutoPush, withGitLock } from '../lib/git'
 
 /**
  * Fetch-and-compare on workspace open (P5-4). A fast-forward is silent — the
@@ -11,64 +11,76 @@ import { canAutoPush } from '../lib/git'
  * `GitDivergedBar` to render; it never merges, rebases, or resets.
  */
 export function useGitAutoPull() {
-  const checkForUpdates = useCallback(async (workspace: string) => {
-    const { setGitDiverged, setGitPullBlocked, setGitAhead } = useWorkspaceStore.getState()
-    try {
-      const outcome = await api.git.fetchAndCompare(workspace)
-      setGitDiverged(
-        outcome.kind === 'diverged'
-          ? {
-              ahead: outcome.ahead,
-              behind: outcome.behind,
-              localPaths: outcome.localPaths,
-              remotePaths: outcome.remotePaths,
+  // #86: the whole body (including the retry-push below) queues behind, and
+  // is fully awaited before, any other git-mutating call — the interval,
+  // window-focus, and manual "Sync now" triggers for this can otherwise fire
+  // close enough together to race a concurrent commit or push.
+  const checkForUpdates = useCallback(
+    (workspace: string) =>
+      withGitLock(async () => {
+        const { setGitDiverged, setGitPullBlocked, setGitAhead } = useWorkspaceStore.getState()
+        try {
+          const outcome = await api.git.fetchAndCompare(workspace)
+          setGitDiverged(
+            outcome.kind === 'diverged'
+              ? {
+                  ahead: outcome.ahead,
+                  behind: outcome.behind,
+                  localPaths: outcome.localPaths,
+                  remotePaths: outcome.remotePaths,
+                }
+              : null,
+          )
+          // `blocked` means the ff-only merge itself refused — most likely an
+          // uncommitted local change conflicting with an incoming one. The
+          // working tree is untouched, but staying silent here (the old
+          // behavior) left the workspace quietly behind the remote with no way
+          // to notice short of opening a terminal. Every other outcome clears
+          // it, including a thrown error below — a later successful check
+          // supersedes a stale blocked notice.
+          setGitPullBlocked(
+            outcome.kind === 'blocked' ? { output: outcome.output, paths: outcome.paths } : null,
+          )
+          // #81: purely ahead (a prior push never landed) is this cycle's retry
+          // point — checkForUpdates already runs on open, a 5-min interval, and
+          // window focus, so a push that failed offline lands on whichever of
+          // those comes first instead of sitting silent until the user notices.
+          // #83: `noUpstream` (remote configured, no tracking branch yet) is the
+          // same situation — `checked_push`'s `push -u origin HEAD` both pushes
+          // and establishes the tracking branch, so the same retry covers it.
+          if (outcome.kind === 'ahead' || outcome.kind === 'noUpstream') {
+            const ahead = outcome.ahead
+            const { repoMode, git } = useWorkspaceStore.getState()
+            if (!canAutoPush(repoMode, git)) {
+              setGitAhead(ahead)
+            } else {
+              try {
+                const pushOutcome = await api.git.pushNotes(
+                  workspace,
+                  repoMode!,
+                  git.allowCodeRepoPush,
+                )
+                setGitAhead(pushOutcome.kind === 'pushed' ? null : ahead)
+              } catch (e) {
+                setGitAhead(ahead)
+                console.error('git retry-push failed', e)
+              }
             }
-          : null,
-      )
-      // `blocked` means the ff-only merge itself refused — most likely an
-      // uncommitted local change conflicting with an incoming one. The
-      // working tree is untouched, but staying silent here (the old
-      // behavior) left the workspace quietly behind the remote with no way
-      // to notice short of opening a terminal. Every other outcome clears
-      // it, including a thrown error below — a later successful check
-      // supersedes a stale blocked notice.
-      setGitPullBlocked(
-        outcome.kind === 'blocked' ? { output: outcome.output, paths: outcome.paths } : null,
-      )
-      // #81: purely ahead (a prior push never landed) is this cycle's retry
-      // point — checkForUpdates already runs on open, a 5-min interval, and
-      // window focus, so a push that failed offline lands on whichever of
-      // those comes first instead of sitting silent until the user notices.
-      // #83: `noUpstream` (remote configured, no tracking branch yet) is the
-      // same situation — `checked_push`'s `push -u origin HEAD` both pushes
-      // and establishes the tracking branch, so the same retry covers it.
-      if (outcome.kind === 'ahead' || outcome.kind === 'noUpstream') {
-        const ahead = outcome.ahead
-        const { repoMode, git } = useWorkspaceStore.getState()
-        if (!canAutoPush(repoMode, git)) {
-          setGitAhead(ahead)
-        } else {
-          try {
-            const pushOutcome = await api.git.pushNotes(workspace, repoMode!, git.allowCodeRepoPush)
-            setGitAhead(pushOutcome.kind === 'pushed' ? null : ahead)
-          } catch (e) {
-            setGitAhead(ahead)
-            console.error('git retry-push failed', e)
+          } else {
+            setGitAhead(null)
           }
+        } catch (e) {
+          // Best-effort, same posture as P5-1's repo detection: never blocks
+          // opening the workspace. Genuine fetch failures (most commonly no
+          // network) stay silent rather than surfacing an error on every offline
+          // open — only the ff-only refusal above is worth interrupting for.
+          setGitDiverged(null)
+          setGitPullBlocked(null)
+          console.error('git fetch/compare failed', e)
         }
-      } else {
-        setGitAhead(null)
-      }
-    } catch (e) {
-      // Best-effort, same posture as P5-1's repo detection: never blocks
-      // opening the workspace. Genuine fetch failures (most commonly no
-      // network) stay silent rather than surfacing an error on every offline
-      // open — only the ff-only refusal above is worth interrupting for.
-      setGitDiverged(null)
-      setGitPullBlocked(null)
-      console.error('git fetch/compare failed', e)
-    }
-  }, [])
+      }),
+    [],
+  )
 
   return { checkForUpdates }
 }
