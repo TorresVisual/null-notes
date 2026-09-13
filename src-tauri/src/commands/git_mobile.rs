@@ -18,7 +18,7 @@
 //! "ios"))]` on `git.rs`'s own, plus `lib.rs`'s dispatch alias) all land
 //! together as one atomic change once the surface is complete.
 
-use super::git::is_notes_monorepo;
+use super::git::{is_notes_monorepo, UnsafeRepoState};
 use crate::models::RepoMode;
 use std::path::Path;
 
@@ -76,6 +76,41 @@ fn has_notes_commit_in_log(repo: &gix::Repository) -> anyhow::Result<bool> {
         }
     }
     Ok(false)
+}
+
+/// Same precedence as desktop's `unsafe_repo_state`: merge/cherry-pick/
+/// rebase markers live as files directly under `.git/` regardless of
+/// implementation (gix and the `git` CLI both write the same on-disk
+/// format), so they're read the same way. Detached-HEAD and index-conflict
+/// checks go through gix's own APIs instead of `HEAD`-file text parsing and
+/// `git ls-files -u`.
+pub fn unsafe_repo_state(workspace: &str) -> anyhow::Result<Option<UnsafeRepoState>> {
+    let repo = gix::discover(workspace)?;
+    let git_dir = repo.git_dir();
+
+    if git_dir.join("MERGE_HEAD").exists() {
+        return Ok(Some(UnsafeRepoState::MergeInProgress));
+    }
+    if git_dir.join("CHERRY_PICK_HEAD").exists() {
+        return Ok(Some(UnsafeRepoState::CherryPickInProgress));
+    }
+    if git_dir.join("rebase-merge").exists() || git_dir.join("rebase-apply").exists() {
+        return Ok(Some(UnsafeRepoState::RebaseInProgress));
+    }
+    if repo.head()?.is_detached() {
+        return Ok(Some(UnsafeRepoState::DetachedHead));
+    }
+
+    let index = repo.index_or_empty()?;
+    let has_conflict = index
+        .entries()
+        .iter()
+        .any(|entry| entry.stage() != gix::index::entry::Stage::Unconflicted);
+    if has_conflict {
+        return Ok(Some(UnsafeRepoState::UnresolvedConflicts));
+    }
+
+    Ok(None)
 }
 
 #[cfg(test)]
@@ -159,6 +194,100 @@ mod tests {
         assert_eq!(
             detect_repo_mode(&notes_dir.to_string_lossy()).unwrap(),
             Some(RepoMode::CodeRepo)
+        );
+    }
+
+    #[test]
+    fn a_clean_repo_is_safe() {
+        let tmp = tempfile::tempdir().unwrap();
+        git_init(tmp.path());
+        commit_file(tmp.path(), "a.md", "hello", "notes: update a");
+        assert_eq!(
+            unsafe_repo_state(&tmp.path().to_string_lossy()).unwrap(),
+            None
+        );
+    }
+
+    #[test]
+    fn a_detached_head_is_unsafe() {
+        let tmp = tempfile::tempdir().unwrap();
+        git_init(tmp.path());
+        commit_file(tmp.path(), "a.md", "hello", "notes: update a");
+        let sha_output = Command::new("git")
+            .arg("-C")
+            .arg(tmp.path())
+            .arg("rev-parse")
+            .arg("HEAD")
+            .output()
+            .unwrap();
+        let sha = String::from_utf8_lossy(&sha_output.stdout)
+            .trim()
+            .to_string();
+        assert!(Command::new("git")
+            .arg("-C")
+            .arg(tmp.path())
+            .arg("checkout")
+            .arg(&sha)
+            .status()
+            .unwrap()
+            .success());
+
+        assert_eq!(
+            unsafe_repo_state(&tmp.path().to_string_lossy()).unwrap(),
+            Some(UnsafeRepoState::DetachedHead)
+        );
+    }
+
+    #[test]
+    fn a_merge_in_progress_is_unsafe() {
+        let tmp = tempfile::tempdir().unwrap();
+        git_init(tmp.path());
+        commit_file(tmp.path(), "a.md", "hello", "notes: update a");
+        std::fs::write(tmp.path().join(".git").join("MERGE_HEAD"), "abc123\n").unwrap();
+        assert_eq!(
+            unsafe_repo_state(&tmp.path().to_string_lossy()).unwrap(),
+            Some(UnsafeRepoState::MergeInProgress)
+        );
+    }
+
+    #[test]
+    fn a_rebase_in_progress_is_unsafe() {
+        let tmp = tempfile::tempdir().unwrap();
+        git_init(tmp.path());
+        commit_file(tmp.path(), "a.md", "hello", "notes: update a");
+        std::fs::create_dir(tmp.path().join(".git").join("rebase-merge")).unwrap();
+        assert_eq!(
+            unsafe_repo_state(&tmp.path().to_string_lossy()).unwrap(),
+            Some(UnsafeRepoState::RebaseInProgress)
+        );
+    }
+
+    #[test]
+    fn unresolved_index_conflicts_are_unsafe() {
+        let tmp = tempfile::tempdir().unwrap();
+        git_init(tmp.path());
+        commit_file(tmp.path(), "a.md", "base\n", "notes: update a");
+        std::fs::write(tmp.path().join("a.md"), "stashed\n").unwrap();
+        assert!(Command::new("git")
+            .arg("-C")
+            .arg(tmp.path())
+            .arg("stash")
+            .arg("push")
+            .status()
+            .unwrap()
+            .success());
+        commit_file(tmp.path(), "a.md", "conflicting\n", "notes: update a");
+        // Expected to fail with a real conflict, leaving unmerged index entries.
+        let _ = Command::new("git")
+            .arg("-C")
+            .arg(tmp.path())
+            .arg("stash")
+            .arg("pop")
+            .status();
+
+        assert_eq!(
+            unsafe_repo_state(&tmp.path().to_string_lossy()).unwrap(),
+            Some(UnsafeRepoState::UnresolvedConflicts)
         );
     }
 }
