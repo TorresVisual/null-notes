@@ -18,7 +18,9 @@
 //! "ios"))]` on `git.rs`'s own, plus `lib.rs`'s dispatch alias) all land
 //! together as one atomic change once the surface is complete.
 
-use super::git::{is_notes_monorepo, UnsafeRepoState};
+use super::git::{
+    build_commit_message, is_notes_monorepo, resolve, CommitOutcome, UnsafeRepoState,
+};
 use crate::models::RepoMode;
 use std::path::Path;
 
@@ -111,6 +113,68 @@ pub fn unsafe_repo_state(workspace: &str) -> anyhow::Result<Option<UnsafeRepoSta
     }
 
     Ok(None)
+}
+
+/// Builds a new tree from HEAD's tree plus `paths`' current on-disk content,
+/// writes a commit on top of HEAD with that tree, and moves the current
+/// branch ref to point at it (via `Repository::commit`, which updates the
+/// ref and reflog atomically). Unlike desktop's `git add` + `git commit`,
+/// there's no index staging step to reason about — the tree is built
+/// directly from the paths this call was given, so a path left out (like an
+/// unstaged edit to some other tracked file) never ends up in the commit.
+/// Hook execution is a shelled-out subprocess, which iOS forbids outright —
+/// `skip_hooks` is accepted for signature parity with desktop but has no
+/// effect here, and `CommitOutcome::HookFailed` is structurally unreachable
+/// from this function.
+pub fn checked_auto_commit(
+    workspace: &str,
+    _mode: RepoMode,
+    paths: &[String],
+    _skip_hooks: bool,
+) -> anyhow::Result<CommitOutcome> {
+    if let Some(state) = unsafe_repo_state(workspace)? {
+        return Ok(CommitOutcome::Skipped {
+            reason: state.reason().to_string(),
+        });
+    }
+
+    let repo = gix::discover(workspace)?;
+    let workdir = repo
+        .workdir()
+        .ok_or_else(|| anyhow::anyhow!("bare repositories are not supported: {workspace}"))?
+        .to_path_buf();
+    let head_tree_id = repo.head_tree_id()?.detach();
+
+    let mut editor = repo.edit_tree(head_tree_id)?;
+    for path in paths {
+        let abs = resolve(workspace, path);
+        let Ok(repo_relative) = abs.strip_prefix(&workdir) else {
+            continue; // outside the repo entirely — skip, don't fail the whole batch
+        };
+        let repo_relative = repo_relative.to_string_lossy().replace('\\', "/");
+
+        if abs.exists() {
+            let content = std::fs::read(&abs)?;
+            let blob_id = repo.write_blob(content)?.detach();
+            editor.upsert(&repo_relative, gix::object::tree::EntryKind::Blob, blob_id)?;
+        } else {
+            // A path that no longer exists on disk is a removal — mirrors
+            // desktop's `addable_paths`' "deleted but previously tracked"
+            // branch. No error if it was never tracked to begin with.
+            editor.remove(&repo_relative)?;
+        }
+    }
+
+    let new_tree_id = editor.write()?.detach();
+    if new_tree_id == head_tree_id {
+        return Ok(CommitOutcome::NothingToCommit);
+    }
+
+    let message = build_commit_message(paths);
+    let head_commit_id = repo.head_id()?.detach();
+    repo.commit("HEAD", &message, new_tree_id, [head_commit_id])?;
+
+    Ok(CommitOutcome::Committed)
 }
 
 #[cfg(test)]
@@ -289,5 +353,78 @@ mod tests {
             unsafe_repo_state(&tmp.path().to_string_lossy()).unwrap(),
             Some(UnsafeRepoState::UnresolvedConflicts)
         );
+    }
+
+    #[test]
+    fn commits_only_the_given_note_paths() {
+        let tmp = tempfile::tempdir().unwrap();
+        git_init(tmp.path());
+        commit_file(tmp.path(), "src.rs", "fn main() {}\n", "add src");
+        commit_file(tmp.path(), "note.md", "# Note\n", "notes: update note");
+        std::fs::write(tmp.path().join("note.md"), "# Note\nmore\n").unwrap();
+        std::fs::write(tmp.path().join("src.rs"), "fn main() { changed() }\n").unwrap();
+
+        let outcome = checked_auto_commit(
+            &tmp.path().to_string_lossy(),
+            RepoMode::CodeRepo,
+            &["note.md".to_string()],
+            false,
+        )
+        .unwrap();
+
+        assert_eq!(outcome, CommitOutcome::Committed);
+        let show = Command::new("git")
+            .arg("-C")
+            .arg(tmp.path())
+            .arg("show")
+            .arg("--stat")
+            .arg("--format=")
+            .arg("HEAD")
+            .output()
+            .unwrap();
+        let files = String::from_utf8_lossy(&show.stdout);
+        assert!(files.contains("note.md"));
+        assert!(
+            !files.contains("src.rs"),
+            "unstaged src.rs edit must survive untouched"
+        );
+        let src_contents = std::fs::read_to_string(tmp.path().join("src.rs")).unwrap();
+        assert_eq!(src_contents, "fn main() { changed() }\n");
+    }
+
+    #[test]
+    fn nothing_to_commit_when_paths_are_unchanged() {
+        let tmp = tempfile::tempdir().unwrap();
+        git_init(tmp.path());
+        commit_file(tmp.path(), "note.md", "# Note\n", "notes: update note");
+
+        let outcome = checked_auto_commit(
+            &tmp.path().to_string_lossy(),
+            RepoMode::CodeRepo,
+            &["note.md".to_string()],
+            false,
+        )
+        .unwrap();
+
+        assert_eq!(outcome, CommitOutcome::NothingToCommit);
+    }
+
+    #[test]
+    fn backs_off_on_an_unsafe_repo_state() {
+        let tmp = tempfile::tempdir().unwrap();
+        git_init(tmp.path());
+        commit_file(tmp.path(), "note.md", "# Note\n", "notes: update note");
+        std::fs::write(tmp.path().join(".git").join("MERGE_HEAD"), "abc123\n").unwrap();
+        std::fs::write(tmp.path().join("note.md"), "# Note\nchanged\n").unwrap();
+
+        let outcome = checked_auto_commit(
+            &tmp.path().to_string_lossy(),
+            RepoMode::CodeRepo,
+            &["note.md".to_string()],
+            false,
+        )
+        .unwrap();
+
+        assert!(matches!(outcome, CommitOutcome::Skipped { .. }));
     }
 }
