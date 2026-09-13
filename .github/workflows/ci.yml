@@ -15,6 +15,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Generate CI signing cert
+        run: ./scripts/windows/dev-cert.ps1
+
+      - name: Package identity .msix
+        run: ./scripts/windows/package-identity.ps1
+
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy, rustfmt
