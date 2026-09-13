@@ -567,7 +567,10 @@ export function Layout() {
             onSync={async () => {
               if (!workspacePath) return
               try {
-                await api.git.rebaseOntoRemote(workspacePath)
+                // #87: queues behind, and is fully awaited before, any other
+                // git-mutating call — this can otherwise fire alongside the
+                // idle-commit timer, the pull interval, or a focus refresh.
+                await withGitLock(() => api.git.rebaseOntoRemote(workspacePath))
               } catch (e) {
                 console.error('git rebase-onto-remote failed', e)
               }
