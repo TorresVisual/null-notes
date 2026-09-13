@@ -258,6 +258,7 @@ Open the now-local `src-tauri/gen/apple/*.xcodeproj/project.pbxproj` (or the gen
 - `tauri ios build`'s `--target`/`-t` flag takes the CLI's short target names (`aarch64`, `aarch64-sim`, `x86_64`), not a Rust target triple — `--target aarch64-apple-ios-sim` (as first drafted here) is not one of the accepted values. Used `--target aarch64-sim` instead (confirmed against the `tauri ios build --help` reference).
 - Removed the Task 2 "Regenerate icons" / "Generate iOS Xcode project" / "Upload generated project + icons" steps from the workflow rather than leaving them in place ahead of these new ones. Task 2's project and icons are now committed to the repo, so every future run would otherwise re-run `tauri ios init` against an already-initialized `gen/apple` — undocumented behavior Tauri's own docs only describe via `rm -r src-tauri/gen` first when *intentionally* recreating a project, not as a safe no-op to run unconditionally. `tauri ios build` is designed to operate against an already-generated project, so the checked-out committed one is used directly.
 - Added `if: always()` to the "Upload screenshots" step. The `idb ui tap <X> <Y>` placeholder is expected to fail the first time this runs (Step 3 below explains why), and without `always()` that failure would skip the upload step entirely, losing `before.png` along with it.
+- The `find` for `APP_PATH` originally searched `src-tauri/gen/apple` for a `*Debug-iphonesimulator*` match. The actual first run showed `xcodebuild -configuration debug` puts the built `.app` under `~/Library/Developer/Xcode/DerivedData/null-notes-<hash>/Build/Products/debug-iphonesimulator/` (lowercase `debug`, and outside the repo entirely, in Xcode's own DerivedData cache) — the original path matched nothing, so `APP_PATH` was empty and `simctl install` crashed with `NSInternalInconsistencyException: installURL`. Fixed to search `~/Library/Developer/Xcode/DerivedData` for `*debug-iphonesimulator*`.
 
 ```yaml
       - name: Build for iOS Simulator
@@ -266,7 +267,7 @@ Open the now-local `src-tauri/gen/apple/*.xcodeproj/project.pbxproj` (or the gen
         run: |
           UDID=$(xcrun simctl create nullnotes-ci "iPhone 15")
           xcrun simctl boot "$UDID"
-          APP_PATH=$(find src-tauri/gen/apple -name "*.app" -path "*Debug-iphonesimulator*" | head -n1)
+          APP_PATH=$(find ~/Library/Developer/Xcode/DerivedData -name "*.app" -path "*debug-iphonesimulator*" | head -n1)
           xcrun simctl install "$UDID" "$APP_PATH"
           xcrun simctl launch "$UDID" dev.nullnotes.app
           sleep 3
