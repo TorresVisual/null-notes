@@ -80,7 +80,7 @@ pub fn detect_repo_mode(workspace: &str) -> anyhow::Result<Option<RepoMode>> {
 /// machine that never wrote the marker: the note files themselves are the
 /// repo-visible signal (see #80). A folder with neither is a folder no one
 /// has ever put a note in yet, so it still reads as a plain `CodeRepo`.
-fn is_workspace_folder(dir: &Path) -> bool {
+pub(crate) fn is_workspace_folder(dir: &Path) -> bool {
     if dir.join(".workspace.json").is_file() {
         return true;
     }
@@ -97,7 +97,7 @@ fn is_workspace_folder(dir: &Path) -> bool {
 /// i.e. `dir` holds nothing but sibling note-workspaces and repo
 /// bookkeeping, never a stray file or an unmarked folder that could be
 /// someone else's source.
-fn only_holds_workspace_siblings(dir: &Path, except: &Path) -> anyhow::Result<bool> {
+pub(crate) fn only_holds_workspace_siblings(dir: &Path, except: &Path) -> anyhow::Result<bool> {
     for entry in std::fs::read_dir(dir)? {
         let entry = entry?;
         let path = entry.path();
@@ -123,7 +123,7 @@ fn only_holds_workspace_siblings(dir: &Path, except: &Path) -> anyhow::Result<bo
 /// leads to it — the whole repo is composed of independent note workspaces,
 /// never someone else's source living next to yours. Any single foreign
 /// entry at any level falls back to the conservative `CodeRepo` reading.
-fn is_notes_monorepo(root: &Path, workspace: &Path) -> anyhow::Result<bool> {
+pub(crate) fn is_notes_monorepo(root: &Path, workspace: &Path) -> anyhow::Result<bool> {
     if !is_workspace_folder(workspace) {
         return Ok(false);
     }
@@ -150,6 +150,7 @@ fn is_notes_monorepo(root: &Path, workspace: &Path) -> anyhow::Result<bool> {
     }
 }
 
+#[cfg(not(target_os = "ios"))]
 #[tauri::command]
 pub async fn detect_repo(workspace: String) -> Result<Option<RepoMode>, String> {
     tokio::task::spawn_blocking(move || detect_repo_mode(&workspace))
@@ -186,6 +187,7 @@ pub fn detect_prior_git_automation(workspace: &str) -> anyhow::Result<bool> {
     Ok(has_remote(workspace)? && has_notes_commits(workspace)?)
 }
 
+#[cfg(not(target_os = "ios"))]
 #[tauri::command]
 pub async fn detect_prior_automation(workspace: String) -> Result<bool, String> {
     tokio::task::spawn_blocking(move || detect_prior_git_automation(&workspace))
@@ -280,7 +282,7 @@ pub enum CommitOutcome {
     HookFailed { output: String },
 }
 
-fn build_commit_message(paths: &[String]) -> String {
+pub(crate) fn build_commit_message(paths: &[String]) -> String {
     let names: Vec<String> = paths
         .iter()
         .map(|p| {
@@ -298,7 +300,7 @@ fn build_commit_message(paths: &[String]) -> String {
     format!("notes: update {summary}")
 }
 
-fn resolve(workspace: &str, path: &str) -> PathBuf {
+pub(crate) fn resolve(workspace: &str, path: &str) -> PathBuf {
     let p = Path::new(path);
     if p.is_absolute() {
         p.to_path_buf()
@@ -468,6 +470,7 @@ pub fn checked_auto_commit(
     }
 }
 
+#[cfg(not(target_os = "ios"))]
 #[tauri::command]
 pub async fn auto_commit(
     workspace: String,
@@ -566,6 +569,7 @@ pub fn list_note_history_at(
     Ok(entries)
 }
 
+#[cfg(not(target_os = "ios"))]
 #[tauri::command]
 pub async fn list_note_history(
     workspace: String,
@@ -611,6 +615,7 @@ pub fn read_note_at_commit_at(
     Ok(String::from_utf8_lossy(&output.stdout).into_owned())
 }
 
+#[cfg(not(target_os = "ios"))]
 #[tauri::command]
 pub async fn read_note_at_commit(
     workspace: String,
@@ -690,6 +695,7 @@ pub fn checked_push(
     }
 }
 
+#[cfg(not(target_os = "ios"))]
 #[tauri::command]
 pub async fn push_notes(
     workspace: String,
@@ -894,6 +900,7 @@ pub fn checked_pull(workspace: &str) -> anyhow::Result<PullOutcome> {
     Ok(PullOutcome::FastForwarded)
 }
 
+#[cfg(not(target_os = "ios"))]
 #[tauri::command]
 pub async fn fetch_and_compare(workspace: String) -> Result<PullOutcome, String> {
     tokio::task::spawn_blocking(move || checked_pull(&workspace))
@@ -949,6 +956,7 @@ pub fn checked_rebase_onto_remote(workspace: &str) -> anyhow::Result<RebaseOutco
     Ok(RebaseOutcome::Aborted { output: stderr })
 }
 
+#[cfg(not(target_os = "ios"))]
 #[tauri::command]
 pub async fn rebase_onto_remote(workspace: String) -> Result<RebaseOutcome, String> {
     tokio::task::spawn_blocking(move || checked_rebase_onto_remote(&workspace))
@@ -1146,6 +1154,7 @@ pub fn checked_init_notes_repo(
     })
 }
 
+#[cfg(not(target_os = "ios"))]
 #[tauri::command]
 pub async fn init_notes_repo(
     workspace: String,
@@ -1194,6 +1203,7 @@ pub fn list_own_github_repos() -> anyhow::Result<Vec<GithubRepo>> {
     Ok(serde_json::from_slice(&output.stdout)?)
 }
 
+#[cfg(not(target_os = "ios"))]
 #[tauri::command]
 pub async fn list_github_repos() -> Result<Vec<GithubRepo>, String> {
     tokio::task::spawn_blocking(list_own_github_repos)
@@ -1207,7 +1217,7 @@ pub async fn list_github_repos() -> Result<Vec<GithubRepo>, String> {
 /// `https://host/user/repo.git` and the scp-like
 /// `git@host:user/repo.git` form, where the last segment is separated by
 /// `:` rather than `/`.
-fn derive_clone_dir_name(url: &str) -> &str {
+pub(crate) fn derive_clone_dir_name(url: &str) -> &str {
     let last_segment = url.rsplit(['/', ':']).next().unwrap_or(url);
     last_segment.strip_suffix(".git").unwrap_or(last_segment)
 }
@@ -1249,6 +1259,7 @@ pub fn checked_clone_repo(url: &str, parent_dir: &str) -> anyhow::Result<PathBuf
     Ok(Path::new(parent_dir).join(dir_name))
 }
 
+#[cfg(not(target_os = "ios"))]
 #[tauri::command]
 pub async fn clone_repo(url: String, parent_dir: String) -> Result<String, String> {
     tokio::task::spawn_blocking(move || checked_clone_repo(&url, &parent_dir))

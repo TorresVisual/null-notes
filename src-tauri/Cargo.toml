@@ -38,6 +38,16 @@ base64 = "0.22"
 unicode-normalization = "0.1.25"
 random_word = { version = "0.5", features = ["de", "en"] }
 portable-pty = "0.9.0"
+gix = { version = "0.87.1", default-features = false, features = [
+    "blocking-network-client",
+    "blocking-http-transport-reqwest-rust-tls",
+    "credentials",
+    "revision",
+    "index",
+    "worktree-mutation",
+    "blob-diff",
+    "sha1",
+] }
 
 [target.'cfg(windows)'.dependencies]
 webview2-com = "0.38"

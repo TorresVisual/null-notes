@@ -21,6 +21,9 @@ jobs:
       - name: cargo build (desktop, unaffected)
         working-directory: src-tauri
         run: cargo build
+      - name: cargo test (git_mobile, native macOS)
+        working-directory: src-tauri
+        run: "cargo test --lib commands::git_mobile::"
       - name: cargo clippy (desktop)
         working-directory: src-tauri
         run: cargo clippy -- -D warnings
