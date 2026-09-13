@@ -19,7 +19,8 @@
 //! together as one atomic change once the surface is complete.
 
 use super::git::{
-    build_commit_message, is_notes_monorepo, resolve, CommitOutcome, PullOutcome, UnsafeRepoState,
+    build_commit_message, is_notes_monorepo, resolve, CommitOutcome, PullOutcome, PushOutcome,
+    UnsafeRepoState,
 };
 use crate::models::RepoMode;
 use std::path::Path;
@@ -332,6 +333,42 @@ pub fn checked_pull(workspace: &str, token: &str) -> anyhow::Result<PullOutcome>
     let upstream_tree = repo.find_commit(upstream_id)?.tree_id()?.detach();
     checkout_tree_to_worktree(&repo, upstream_tree)?;
     Ok(PullOutcome::FastForwarded)
+}
+
+/// **Deferred, not implemented.** `gix` has no reviewed send-pack (push)
+/// support at any released version, including 0.87.1 — confirmed against
+/// GitoxideLabs/gitoxide#306 (gitoxide's own push tracking issue, still open
+/// as an unresolved feature discussion) and the absence of a `push.rs` in
+/// gitoxide's own `gix/examples/`. The one attempt at a from-scratch
+/// implementation found (gitoxide PR #2538) is an unreviewed, closed
+/// experimental branch, not something to depend on for a path that pushes
+/// real commits to a user's real GitHub remote. The two checks that *are*
+/// implemented here (the `CodeRepo` guard and `NoRemote` detection) match
+/// desktop's `checked_push` exactly; actually sending the pack is tracked as
+/// a follow-up plan once gix gains reviewed push support or the wire
+/// protocol is implemented directly (see docs/plans/git-mobile-gix.md).
+pub fn checked_push(
+    workspace: &str,
+    mode: RepoMode,
+    allow_code_repo_push: bool,
+    _token: &str,
+) -> anyhow::Result<PushOutcome> {
+    if mode == RepoMode::CodeRepo && !allow_code_repo_push {
+        anyhow::bail!(
+            "refusing to push a CodeRepo workspace — set allow_code_repo_push to override"
+        );
+    }
+
+    let repo = gix::discover(workspace)?;
+    match repo.find_default_remote(gix::remote::Direction::Push) {
+        None => return Ok(PushOutcome::NoRemote),
+        Some(Err(e)) => return Err(e.into()),
+        Some(Ok(_remote)) => {}
+    }
+
+    anyhow::bail!(
+        "push is not yet implemented on mobile — gix has no reviewed send-pack support (see GitoxideLabs/gitoxide#306)"
+    )
 }
 
 #[cfg(test)]
@@ -682,6 +719,35 @@ mod tests {
         assert_eq!(
             checked_pull(&tmp.path().to_string_lossy(), "").unwrap(),
             PullOutcome::NoRemote
+        );
+    }
+
+    #[test]
+    fn push_reports_no_remote_when_none_is_configured() {
+        let tmp = tempfile::tempdir().unwrap();
+        git_init(tmp.path());
+        commit_file(tmp.path(), "a.md", "# A\n", "notes: update a");
+
+        assert_eq!(
+            checked_push(
+                &tmp.path().to_string_lossy(),
+                RepoMode::NotesOnly,
+                false,
+                ""
+            )
+            .unwrap(),
+            PushOutcome::NoRemote
+        );
+    }
+
+    #[test]
+    fn push_refuses_a_code_repo_without_the_override() {
+        let tmp = tempfile::tempdir().unwrap();
+        git_init(tmp.path());
+        commit_file(tmp.path(), "a.md", "# A\n", "notes: update a");
+
+        assert!(
+            checked_push(&tmp.path().to_string_lossy(), RepoMode::CodeRepo, false, "").is_err()
         );
     }
 }
