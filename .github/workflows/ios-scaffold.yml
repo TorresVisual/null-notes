@@ -58,6 +58,30 @@ jobs:
           idb ui tap 62 193 --udid "$UDID"
           sleep 1
           xcrun simctl io "$UDID" screenshot after.png
+      - name: Screenshot onboarding form
+        run: xcrun simctl io "$UDID" screenshot onboarding-before.png
+      - name: Tap the URL field and type
+        run: |
+          idb ui tap --udid "$UDID" 196 380
+          idb ui text --udid "$UDID" "https://example.com/no-such-repo.git"
+      - name: Tap the token field and type
+        run: |
+          idb ui tap --udid "$UDID" 196 460
+          idb ui text --udid "$UDID" "dummy-token-for-ci"
+      - name: Tap Clone workspace
+        run: idb ui tap --udid "$UDID" 196 520
+      - name: Wait for the clone attempt to fail (unreachable host)
+        run: sleep 5
+      - name: Screenshot the result
+        run: xcrun simctl io "$UDID" screenshot onboarding-after.png
+      - name: Upload onboarding screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mobile-onboarding-screenshots
+          path: |
+            onboarding-before.png
+            onboarding-after.png
       - name: Upload screenshots
         if: always()
         uses: actions/upload-artifact@v4
