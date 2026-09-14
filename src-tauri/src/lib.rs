@@ -9,6 +9,11 @@ use std::path::PathBuf;
 use std::sync::OnceLock;
 use tauri::{Emitter, Manager};
 
+#[cfg(not(target_os = "ios"))]
+use commands::git as git_impl;
+#[cfg(target_os = "ios")]
+use commands::git_mobile as git_impl;
+
 static ERROR_LOG_DIR: OnceLock<PathBuf> = OnceLock::new();
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -135,17 +140,17 @@ pub fn run() {
             commands::editor_launch::open_in_editor,
             commands::editor_launch::resolve_code_links,
             commands::crossref::resolve_cross_refs,
-            commands::git::detect_repo,
-            commands::git::detect_prior_automation,
-            commands::git::auto_commit,
-            commands::git::push_notes,
-            commands::git::fetch_and_compare,
-            commands::git::rebase_onto_remote,
-            commands::git::init_notes_repo,
-            commands::git::list_note_history,
-            commands::git::read_note_at_commit,
-            commands::git::list_github_repos,
-            commands::git::clone_repo,
+            git_impl::detect_repo,
+            git_impl::detect_prior_automation,
+            git_impl::auto_commit,
+            git_impl::push_notes,
+            git_impl::fetch_and_compare,
+            git_impl::rebase_onto_remote,
+            git_impl::init_notes_repo,
+            git_impl::list_note_history,
+            git_impl::read_note_at_commit,
+            git_impl::list_github_repos,
+            git_impl::clone_repo,
             commands::terminal::terminal_open,
             commands::terminal::terminal_write,
             commands::terminal::terminal_resize,

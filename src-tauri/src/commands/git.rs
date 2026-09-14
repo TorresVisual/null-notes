@@ -150,6 +150,7 @@ pub(crate) fn is_notes_monorepo(root: &Path, workspace: &Path) -> anyhow::Result
     }
 }
 
+#[cfg(not(target_os = "ios"))]
 #[tauri::command]
 pub async fn detect_repo(workspace: String) -> Result<Option<RepoMode>, String> {
     tokio::task::spawn_blocking(move || detect_repo_mode(&workspace))
@@ -186,6 +187,7 @@ pub fn detect_prior_git_automation(workspace: &str) -> anyhow::Result<bool> {
     Ok(has_remote(workspace)? && has_notes_commits(workspace)?)
 }
 
+#[cfg(not(target_os = "ios"))]
 #[tauri::command]
 pub async fn detect_prior_automation(workspace: String) -> Result<bool, String> {
     tokio::task::spawn_blocking(move || detect_prior_git_automation(&workspace))
@@ -468,6 +470,7 @@ pub fn checked_auto_commit(
     }
 }
 
+#[cfg(not(target_os = "ios"))]
 #[tauri::command]
 pub async fn auto_commit(
     workspace: String,
@@ -566,6 +569,7 @@ pub fn list_note_history_at(
     Ok(entries)
 }
 
+#[cfg(not(target_os = "ios"))]
 #[tauri::command]
 pub async fn list_note_history(
     workspace: String,
@@ -611,6 +615,7 @@ pub fn read_note_at_commit_at(
     Ok(String::from_utf8_lossy(&output.stdout).into_owned())
 }
 
+#[cfg(not(target_os = "ios"))]
 #[tauri::command]
 pub async fn read_note_at_commit(
     workspace: String,
@@ -690,6 +695,7 @@ pub fn checked_push(
     }
 }
 
+#[cfg(not(target_os = "ios"))]
 #[tauri::command]
 pub async fn push_notes(
     workspace: String,
@@ -894,6 +900,7 @@ pub fn checked_pull(workspace: &str) -> anyhow::Result<PullOutcome> {
     Ok(PullOutcome::FastForwarded)
 }
 
+#[cfg(not(target_os = "ios"))]
 #[tauri::command]
 pub async fn fetch_and_compare(workspace: String) -> Result<PullOutcome, String> {
     tokio::task::spawn_blocking(move || checked_pull(&workspace))
@@ -949,6 +956,7 @@ pub fn checked_rebase_onto_remote(workspace: &str) -> anyhow::Result<RebaseOutco
     Ok(RebaseOutcome::Aborted { output: stderr })
 }
 
+#[cfg(not(target_os = "ios"))]
 #[tauri::command]
 pub async fn rebase_onto_remote(workspace: String) -> Result<RebaseOutcome, String> {
     tokio::task::spawn_blocking(move || checked_rebase_onto_remote(&workspace))
@@ -1146,6 +1154,7 @@ pub fn checked_init_notes_repo(
     })
 }
 
+#[cfg(not(target_os = "ios"))]
 #[tauri::command]
 pub async fn init_notes_repo(
     workspace: String,
@@ -1194,6 +1203,7 @@ pub fn list_own_github_repos() -> anyhow::Result<Vec<GithubRepo>> {
     Ok(serde_json::from_slice(&output.stdout)?)
 }
 
+#[cfg(not(target_os = "ios"))]
 #[tauri::command]
 pub async fn list_github_repos() -> Result<Vec<GithubRepo>, String> {
     tokio::task::spawn_blocking(list_own_github_repos)
@@ -1249,6 +1259,7 @@ pub fn checked_clone_repo(url: &str, parent_dir: &str) -> anyhow::Result<PathBuf
     Ok(Path::new(parent_dir).join(dir_name))
 }
 
+#[cfg(not(target_os = "ios"))]
 #[tauri::command]
 pub async fn clone_repo(url: String, parent_dir: String) -> Result<String, String> {
     tokio::task::spawn_blocking(move || checked_clone_repo(&url, &parent_dir))

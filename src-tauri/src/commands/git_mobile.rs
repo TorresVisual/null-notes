@@ -596,6 +596,137 @@ pub fn list_own_github_repos() -> anyhow::Result<Vec<GithubRepo>> {
     anyhow::bail!("gh not available")
 }
 
+// Tauri command wrappers. Command names and (mostly) signatures match
+// desktop's `git.rs` exactly, so the frontend's `invoke("auto_commit", …)`
+// calls resolve to whichever module `lib.rs`'s `git_impl` alias picks for
+// the current platform without any frontend branching — see this module's
+// doc comment for why these can't coexist with `git.rs`'s own wrappers in
+// the same compiled binary. `fetch_and_compare`, `push_notes` and
+// `clone_repo` each gain a `token: String` parameter desktop's don't have
+// (Credentials, docs/plans/git-mobile-gix.md's Global Constraints);
+// `init_notes_repo`/`list_github_repos` keep desktop's exact signature even
+// though most of it is unused, so the frontend never has to branch on
+// platform to know what to pass.
+
+#[cfg(target_os = "ios")]
+#[tauri::command]
+pub async fn detect_repo(workspace: String) -> Result<Option<RepoMode>, String> {
+    tokio::task::spawn_blocking(move || detect_repo_mode(&workspace))
+        .await
+        .map_err(|e| e.to_string())?
+        .map_err(|e| e.to_string())
+}
+
+#[cfg(target_os = "ios")]
+#[tauri::command]
+pub async fn detect_prior_automation(workspace: String) -> Result<bool, String> {
+    tokio::task::spawn_blocking(move || detect_prior_git_automation(&workspace))
+        .await
+        .map_err(|e| e.to_string())?
+        .map_err(|e| e.to_string())
+}
+
+#[cfg(target_os = "ios")]
+#[tauri::command]
+pub async fn auto_commit(
+    workspace: String,
+    mode: RepoMode,
+    paths: Vec<String>,
+    skip_hooks: bool,
+) -> Result<CommitOutcome, String> {
+    tokio::task::spawn_blocking(move || checked_auto_commit(&workspace, mode, &paths, skip_hooks))
+        .await
+        .map_err(|e| e.to_string())?
+        .map_err(|e| e.to_string())
+}
+
+#[cfg(target_os = "ios")]
+#[tauri::command]
+pub async fn push_notes(
+    workspace: String,
+    mode: RepoMode,
+    allow_code_repo_push: bool,
+    token: String,
+) -> Result<PushOutcome, String> {
+    tokio::task::spawn_blocking(move || {
+        checked_push(&workspace, mode, allow_code_repo_push, &token)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+    .map_err(|e| e.to_string())
+}
+
+#[cfg(target_os = "ios")]
+#[tauri::command]
+pub async fn fetch_and_compare(workspace: String, token: String) -> Result<PullOutcome, String> {
+    tokio::task::spawn_blocking(move || checked_pull(&workspace, &token))
+        .await
+        .map_err(|e| e.to_string())?
+        .map_err(|e| e.to_string())
+}
+
+#[cfg(target_os = "ios")]
+#[tauri::command]
+pub async fn rebase_onto_remote(workspace: String) -> Result<RebaseOutcome, String> {
+    tokio::task::spawn_blocking(move || checked_rebase_onto_remote(&workspace))
+        .await
+        .map_err(|e| e.to_string())?
+        .map_err(|e| e.to_string())
+}
+
+#[cfg(target_os = "ios")]
+#[tauri::command]
+pub async fn init_notes_repo(
+    _workspace: String,
+    _create_github_remote: bool,
+) -> Result<RepoInitOutcome, String> {
+    checked_init_notes_repo().map_err(|e| e.to_string())
+}
+
+#[cfg(target_os = "ios")]
+#[tauri::command]
+pub async fn list_note_history(
+    workspace: String,
+    note_path: String,
+) -> Result<Vec<NoteHistoryEntry>, String> {
+    tokio::task::spawn_blocking(move || list_note_history_at(&workspace, &note_path))
+        .await
+        .map_err(|e| e.to_string())?
+        .map_err(|e| e.to_string())
+}
+
+#[cfg(target_os = "ios")]
+#[tauri::command]
+pub async fn read_note_at_commit(
+    workspace: String,
+    relative_path: String,
+    sha: String,
+) -> Result<String, String> {
+    tokio::task::spawn_blocking(move || read_note_at_commit_at(&workspace, &relative_path, &sha))
+        .await
+        .map_err(|e| e.to_string())?
+        .map_err(|e| e.to_string())
+}
+
+#[cfg(target_os = "ios")]
+#[tauri::command]
+pub async fn list_github_repos() -> Result<Vec<GithubRepo>, String> {
+    tokio::task::spawn_blocking(list_own_github_repos)
+        .await
+        .map_err(|e| e.to_string())?
+        .map_err(|e| e.to_string())
+}
+
+#[cfg(target_os = "ios")]
+#[tauri::command]
+pub async fn clone_repo(url: String, parent_dir: String, token: String) -> Result<String, String> {
+    tokio::task::spawn_blocking(move || checked_clone_repo(&url, &parent_dir, &token))
+        .await
+        .map_err(|e| e.to_string())?
+        .map_err(|e| e.to_string())
+        .map(|p| p.to_string_lossy().into_owned())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
