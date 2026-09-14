@@ -49,6 +49,9 @@ gix = { version = "0.87.1", default-features = false, features = [
     "sha1",
     "merge",
 ] }
+gix-pack = { version = "0.74.2", default-features = false, features = ["generate"] }
+gix-object = { version = "0.64.1", default-features = false }
+gix-zlib = { version = "0.1.0", default-features = false }
 
 [target.'cfg(windows)'.dependencies]
 webview2-com = "0.38"

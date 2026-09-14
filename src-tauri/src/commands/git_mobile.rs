@@ -296,6 +296,47 @@ fn objects_missing_from_remote(
     Ok(missing)
 }
 
+/// Serializes `object_ids` into a valid, self-contained (non-thin) pack:
+/// every object is written as a full base entry, never a delta. Simpler
+/// and always protocol-valid, at the cost of the bandwidth savings a real
+/// delta pack would get — see this plan's Global Constraints.
+fn build_pack_bytes(
+    repo: &gix::Repository,
+    object_ids: &[gix::ObjectId],
+) -> anyhow::Result<Vec<u8>> {
+    use gix_pack::data::output;
+
+    let mut entries = Vec::with_capacity(object_ids.len());
+    let mut buf = Vec::new();
+    for id in object_ids {
+        let Some(data) = gix_object::Find::try_find(&repo.objects, id, &mut buf)
+            .map_err(|e| anyhow::anyhow!("{e}"))?
+        else {
+            anyhow::bail!("object {id} referenced for push is missing from the local store");
+        };
+        let count = output::Count::from_data(*id, None);
+        entries.push(output::Entry::from_data(
+            &count,
+            &data,
+            gix_zlib::Compression::default(),
+        )?);
+    }
+    let num_entries = entries.len() as u32;
+
+    let mut pack_bytes = Vec::new();
+    let mut writer = output::bytes::FromEntriesIter::new(
+        std::iter::once(Ok::<_, std::convert::Infallible>(entries)),
+        &mut pack_bytes,
+        num_entries,
+        gix_pack::data::Version::V2,
+        repo.object_hash(),
+    );
+    for result in &mut writer {
+        result?;
+    }
+    Ok(pack_bytes)
+}
+
 /// Repo-root-relative changed paths between two commits' trees, matching
 /// desktop's `changed_note_paths`.
 fn changed_paths_between(
@@ -1322,5 +1363,41 @@ mod tests {
 
         // One commit, one root tree, one blob.
         assert_eq!(missing.len(), 3);
+    }
+
+    #[test]
+    fn built_pack_is_accepted_by_real_git_index_pack() {
+        let tmp = tempfile::tempdir().unwrap();
+        git_init(tmp.path());
+        commit_file(tmp.path(), "a.md", "# A\n", "notes: add a");
+        let repo = gix::discover(tmp.path()).unwrap();
+        let head = repo.head_id().unwrap().detach();
+
+        let object_ids = objects_missing_from_remote(&repo, head, None).unwrap();
+        let pack_bytes = build_pack_bytes(&repo, &object_ids).unwrap();
+
+        // A fresh bare repo has no objects of its own — `index-pack` proves
+        // the bytes are a well-formed pack purely from their own content.
+        let bare = tempfile::tempdir().unwrap();
+        assert!(Command::new("git")
+            .arg("init")
+            .arg("-q")
+            .arg("--bare")
+            .arg(bare.path())
+            .status()
+            .unwrap()
+            .success());
+        let mut child = Command::new("git")
+            .arg("-C")
+            .arg(bare.path())
+            .arg("index-pack")
+            .arg("--stdin")
+            .stdin(std::process::Stdio::piped())
+            .stdout(std::process::Stdio::null())
+            .spawn()
+            .unwrap();
+        use std::io::Write as _;
+        child.stdin.take().unwrap().write_all(&pack_bytes).unwrap();
+        assert!(child.wait().unwrap().success());
     }
 }
