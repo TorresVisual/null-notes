@@ -1,7 +1,11 @@
-import { describe, it, expect, vi, afterEach } from 'vitest'
+import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest'
 import { render, screen, cleanup, fireEvent } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { platform } from '@tauri-apps/plugin-os'
 import { Titlebar } from './Titlebar'
+import { useMobileSidebarStore } from '../store/mobileSidebar'
+
+vi.mock('@tauri-apps/plugin-os', () => ({ platform: vi.fn() }))
 
 const setTitle = vi.fn()
 const isMaximized = vi.fn().mockResolvedValue(false)
@@ -76,5 +80,39 @@ describe('Titlebar', () => {
     expect(toggleMaximize).toHaveBeenCalled()
     fireEvent.click(screen.getByLabelText('Close'))
     expect(close).toHaveBeenCalled()
+  })
+})
+
+describe('Titlebar on mobile', () => {
+  beforeEach(() => {
+    useMobileSidebarStore.setState({ open: false })
+  })
+
+  it('shows a menu-toggle button and hides window-chrome buttons', () => {
+    vi.mocked(platform).mockReturnValue('ios')
+    render(<Titlebar title="test" onCommand={vi.fn()} />)
+
+    expect(screen.getByLabelText('Toggle sidebar')).toBeInTheDocument()
+    expect(screen.queryByLabelText('Minimize')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Maximize')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Close')).not.toBeInTheDocument()
+  })
+
+  it('toggle button flips the mobile sidebar store', async () => {
+    const user = userEvent.setup()
+    vi.mocked(platform).mockReturnValue('ios')
+    render(<Titlebar title="test" onCommand={vi.fn()} />)
+
+    await user.click(screen.getByLabelText('Toggle sidebar'))
+    expect(useMobileSidebarStore.getState().open).toBe(true)
+  })
+
+  it('keeps window-chrome buttons and omits the toggle on desktop', () => {
+    vi.mocked(platform).mockReturnValue('windows')
+    render(<Titlebar title="test" onCommand={vi.fn()} />)
+
+    expect(screen.queryByLabelText('Toggle sidebar')).not.toBeInTheDocument()
+    expect(screen.getByLabelText('Minimize')).toBeInTheDocument()
+    expect(screen.getByLabelText('Close')).toBeInTheDocument()
   })
 })

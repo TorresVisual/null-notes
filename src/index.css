@@ -301,6 +301,13 @@ button, [role="button"], .tree-row, .tab, .search-result, .slash-menu-item,
 .titlebar-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
 .titlebar-btn-close:hover { background: var(--danger); color: #fff; }
 
+.titlebar-menu-toggle { margin-right: 4px; }
+
+@media (hover: none) {
+  .titlebar { height: 44px; }
+  .titlebar-btn { width: 44px; }
+}
+
 .layout {
   display: flex;
   flex: 1;

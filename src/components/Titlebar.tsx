@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { getCurrentWindow } from '@tauri-apps/api/window'
-import { Copy, Minus, Square, X } from 'lucide-react'
+import { Menu, Copy, Minus, Square, X } from 'lucide-react'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -10,6 +10,8 @@ import {
   DropdownMenuTrigger,
 } from './ui/dropdown-menu'
 import { folderName } from '../lib/pathPrefix'
+import { isMobile } from '../lib/platform'
+import { useMobileSidebarStore } from '../store/mobileSidebar'
 
 interface MenuEntry {
   id: string
@@ -80,8 +82,16 @@ export function Titlebar({ title, onCommand, recentWorkspaces = [] }: TitlebarPr
     return () => void unlisten.then((off) => off())
   }, [])
 
+  const toggleSidebar = useMobileSidebarStore((s) => s.toggle)
+  const mobile = isMobile()
+
   return (
     <div className="titlebar" data-tauri-drag-region>
+      {mobile && (
+        <button className="titlebar-btn titlebar-menu-toggle" aria-label="Toggle sidebar" onClick={toggleSidebar}>
+          <Menu size={16} />
+        </button>
+      )}
       <div className="titlebar-menus">
         <TitlebarMenu label="File" items={buildFileMenu(recentWorkspaces)} onCommand={onCommand} />
         <TitlebarMenu label="View" items={VIEW_MENU} onCommand={onCommand} />
@@ -93,29 +103,31 @@ export function Titlebar({ title, onCommand, recentWorkspaces = [] }: TitlebarPr
       >
         {title}
       </div>
-      <div className="titlebar-controls">
-        <button
-          className="titlebar-btn"
-          aria-label="Minimize"
-          onClick={() => void getCurrentWindow().minimize()}
-        >
-          <Minus size={14} />
-        </button>
-        <button
-          className="titlebar-btn"
-          aria-label={maximized ? 'Restore' : 'Maximize'}
-          onClick={() => void getCurrentWindow().toggleMaximize()}
-        >
-          {maximized ? <Copy size={12} /> : <Square size={12} />}
-        </button>
-        <button
-          className="titlebar-btn titlebar-btn-close"
-          aria-label="Close"
-          onClick={() => void getCurrentWindow().close()}
-        >
-          <X size={14} />
-        </button>
-      </div>
+      {!mobile && (
+        <div className="titlebar-controls">
+          <button
+            className="titlebar-btn"
+            aria-label="Minimize"
+            onClick={() => void getCurrentWindow().minimize()}
+          >
+            <Minus size={14} />
+          </button>
+          <button
+            className="titlebar-btn"
+            aria-label={maximized ? 'Restore' : 'Maximize'}
+            onClick={() => void getCurrentWindow().toggleMaximize()}
+          >
+            {maximized ? <Copy size={12} /> : <Square size={12} />}
+          </button>
+          <button
+            className="titlebar-btn titlebar-btn-close"
+            aria-label="Close"
+            onClick={() => void getCurrentWindow().close()}
+          >
+            <X size={14} />
+          </button>
+        </div>
+      )}
     </div>
   )
 }
