@@ -3,6 +3,8 @@ import type { NoteMetadata, WorkspaceState, WorkspaceTree, SearchResult, AppSett
 import type { PdfPage, PdfMarkdownImport } from '../pdf/types'
 import { useWorkspaceStore } from '../store/workspace'
 import { sidecarDir } from './pathPrefix'
+import { isMobile } from './platform'
+import { getStoredGitToken } from './gitCredentials'
 
 export const api = {
   notes: {
@@ -119,10 +121,16 @@ export const api = {
       invoke<boolean>('detect_prior_automation', { workspace }),
     autoCommit: (workspace: string, mode: RepoMode, paths: string[], skipHooks: boolean) =>
       invoke<CommitOutcome>('auto_commit', { workspace, mode, paths, skipHooks }),
-    pushNotes: (workspace: string, mode: RepoMode, allowCodeRepoPush: boolean) =>
-      invoke<PushOutcome>('push_notes', { workspace, mode, allowCodeRepoPush }),
-    fetchAndCompare: (workspace: string) =>
-      invoke<PullOutcome>('fetch_and_compare', { workspace }),
+    pushNotes: async (workspace: string, mode: RepoMode, allowCodeRepoPush: boolean) => {
+      const args: Record<string, unknown> = { workspace, mode, allowCodeRepoPush }
+      if (isMobile()) args.token = await getStoredGitToken()
+      return invoke<PushOutcome>('push_notes', args)
+    },
+    fetchAndCompare: async (workspace: string) => {
+      const args: Record<string, unknown> = { workspace }
+      if (isMobile()) args.token = await getStoredGitToken()
+      return invoke<PullOutcome>('fetch_and_compare', args)
+    },
     rebaseOntoRemote: (workspace: string) =>
       invoke<RebaseOutcome>('rebase_onto_remote', { workspace }),
     initNotesRepo: (workspace: string, createGithubRemote: boolean) =>
@@ -133,8 +141,11 @@ export const api = {
       invoke<string>('read_note_at_commit', { workspace, relativePath, sha }),
     listGithubRepos: () =>
       invoke<GithubRepo[]>('list_github_repos'),
-    cloneRepo: (url: string, parentDir: string) =>
-      invoke<string>('clone_repo', { url, parentDir }),
+    cloneRepo: async (url: string, parentDir: string) => {
+      const args: Record<string, unknown> = { url, parentDir }
+      if (isMobile()) args.token = await getStoredGitToken()
+      return invoke<string>('clone_repo', args)
+    },
     getGitToken: () =>
       invoke<string>('get_git_token'),
     setGitToken: (token: string) =>
