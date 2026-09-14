@@ -1886,6 +1886,13 @@ pre:has(code.language-expect)::before, pre:has(code.language-expected)::before {
   cursor: pointer;
 }
 
+@media (hover: none) {
+  .toolbar-button { width: 44px; height: 44px; }
+  .sidebar button { padding: 13px 10px; }
+  .tab .tab-close { min-width: 32px; min-height: 32px; }
+  .dialog-action, .dialog-action-primary { min-height: 44px; padding: 0 16px; }
+}
+
 .toolbar-button:hover { background: var(--border-strong); color: var(--text-primary); }
 .toolbar-button.active { background: var(--accent); color: var(--accent-contrast); }
 
@@ -2603,6 +2610,13 @@ pre:has(code.language-expect)::before, pre:has(code.language-expected)::before {
 .sidebar .tree-row:hover .tree-rename { opacity: 1; }
 .sidebar .tree-delete:hover { color: var(--danger); }
 .sidebar .tree-rename:hover { color: var(--accent); }
+
+@media (hover: none) {
+  .sidebar .tree-delete,
+  .sidebar .tree-rename {
+    opacity: 1;
+  }
+}
 
 .section-label {
   font-size: 11px;
