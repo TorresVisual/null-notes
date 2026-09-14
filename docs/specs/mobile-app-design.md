@@ -82,6 +82,8 @@ The TipTap editor surface and the ink Canvas (`src/ink/`, perfect-freehand) alre
 - A code block on iOS shows its content and any pinned output, with no Run button and no crash/error state.
 - The pdfium spike has a clear yes/no answer recorded before PDF-import work is planned in detail.
 
+**Resolved 2026-09-15 — feature-cut UI gating done.** `docs/plans/mobile-feature-cuts.md` hid all three structural cuts (Run/output panel, Open in IDE, terminal) behind `isMobile()` at the exact widget/render points named above — no Rust changes, since `code_run.rs`/`editor_launch.rs`/`terminal.rs` already compiled clean for the iOS target; the gap was frontend-only. The terminal cut additionally guards the `toggle-terminal` command handler itself, not just its two toolbar/menu entry points, since a physical keyboard's `Ctrl+\`` bypasses both.
+
 ## Out of scope (v1)
 
 - **Android.** Later, separate pass — this spec's approach (Tauri mobile, git-only storage via `gix`) is expected to transfer, but isn't designed for it yet.
