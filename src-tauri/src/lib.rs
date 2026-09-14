@@ -152,6 +152,8 @@ pub fn run() {
             git_impl::read_note_at_commit,
             git_impl::list_github_repos,
             git_impl::clone_repo,
+            commands::git_credentials::get_git_token,
+            commands::git_credentials::set_git_token,
             commands::terminal::terminal_open,
             commands::terminal::terminal_write,
             commands::terminal::terminal_resize,

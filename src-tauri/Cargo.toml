@@ -56,6 +56,9 @@ gix-zlib = { version = "0.1.0", default-features = false }
 gix-transport = { version = "0.59.2", default-features = false, features = ["blocking-client"] }
 gix-protocol = { version = "0.65.1", default-features = false, features = ["blocking-client"] }
 
+[target.'cfg(target_os = "ios")'.dependencies]
+keyring = "4"
+
 [target.'cfg(windows)'.dependencies]
 webview2-com = "0.38"
 windows = { version = "0.61", features = [

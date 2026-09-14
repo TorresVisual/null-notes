@@ -135,6 +135,10 @@ export const api = {
       invoke<GithubRepo[]>('list_github_repos'),
     cloneRepo: (url: string, parentDir: string) =>
       invoke<string>('clone_repo', { url, parentDir }),
+    getGitToken: () =>
+      invoke<string>('get_git_token'),
+    setGitToken: (token: string) =>
+      invoke<void>('set_git_token', { token }),
   },
   settings: {
     load: () =>
