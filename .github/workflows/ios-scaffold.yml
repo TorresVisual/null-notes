@@ -51,6 +51,13 @@ jobs:
           xcrun simctl io "$UDID" screenshot before.png
           xcrun simctl spawn "$UDID" log show --predicate 'process == "null-notes" OR eventMessage CONTAINS "nullnotes"' --last 2m > app.log || true
           echo "UDID=$UDID" >> "$GITHUB_ENV"
+      - name: Locate bundled pdfium relative to the executable
+        run: |
+          set -euo pipefail
+          APP_PATH=$(xcrun simctl get_app_container "$UDID" dev.nullnotes.app app)
+          echo "App bundle: $APP_PATH"
+          ls -la "$APP_PATH" | grep -i pdfium || { echo "libpdfium.dylib NOT found in app bundle root"; exit 1; }
+          echo "$APP_PATH/null-notes" # the executable's own path, for comparison
       - name: Install idb and send a synthetic tap
         run: |
           brew tap facebook/fb
