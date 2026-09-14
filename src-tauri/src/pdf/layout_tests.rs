@@ -2249,6 +2249,34 @@ fn a_baseline_shaped_line_is_never_mistaken_for_the_other_half_of_a_fraction() {
     );
 }
 
+// `splice_into_baseline` appends the fraction after a baseline that has
+// nothing trailing it ("R =" with no suffix) — leaving the baseline's own
+// `Inline::Maths("R =")` sitting directly next to the spliced-in
+// `Inline::Maths(frac)`. `render_content` used to wrap each independently,
+// producing "$R =$$\frac{a + b}{c + d}$" — two adjacent spans glued with no
+// separator, seen for real on Analysis_2_Blatt10.pdf/Analysis_2_Blatt11.pdf.
+#[test]
+fn a_baseline_prefix_with_nothing_after_the_fraction_does_not_glue_two_maths_spans() {
+    let mut chars = page_at(
+        900.0,
+        &["ordinary paragraph text", "with a normal line spacing"],
+    );
+    chars.extend(set("a + b", 300.0, 700.0, maths_italic()));
+    chars.extend(set("R =", 250.0, 693.0, maths_italic()));
+    chars.extend(set("c + d", 300.0, 680.0, maths_italic()));
+
+    let markdown = chars_to_markdown(&chars);
+
+    assert!(
+        markdown.contains(r"R = \frac{a + b}{c + d}"),
+        "got: {markdown}"
+    );
+    assert!(
+        !markdown.contains("$$"),
+        "adjacent maths spans left glued: {markdown}"
+    );
+}
+
 // A \binom vector's large open/close parens land on their own line — their
 // y matches neither content row above/below them (see
 // docs/specs/pdf-table-fraction-maths-guards-design.md for why: TeX draws

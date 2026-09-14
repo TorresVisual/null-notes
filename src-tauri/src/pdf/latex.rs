@@ -521,6 +521,7 @@ pub(super) fn symbol_command(ch: char) -> Option<&'static str> {
         '↦' => "\\mapsto",
         '⇒' => "\\Rightarrow",
         '⇔' => "\\iff",
+        '↔' => "\\leftrightarrow",
         '≤' => "\\leq",
         '≥' => "\\geq",
         '≠' => "\\neq",
@@ -540,6 +541,7 @@ pub(super) fn symbol_command(ch: char) -> Option<&'static str> {
         '∩' => "\\cap",
         '∅' => "\\emptyset",
         '∖' => "\\setminus",
+        '△' => "\\triangle",
         // Operators
         '−' => "-",
         '±' => "\\pm",
@@ -547,7 +549,7 @@ pub(super) fn symbol_command(ch: char) -> Option<&'static str> {
         '×' => "\\times",
         '÷' => "\\div",
         '⋅' | '·' => "\\cdot",
-        '∘' => "\\circ",
+        '∘' | '◦' => "\\circ",
         '⊕' => "\\oplus",
         '⊗' => "\\otimes",
         // Large operators and calculus
@@ -830,6 +832,9 @@ mod tests {
         assert_eq!(to_latex(&run("∈", Family::Symbol)), r"\in");
         assert_eq!(to_latex(&run("≤", Family::Symbol)), r"\leq");
         assert_eq!(to_latex(&run("α", Family::Italic)), r"\alpha");
+        assert_eq!(to_latex(&run("↔", Family::Symbol)), r"\leftrightarrow");
+        assert_eq!(to_latex(&run("△", Family::Symbol)), r"\triangle");
+        assert_eq!(to_latex(&run("◦", Family::Symbol)), r"\circ");
     }
 
     // Computer Modern draws \vec by placing the combining right-arrow accent

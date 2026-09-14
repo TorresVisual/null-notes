@@ -3303,10 +3303,23 @@ fn reconstruct_matrices(
 
 fn render_content(content: &[Inline]) -> String {
     let mut out = String::new();
+    let mut last_was_maths = false;
     for inline in content {
         let span = match inline {
             Inline::Maths(latex) => {
-                out.push_str(&format!("${latex}$"));
+                if last_was_maths {
+                    // Adjacent maths runs (e.g. a `\frac{}{}` reconstructed as
+                    // its own span next to the surrounding equation) join the
+                    // still-open previous span instead of opening a new one,
+                    // or they come out glued as `$...$$...$`.
+                    out.pop();
+                    out.push(' ');
+                    out.push_str(latex);
+                    out.push('$');
+                } else {
+                    out.push_str(&format!("${latex}$"));
+                }
+                last_was_maths = true;
                 continue;
             }
             Inline::Text(span) => span,
@@ -3316,6 +3329,7 @@ fn render_content(content: &[Inline]) -> String {
             // through its own arm in `blocks_to_markdown` instead.
             Inline::TableRow(_, _) | Inline::ImageRef(_, _) => continue,
         };
+        last_was_maths = false;
         let marker = match (span.bold, span.italic) {
             (true, true) => "***",
             (true, false) => "**",
