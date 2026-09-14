@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   FilePlus,
   FolderOpen,
@@ -29,6 +29,8 @@ import { promptText } from '../store/promptDialog'
 import { api } from '../lib/tauri'
 import type { NoteMetadata } from '../types'
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip'
+import { isMobile } from '../lib/platform'
+import { useMobileSidebarStore } from '../store/mobileSidebar'
 
 interface SidebarProps {
   onSearchOpen: () => void
@@ -59,11 +61,15 @@ export function Sidebar({
   const setActiveTab = useWorkspaceStore((s) => s.setActiveTab)
   const folderError = useWorkspaceStore((s) => s.folderError)
   const folderLoading = useWorkspaceStore((s) => s.folderLoading)
+  const activeTab = useWorkspaceStore((s) => s.activeTab)
   const { openWorkspace } = useWorkspace()
   const createNote = useCreateNote()
   const createFolder = useCreateFolder()
   const createCanvasNote = useCreateCanvasNote()
   const [tagFilteredNotes, setTagFilteredNotes] = useState<NoteMetadata[]>([])
+  const mobile = isMobile()
+  const drawerOpen = useMobileSidebarStore((s) => s.open)
+  const closeDrawer = useMobileSidebarStore((s) => s.close)
 
   useEffect(() => {
     if (!tagFilter || !workspacePath) {
@@ -72,6 +78,20 @@ export function Sidebar({
     }
     api.notes.notesWithTag(workspacePath, tagFilter).then(setTagFilteredNotes)
   }, [tagFilter, workspacePath])
+
+  const isFirstRender = useRef(true)
+  useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false
+      return
+    }
+    if (mobile) closeDrawer()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab])
+
+  function closeIfMobile() {
+    if (mobile) closeDrawer()
+  }
 
   const tree = workspacePath ? buildFolderTree(workspacePath, folders, notes) : []
 
@@ -96,9 +116,9 @@ export function Sidebar({
   const workspaceName = workspacePath ? folderName(workspacePath) : null
 
   return (
-    <aside className="sidebar">
+    <aside className={`sidebar${mobile ? ` sidebar--drawer${drawerOpen ? ' sidebar--open' : ''}` : ''}`}>
       {workspaceName && <p className="workspace-name" title={workspacePath ?? ''}>{workspaceName}</p>}
-      <button className="sidebar-workspace-btn" onClick={() => void openWorkspace()} disabled={folderLoading}>
+      <button className="sidebar-workspace-btn" onClick={() => { void openWorkspace(); closeIfMobile() }} disabled={folderLoading}>
         <FolderOpen size={14} /> {folderLoading ? 'Opening…' : 'Open Workspace'}
       </button>
       <p className="section-label">New</p>
@@ -120,7 +140,7 @@ export function Sidebar({
       <div className="sidebar-group">
         <button
           className="sidebar-nav-btn"
-          onClick={() => setActiveTab(null)}
+          onClick={() => { setActiveTab(null); closeIfMobile() }}
           disabled={!workspacePath}
         >
           <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -128,13 +148,13 @@ export function Sidebar({
           </span>
           <kbd>Ctrl H</kbd>
         </button>
-        <button className="sidebar-nav-btn" onClick={onSearchOpen}>
+        <button className="sidebar-nav-btn" onClick={() => { onSearchOpen(); closeIfMobile() }}>
           <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <Search size={13} /> Search
           </span>
           <kbd>Ctrl K</kbd>
         </button>
-        <button className="sidebar-nav-btn" onClick={onSettingsOpen}>
+        <button className="sidebar-nav-btn" onClick={() => { onSettingsOpen(); closeIfMobile() }}>
           <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <Settings size={13} /> Settings
           </span>
@@ -145,7 +165,7 @@ export function Sidebar({
           <TooltipTrigger asChild>
             <button
               className="toolbar-button"
-              onClick={onGraphOpen}
+              onClick={() => { onGraphOpen(); closeIfMobile() }}
               disabled={!workspacePath}
               aria-label="Graph view"
             >
@@ -158,7 +178,7 @@ export function Sidebar({
           <TooltipTrigger asChild>
             <button
               className="toolbar-button"
-              onClick={onTaskOpen}
+              onClick={() => { onTaskOpen(); closeIfMobile() }}
               disabled={!workspacePath}
               aria-label="Tasks"
             >
@@ -171,7 +191,7 @@ export function Sidebar({
           <TooltipTrigger asChild>
             <button
               className="toolbar-button"
-              onClick={onReviewOpen}
+              onClick={() => { onReviewOpen(); closeIfMobile() }}
               disabled={!workspacePath}
               aria-label="Review"
             >
@@ -184,7 +204,7 @@ export function Sidebar({
           <TooltipTrigger asChild>
             <button
               className="toolbar-button"
-              onClick={onTerminalToggle}
+              onClick={() => { onTerminalToggle(); closeIfMobile() }}
               disabled={!workspacePath}
               aria-label="Terminal"
             >
@@ -197,7 +217,7 @@ export function Sidebar({
           <TooltipTrigger asChild>
             <button
               className="toolbar-button"
-              onClick={onFormulaSheetOpen}
+              onClick={() => { onFormulaSheetOpen(); closeIfMobile() }}
               disabled={!workspacePath}
               aria-label="Generate formula sheet"
             >

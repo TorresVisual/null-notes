@@ -326,6 +326,31 @@ button, [role="button"], .tree-row, .tab, .search-result, .slash-menu-item,
   overflow-y: auto;
 }
 
+.sidebar-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 90;
+}
+
+.sidebar--drawer {
+  position: fixed;
+  top: 44px; /* below the mobile titlebar, see Task 2 */
+  bottom: 0;
+  left: 0;
+  width: 85vw;
+  max-width: 320px;
+  z-index: 91;
+  transform: translateX(-100%);
+  transition: transform var(--duration-base) var(--ease-standard);
+  box-shadow: var(--shadow-modal);
+  padding-bottom: max(12px, env(safe-area-inset-bottom));
+}
+
+.sidebar--drawer.sidebar--open {
+  transform: translateX(0);
+}
+
 /* Ghost by default — a filled box on every nav row read as a stack of form
    fields rather than a navigation panel. Background only appears on
    interaction; grouping and the New-actions toolbar (below) carry hierarchy

@@ -1,10 +1,14 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, cleanup } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { platform } from '@tauri-apps/plugin-os'
 import { Sidebar } from './Sidebar'
 import { useWorkspaceStore } from '../store/workspace'
 import { useNotesStore } from '../store/notes'
+import { useMobileSidebarStore } from '../store/mobileSidebar'
 import { TooltipProvider } from './ui/tooltip'
+
+vi.mock('@tauri-apps/plugin-os', () => ({ platform: vi.fn() }))
 
 vi.mock('../lib/tauri', () => ({
   api: { notes: { notesWithTag: vi.fn().mockResolvedValue([]) } },
@@ -78,5 +82,60 @@ describe('Sidebar Open Workspace button', () => {
     renderSidebar()
 
     expect(screen.getByRole('button', { name: /Opening…/ })).toBeDisabled()
+  })
+})
+
+describe('Sidebar drawer on mobile', () => {
+  beforeEach(() => {
+    useNotesStore.setState({ notes: [], folders: [], tags: [] })
+    useWorkspaceStore.setState({ path: '/ws', activeTab: null, tagFilter: null })
+    useMobileSidebarStore.setState({ open: true })
+  })
+
+  it('has the drawer class and is open when the store says open', () => {
+    vi.mocked(platform).mockReturnValue('ios')
+    const { container } = renderSidebar()
+
+    const aside = container.querySelector('aside')
+    expect(aside).toHaveClass('sidebar--drawer')
+    expect(aside).toHaveClass('sidebar--open')
+  })
+
+  it('closes when activeTab changes', () => {
+    vi.mocked(platform).mockReturnValue('ios')
+    const { rerender } = renderSidebar()
+    expect(useMobileSidebarStore.getState().open).toBe(true)
+
+    useWorkspaceStore.setState({ activeTab: '/ws/note.md' })
+    rerender(
+      <TooltipProvider>
+        <Sidebar {...props} />
+      </TooltipProvider>,
+    )
+
+    expect(useMobileSidebarStore.getState().open).toBe(false)
+  })
+
+  it('closes when a secondary action (e.g. Search) is triggered', async () => {
+    const user = userEvent.setup()
+    vi.mocked(platform).mockReturnValue('ios')
+    const onSearchOpen = vi.fn()
+    render(
+      <TooltipProvider>
+        <Sidebar {...props} onSearchOpen={onSearchOpen} />
+      </TooltipProvider>,
+    )
+
+    await user.click(screen.getByText('Search'))
+
+    expect(onSearchOpen).toHaveBeenCalled()
+    expect(useMobileSidebarStore.getState().open).toBe(false)
+  })
+
+  it('has no drawer class on desktop', () => {
+    vi.mocked(platform).mockReturnValue('windows')
+    const { container } = renderSidebar()
+
+    expect(container.querySelector('aside')).not.toHaveClass('sidebar--drawer')
   })
 })

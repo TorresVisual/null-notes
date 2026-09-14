@@ -61,6 +61,8 @@ import type { DiagramMetadata } from '../types'
 import { goBack, goForward } from '../lib/navigationHistory'
 import { useFocusModeStore } from '../store/focusMode'
 import { canPushHere, pushIfAllowed, withGitLock } from '../lib/git'
+import { isMobile } from '../lib/platform'
+import { useMobileSidebarStore } from '../store/mobileSidebar'
 
 type ViewMode = 'wysiwyg' | 'raw'
 
@@ -72,6 +74,9 @@ export function Layout() {
   const reopenClosedTab = useWorkspaceStore((s) => s.reopenClosedTab)
   const focusMode = useFocusModeStore((s) => s.enabled)
   const toggleFocusMode = useFocusModeStore((s) => s.toggle)
+  const mobile = isMobile()
+  const mobileSidebarOpen = useMobileSidebarStore((s) => s.open)
+  const closeMobileSidebar = useMobileSidebarStore((s) => s.close)
   const workspacePath = useWorkspaceStore((s) => s.path)
   const recentWorkspaces = useWorkspaceStore((s) => s.recentWorkspaces)
   const notes = useNotesStore((s) => s.notes)
@@ -525,6 +530,9 @@ export function Layout() {
             closeOverlay()
           }}
         />
+      )}
+      {mobile && mobileSidebarOpen && (
+        <div className="sidebar-backdrop" onClick={closeMobileSidebar} />
       )}
       {!focusMode && (
         <Sidebar
