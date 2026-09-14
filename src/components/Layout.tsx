@@ -286,7 +286,7 @@ export function Layout() {
           if (workspacePath) openOverlay('formulaSheet')
           break
         case 'toggle-terminal':
-          if (!workspacePath) break
+          if (!workspacePath || mobile) break
           setTerminalMounted(true)
           setTerminalOpen((o) => !o)
           break
@@ -547,6 +547,7 @@ export function Layout() {
           }}
           onFormulaSheetOpen={() => openOverlay('formulaSheet')}
           onTerminalToggle={() => {
+            if (mobile) return
             setTerminalMounted(true)
             setTerminalOpen((o) => !o)
           }}

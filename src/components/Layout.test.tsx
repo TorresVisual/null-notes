@@ -6,6 +6,7 @@ import { useNotesStore } from '../store/notes'
 import { useSettingsStore, DEFAULT_SETTINGS } from '../store/settings'
 import { useNote } from '../hooks/useNote'
 import { api } from '../lib/tauri'
+import { platform } from '@tauri-apps/plugin-os'
 
 vi.mock('@tauri-apps/api/event', () => ({
   listen: vi.fn().mockResolvedValue(vi.fn()),
@@ -90,6 +91,9 @@ vi.mock('../hooks/useScrollRestoration', () => ({ useScrollRestoration: () => ({
 vi.mock('../hooks/useGitConfig', () => ({ useGitConfig: () => ({ updateGit: vi.fn() }) }))
 vi.mock('../hooks/useGitAutoCommit', () => ({
   useGitAutoCommit: () => ({ flushGitCommit: vi.fn().mockResolvedValue(undefined) }),
+}))
+vi.mock('../hooks/useTerminal', () => ({
+  useTerminal: () => ({ insertText: vi.fn(), kill: vi.fn(), isReady: true }),
 }))
 
 function runCommand(id: string) {
@@ -203,6 +207,28 @@ describe('Layout overlay exclusivity', () => {
     fireEvent.click(result)
 
     await waitFor(() => expect(document.querySelector('.search-jump-target')).toBeInTheDocument())
+  })
+})
+
+describe('Layout terminal command on mobile', () => {
+  it('does not mount the terminal pane on iOS even via the toggle-terminal command', () => {
+    vi.mocked(platform).mockReturnValue('ios')
+    useWorkspaceStore.setState({ path: '/ws', activeTab: null, tagFilter: null })
+    render(<Layout />)
+
+    act(() => runCommand('toggle-terminal'))
+
+    expect(document.querySelector('.terminal-pane')).not.toBeInTheDocument()
+  })
+
+  it('still mounts the terminal pane on desktop', () => {
+    vi.mocked(platform).mockReturnValue('windows')
+    useWorkspaceStore.setState({ path: '/ws', activeTab: null, tagFilter: null })
+    render(<Layout />)
+
+    act(() => runCommand('toggle-terminal'))
+
+    expect(document.querySelector('.terminal-pane')).toBeInTheDocument()
   })
 })
 
