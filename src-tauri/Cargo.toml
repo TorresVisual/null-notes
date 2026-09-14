@@ -58,6 +58,10 @@ gix-protocol = { version = "0.65.1", default-features = false, features = ["bloc
 
 [target.'cfg(target_os = "ios")'.dependencies]
 keyring = "4"
+# keyring's default `v1` feature only turns on apple-native-keyring-store's
+# `keychain` feature; iOS's build of that crate has a compile_error! unless
+# `protected` is also enabled (Cargo unifies this with keyring's own copy).
+apple-native-keyring-store = { version = "1", features = ["protected"] }
 
 [target.'cfg(windows)'.dependencies]
 webview2-com = "0.38"
