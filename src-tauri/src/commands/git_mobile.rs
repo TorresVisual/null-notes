@@ -248,6 +248,54 @@ fn count_commits_between(
         .count() as u32)
 }
 
+/// Every commit, tree, and blob reachable from `new` that isn't already
+/// reachable from `old` — the exact object set a push of `new` onto a
+/// remote currently at `old` must send. `old` is `None` when the target
+/// branch doesn't exist on the remote yet (first push of a new branch),
+/// in which case everything reachable from `new` is missing.
+fn objects_missing_from_remote(
+    repo: &gix::Repository,
+    new: gix::ObjectId,
+    old: Option<gix::ObjectId>,
+) -> anyhow::Result<Vec<gix::ObjectId>> {
+    let mut commit_walk = repo.rev_walk([new]);
+    if let Some(old) = old {
+        commit_walk = commit_walk.with_hidden([old]);
+    }
+    let new_commits: Vec<gix::ObjectId> = commit_walk
+        .all()?
+        .map(|info| info.map(|i| i.id().detach()))
+        .collect::<Result<_, _>>()?;
+
+    // Objects already on the remote: everything reachable from `old`'s
+    // tree. A blob/tree's hash is identical wherever it's reachable from,
+    // so de-duping against this single set (rather than per-commit) is
+    // correct and avoids resending unchanged content.
+    let mut known = std::collections::HashSet::new();
+    if let Some(old) = old {
+        let old_tree = repo.find_commit(old)?.tree()?;
+        known.insert(old_tree.id);
+        for entry in old_tree.traverse().breadthfirst.files()? {
+            known.insert(entry.oid);
+        }
+    }
+
+    let mut missing: Vec<gix::ObjectId> = new_commits.clone();
+    for commit_id in &new_commits {
+        let tree = repo.find_commit(*commit_id)?.tree()?;
+        if known.insert(tree.id) {
+            missing.push(tree.id);
+        }
+        for entry in tree.traverse().breadthfirst.files()? {
+            if known.insert(entry.oid) {
+                missing.push(entry.oid);
+            }
+        }
+    }
+
+    Ok(missing)
+}
+
 /// Repo-root-relative changed paths between two commits' trees, matching
 /// desktop's `changed_note_paths`.
 fn changed_paths_between(
@@ -1238,5 +1286,41 @@ mod tests {
     #[test]
     fn list_github_repos_is_not_supported_on_mobile() {
         assert!(list_own_github_repos().is_err());
+    }
+
+    #[test]
+    fn missing_objects_includes_new_commit_tree_and_blob_but_not_shared_history() {
+        let tmp = tempfile::tempdir().unwrap();
+        git_init(tmp.path());
+        commit_file(tmp.path(), "a.md", "# A\n", "notes: add a");
+        let repo = gix::discover(tmp.path()).unwrap();
+        let old = repo.head_id().unwrap().detach();
+
+        commit_file(tmp.path(), "b.md", "# B\n", "notes: add b");
+        let repo = gix::discover(tmp.path()).unwrap();
+        let new = repo.head_id().unwrap().detach();
+
+        let missing = objects_missing_from_remote(&repo, new, Some(old)).unwrap();
+
+        // The new commit itself, its (new) root tree, and b.md's blob must
+        // all be present — three objects, since a.md's blob and the old
+        // root tree are already reachable from `old` and must not repeat.
+        assert_eq!(missing.len(), 3);
+        assert!(missing.contains(&new));
+        assert!(!missing.contains(&old));
+    }
+
+    #[test]
+    fn missing_objects_with_no_old_ref_includes_everything_reachable() {
+        let tmp = tempfile::tempdir().unwrap();
+        git_init(tmp.path());
+        commit_file(tmp.path(), "a.md", "# A\n", "notes: add a");
+        let repo = gix::discover(tmp.path()).unwrap();
+        let new = repo.head_id().unwrap().detach();
+
+        let missing = objects_missing_from_remote(&repo, new, None).unwrap();
+
+        // One commit, one root tree, one blob.
+        assert_eq!(missing.len(), 3);
     }
 }
