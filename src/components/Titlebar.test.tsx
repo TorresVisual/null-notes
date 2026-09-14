@@ -81,6 +81,13 @@ describe('Titlebar', () => {
     fireEvent.click(screen.getByLabelText('Close'))
     expect(close).toHaveBeenCalled()
   })
+
+  it('keeps Toggle Terminal in the View menu on desktop', async () => {
+    const user = userEvent.setup()
+    render(<Titlebar title="null-notes" onCommand={vi.fn()} />)
+    await user.click(screen.getByText('View'))
+    expect(await screen.findByText('Toggle Terminal')).toBeInTheDocument()
+  })
 })
 
 describe('Titlebar on mobile', () => {
@@ -114,5 +121,14 @@ describe('Titlebar on mobile', () => {
     expect(screen.queryByLabelText('Toggle sidebar')).not.toBeInTheDocument()
     expect(screen.getByLabelText('Minimize')).toBeInTheDocument()
     expect(screen.getByLabelText('Close')).toBeInTheDocument()
+  })
+
+  it('omits Toggle Terminal from the View menu on iOS', async () => {
+    const user = userEvent.setup()
+    vi.mocked(platform).mockReturnValue('ios')
+    render(<Titlebar title="test" onCommand={vi.fn()} />)
+
+    await user.click(screen.getByText('View'))
+    expect(screen.queryByText('Toggle Terminal')).not.toBeInTheDocument()
   })
 })

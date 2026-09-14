@@ -200,19 +200,21 @@ export function Sidebar({
           </TooltipTrigger>
           <TooltipContent>Review <kbd>Ctrl Shift R</kbd></TooltipContent>
         </Tooltip>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button
-              className="toolbar-button"
-              onClick={() => { onTerminalToggle(); closeIfMobile() }}
-              disabled={!workspacePath}
-              aria-label="Terminal"
-            >
-              <SquareTerminal size={14} />
-            </button>
-          </TooltipTrigger>
-          <TooltipContent>Terminal <kbd>Ctrl `</kbd></TooltipContent>
-        </Tooltip>
+        {!mobile && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                className="toolbar-button"
+                onClick={() => { onTerminalToggle(); closeIfMobile() }}
+                disabled={!workspacePath}
+                aria-label="Terminal"
+              >
+                <SquareTerminal size={14} />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>Terminal <kbd>Ctrl `</kbd></TooltipContent>
+          </Tooltip>
+        )}
         <Tooltip>
           <TooltipTrigger asChild>
             <button

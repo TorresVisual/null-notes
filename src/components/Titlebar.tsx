@@ -49,22 +49,25 @@ function buildFileMenu(recentWorkspaces: string[]): MenuItemSpec[] {
   ]
 }
 
-const VIEW_MENU: MenuItemSpec[] = [
-  { id: 'home', label: 'Home', accel: 'Ctrl+H' },
-  { separator: true },
-  { id: 'search', label: 'Search', accel: 'Ctrl+K' },
-  { id: 'quick-switch', label: 'Quick Switcher', accel: 'Ctrl+P' },
-  { id: 'toggle-view', label: 'Toggle Source/Preview', accel: 'Ctrl+E' },
-  { id: 'insert-ink', label: 'Insert Ink Block', accel: 'Ctrl+Shift+I' },
-  { id: 'graph-view', label: 'Connections Graph', accel: 'Ctrl+G' },
-  { id: 'toggle-terminal', label: 'Toggle Terminal', accel: 'Ctrl+`' },
-  { id: 'toggle-outline', label: 'Toggle Outline', accel: 'Ctrl+Shift+O' },
-  { id: 'task-view', label: 'Tasks', accel: 'Ctrl+Shift+K' },
-  { id: 'review', label: 'Review', accel: 'Ctrl+Shift+R' },
-  { id: 'deck-view', label: 'Browse All Cards', accel: 'Ctrl+Shift+D' },
-  { separator: true },
-  { id: 'shortcuts-help', label: 'Keyboard Shortcuts' },
-]
+function buildViewMenu(mobile: boolean): MenuItemSpec[] {
+  const items: MenuItemSpec[] = [
+    { id: 'home', label: 'Home', accel: 'Ctrl+H' },
+    { separator: true },
+    { id: 'search', label: 'Search', accel: 'Ctrl+K' },
+    { id: 'quick-switch', label: 'Quick Switcher', accel: 'Ctrl+P' },
+    { id: 'toggle-view', label: 'Toggle Source/Preview', accel: 'Ctrl+E' },
+    { id: 'insert-ink', label: 'Insert Ink Block', accel: 'Ctrl+Shift+I' },
+    { id: 'graph-view', label: 'Connections Graph', accel: 'Ctrl+G' },
+    { id: 'toggle-terminal', label: 'Toggle Terminal', accel: 'Ctrl+`' },
+    { id: 'toggle-outline', label: 'Toggle Outline', accel: 'Ctrl+Shift+O' },
+    { id: 'task-view', label: 'Tasks', accel: 'Ctrl+Shift+K' },
+    { id: 'review', label: 'Review', accel: 'Ctrl+Shift+R' },
+    { id: 'deck-view', label: 'Browse All Cards', accel: 'Ctrl+Shift+D' },
+    { separator: true },
+    { id: 'shortcuts-help', label: 'Keyboard Shortcuts' },
+  ]
+  return mobile ? items.filter((item) => !('id' in item && item.id === 'toggle-terminal')) : items
+}
 
 interface TitlebarProps {
   title: string
@@ -94,7 +97,7 @@ export function Titlebar({ title, onCommand, recentWorkspaces = [] }: TitlebarPr
       )}
       <div className="titlebar-menus">
         <TitlebarMenu label="File" items={buildFileMenu(recentWorkspaces)} onCommand={onCommand} />
-        <TitlebarMenu label="View" items={VIEW_MENU} onCommand={onCommand} />
+        <TitlebarMenu label="View" items={buildViewMenu(mobile)} onCommand={onCommand} />
       </div>
       <div
         className="titlebar-title"

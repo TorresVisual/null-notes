@@ -138,4 +138,16 @@ describe('Sidebar drawer on mobile', () => {
 
     expect(container.querySelector('aside')).not.toHaveClass('sidebar--drawer')
   })
+
+  it('hides the terminal toolbar button on iOS', () => {
+    vi.mocked(platform).mockReturnValue('ios')
+    renderSidebar()
+    expect(screen.queryByLabelText('Terminal')).not.toBeInTheDocument()
+  })
+
+  it('still shows the terminal toolbar button on desktop', () => {
+    vi.mocked(platform).mockReturnValue('windows')
+    renderSidebar()
+    expect(screen.getByLabelText('Terminal')).toBeInTheDocument()
+  })
 })
