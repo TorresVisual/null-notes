@@ -21,7 +21,7 @@ jobs:
           tar -xzf pdfium-ios-sim.tgz -C src-tauri/gen/pdfium-ios
           find src-tauri/gen/pdfium-ios -iname "*pdfium*"
       - name: Copy pdfium smoke-test fixture
-        run: cp notes/tests/multi_column_test.pdf src-tauri/gen/pdfium-smoke-fixture.pdf
+        run: cp src-tauri/tests/fixtures/sample.pdf src-tauri/gen/pdfium-smoke-fixture.pdf
       - name: cargo check (iOS)
         working-directory: src-tauri
         run: cargo check --target aarch64-apple-ios-sim

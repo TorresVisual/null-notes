@@ -121,7 +121,7 @@ git commit -m "ci(mobile): fetch and bundle a real iOS pdfium binary"
 **Files:**
 - Modify: `src-tauri/src/pdf/renderer.rs` (only if Task 1's Result says the fallback is needed)
 - Modify: `src-tauri/src/lib.rs` (a CI-only smoke-test hook, feature-gated)
-- Create: `src-tauri/gen/pdfium-smoke-fixture.pdf` (copy of `notes/tests/multi_column_test.pdf` — smallest real corpus fixture, 2.6K, already has a genuine text layer)
+- Create: `src-tauri/gen/pdfium-smoke-fixture.pdf` (copy of `src-tauri/tests/fixtures/sample.pdf`, itself a copy of `notes/tests/multi_column_test.pdf` — smallest real corpus fixture, 2.6K, already has a genuine text layer; `notes/` is gitignored, so the fixture is committed under `src-tauri/tests/fixtures/` — the path the existing `#[ignore]`d `renderer.rs` test already expected — so CI's checkout actually has it)
 - Modify: `.github/workflows/ios-scaffold.yml` (bundle the fixture, pull the result file, assert)
 
 **Interfaces:**
@@ -196,7 +196,7 @@ Copy the fixture into place before the build step in `ios-scaffold.yml`:
 
 ```yaml
       - name: Copy pdfium smoke-test fixture
-        run: cp notes/tests/multi_column_test.pdf src-tauri/gen/pdfium-smoke-fixture.pdf
+        run: cp src-tauri/tests/fixtures/sample.pdf src-tauri/gen/pdfium-smoke-fixture.pdf
 ```
 
 (Insert this before the "Build for iOS Simulator" step, after Task 1's fetch step.)
