@@ -34,14 +34,24 @@ pub fn run() {
     #[cfg(all(target_os = "ios", debug_assertions))]
     if std::env::var("NULLNOTES_PDFIUM_SMOKE_TEST").is_ok() {
         std::thread::spawn(|| {
-            let result = crate::pdf::extract::extract_pages(std::path::Path::new(
-                "assets/pdfium-smoke-fixture.pdf",
-            ))
-            .map(|pages| {
-                let text = crate::pdf::extract::pages_to_text(&pages);
-                format!("PASS pages={} chars={}", pages.len(), text.len())
-            })
-            .unwrap_or_else(|e| format!("FAIL {e}"));
+            // CWD at launch isn't guaranteed to be the bundle root on iOS
+            // Simulator (confirmed empirically — a CWD-relative path here
+            // produced NotFound); anchor off the executable's own directory
+            // instead, matching bind_pdfium()'s iOS fallback in pdf/renderer.rs.
+            let fixture = std::env::current_exe()
+                .ok()
+                .and_then(|p| {
+                    p.parent()
+                        .map(|p| p.join("assets/pdfium-smoke-fixture.pdf"))
+                })
+                .unwrap_or_else(|| "assets/pdfium-smoke-fixture.pdf".into());
+
+            let result = crate::pdf::extract::extract_pages(&fixture)
+                .map(|pages| {
+                    let text = crate::pdf::extract::pages_to_text(&pages);
+                    format!("PASS pages={} chars={}", pages.len(), text.len())
+                })
+                .unwrap_or_else(|e| format!("FAIL {e}"));
 
             let out = std::env::temp_dir().join("pdfium_smoke_result.txt");
             let _ = std::fs::write(&out, result);
