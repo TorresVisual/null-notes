@@ -85,6 +85,30 @@ jobs:
           echo "Found at: $RESULT_PATH"
           cat "$RESULT_PATH" | tee smoke-result.txt
           grep -q "^PASS" smoke-result.txt
+      - name: Read pdfium render smoke-test result
+        run: |
+          set -euo pipefail
+          APP_DATA=$(xcrun simctl get_app_container "$UDID" dev.nullnotes.app data)
+          RESULT_PATH=$(find "$APP_DATA" -iname "pdfium_render_smoke_result.txt" | head -n1)
+          if [ -z "$RESULT_PATH" ]; then
+            echo "pdfium_render_smoke_result.txt not found anywhere in the data container"
+            echo "--- data container layout (2 levels) ---"
+            find "$APP_DATA" -maxdepth 2
+            exit 1
+          fi
+          echo "Found at: $RESULT_PATH"
+          cat "$RESULT_PATH" | tee render-smoke-result.txt
+          grep -q "^PASS" render-smoke-result.txt
+      - name: Pull the rendered page PNG for visual confirmation
+        run: |
+          set -euo pipefail
+          APP_DATA=$(xcrun simctl get_app_container "$UDID" dev.nullnotes.app data)
+          PNG_PATH=$(find "$APP_DATA" -iname "page-0.png" | head -n1)
+          if [ -z "$PNG_PATH" ]; then
+            echo "page-0.png not found anywhere in the data container"
+            exit 1
+          fi
+          cp "$PNG_PATH" rendered-page-0.png
       - name: Install idb and send a synthetic tap
         run: |
           brew tap facebook/fb
@@ -134,3 +158,11 @@ jobs:
             after.png
             app.log
             ax-tree.json
+      - name: Upload rendered page PNG
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pdfium-render-smoke
+          path: |
+            render-smoke-result.txt
+            rendered-page-0.png

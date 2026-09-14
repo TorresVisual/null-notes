@@ -58,6 +58,49 @@ pub fn run() {
         });
     }
 
+    #[cfg(all(target_os = "ios", debug_assertions))]
+    if std::env::var("NULLNOTES_PDFIUM_SMOKE_TEST").is_ok() {
+        std::thread::spawn(|| {
+            let fixture = std::env::current_exe()
+                .ok()
+                .and_then(|p| {
+                    p.parent()
+                        .map(|p| p.join("assets/pdfium-smoke-fixture.pdf"))
+                })
+                .unwrap_or_else(|| "assets/pdfium-smoke-fixture.pdf".into());
+            let out_dir = std::env::temp_dir();
+
+            // render_pages is async, but this hook runs before
+            // tauri::Builder::default() is constructed (same insertion point
+            // as the existing extract-check hook above), so Tauri's own
+            // async_runtime isn't guaranteed live yet — a throwaway runtime
+            // here is self-contained and doesn't depend on that timing.
+            let result = tokio::runtime::Runtime::new()
+                .map_err(|e| anyhow::anyhow!("runtime: {e}"))
+                .and_then(|rt| {
+                    rt.block_on(crate::pdf::renderer::render_pages(
+                        &fixture,
+                        &out_dir,
+                        |_, _| {},
+                    ))
+                })
+                .map(|pages| match pages.first() {
+                    Some(p) => format!(
+                        "PASS pages={} width={} height={} path={}",
+                        pages.len(),
+                        p.width,
+                        p.height,
+                        p.path
+                    ),
+                    None => "FAIL rendered zero pages".to_string(),
+                })
+                .unwrap_or_else(|e| format!("FAIL {e}"));
+
+            let out = std::env::temp_dir().join("pdfium_render_smoke_result.txt");
+            let _ = std::fs::write(&out, result);
+        });
+    }
+
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
