@@ -2659,6 +2659,59 @@ fn a_maths_heavy_two_by_two_grid_is_not_mistaken_for_a_table() {
     );
 }
 
+// Issue #92: a 2x3 grid of unlabeled side-by-side formulas (Ue1.pdf
+// Beispiel 1.1's X_1/Y_1/Z_1 over X_2/Y_2/Z_2) used to flatten into one
+// run-on `Block::MathsDisplay` because `group_blocks` joins consecutive
+// display-maths lines unconditionally. Each row here is a complete set of
+// equations on its own — two-plus `Maths` pieces, each with its own `=` —
+// so the two rows must land in separate blocks instead of merging.
+#[test]
+fn a_grid_of_independent_equation_rows_splits_into_separate_maths_blocks() {
+    let mut chars = set("X=AB", 100.0, 700.0, maths_italic());
+    chars.extend(set("Y=CD", 200.0, 700.0, maths_italic()));
+    chars.extend(set("Z=EF", 300.0, 700.0, maths_italic()));
+    chars.extend(set("P=GH", 100.0, 684.0, maths_italic()));
+    chars.extend(set("Q=IJ", 200.0, 684.0, maths_italic()));
+    chars.extend(set("R=KL", 300.0, 684.0, maths_italic()));
+
+    let blocks = group_blocks(&group_lines(&chars));
+
+    let maths_blocks: Vec<&Block> = blocks
+        .iter()
+        .filter(|b| matches!(b, Block::MathsDisplay { .. }))
+        .collect();
+    assert_eq!(
+        maths_blocks.len(),
+        2,
+        "expected the two equation rows to land in separate blocks, got {blocks:?}"
+    );
+}
+
+// A row with no relation of its own (Ue1.pdf Beispiel 1.5's "+ n + (n-1) +
+// ... + 1", the second half of a bar-less sum split across two baselines)
+// is a fragment that needs the row above it to complete it, not an
+// independent equation — it must still merge into the preceding row's
+// block exactly as before, regardless of how many `Maths` pieces that
+// preceding row has.
+#[test]
+fn a_continuation_row_without_its_own_relation_still_merges() {
+    let mut chars = set("A=", 100.0, 700.0, maths_italic());
+    chars.extend(set("B", 300.0, 700.0, maths_italic()));
+    chars.extend(set("C", 100.0, 684.0, maths_italic()));
+
+    let blocks = group_blocks(&group_lines(&chars));
+
+    let maths_blocks: Vec<&Block> = blocks
+        .iter()
+        .filter(|b| matches!(b, Block::MathsDisplay { .. }))
+        .collect();
+    assert_eq!(
+        maths_blocks.len(),
+        1,
+        "expected the continuation row to stay merged, got {blocks:?}"
+    );
+}
+
 #[test]
 fn consecutive_table_row_lines_merge_into_one_table_block() {
     let mut chars = set("ID", 72.0, 700.0, Style::default());

@@ -2361,6 +2361,42 @@ fn classify(line: &Line, body: f32, left_margin: f32) -> LineKind {
     LineKind::Prose
 }
 
+/// Relation operators whose presence marks a `Maths` span as a complete
+/// equation rather than a bare term or operator limit.
+const EQUATION_RELATIONS: [&str; 9] = [
+    "=",
+    "\\equiv",
+    "\\leq",
+    "\\geq",
+    "\\neq",
+    "\\to",
+    "\\leftrightarrow",
+    "\\Rightarrow",
+    "\\Leftrightarrow",
+];
+
+/// A display-maths line that reads as one or more complete equations of its
+/// own, rather than a fragment that needs a neighboring row to complete it
+/// (a bar-less fraction's numerator, Beispiel 1.5's continued sum, ...).
+/// Two or more `Maths` pieces is the shape a row of independent formulas
+/// takes — see `docs/specs/pdf-table-fraction-maths-guards-design.md` for
+/// the same shape misread the other way by `try_table_at` — and a relation
+/// operator confirms each piece is a standalone statement, not just an
+/// operator's own multi-piece rendering (a big-operator limit, a delimiter
+/// row) which never carries one.
+fn is_self_contained_equation_row(line: &Line) -> bool {
+    let maths_pieces = line
+        .content
+        .iter()
+        .filter(|i| matches!(i, Inline::Maths(_)))
+        .count();
+    maths_pieces >= 2
+        && line.content.iter().any(|i| match i {
+            Inline::Maths(latex) => EQUATION_RELATIONS.iter().any(|op| latex.contains(op)),
+            _ => false,
+        })
+}
+
 /// Groups lines into blocks, splitting on vertical gaps and on changes of kind.
 pub fn group_blocks(lines: &[Line]) -> Vec<Block> {
     let lines: Vec<&Line> = lines.iter().filter(|l| !l.is_blank()).collect();
@@ -2424,10 +2460,23 @@ pub fn group_blocks(lines: &[Line]) -> Vec<Block> {
         // block, and every image always opens its own block too — an image
         // never merges with a neighbor the way a table row's continuation
         // can, so there is no equivalent "still the same one" flag to check.
+        // Two consecutive display-maths lines normally accumulate into one
+        // equation (a radical or fraction bar sets its own row) — but a row
+        // that is itself a complete set of equations, following another row
+        // that is too, is a 2D grid of independent formulas, not one
+        // continued expression. See `is_self_contained_equation_row`.
+        let breaks_formula_row = kind == LineKind::MathsDisplay
+            && current_kind == LineKind::MathsDisplay
+            && is_self_contained_equation_row(line)
+            && current
+                .last()
+                .is_some_and(|l| is_self_contained_equation_row(l));
+
         let opens_block = matches!(kind, LineKind::List(_, _))
             || matches!(current_kind, LineKind::Heading(_))
             || starts_new_table
-            || kind == LineKind::Image;
+            || kind == LineKind::Image
+            || breaks_formula_row;
         let kind_break = opens_block || (kind != current_kind && !continues_item);
 
         if !current.is_empty() && (gap_break || kind_break) {
