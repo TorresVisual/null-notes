@@ -10,11 +10,13 @@ import {
 import type { RunEntry } from './CodeBlockRun'
 import { api } from '../../lib/tauri'
 import { useWorkspaceStore } from '../../store/workspace'
+import { platform } from '@tauri-apps/plugin-os'
 
 const { listenCallbacks } = vi.hoisted(() => ({
   listenCallbacks: new Map<string, (event: { payload: unknown }) => void>(),
 }))
 
+vi.mock('@tauri-apps/plugin-os', () => ({ platform: vi.fn() }))
 vi.mock('../../lib/tauri', () => ({
   api: { codeRun: { run: vi.fn(), sendInput: vi.fn(), stop: vi.fn() } },
 }))
@@ -70,6 +72,21 @@ describe('CodeBlockRun panel visibility', () => {
   it('does not show a Run button on an unsupported language', () => {
     mount(codeBlock('rust', 'fn main() {}'))
     expect(editor?.view.dom.querySelector('.code-run-run')).toBeNull()
+  })
+})
+
+describe('CodeBlockRun on mobile', () => {
+  it('hides the entire run panel on iOS even for a runnable language', () => {
+    vi.mocked(platform).mockReturnValue('ios')
+    mount(codeBlock('python'))
+    expect(editor?.view.dom.querySelector('.code-run-run')).toBeNull()
+    expect(editor?.view.dom.querySelector('.code-run-panel')).toBeNull()
+  })
+
+  it('still shows the run panel on desktop', () => {
+    vi.mocked(platform).mockReturnValue('windows')
+    mount(codeBlock('python'))
+    expect(editor?.view.dom.querySelector('.code-run-run')).not.toBeNull()
   })
 })
 
