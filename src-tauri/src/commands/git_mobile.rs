@@ -19,11 +19,12 @@
 //! together as one atomic change once the surface is complete.
 
 use super::git::{
-    build_commit_message, is_notes_monorepo, resolve, CommitOutcome, PullOutcome, PushOutcome,
-    RebaseOutcome, UnsafeRepoState,
+    build_commit_message, derive_clone_dir_name, is_notes_monorepo, resolve, CommitOutcome,
+    GithubRepo, NoteHistoryEntry, PullOutcome, PushOutcome, RebaseOutcome, RepoInitOutcome,
+    UnsafeRepoState, NOTE_HISTORY_LIMIT,
 };
 use crate::models::RepoMode;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 /// `gix::discover` walks upward from `workspace` the same way `git rev-parse
 /// --show-toplevel` does, but never shells out — the whole reason this
@@ -431,6 +432,170 @@ pub fn checked_rebase_onto_remote(workspace: &str) -> anyhow::Result<RebaseOutco
     Ok(RebaseOutcome::Rebased)
 }
 
+/// `--follow`'s rename-tracking has no single documented gix equivalent —
+/// this walks commits touching the note's *current* path only, a real (if
+/// narrower) difference from desktop's rename-following history worth
+/// flagging rather than silently shipping degraded behavior for renamed
+/// notes on mobile specifically.
+pub fn list_note_history_at(
+    workspace: &str,
+    note_path: &str,
+) -> anyhow::Result<Vec<NoteHistoryEntry>> {
+    let repo = gix::discover(workspace)?;
+    let workdir = repo
+        .workdir()
+        .ok_or_else(|| anyhow::anyhow!("bare repositories are not supported: {workspace}"))?;
+    let abs = resolve(workspace, note_path);
+    let repo_relative = abs
+        .strip_prefix(workdir)
+        .unwrap_or(Path::new(note_path))
+        .to_string_lossy()
+        .replace('\\', "/");
+
+    let head_id = repo.head_id()?.detach();
+    let mut entries = Vec::new();
+    for info in repo.rev_walk([head_id]).all()?.take(NOTE_HISTORY_LIMIT * 4) {
+        let info = info?;
+        let commit = info.object()?;
+        let tree = commit.tree()?;
+        let Some(entry) = tree.lookup_entry_by_path(&repo_relative)? else {
+            continue;
+        };
+        // Only entries where this path's blob actually changed vs. its
+        // first parent count as "touching" it, matching git log's default
+        // (non---follow) path-filter semantics.
+        let mut parent_ids = commit.parent_ids();
+        let changed = match parent_ids.next() {
+            None => true,
+            Some(parent_id) => {
+                let parent_tree = repo.find_commit(parent_id.detach())?.tree()?;
+                let before = parent_tree
+                    .lookup_entry_by_path(&repo_relative)?
+                    .map(|e| e.object_id());
+                before != Some(entry.object_id())
+            }
+        };
+        if !changed {
+            continue;
+        }
+        entries.push(NoteHistoryEntry {
+            sha: commit.id().to_string(),
+            timestamp_ms: commit.time()?.seconds * 1000,
+            // `title` keeps a trailing newline when the message is a single
+            // line with no body (no blank-line separator to trim against) —
+            // trimmed here to match desktop's `%s` format, which never has one.
+            message: commit.message()?.title.to_string().trim_end().to_string(),
+            path: repo_relative.clone(),
+        });
+        if entries.len() >= NOTE_HISTORY_LIMIT {
+            break;
+        }
+    }
+    Ok(entries)
+}
+
+/// `sha` is validated the same way desktop's `read_note_at_commit_at` does —
+/// it's about to be resolved as a revision, and a value like `--output=...`
+/// would otherwise be misread as a flag rather than a commit-ish.
+pub fn read_note_at_commit_at(
+    workspace: &str,
+    relative_path: &str,
+    sha: &str,
+) -> anyhow::Result<String> {
+    if sha.len() < 7 || sha.len() > 40 || !sha.bytes().all(|b| b.is_ascii_hexdigit()) {
+        anyhow::bail!("invalid commit sha: {sha}");
+    }
+    let repo = gix::discover(workspace)?;
+    let commit_id = repo.rev_parse_single(sha)?;
+    let tree = repo.find_commit(commit_id.detach())?.tree()?;
+    let entry = tree
+        .lookup_entry_by_path(relative_path)?
+        .ok_or_else(|| anyhow::anyhow!("{relative_path} not found at {sha}"))?;
+    let blob = repo.find_blob(entry.object_id())?;
+    Ok(String::from_utf8_lossy(&blob.data).into_owned())
+}
+
+/// Clone via fetch into a freshly `gix::init`-ed repo — the documented gix
+/// pattern for cloning (init empty + fetch + checkout), since `gix::init`
+/// doesn't clone on its own and there's no porcelain `gix::clone` distinct
+/// from that pattern.
+pub fn checked_clone_repo(url: &str, parent_dir: &str, token: &str) -> anyhow::Result<PathBuf> {
+    if url.starts_with('-') {
+        anyhow::bail!("refusing suspicious repository URL: {url}");
+    }
+    let dir_name = derive_clone_dir_name(url);
+    if dir_name.is_empty() || dir_name.starts_with('-') {
+        anyhow::bail!("could not determine a folder name from {url}");
+    }
+    let dest = Path::new(parent_dir).join(dir_name);
+    std::fs::create_dir(&dest)?;
+
+    let repo = gix::init(&dest)?;
+    let remote = repo
+        .remote_at(url)?
+        .with_fetch_tags(gix::remote::fetch::Tags::All)
+        .with_refspecs(
+            Some("+refs/heads/*:refs/remotes/origin/*"),
+            gix::remote::Direction::Fetch,
+        )?;
+    let connection = remote
+        .connect(gix::remote::Direction::Fetch)?
+        .with_credentials(basic_auth_credentials(token.to_string()));
+    let outcome = connection
+        .prepare_fetch(gix::progress::Discard, Default::default())?
+        .receive(gix::progress::Discard, &Default::default())?;
+
+    // A fresh `gix::init` leaves HEAD unborn (pointing at the configured
+    // default branch name, which doesn't exist as a ref yet) — cloning has
+    // to create that branch itself once the fetch lands objects, mirroring
+    // what `git clone` does. The first mapped branch's resolved commit
+    // stands in for "the remote's default branch": good enough for the
+    // common single-default-branch case this app's workspaces are in.
+    let gix::head::Kind::Unborn(head_name) = repo.head()?.kind else {
+        anyhow::bail!("expected an unborn HEAD immediately after gix::init");
+    };
+    let mapping = outcome
+        .ref_map
+        .mappings
+        .first()
+        .ok_or_else(|| anyhow::anyhow!("remote {url} has no branches to clone"))?;
+    let commit_id = mapping
+        .remote
+        .peeled_id()
+        .ok_or_else(|| anyhow::anyhow!("remote branch has no resolvable commit"))?
+        .to_owned();
+    repo.reference(
+        head_name,
+        commit_id,
+        gix::refs::transaction::PreviousValue::MustNotExist,
+        "clone: create initial branch",
+    )?;
+
+    let tree_id = repo.find_commit(commit_id)?.tree_id()?.detach();
+    checkout_tree_to_worktree(&repo, tree_id)?;
+
+    Ok(dest)
+}
+
+/// Out of mobile v1 scope (spec, "Out of scope (v1)": no fresh-workspace
+/// creation from mobile). Kept registered (once Tauri wrappers land) rather
+/// than omitted so a stray call fails loudly instead of the command simply
+/// not existing.
+pub fn checked_init_notes_repo() -> anyhow::Result<RepoInitOutcome> {
+    anyhow::bail!(
+        "starting a new workspace from mobile is not supported — join an existing Git-backed workspace instead"
+    )
+}
+
+/// Out of mobile v1 scope (spec, Credentials: "Mobile onboarding skips the
+/// picker — the user pastes a repository URL directly"). Same error text
+/// desktop already produces when `gh` isn't installed, so any shared
+/// frontend fallback path handles this identically on mobile with zero new
+/// UI code.
+pub fn list_own_github_repos() -> anyhow::Result<Vec<GithubRepo>> {
+    anyhow::bail!("gh not available")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -682,6 +847,14 @@ mod tests {
         assert!(matches!(outcome, CommitOutcome::Skipped { .. }));
     }
 
+    // `derive_clone_dir_name` (git.rs) assumes a forward-slash URL, same as
+    // any real git remote — a raw Windows path's backslashes would parse
+    // wrong, so tests that pass a local path as a "URL" convert it first,
+    // mirroring git.rs's own `as_url` test helper.
+    fn as_url(path: &Path) -> String {
+        path.to_string_lossy().replace('\\', "/")
+    }
+
     fn git_clone(remote: &Path, dest: &Path) {
         assert!(Command::new("git")
             .arg("clone")
@@ -855,5 +1028,70 @@ mod tests {
         std::fs::write(clone.path().join(".git").join("MERGE_HEAD"), "abc123\n").unwrap();
 
         assert!(checked_rebase_onto_remote(&clone.path().to_string_lossy()).is_err());
+    }
+
+    #[test]
+    fn list_note_history_returns_commits_touching_the_path_newest_first() {
+        let tmp = tempfile::tempdir().unwrap();
+        git_init(tmp.path());
+        commit_file(tmp.path(), "Todo.md", "- one\n", "notes: update Todo");
+        commit_file(
+            tmp.path(),
+            "Todo.md",
+            "- one\n- two\n",
+            "notes: update Todo",
+        );
+
+        let path = tmp.path().join("Todo.md").to_string_lossy().into_owned();
+        let entries = list_note_history_at(&tmp.path().to_string_lossy(), &path).unwrap();
+
+        assert_eq!(entries.len(), 2);
+        assert_eq!(entries[0].message, "notes: update Todo");
+        assert_eq!(entries[0].path, "Todo.md");
+    }
+
+    #[test]
+    fn read_note_at_commit_returns_the_historical_content() {
+        let tmp = tempfile::tempdir().unwrap();
+        git_init(tmp.path());
+        commit_file(tmp.path(), "Todo.md", "- one\n", "notes: update Todo");
+        let path = tmp.path().join("Todo.md").to_string_lossy().into_owned();
+        let first_sha = list_note_history_at(&tmp.path().to_string_lossy(), &path).unwrap()[0]
+            .sha
+            .clone();
+        commit_file(
+            tmp.path(),
+            "Todo.md",
+            "- one\n- two\n",
+            "notes: update Todo",
+        );
+
+        let content =
+            read_note_at_commit_at(&tmp.path().to_string_lossy(), "Todo.md", &first_sha).unwrap();
+
+        assert_eq!(content, "- one\n");
+    }
+
+    #[test]
+    fn clone_repo_clones_into_the_derived_directory_name() {
+        let origin = tempfile::tempdir().unwrap();
+        git_init(origin.path());
+        commit_file(origin.path(), "a.md", "# A\n", "notes: update a");
+        let parent = tempfile::tempdir().unwrap();
+
+        let dest = checked_clone_repo(&as_url(origin.path()), &parent.path().to_string_lossy(), "")
+            .unwrap();
+
+        assert!(dest.join("a.md").exists());
+    }
+
+    #[test]
+    fn init_notes_repo_is_not_supported_on_mobile() {
+        assert!(checked_init_notes_repo().is_err());
+    }
+
+    #[test]
+    fn list_github_repos_is_not_supported_on_mobile() {
+        assert!(list_own_github_repos().is_err());
     }
 }
