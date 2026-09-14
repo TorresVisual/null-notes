@@ -1161,6 +1161,7 @@ code {
 .note-editor ol {
   padding-left: 1.4em;
   margin-bottom: 0.6em;
+  list-style: revert;
 }
 
 .note-editor blockquote {
