@@ -73,8 +73,17 @@ jobs:
       - name: Read pdfium smoke-test result
         run: |
           set -euo pipefail
-          RESULT_PATH=$(xcrun simctl spawn "$UDID" getconf DARWIN_USER_TEMP_DIR)pdfium_smoke_result.txt
-          xcrun simctl spawn "$UDID" cat "$RESULT_PATH" | tee smoke-result.txt
+          APP_DATA=$(xcrun simctl get_app_container "$UDID" dev.nullnotes.app data)
+          echo "App data container: $APP_DATA"
+          RESULT_PATH=$(find "$APP_DATA" -iname "pdfium_smoke_result.txt" | head -n1)
+          if [ -z "$RESULT_PATH" ]; then
+            echo "pdfium_smoke_result.txt not found anywhere in the data container"
+            echo "--- data container layout (2 levels) ---"
+            find "$APP_DATA" -maxdepth 2
+            exit 1
+          fi
+          echo "Found at: $RESULT_PATH"
+          cat "$RESULT_PATH" | tee smoke-result.txt
           grep -q "^PASS" smoke-result.txt
       - name: Install idb and send a synthetic tap
         run: |
