@@ -31,6 +31,23 @@ pub fn run() {
         );
     }
 
+    #[cfg(all(target_os = "ios", debug_assertions))]
+    if std::env::var("NULLNOTES_PDFIUM_SMOKE_TEST").is_ok() {
+        std::thread::spawn(|| {
+            let result = crate::pdf::extract::extract_pages(std::path::Path::new(
+                "assets/pdfium-smoke-fixture.pdf",
+            ))
+            .map(|pages| {
+                let text = crate::pdf::extract::pages_to_text(&pages);
+                format!("PASS pages={} chars={}", pages.len(), text.len())
+            })
+            .unwrap_or_else(|e| format!("FAIL {e}"));
+
+            let out = std::env::temp_dir().join("pdfium_smoke_result.txt");
+            let _ = std::fs::write(&out, result);
+        });
+    }
+
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())

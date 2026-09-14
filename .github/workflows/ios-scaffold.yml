@@ -20,6 +20,8 @@ jobs:
           mkdir -p src-tauri/gen/pdfium-ios
           tar -xzf pdfium-ios-sim.tgz -C src-tauri/gen/pdfium-ios
           find src-tauri/gen/pdfium-ios -iname "*pdfium*"
+      - name: Copy pdfium smoke-test fixture
+        run: cp notes/tests/multi_column_test.pdf src-tauri/gen/pdfium-smoke-fixture.pdf
       - name: cargo check (iOS)
         working-directory: src-tauri
         run: cargo check --target aarch64-apple-ios-sim
@@ -62,6 +64,18 @@ jobs:
           find "$APP_PATH" -iname "*pdfium*" || true
           echo "--- executable path, for comparison ---"
           echo "$APP_PATH/null-notes"
+      - name: Relaunch app with the pdfium smoke-test flag
+        run: |
+          set -euo pipefail
+          xcrun simctl terminate "$UDID" dev.nullnotes.app || true
+          SIMCTL_CHILD_NULLNOTES_PDFIUM_SMOKE_TEST=1 xcrun simctl launch "$UDID" dev.nullnotes.app
+          sleep 3
+      - name: Read pdfium smoke-test result
+        run: |
+          set -euo pipefail
+          RESULT_PATH=$(xcrun simctl spawn "$UDID" getconf DARWIN_USER_TEMP_DIR)pdfium_smoke_result.txt
+          xcrun simctl spawn "$UDID" cat "$RESULT_PATH" | tee smoke-result.txt
+          grep -q "^PASS" smoke-result.txt
       - name: Install idb and send a synthetic tap
         run: |
           brew tap facebook/fb

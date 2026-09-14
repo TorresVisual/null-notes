@@ -44,12 +44,26 @@ pub fn bind_pdfium() -> Result<pdfium_render::prelude::Pdfium> {
             // the equations). Propagating it as an error made every such import
             // fail with a bogus "pdfium not found".
             PdfiumError::PdfiumLibraryBindingsAlreadyInitialized => Err(e),
-            _ => exe_dir_candidate
-                .map(|dir| {
-                    Pdfium::bind_to_library(Pdfium::pdfium_platform_library_name_at_path(&dir))
-                })
-                .unwrap_or_else(Pdfium::bind_to_system_library)
-                .or_else(|_| Pdfium::bind_to_system_library()),
+            _ => {
+                // iOS bundles `bundle.resources` entries into a fixed `assets/`
+                // subdirectory next to the executable, not the executable's own
+                // directory (confirmed empirically: docs/plans/mobile-pdfium-ios-spike.md
+                // Task 1) — desktop's lookup order below is unaffected.
+                #[cfg(target_os = "ios")]
+                if let Some(dir) = &exe_dir_candidate {
+                    if let Ok(b) = Pdfium::bind_to_library(
+                        Pdfium::pdfium_platform_library_name_at_path(dir.join("assets")),
+                    ) {
+                        return Ok(b);
+                    }
+                }
+                exe_dir_candidate
+                    .map(|dir| {
+                        Pdfium::bind_to_library(Pdfium::pdfium_platform_library_name_at_path(&dir))
+                    })
+                    .unwrap_or_else(Pdfium::bind_to_system_library)
+                    .or_else(|_| Pdfium::bind_to_system_library())
+            }
         });
 
     match attempt {

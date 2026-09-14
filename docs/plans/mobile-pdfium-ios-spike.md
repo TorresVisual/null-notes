@@ -105,7 +105,7 @@ Add a step to `ios-scaffold.yml`, after the existing `- name: Boot Simulator and
 
 `gh workflow run ios-scaffold.yml && gh run watch --exit-status`, then `gh run view --log-failed` if it fails.
 
-**Result:** *(fill in after running)* — record whether `libpdfium.dylib` appeared at the app bundle root as a sibling of the `null-notes` executable (meaning `bind_pdfium()`'s existing exe-dir-relative lookup, `renderer.rs:47-51`, already finds it with zero Rust changes) or somewhere else (meaning Task 2 needs a small `#[cfg(target_os = "ios")]` addition to `bind_pdfium()`).
+**Result:** Confirmed via CI run [34903359819](https://github.com/TorresVisual/null-notes/actions/runs/34903359819) — `libpdfium.dylib` lands at `null-notes.app/assets/libpdfium.dylib`, **not** the bundle root. The executable (`null-notes.app/null-notes`) is a sibling of the `assets/` directory, not of the dylib itself, so `bind_pdfium()`'s existing exe-dir-relative lookup (`renderer.rs:47-51`) does not find it. Tauri's iOS bundling places every `bundle.resources` entry with an empty target path under a fixed `assets/` subdirectory next to the executable — Task 2 adds an iOS-only fallback that checks `<exe_dir>/assets/` directly, no env var or `AppHandle` plumbing needed since the subdirectory name is fixed, not app-specific.
 
 - [ ] **Step 6: Commit**
 
