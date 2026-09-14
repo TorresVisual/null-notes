@@ -530,7 +530,21 @@ pub fn checked_clone_repo(url: &str, parent_dir: &str, token: &str) -> anyhow::R
     let dest = Path::new(parent_dir).join(dir_name);
     std::fs::create_dir(&dest)?;
 
-    let repo = gix::init(&dest)?;
+    let mut repo = gix::init(&dest)?;
+    // Every ref write below (the fetch's own `refs/remotes/origin/*` update
+    // included) needs a committer identity for its reflog entry. Desktop
+    // gets this for free from the machine's `~/.gitconfig`; a fresh iOS
+    // install (or this CI runner) has no such thing, so a freshly cloned
+    // repo gets a synthetic local identity up front rather than failing —
+    // this isn't attributing authorship to anyone, just letting reflogs
+    // work at all on a device that never ran a git identity setup step.
+    if repo.committer().is_none() {
+        let mut config = repo.config_snapshot_mut();
+        config.set_raw_value("user.name", "null-notes")?;
+        config.set_raw_value("user.email", "noreply@nullnotes.app")?;
+        config.commit()?;
+    }
+
     let remote = repo
         .remote_at(url)?
         .with_fetch_tags(gix::remote::fetch::Tags::All)
