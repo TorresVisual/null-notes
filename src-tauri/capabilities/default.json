@@ -12,6 +12,7 @@
     "core:window:allow-is-maximized",
     "core:window:allow-close",
     "opener:default",
+    "os:default",
     "dialog:allow-open",
     "dialog:allow-save",
     "dialog:allow-message",

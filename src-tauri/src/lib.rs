@@ -34,6 +34,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_os::init())
         // Veto the close so the UI can flush unsaved edits; it calls
         // `confirm_close` once the buffer is safely on disk.
         .on_window_event(|window, event| {
