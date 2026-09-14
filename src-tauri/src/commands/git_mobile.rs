@@ -425,23 +425,23 @@ pub fn checked_pull(workspace: &str, token: &str) -> anyhow::Result<PullOutcome>
     Ok(PullOutcome::FastForwarded)
 }
 
-/// **Deferred, not implemented.** `gix` has no reviewed send-pack (push)
-/// support at any released version, including 0.87.1 — confirmed against
-/// GitoxideLabs/gitoxide#306 (gitoxide's own push tracking issue, still open
-/// as an unresolved feature discussion) and the absence of a `push.rs` in
-/// gitoxide's own `gix/examples/`. The one attempt at a from-scratch
-/// implementation found (gitoxide PR #2538) is an unreviewed, closed
-/// experimental branch, not something to depend on for a path that pushes
-/// real commits to a user's real GitHub remote. The two checks that *are*
-/// implemented here (the `CodeRepo` guard and `NoRemote` detection) match
-/// desktop's `checked_push` exactly; actually sending the pack is tracked as
-/// a follow-up plan once gix gains reviewed push support or the wire
-/// protocol is implemented directly (see docs/plans/git-mobile-gix.md).
+/// `gix` has no porcelain send-pack API at any released version (confirmed
+/// by reading `gix-0.87.1`'s source directly — no `pub mod push` anywhere in
+/// the crate), so this hand-rolls the git wire protocol on top of
+/// `Connection::transport_mut()` and `gix_protocol::handshake()` (the same
+/// handshake/credential-retry porcelain `checked_pull` gets for free via
+/// `prepare_fetch`, reused here directly since there's no push equivalent):
+/// handshake for `receive-pack`, find the remote's current oid for the
+/// target branch in the V1 ref advertisement, send the ref-update-request
+/// line, a flush-pkt, then the raw pack bytes with no further pkt-line
+/// wrapping (`RequestWriter::into_parts()` is what makes that possible —
+/// `RequestWriter::write()` always pkt-line-encodes, but the pack payload
+/// must go on the wire unwrapped), and finally parse `report-status`.
 pub fn checked_push(
     workspace: &str,
     mode: RepoMode,
     allow_code_repo_push: bool,
-    _token: &str,
+    token: &str,
 ) -> anyhow::Result<PushOutcome> {
     if mode == RepoMode::CodeRepo && !allow_code_repo_push {
         anyhow::bail!(
@@ -450,15 +450,102 @@ pub fn checked_push(
     }
 
     let repo = gix::discover(workspace)?;
-    match repo.find_default_remote(gix::remote::Direction::Push) {
+    let remote = match repo.find_default_remote(gix::remote::Direction::Push) {
         None => return Ok(PushOutcome::NoRemote),
         Some(Err(e)) => return Err(e.into()),
-        Some(Ok(_remote)) => {}
+        Some(Ok(remote)) => remote,
+    };
+
+    let head_name = repo
+        .head_name()?
+        .ok_or_else(|| anyhow::anyhow!("HEAD is not a symbolic ref"))?;
+    let new_id = repo.head_id()?.detach();
+    let ref_name = head_name.as_bstr().to_string();
+
+    // The `<old-value>` the wire protocol sends is a compare-and-swap
+    // guard, not a live read of the remote's current tip: the server
+    // rejects the update if its actual current value doesn't match what we
+    // claim here. So this has to be *our own* last-known value for the
+    // branch — the local remote-tracking ref, same source `checked_pull`
+    // and `checked_rebase_onto_remote` already use — never a value read
+    // fresh from the handshake's ref advertisement, which (unlike this) we
+    // have no local objects for and can't diff against.
+    let old_id = repo
+        .find_reference(&format!("refs/remotes/origin/{}", head_name.shorten()))
+        .ok()
+        .and_then(|r| r.into_fully_peeled_id().ok())
+        .map(|id| id.detach());
+
+    let mut connection = remote.connect(gix::remote::Direction::Push)?;
+    let transport = connection.transport_mut();
+    match gix_protocol::handshake(
+        &mut *transport,
+        gix_transport::Service::ReceivePack,
+        basic_auth_credentials(token.to_string()),
+        Vec::new(),
+        &mut gix::progress::Discard,
+    ) {
+        Ok(_handshake) => {}
+        Err(gix_protocol::handshake::Error::InvalidCredentials { source, .. }) => {
+            return Ok(PushOutcome::AuthFailed {
+                output: source.to_string(),
+            })
+        }
+        Err(e) => return Err(e.into()),
+    };
+
+    if old_id == Some(new_id) {
+        return Ok(PushOutcome::Pushed); // nothing to do, already up to date
     }
 
-    anyhow::bail!(
-        "push is not yet implemented on mobile — gix has no reviewed send-pack support (see GitoxideLabs/gitoxide#306)"
-    )
+    let object_ids = objects_missing_from_remote(&repo, new_id, old_id)?;
+    let pack_bytes = build_pack_bytes(&repo, &object_ids)?;
+
+    let old_hex = old_id
+        .unwrap_or_else(|| repo.object_hash().null())
+        .to_string();
+    let command_line = format!("{old_hex} {new_id} {ref_name}\0report-status\n");
+
+    use std::io::Write as _;
+    let mut writer = transport.request(
+        gix_transport::client::WriteMode::OneLfTerminatedLinePerWriteCall,
+        gix_transport::client::MessageKind::Flush,
+        false,
+    )?;
+    writer.write_all(command_line.as_bytes())?;
+    writer.write_message(gix_transport::client::MessageKind::Flush)?;
+    let (mut raw_writer, mut reader) = writer.into_parts();
+    raw_writer.write_all(&pack_bytes)?;
+    raw_writer.flush()?;
+    drop(raw_writer); // must happen before reading the response — see `into_parts()`'s doc comment
+
+    let mut report_lines = Vec::new();
+    while let Some(result) = reader.readline() {
+        let line = result.map_err(|e| anyhow::anyhow!("{e}"))?;
+        let line = line.map_err(|e| anyhow::anyhow!("{e}"))?;
+        match line.as_bstr() {
+            Some(text) => {
+                use gix_object::bstr::ByteSlice as _;
+                report_lines.push(String::from_utf8_lossy(text.trim_end()).into_owned())
+            }
+            None => break, // flush-pkt: end of report-status
+        }
+    }
+
+    let Some(unpack_line) = report_lines.first() else {
+        anyhow::bail!("receive-pack sent no report-status response");
+    };
+    if unpack_line != "unpack ok" {
+        anyhow::bail!("receive-pack failed to unpack the pushed pack: {unpack_line}");
+    }
+    match report_lines.get(1) {
+        Some(line) if line.starts_with("ok ") => Ok(PushOutcome::Pushed),
+        Some(line) if line.starts_with("ng ") => Ok(PushOutcome::Rejected {
+            output: line.clone(),
+        }),
+        Some(other) => anyhow::bail!("unexpected report-status ref line: {other}"),
+        None => anyhow::bail!("receive-pack's report-status had no ref-update line"),
+    }
 }
 
 /// Replays the local commits a `Diverged` outcome found on top of the
@@ -1216,6 +1303,134 @@ mod tests {
         assert!(
             checked_push(&tmp.path().to_string_lossy(), RepoMode::CodeRepo, false, "").is_err()
         );
+    }
+
+    #[test]
+    fn pushes_new_commits_to_the_remote() {
+        let origin = tempfile::tempdir().unwrap();
+        git_init(origin.path());
+        commit_file(origin.path(), "a.md", "# A\n", "notes: update a");
+        // Bare, so it can receive a push without `receive.denyCurrentBranch`
+        // rejecting it — desktop's own push path never has to deal with a
+        // non-bare receiver either, since it always pushes to GitHub.
+        let bare = origin.path().with_extension("bare");
+        assert!(Command::new("git")
+            .arg("clone")
+            .arg("-q")
+            .arg("--bare")
+            .arg(origin.path())
+            .arg(&bare)
+            .status()
+            .unwrap()
+            .success());
+
+        let clone = tempfile::tempdir().unwrap();
+        git_clone(&bare, clone.path());
+        commit_file(clone.path(), "b.md", "# B\n", "notes: update b");
+
+        let outcome = checked_push(
+            &clone.path().to_string_lossy(),
+            RepoMode::NotesOnly,
+            false,
+            "",
+        )
+        .unwrap();
+
+        assert_eq!(outcome, PushOutcome::Pushed);
+        let log = Command::new("git")
+            .arg("-C")
+            .arg(&bare)
+            .arg("log")
+            .arg("--oneline")
+            .arg("-n1")
+            .output()
+            .unwrap();
+        assert!(String::from_utf8_lossy(&log.stdout).contains("notes: update b"));
+    }
+
+    #[test]
+    fn pushes_a_brand_new_branch_the_remote_has_never_seen() {
+        let bare = tempfile::tempdir().unwrap();
+        assert!(Command::new("git")
+            .arg("init")
+            .arg("-q")
+            .arg("--bare")
+            .arg(bare.path())
+            .status()
+            .unwrap()
+            .success());
+
+        let clone = tempfile::tempdir().unwrap();
+        git_clone(bare.path(), clone.path());
+        commit_file(clone.path(), "a.md", "# A\n", "notes: first commit");
+
+        let outcome = checked_push(
+            &clone.path().to_string_lossy(),
+            RepoMode::NotesOnly,
+            false,
+            "",
+        )
+        .unwrap();
+
+        assert_eq!(outcome, PushOutcome::Pushed);
+    }
+
+    #[test]
+    fn rejects_a_non_fast_forward_push() {
+        let origin = tempfile::tempdir().unwrap();
+        git_init(origin.path());
+        commit_file(origin.path(), "a.md", "# A\n", "notes: update a");
+        let bare = origin.path().with_extension("bare");
+        assert!(Command::new("git")
+            .arg("clone")
+            .arg("-q")
+            .arg("--bare")
+            .arg(origin.path())
+            .arg(&bare)
+            .status()
+            .unwrap()
+            .success());
+
+        let clone_a = tempfile::tempdir().unwrap();
+        git_clone(&bare, clone_a.path());
+        commit_file(clone_a.path(), "b.md", "# B\n", "notes: from clone a");
+        assert_eq!(
+            checked_push(
+                &clone_a.path().to_string_lossy(),
+                RepoMode::NotesOnly,
+                false,
+                ""
+            )
+            .unwrap(),
+            PushOutcome::Pushed
+        );
+
+        // clone_b branched from `origin` before clone_a's push landed, so
+        // its parent commit is now stale on `bare` once its remote is
+        // repointed there.
+        let clone_b = tempfile::tempdir().unwrap();
+        git_clone(origin.path(), clone_b.path());
+        commit_file(clone_b.path(), "c.md", "# C\n", "notes: from clone b");
+        assert!(Command::new("git")
+            .arg("-C")
+            .arg(clone_b.path())
+            .arg("remote")
+            .arg("set-url")
+            .arg("origin")
+            .arg(&bare)
+            .status()
+            .unwrap()
+            .success());
+
+        let outcome = checked_push(
+            &clone_b.path().to_string_lossy(),
+            RepoMode::NotesOnly,
+            false,
+            "",
+        )
+        .unwrap();
+
+        assert!(matches!(outcome, PushOutcome::Rejected { .. }));
     }
 
     #[test]
