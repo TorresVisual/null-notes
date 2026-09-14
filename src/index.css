@@ -2305,6 +2305,38 @@ pre:has(code.language-expect)::before, pre:has(code.language-expected)::before {
 .workspace-picker-clone:hover { color: var(--text-primary); border-color: var(--text-tertiary); }
 .workspace-picker-clone:focus-visible { outline: none; box-shadow: var(--focus-ring); }
 
+.workspace-picker-onboarding {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  margin-top: var(--space-xs);
+}
+
+.workspace-picker-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-tertiary);
+}
+
+.workspace-picker-field input {
+  padding: 10px 12px;
+  background: var(--bg-sunken);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 400;
+}
+
+.workspace-picker-field input:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: var(--focus-ring);
+}
+
 /* Clone workspace dialog (#79) — rows inside the shared .search-modal/
    .search-results chrome. CommandItem's own Tailwind defaults (px-2 py-1.5,
    i.e. 8px/6px) are tighter than every other row in this dialog family
