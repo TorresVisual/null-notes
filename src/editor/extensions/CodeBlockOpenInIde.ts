@@ -4,6 +4,7 @@ import { Decoration, DecorationSet } from '@tiptap/pm/view'
 import type { EditorState } from '@tiptap/pm/state'
 import { codeBlockSourcePath } from '../../lib/codeLinks'
 import { useWorkspaceStore } from '../../store/workspace'
+import { isMobile } from '../../lib/platform'
 import { api } from '../../lib/tauri'
 import { isResolved, resolveMissing, getCodeBacklinks, resolveCodeBacklinks } from './CodeLink'
 import type { BacklinkEntry } from '../../types'
@@ -87,7 +88,7 @@ function buildBacklinksBadge(target: string, backlinks: BacklinkEntry[]): HTMLEl
 }
 
 function decorate(state: EditorState, workspace: string | null, notePath: string): DecorationSet {
-  if (!workspace) return DecorationSet.empty
+  if (!workspace || isMobile()) return DecorationSet.empty
 
   const decorations: Decoration[] = []
 

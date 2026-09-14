@@ -1,4 +1,14 @@
 import '@testing-library/jest-dom'
+import { vi } from 'vitest'
+
+// `isMobile()` (src/lib/platform.ts) now runs inside ProseMirror decorate()
+// calls for two coreExtensions (CodeBlockRun, CodeBlockOpenInIde), so any
+// test mounting an editor hits `platform()` — which reads
+// `window.__TAURI_OS_PLUGIN_INTERNALS__`, absent in jsdom. Default to
+// desktop here so the ~50 editor-extension test files that never cared
+// about platform don't each need their own mock; a test file can still
+// override with its own `vi.mock('@tauri-apps/plugin-os', ...)`.
+vi.mock('@tauri-apps/plugin-os', () => ({ platform: vi.fn(() => 'windows') }))
 
 // jsdom doesn't implement elementFromPoint; ProseMirror's own mousedown
 // handler calls it on every click inside the editable content to resolve

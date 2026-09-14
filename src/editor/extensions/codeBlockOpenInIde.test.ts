@@ -1,4 +1,5 @@
 ﻿import { describe, it, expect, afterEach, vi, beforeEach } from 'vitest'
+import { platform } from '@tauri-apps/plugin-os'
 import type { BacklinkEntry } from '../../types'
 
 const resolveCodeLinks = vi.fn<
@@ -13,6 +14,7 @@ const codeBacklinksForWithContext = vi.fn<
   (workspace: string, target: string) => Promise<BacklinkEntry[]>
 >()
 
+vi.mock('@tauri-apps/plugin-os', () => ({ platform: vi.fn() }))
 vi.mock('../../lib/tauri', () => ({
   api: {
     notes: {
@@ -66,6 +68,7 @@ beforeEach(() => {
   openInEditor.mockReset()
   codeBacklinksForWithContext.mockReset()
   codeBacklinksForWithContext.mockResolvedValue([])
+  vi.mocked(platform).mockReturnValue('windows')
   useWorkspaceStore.setState({ path: '/ws', openTabs: [], activeTab: null })
 })
 
@@ -96,6 +99,15 @@ describe('code block "Open in IDE"', () => {
     await settle()
 
     expect(openInEditor).toHaveBeenCalledWith('/ws', 'src/main.rs', 12)
+  })
+
+  it('never shows the Open-in-IDE button on iOS, even once the link resolves', async () => {
+    vi.mocked(platform).mockReturnValue('ios')
+    resolveCodeLinks.mockResolvedValue(['ok'])
+    mount(codeBlock('// src/main.rs'))
+    await settle()
+
+    expect(buttons(editor!)).toHaveLength(0)
   })
 
   // The DoD: never a dead button. An unresolved path shows nothing to click,
