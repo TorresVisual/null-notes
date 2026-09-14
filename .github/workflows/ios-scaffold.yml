@@ -62,14 +62,14 @@ jobs:
         run: xcrun simctl io "$UDID" screenshot onboarding-before.png
       - name: Tap the URL field and type
         run: |
-          idb ui tap --udid "$UDID" 196 380
+          idb ui tap --udid "$UDID" 320 605
           idb ui text --udid "$UDID" "https://example.com/no-such-repo.git"
       - name: Tap the token field and type
         run: |
-          idb ui tap --udid "$UDID" 196 460
+          idb ui tap --udid "$UDID" 320 677
           idb ui text --udid "$UDID" "dummy-token-for-ci"
       - name: Tap Clone workspace
-        run: idb ui tap --udid "$UDID" 196 520
+        run: idb ui tap --udid "$UDID" 320 726
       - name: Wait for the clone attempt to fail (unreachable host)
         run: sleep 5
       - name: Screenshot the result
