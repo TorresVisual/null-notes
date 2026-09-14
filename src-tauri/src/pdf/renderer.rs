@@ -52,7 +52,7 @@ pub fn bind_pdfium() -> Result<pdfium_render::prelude::Pdfium> {
                 #[cfg(target_os = "ios")]
                 if let Some(dir) = &exe_dir_candidate {
                     if let Ok(b) = Pdfium::bind_to_library(
-                        Pdfium::pdfium_platform_library_name_at_path(dir.join("assets")),
+                        Pdfium::pdfium_platform_library_name_at_path(&dir.join("assets")),
                     ) {
                         return Ok(b);
                     }
