@@ -69,7 +69,10 @@ jobs:
           set -euo pipefail
           xcrun simctl terminate "$UDID" dev.nullnotes.app || true
           SIMCTL_CHILD_NULLNOTES_PDFIUM_SMOKE_TEST=1 xcrun simctl launch "$UDID" dev.nullnotes.app
-          sleep 3
+          # 3s was enough when only the extract-path thread ran; the added
+          # render-path thread does real pdfium rasterization concurrently
+          # and needs more wall-clock margin on a shared CI VM.
+          sleep 10
       - name: Read pdfium smoke-test result
         run: |
           set -euo pipefail
