@@ -83,6 +83,10 @@ jobs:
             echo "pdfium_smoke_result.txt not found anywhere in the data container"
             echo "--- data container layout (2 levels) ---"
             find "$APP_DATA" -maxdepth 2
+            echo "--- is the process still alive? ---"
+            xcrun simctl spawn "$UDID" launchctl list | grep nullnotes || echo "not found in launchctl list"
+            echo "--- recent device log for the app ---"
+            xcrun simctl spawn "$UDID" log show --predicate 'process == "null-notes" OR eventMessage CONTAINS "nullnotes"' --last 1m || true
             exit 1
           fi
           echo "Found at: $RESULT_PATH"
