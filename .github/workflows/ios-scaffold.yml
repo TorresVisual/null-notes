@@ -73,7 +73,13 @@ jobs:
           )
           sleep 1
 
-          echo "FIXTURE_REMOTE_URL=http://127.0.0.1:8080/fixture-remote.git" >> "$GITHUB_ENV"
+          # Python's CGIHTTPRequestHandler only execs a script for paths under
+          # a cgi_directories entry (default "/cgi-bin"); it appends whatever
+          # follows the script name as PATH_INFO, which git-http-backend uses
+          # (with GIT_PROJECT_ROOT) to locate the repo. A URL with no
+          # /cgi-bin/git-http-backend/ prefix is served as a static-file
+          # lookup instead — 404, which git reports as "repository not found".
+          echo "FIXTURE_REMOTE_URL=http://127.0.0.1:8080/cgi-bin/git-http-backend/fixture-remote.git" >> "$GITHUB_ENV"
       - name: Sanity-check the local git remote with a real host-side clone
         run: |
           set -euo pipefail
