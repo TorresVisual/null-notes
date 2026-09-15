@@ -45,6 +45,8 @@ export const api = {
       invoke<BacklinkEntry[]>('backlinks_for_with_context', { workspace, title }),
     codeBacklinksForWithContext: (workspace: string, target: string) =>
       invoke<BacklinkEntry[]>('code_backlinks_for_with_context', { workspace, target }),
+    unlinkedMentionsForWithContext: (workspace: string, title: string, notePath: string) =>
+      invoke<BacklinkEntry[]>('unlinked_mentions_for_with_context', { workspace, title, notePath }),
     createFolder: (parent: string, name: string) =>
       invoke<string>('create_folder', { parent, name }),
     splitIntoTasks: (markdown: string) =>

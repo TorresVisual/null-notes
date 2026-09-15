@@ -226,6 +226,19 @@ pub async fn extract_code_links_with_fingerprints(
 /// entry never dominates the panel.
 const BACKLINK_SNIPPET_MAX_CHARS: usize = 160;
 
+/// Trims `line` and truncates it to `BACKLINK_SNIPPET_MAX_CHARS`, appending
+/// `…` when it was cut — shared by every backlink-style snippet extractor
+/// below so the display shape (and limit) stays in one place.
+fn finalize_snippet_line(line: &str) -> String {
+    let trimmed = line.trim();
+    if trimmed.chars().count() > BACKLINK_SNIPPET_MAX_CHARS {
+        let truncated: String = trimmed.chars().take(BACKLINK_SNIPPET_MAX_CHARS).collect();
+        format!("{truncated}…")
+    } else {
+        trimmed.to_string()
+    }
+}
+
 /// The first line in `content` that links to `title` (case-insensitive,
 /// matching how `backlinks_for`'s own SQL comparison works), trimmed and
 /// truncated — or `None` if no such line exists. A line-based, not
@@ -235,13 +248,7 @@ pub fn extract_backlink_snippet(content: &str, title: &str) -> Option<String> {
     let pattern = format!(r"(?i)\[\[\s*{}\s*\]\]", regex::escape(title));
     let re = Regex::new(&pattern).ok()?;
     let line = content.lines().find(|line| re.is_match(line))?;
-    let trimmed = line.trim();
-    if trimmed.chars().count() > BACKLINK_SNIPPET_MAX_CHARS {
-        let truncated: String = trimmed.chars().take(BACKLINK_SNIPPET_MAX_CHARS).collect();
-        Some(format!("{truncated}…"))
-    } else {
-        Some(trimmed.to_string())
-    }
+    Some(finalize_snippet_line(line))
 }
 
 /// Mirrors `extract_backlink_snippet`, but for a code link: the first line
@@ -252,13 +259,19 @@ pub fn extract_code_backlink_snippet(content: &str, target: &str) -> Option<Stri
     let line = content
         .lines()
         .find(|line| extract_code_link_targets(line).iter().any(|t| t == target))?;
-    let trimmed = line.trim();
-    if trimmed.chars().count() > BACKLINK_SNIPPET_MAX_CHARS {
-        let truncated: String = trimmed.chars().take(BACKLINK_SNIPPET_MAX_CHARS).collect();
-        Some(format!("{truncated}…"))
-    } else {
-        Some(trimmed.to_string())
-    }
+    Some(finalize_snippet_line(line))
+}
+
+/// Mirrors `extract_backlink_snippet`, but for an unlinked mention: the first
+/// line containing `title` as plain text (case-insensitive), with no
+/// `[[...]]` bracket requirement — any note where the brackets *are* present
+/// already has a `note_links` row and is filtered out before this runs (see
+/// `unlinked_mentions_for`), so a plain substring match is enough here.
+pub fn extract_unlinked_mention_snippet(content: &str, title: &str) -> Option<String> {
+    let pattern = format!(r"(?i){}", regex::escape(title));
+    let re = Regex::new(&pattern).ok()?;
+    let line = content.lines().find(|line| re.is_match(line))?;
+    Some(finalize_snippet_line(line))
 }
 
 // Line-based rather than `strip_code`-then-regex like `extract_tags`: removing
@@ -1864,6 +1877,39 @@ pub async fn code_backlinks_for_with_context(
     db: State<'_, DbPool>,
 ) -> Result<Vec<BacklinkEntry>, String> {
     code_backlinks_with_context(&db, &workspace, &target)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Mirrors `backlinks_with_context`, for plain-text mentions of `title` that
+/// carry no `[[...]]` link (issue #48) — same read-each-file-for-a-snippet
+/// shape, `note_path` excludes the note asking about its own title.
+async fn unlinked_mentions_with_context(
+    pool: &DbPool,
+    workspace: &str,
+    title: &str,
+    note_path: &str,
+) -> anyhow::Result<Vec<BacklinkEntry>> {
+    let notes = db::notes::unlinked_mentions_for(pool, workspace, title, note_path).await?;
+    let mut entries = Vec::with_capacity(notes.len());
+    for note in notes {
+        let snippet = tokio::fs::read_to_string(&note.path)
+            .await
+            .ok()
+            .and_then(|content| extract_unlinked_mention_snippet(&content, title));
+        entries.push(BacklinkEntry { note, snippet });
+    }
+    Ok(entries)
+}
+
+#[tauri::command]
+pub async fn unlinked_mentions_for_with_context(
+    workspace: String,
+    title: String,
+    note_path: String,
+    db: State<'_, DbPool>,
+) -> Result<Vec<BacklinkEntry>, String> {
+    unlinked_mentions_with_context(&db, &workspace, &title, &note_path)
         .await
         .map_err(|e| e.to_string())
 }

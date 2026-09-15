@@ -52,6 +52,7 @@ vi.mock('../lib/tauri', () => ({
       listDueCards: vi.fn().mockResolvedValue([]),
       backlinksFor: vi.fn().mockResolvedValue([]),
       backlinksForWithContext: vi.fn().mockResolvedValue([]),
+      unlinkedMentionsForWithContext: vi.fn().mockResolvedValue([]),
       search: vi.fn().mockResolvedValue([]),
     },
     git: {

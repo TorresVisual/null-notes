@@ -209,6 +209,7 @@ pub fn run() {
             commands::notes::backlinks_for,
             commands::notes::backlinks_for_with_context,
             commands::notes::code_backlinks_for_with_context,
+            commands::notes::unlinked_mentions_for_with_context,
             commands::notes::graph_links,
             commands::notes::graph_tags,
             commands::notes::create_folder,

@@ -659,6 +659,45 @@ pub async fn backlinks_for(
     Ok(rows)
 }
 
+// ponytail: plain substring match, not word-boundary — a short title like
+// "DB" also matches inside "DBMS". Same shape the issue asked for
+// (note_containing_marker's LIKE pattern); tighten to a word-boundary regex
+// post-filter if false positives turn out to matter in practice.
+/// Notes in `workspace` (other than `exclude_path`, the note whose own title
+/// this is) whose body contains `title` as plain text but that have no
+/// `note_links` row pointing at it — Obsidian calls these "unlinked
+/// mentions" (issue #48). A note that already links via `[[Title]]` is
+/// excluded by the `NOT EXISTS`, even if it also happens to mention the
+/// title elsewhere in prose.
+pub async fn unlinked_mentions_for(
+    pool: &SqlitePool,
+    workspace: &str,
+    title: &str,
+    exclude_path: &str,
+) -> Result<Vec<NoteMetadata>> {
+    let like_pattern = format!("%{}%", escape_like(title));
+    let rows = sqlx::query_as::<_, NoteMetadata>(
+        "SELECT n.id, n.title, n.path, n.workspace, n.updated_at
+         FROM notes n
+         JOIN notes_fts f ON f.path = n.path
+         WHERE n.workspace = ?
+           AND n.path != ?
+           AND f.body LIKE ? ESCAPE '\\'
+           AND NOT EXISTS (
+             SELECT 1 FROM note_links nl
+             WHERE nl.source_path = n.path AND nl.target_title = ? COLLATE NOCASE
+           )
+         ORDER BY n.updated_at DESC",
+    )
+    .bind(workspace)
+    .bind(exclude_path)
+    .bind(&like_pattern)
+    .bind(title)
+    .fetch_all(pool)
+    .await?;
+    Ok(rows)
+}
+
 /// Mirrors `backlinks_for`, but for code-file references (`target` is a
 /// workspace-relative path, matched exactly — unlike a wiki-link title, a
 /// pasted path isn't retyped with different casing).
@@ -1126,6 +1165,68 @@ mod tests {
 
         let backlinks = backlinks_for(&pool, "/ws", "Big O Notation").await.unwrap();
         assert_eq!(backlinks.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_unlinked_mentions_for_finds_plain_text_mention() {
+        let pool = make_pool().await;
+        index_note(&pool, &note("a", "A", "/ws/a.md", "/ws"))
+            .await
+            .unwrap();
+        index_note_content(&pool, "/ws/a.md", "A", "See Big O Notation for details.")
+            .await
+            .unwrap();
+
+        let mentions = unlinked_mentions_for(&pool, "/ws", "Big O Notation", "/ws/other.md")
+            .await
+            .unwrap();
+        assert_eq!(mentions.len(), 1);
+        assert_eq!(mentions[0].id, "a");
+    }
+
+    #[tokio::test]
+    async fn test_unlinked_mentions_for_excludes_notes_that_already_link() {
+        let pool = make_pool().await;
+        index_note(&pool, &note("a", "A", "/ws/a.md", "/ws"))
+            .await
+            .unwrap();
+        index_note_content(
+            &pool,
+            "/ws/a.md",
+            "A",
+            "See [[Big O Notation]] for details.",
+        )
+        .await
+        .unwrap();
+        set_links(&pool, "/ws/a.md", &["Big O Notation".to_string()])
+            .await
+            .unwrap();
+
+        let mentions = unlinked_mentions_for(&pool, "/ws", "Big O Notation", "/ws/other.md")
+            .await
+            .unwrap();
+        assert!(mentions.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_unlinked_mentions_for_excludes_the_note_itself() {
+        let pool = make_pool().await;
+        index_note(&pool, &note("a", "Big O Notation", "/ws/a.md", "/ws"))
+            .await
+            .unwrap();
+        index_note_content(
+            &pool,
+            "/ws/a.md",
+            "Big O Notation",
+            "Big O Notation describes growth rate.",
+        )
+        .await
+        .unwrap();
+
+        let mentions = unlinked_mentions_for(&pool, "/ws", "Big O Notation", "/ws/a.md")
+            .await
+            .unwrap();
+        assert!(mentions.is_empty());
     }
 
     #[tokio::test]
