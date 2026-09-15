@@ -262,6 +262,6 @@ git commit -m "docs(mobile): record the iOS pdfium spike's Go/No-Go result"
 ## Out of scope (this plan)
 
 - **The physical iOS device path (`pdfium-ios-device-arm64.tgz`).** This plan only proves the Simulator case, which is what CI can actually run without a paid Apple Developer account for device provisioning. A device-specific pdfium binary swap is the same mechanism (Task 1, different `.tgz`) but isn't exercised here — real device behavior (different code-signing enforcement than the Simulator) is a known gap this plan does not close, called out explicitly rather than assumed to transfer.
-- **Rendering a page to an image on iOS** (`render_pages_native`'s bitmap path, `renderer.rs:72`). The spike only proves text extraction (`extract_pages`) works — rendering exercises more of pdfium's surface (font loading, bitmap allocation) and is left for the actual PDF-import mobile plan once this spike's answer is Go.
+- **Rendering a page to an image on iOS** (`render_pages_native`'s bitmap path, `renderer.rs:72`). The spike only proves text extraction (`extract_pages`) works — rendering exercises more of pdfium's surface (font loading, bitmap allocation) and is left for the actual PDF-import mobile plan once this spike's answer is Go — addressed in `docs/plans/mobile-pdfium-render-spike.md`, Go.
 - **A production PDF-import UI/flow for mobile.** Explicitly a spike per the spec's own framing — its DoD is a recorded answer, not shippable functionality.
 - **Android.** Same footnote as every prior mobile plan.

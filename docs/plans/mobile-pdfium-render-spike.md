@@ -143,6 +143,11 @@ Insert immediately after the existing `- name: Read pdfium smoke-test result` st
 
 A `grep -q "^PASS"` pass is necessary but not sufficient — a render call can return an all-black or all-white bitmap and still report plausible-looking `width`/`height` values. The PNG itself is what actually confirms this, per Step 5.
 
+**Result: Go.** CI run [34998343375](https://github.com/TorresVisual/null-notes/actions/runs/34998343375) — `PASS pages=1 width=1556 height=2200`. The downloaded `rendered-page-0.png` is a real, readable rendered page (two-column layout, headings, body text, a code block, and an equation, all correctly positioned) — not blank or garbage.
+
+Two earlier CI runs failed before this one, both fixed along the way (kept here since they're real findings about this hook, not CI flakes):
+- [34911172337](https://github.com/TorresVisual/null-notes/actions/runs/34911172337) / [34995637288](https://github.com/TorresVisual/null-notes/actions/runs/34995637288): the pre-existing extract-check thread failed to write its result file. Root cause (confirmed via a device-log capture added to the failure branch, run [34996792446](https://github.com/TorresVisual/null-notes/actions/runs/34996792446)): the relaunched process was killed by signal 11 (SIGSEGV). `bind_pdfium()` (`pdf/renderer.rs`) only accounts for a *second* bind arriving after the first has completed — it was never built for two threads racing to bind for the first time concurrently, which is what the extract-check and render-check threads were doing every launch. Fixed by having the render-check thread join the extract-check thread's handle before calling `bind_pdfium()` itself, making the two binds sequential rather than racing.
+
 - [ ] **Step 4: Upload the PNG as a CI artifact**
 
 Add to the existing "Upload screenshots" artifact step's sibling list, or as its own step — either is fine, but keep it a separate named artifact so it's easy to find:
