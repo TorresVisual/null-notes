@@ -49,7 +49,7 @@ your human partner before Step 1 and checks the chosen boxes itself.
 - Consumes: `crate::pdf::renderer::render_pages(pdf_path: &Path, out_dir: &Path, progress: impl Fn(usize, usize)) -> anyhow::Result<Vec<PdfPage>>` (`src-tauri/src/pdf/renderer.rs:5`, already calls `bind_pdfium()` internally — reused as-is) and `PdfPage { index: usize, path: String, width: u32, height: u32 }` (`src-tauri/src/pdf/models.rs:5`)
 - Produces: a second result file (`pdfium_render_smoke_result.txt`) and a rendered `page-0.png` inside the app's sandboxed container, both read directly off the Simulator's filesystem by CI.
 
-- [ ] **Step 1: Add the render-check hook to `src-tauri/src/lib.rs`**
+- [x] **Step 1: Add the render-check hook to `src-tauri/src/lib.rs`**
 
 Insert immediately after the existing `#[cfg(all(target_os = "ios", debug_assertions))]` block (the one ending at the `});` that closes its `std::thread::spawn`, currently around `lib.rs:59`) — as its own separate block, not folded into the existing one, so either check's failure is unambiguous in the result files:
 
@@ -100,7 +100,7 @@ Insert immediately after the existing `#[cfg(all(target_os = "ios", debug_assert
 
 This runs once, only in a debug iOS build, only when the CI-set env var is present — same lifecycle as the existing extract-check block, no separate cleanup needed.
 
-- [ ] **Step 2: Run `cargo check`/`cargo clippy` for iOS locally to catch typos before spending a CI run**
+- [x] **Step 2: Run `cargo check`/`cargo clippy` for iOS locally to catch typos before spending a CI run**
 
 ```bash
 cd src-tauri
@@ -110,7 +110,7 @@ cargo clippy --target aarch64-apple-ios-sim -- -D warnings
 
 Expected: both pass clean — `tokio::runtime::Runtime` and `anyhow` are already dependencies used elsewhere in this crate, so this should not need a `Cargo.toml` change.
 
-- [ ] **Step 3: Add a "Read pdfium render smoke-test result" step to `ios-scaffold.yml`**
+- [x] **Step 3: Add a "Read pdfium render smoke-test result" step to `ios-scaffold.yml`**
 
 Insert immediately after the existing `- name: Read pdfium smoke-test result` step (the one that greps `smoke-result.txt` for `^PASS`):
 
@@ -148,7 +148,7 @@ A `grep -q "^PASS"` pass is necessary but not sufficient — a render call can r
 Two earlier CI runs failed before this one, both fixed along the way (kept here since they're real findings about this hook, not CI flakes):
 - [34911172337](https://github.com/TorresVisual/null-notes/actions/runs/34911172337) / [34995637288](https://github.com/TorresVisual/null-notes/actions/runs/34995637288): the pre-existing extract-check thread failed to write its result file. Root cause (confirmed via a device-log capture added to the failure branch, run [34996792446](https://github.com/TorresVisual/null-notes/actions/runs/34996792446)): the relaunched process was killed by signal 11 (SIGSEGV). `bind_pdfium()` (`pdf/renderer.rs`) only accounts for a *second* bind arriving after the first has completed — it was never built for two threads racing to bind for the first time concurrently, which is what the extract-check and render-check threads were doing every launch. Fixed by having the render-check thread join the extract-check thread's handle before calling `bind_pdfium()` itself, making the two binds sequential rather than racing.
 
-- [ ] **Step 4: Upload the PNG as a CI artifact**
+- [x] **Step 4: Upload the PNG as a CI artifact**
 
 Add to the existing "Upload screenshots" artifact step's sibling list, or as its own step — either is fine, but keep it a separate named artifact so it's easy to find:
 
@@ -163,7 +163,7 @@ Add to the existing "Upload screenshots" artifact step's sibling list, or as its
             rendered-page-0.png
 ```
 
-- [ ] **Step 5: Run the workflow and visually inspect the artifact**
+- [x] **Step 5: Run the workflow and visually inspect the artifact**
 
 ```bash
 gh workflow run ios-scaffold.yml
@@ -173,11 +173,11 @@ gh run download --name pdfium-render-smoke
 
 Open `rendered-page-0.png`. Expected: a real rendered page of `src-tauri/tests/fixtures/sample.pdf`'s content (readable text/layout, not a blank or garbage image) at roughly the `1700`-wide / up-to-`2200`-tall bounds `render_pages_native`'s `PdfRenderConfig` requests. If the workflow fails, `gh run view --log-failed` — a `grep -q "^PASS"` failure with a `FAIL ...` line in `render-smoke-result.txt` is real evidence (the actual pdfium error), not a CI plumbing bug; read it before assuming the harness is wrong. If the PNG opens but looks wrong (blank, corrupted, wrong dimensions) despite a `PASS` result string, that is itself the finding for Task 2 — record it as a Go with caveats or a No-Go, not a passed check.
 
-- [ ] **Step 6: Record the result as a short addendum to this task**
+- [x] **Step 6: Record the result as a short addendum to this task**
 
 Note the CI run URL and what the opened PNG actually showed (matching `mobile-pdfium-ios-spike.md`'s own "Result:" convention) directly below this step in this plan file, before moving to Task 2.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src-tauri/src/lib.rs .github/workflows/ios-scaffold.yml docs/plans/mobile-pdfium-render-spike.md
@@ -194,17 +194,17 @@ git commit -m "feat(mobile): add an iOS pdfium page-rendering smoke test"
 
 **Interfaces:** None — this task only records Task 1's already-obtained result; it does not run new code.
 
-- [ ] **Step 1: Update the spec's Engineering risk section**
+- [x] **Step 1: Update the spec's Engineering risk section**
 
 If Task 1's result was Go: append a new dated paragraph directly after the existing "Resolved 2026-09-14 — Go." paragraph in `docs/specs/mobile-app-design.md`, following that paragraph's own convention (what was proven, the CI run URL, what's still not exercised). State plainly that PDF import's Simulator-side unknowns are now fully resolved (both text extraction and rendering), and that the one remaining open item — a signed physical-device build — is blocked on the maintainer provisioning an Apple Developer Program account and the corresponding GitHub Actions secrets (`APPLE_DEVELOPMENT_TEAM` or the `APPLE_API_ISSUER`/`APPLE_API_KEY`/`APPLE_API_KEY_PATH` trio), not on further engineering spikes — so it isn't silently forgotten, and so nobody assumes it's covered by this Simulator-only proof.
 
 If Task 1's result was No-Go: add a dated note recording the exact failure (or the visual defect found in Step 5) and the CI run URL, and add a sentence to the spec's "Out of scope (v1)" list naming PDF-import rendering as a documented v1 gap on iOS, matching the framing `mobile-pdfium-ios-spike.md` Task 3 already established for a No-Go outcome. Do not attempt a workaround in this task.
 
-- [ ] **Step 2: Close out the parent spike's deferred bullet**
+- [x] **Step 2: Close out the parent spike's deferred bullet**
 
 In `docs/plans/mobile-pdfium-ios-spike.md`'s "Out of scope (this plan)" section, the bullet reading *"Rendering a page to an image on iOS... is left for the actual PDF-import mobile plan once this spike's answer is Go"* — append one clause pointing to this plan and its result (e.g. "— addressed in `docs/plans/mobile-pdfium-render-spike.md`, \<Go/No-Go\>"), so a future reader following that bullet's own pointer lands on a resolved answer instead of a dead end.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add docs/specs/mobile-app-design.md docs/plans/mobile-pdfium-ios-spike.md
