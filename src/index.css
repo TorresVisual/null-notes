@@ -3540,6 +3540,7 @@ pre:has(code.language-expect)::before, pre:has(code.language-expected)::before {
 
 /* Imported PDF pages — reference images, not editable content */
 .pdf-page-block {
+  position: relative;
   margin: 8px 0;
   border: 1px solid var(--border-strong);
   border-radius: 6px;
@@ -3553,6 +3554,26 @@ pre:has(code.language-expect)::before, pre:has(code.language-expected)::before {
   max-width: 100%;
   height: auto;
   display: block;
+}
+
+/* The ink layer composited over an imported page — positioned by JS to match
+   the (responsively-scaled) image underneath it. Ink's usual chrome (opaque
+   grid background, border) is stripped here since it would otherwise hide
+   the page it's meant to annotate. */
+.pdf-page-ink {
+  position: absolute;
+}
+
+.pdf-page-ink .ink-canvas-wrap {
+  border: none;
+  border-radius: 0;
+  overflow: visible;
+  background: transparent;
+}
+
+.pdf-page-ink .ink-canvas {
+  background: transparent;
+  background-image: none;
 }
 
 /* Scanned PDF: nothing to convert, so route to Pages mode */

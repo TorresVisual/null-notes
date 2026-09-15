@@ -1,8 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Node, mergeAttributes } from '@tiptap/core'
 import { ReactNodeViewRenderer } from '@tiptap/react'
 import type { ReactNodeViewProps } from '@tiptap/react'
 import { api } from '../../lib/tauri'
+import { inkApi } from '../../lib/ink'
+import { InkCanvas } from '../../ink/InkCanvas'
 
 interface PdfPageBlockAttrs {
   src: string
@@ -10,9 +12,21 @@ interface PdfPageBlockAttrs {
   height: number
 }
 
-function PdfPageBlockView({ node }: ReactNodeViewProps) {
+// One ink sidecar per page, named after it (`page-0.png` -> `page-0.svg`) —
+// deterministic, so no extra node attribute or markdown schema change is
+// needed to remember which file a page's annotations live in.
+export function inkSrcFor(inkDir: string, pageSrc: string): string {
+  const sep = inkDir.includes('\\') ? '\\' : '/'
+  const base = pageSrc.split(/[\\/]/).pop() ?? pageSrc
+  return `${inkDir}${sep}${base.replace(/\.[^.]+$/, '.svg')}`
+}
+
+function PdfPageBlockView({ node, editor }: ReactNodeViewProps) {
   const { src, width, height } = node.attrs as unknown as PdfPageBlockAttrs
   const [dataUrl, setDataUrl] = useState<string | null>(null)
+  const [inkSrc, setInkSrc] = useState<string | null>(null)
+  const [geometry, setGeometry] = useState({ left: 0, top: 0, zoom: 1 })
+  const imgRef = useRef<HTMLImageElement>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -26,11 +40,45 @@ function PdfPageBlockView({ node }: ReactNodeViewProps) {
     }
   }, [src])
 
+  useEffect(() => {
+    const notePath = editor.storage.noteContext.notePath
+    if (!notePath || !src) return
+    let cancelled = false
+    void inkApi.ensureDir(notePath).then((dir) => {
+      if (!cancelled) setInkSrc(inkSrcFor(dir, src))
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [editor, src])
+
+  // Ink is stored in the page's native pixel space (matches `width`/`height`
+  // above) so a stroke stays put on the page regardless of column width —
+  // the image itself scales responsively, so its rendered size is tracked
+  // and fed to InkCanvas's own `zoom` as the ratio between the two.
+  useEffect(() => {
+    const img = imgRef.current
+    if (!img || !dataUrl) return
+    const sync = () => {
+      setGeometry({ left: img.offsetLeft, top: img.offsetTop, zoom: img.offsetWidth / width })
+    }
+    const observer = new ResizeObserver(sync)
+    observer.observe(img)
+    return () => observer.disconnect()
+  }, [dataUrl, width])
+
   if (!src) return null
   return (
     <div className="pdf-page-block">
       {dataUrl ? (
-        <img src={dataUrl} width={width} height={height} alt="Imported PDF page" />
+        <>
+          <img ref={imgRef} src={dataUrl} width={width} height={height} alt="Imported PDF page" />
+          {inkSrc && (
+            <div className="pdf-page-ink" style={{ left: geometry.left, top: geometry.top }}>
+              <InkCanvas svgPath={inkSrc} width={width} height={height} zoom={geometry.zoom} />
+            </div>
+          )}
+        </>
       ) : (
         <p className="status">Loading page…</p>
       )}
