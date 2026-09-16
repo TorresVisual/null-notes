@@ -4044,27 +4044,108 @@ pre:has(code.language-expect)::before, pre:has(code.language-expected)::before {
 .task-view-item-text:hover { text-decoration: underline; }
 
 /* Error log dialog — reuses .settings-panel for chrome and
-   .template-empty-hint for the empty state; only the entry row is its own. */
+   .template-empty-hint for the empty state; the filter input, entry rows,
+   and stack-trace disclosure below are its own. */
 .error-log-dialog {
   width: min(640px, calc(100vw - 40px));
   max-height: min(600px, calc(100vh - 60px));
 }
 
-.error-log-list {
-  font-family: var(--font-mono);
-  font-size: 12px;
+.error-log-filter-input {
+  width: 100%;
+  padding: 10px 12px;
+  background: var(--bg-sunken);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-size: 13px;
+  outline: none;
 }
+
+.error-log-filter-input:focus-visible { box-shadow: var(--focus-ring); border-color: var(--accent); }
+
+.error-log-list { gap: var(--space-md); }
 
 .error-log-entry {
   display: flex;
-  gap: var(--space-sm);
-  padding: 6px 0;
+  flex-direction: column;
+  gap: 4px;
+  padding: var(--space-sm) 0;
   border-bottom: 1px solid var(--border);
 }
 
-.error-log-timestamp { color: var(--text-tertiary); white-space: nowrap; }
-.error-log-source { color: var(--accent); white-space: nowrap; }
-.error-log-message { color: var(--text-primary); overflow-wrap: anywhere; }
+.error-log-entry:last-child { border-bottom: none; }
+
+.error-log-entry-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.error-log-timestamp {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+}
+
+.error-log-source {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent);
+  background: var(--accent-bg);
+  border-radius: 3px;
+  padding: 1px 6px;
+  white-space: nowrap;
+}
+
+.error-log-entry-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+}
+
+.error-log-expand, .error-log-copy {
+  padding: 2px 8px;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-tertiary);
+  font-size: 11px;
+  font-family: var(--font-mono);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+}
+
+.error-log-expand:hover, .error-log-copy:hover { color: var(--accent); border-color: var(--accent); }
+.error-log-copy.copied { color: var(--accent); border-color: var(--accent); }
+
+.error-log-expand-icon { transition: transform var(--duration-fast) var(--ease-spring); }
+.error-log-expand-icon.rotated { transform: rotate(90deg); }
+
+.error-log-message {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
+}
+
+.error-log-context {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+  background: var(--bg-sunken);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: var(--space-sm);
+  overflow-x: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
 
 /* Review session (P9-3) — shares the settings-panel/task-view shell. */
 .review-session {
