@@ -140,6 +140,7 @@ describe('command:split-tasks focus guard', () => {
       </>,
     )
     const [firstPm, secondPm] = Array.from(container.querySelectorAll('.ProseMirror'))
+    if (!firstPm || !secondPm) throw new Error('expected two mounted editors')
     await waitFor(() => expect(firstPm.textContent).toContain('Exercise 1'))
     ;(secondPm as HTMLElement).focus()
 

@@ -229,12 +229,13 @@ describe('the editor toolbar', () => {
       </>,
     )
     const [firstPm, secondPm] = Array.from(container.querySelectorAll('.ProseMirror'))
+    if (!firstPm || !secondPm) throw new Error('expected two mounted editors')
     await waitFor(() => expect(firstPm.textContent).toContain('first'))
     clickInto(secondPm as HTMLElement)
 
     window.dispatchEvent(new Event('command:insert-ink'))
 
     await waitFor(() => expect(insertInk).toHaveBeenCalledTimes(1))
-    expect(vi.mocked(insertInk).mock.calls[0][1]).toBe('/ws/b.md')
+    expect(vi.mocked(insertInk).mock.calls[0]?.[1]).toBe('/ws/b.md')
   })
 })
