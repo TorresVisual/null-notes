@@ -2418,11 +2418,31 @@ pub fn group_blocks(lines: &[Line]) -> Vec<Block> {
     let mut xs: Vec<f32> = lines.iter().map(|l| l.x).collect();
     let left_margin = median(&mut xs);
 
-    let mut gaps: Vec<f32> = lines
+    // Inline maths (`$...$`) sets taller than the surrounding prose, so a
+    // line carrying it has more leading above and below than a plain text
+    // line — pulling the whole-page median up in a maths-dense region.
+    // Found on Ue1.pdf: short inline-maths lines interleaved with prose
+    // inflated the median enough to swallow the ~28pt gap between
+    // consecutive "Beispiel N.M." blocks, which a maths-light page (e.g.
+    // Ue5.pdf, whose maths sits in its own display blocks) never triggers.
+    // Sampling only prose-to-prose gaps keeps the median representative of
+    // the region's actual paragraph spacing.
+    let has_inline_maths =
+        |line: &&Line| line.content.iter().any(|i| matches!(i, Inline::Maths(_)));
+    let mut prose_gaps: Vec<f32> = lines
         .windows(2)
+        .filter(|pair| !has_inline_maths(&pair[0]) && !has_inline_maths(&pair[1]))
         .map(|pair| (pair[0].y - pair[1].y).abs())
         .collect();
-    let typical_gap = median(&mut gaps);
+    let typical_gap = if prose_gaps.is_empty() {
+        let mut gaps: Vec<f32> = lines
+            .windows(2)
+            .map(|pair| (pair[0].y - pair[1].y).abs())
+            .collect();
+        median(&mut gaps)
+    } else {
+        median(&mut prose_gaps)
+    };
 
     let mut blocks: Vec<Block> = Vec::new();
     let mut current: Vec<&Line> = Vec::new();
