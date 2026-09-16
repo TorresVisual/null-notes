@@ -94,3 +94,44 @@ describe('WikiLinkView preview', () => {
     expect(openNote).toHaveBeenCalledTimes(1)
   })
 })
+
+describe('WikiLink [[ autocomplete', () => {
+  it('shows matching note titles and inserts a wiki-link node on selection', async () => {
+    const user = userEvent.setup()
+    const { container } = mount('<p></p>')
+    await waitFor(() => expect(editor).not.toBeNull())
+
+    editor?.commands.focus('end')
+    // userEvent.type treats "[" as a special-key meta character; "[[" doubled
+    // escapes it down to a literal "[[" in the document.
+    await user.type(container.querySelector('.tiptap') as HTMLElement, '[[[[Big O')
+
+    const item = await waitFor(() => {
+      const el = document.querySelector('.slash-menu-item')
+      if (!el) throw new Error('menu not rendered')
+      return el
+    })
+    expect(item.textContent).toBe('Big O Notation')
+
+    await user.click(item)
+
+    await waitFor(() => expect(getWikiLink(container)).toBeInTheDocument())
+    expect(editor?.getText()).toBe('')
+  })
+
+  it('offers a "create note" entry for a title that does not exist yet', async () => {
+    const user = userEvent.setup()
+    const { container } = mount('<p></p>')
+    await waitFor(() => expect(editor).not.toBeNull())
+
+    editor?.commands.focus('end')
+    await user.type(container.querySelector('.tiptap') as HTMLElement, '[[[[Brand New Note')
+
+    const items = await waitFor(() => {
+      const els = document.querySelectorAll('.slash-menu-item')
+      if (!els.length) throw new Error('menu not rendered')
+      return Array.from(els)
+    })
+    expect(items.some((el) => el.textContent === 'Create note "Brand New Note"')).toBe(true)
+  })
+})

@@ -1,7 +1,10 @@
-import { useState } from 'react'
+import { forwardRef, useEffect, useImperativeHandle, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Node } from '@tiptap/core'
-import { ReactNodeViewRenderer, NodeViewWrapper } from '@tiptap/react'
+import { ReactNodeViewRenderer, ReactRenderer, NodeViewWrapper } from '@tiptap/react'
 import type { ReactNodeViewProps } from '@tiptap/react'
+import Suggestion from '@tiptap/suggestion'
+import { PluginKey } from '@tiptap/pm/state'
 import { useNotesStore } from '../../store/notes'
 import { useWorkspaceStore } from '../../store/workspace'
 import { useCreateNote } from '../../hooks/useCreateNote'
@@ -71,11 +74,148 @@ function WikiLinkView({ node }: ReactNodeViewProps) {
   )
 }
 
+// ── [[ autocomplete ──────────────────────────────────────────────────────────
+// Mirrors SlashCommands.tsx's Suggestion setup — same rect-anchored portal
+// menu, same keyboard handling, same `.slash-menu` classes reused rather than
+// duplicated. Only the item source differs: note titles instead of a fixed
+// command list, plus a trailing "create note" entry for titles that don't
+// exist yet, since a wiki-link is allowed to point at a note that isn't
+// written yet.
+interface WikiLinkItem {
+  title: string
+  isNew: boolean
+}
+
+function wikiLinkItems({ query }: { query: string }): WikiLinkItem[] {
+  const q = query.toLowerCase()
+  const notes = useNotesStore.getState().notes
+  const matches = notes
+    .filter((n) => n.title.toLowerCase().includes(q))
+    .slice(0, 10)
+    .map((n) => ({ title: n.title, isNew: false }))
+  const exact = notes.some((n) => n.title.toLowerCase() === q)
+  if (query && !exact) matches.push({ title: query, isNew: true })
+  return matches
+}
+
+interface WikiLinkMenuProps {
+  items: WikiLinkItem[]
+  onSelect: (item: WikiLinkItem) => void
+  clientRect: (() => DOMRect | null) | null
+}
+
+interface WikiLinkMenuHandle {
+  onKeyDown: (e: KeyboardEvent) => boolean
+}
+
+const WikiLinkMenu = forwardRef<WikiLinkMenuHandle, WikiLinkMenuProps>(function WikiLinkMenu(
+  { items, onSelect, clientRect },
+  ref,
+) {
+  const [selected, setSelected] = useState(0)
+
+  useEffect(() => setSelected(0), [items])
+
+  useImperativeHandle(ref, () => ({
+    onKeyDown(e) {
+      if (e.key === 'ArrowUp') {
+        setSelected((s) => Math.max(0, s - 1))
+        return true
+      }
+      if (e.key === 'ArrowDown') {
+        setSelected((s) => Math.min(items.length - 1, s + 1))
+        return true
+      }
+      if (e.key === 'Enter') {
+        const item = items[selected]
+        if (item) onSelect(item)
+        return true
+      }
+      return false
+    },
+  }))
+
+  const rect = clientRect?.()
+  if (!items.length || !rect) return null
+
+  return createPortal(
+    <div
+      className="slash-menu"
+      style={{ position: 'fixed', top: rect.bottom + 6, left: rect.left, zIndex: 50 }}
+    >
+      {items.map((item, i) => (
+        <button
+          key={item.title}
+          className={`slash-menu-item${i === selected ? ' selected' : ''}`}
+          onMouseEnter={() => setSelected(i)}
+          onMouseDown={(e) => {
+            e.preventDefault()
+            onSelect(item)
+          }}
+        >
+          <span className="slash-item-title">{item.isNew ? `Create note "${item.title}"` : item.title}</span>
+        </button>
+      ))}
+    </div>,
+    document.body,
+  )
+})
+
 export const WikiLink = Node.create({
   name: 'wikiLink',
   group: 'inline',
   inline: true,
   atom: true,
+
+  addProseMirrorPlugins() {
+    return [
+      Suggestion({
+        editor: this.editor,
+        pluginKey: new PluginKey('wikiLinkSuggestion'),
+        char: '[[',
+        allowSpaces: true,
+        startOfLine: false,
+        items: wikiLinkItems,
+        command({ editor, range, props }) {
+          const { title } = props as WikiLinkItem
+          editor.chain().focus().deleteRange(range).insertContent({ type: 'wikiLink', attrs: { title } }).run()
+        },
+        render() {
+          let renderer: ReactRenderer<WikiLinkMenuHandle, WikiLinkMenuProps>
+
+          return {
+            onStart(props) {
+              renderer = new ReactRenderer(WikiLinkMenu, {
+                props: {
+                  items: props.items as WikiLinkItem[],
+                  onSelect: (item: WikiLinkItem) => props.command(item),
+                  clientRect: props.clientRect,
+                },
+                editor: props.editor,
+              })
+            },
+            onUpdate(props) {
+              renderer.updateProps({
+                items: props.items as WikiLinkItem[],
+                onSelect: (item: WikiLinkItem) => props.command(item),
+                clientRect: props.clientRect,
+              })
+            },
+            onKeyDown({ event }) {
+              if (event.key === 'Escape') {
+                renderer.destroy()
+                return true
+              }
+              return renderer.ref?.onKeyDown(event) ?? false
+            },
+            onExit() {
+              renderer.destroy()
+            },
+          }
+        },
+      }),
+    ]
+  },
 
   addAttributes() {
     return {
