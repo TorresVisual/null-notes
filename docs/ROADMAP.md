@@ -1350,6 +1350,70 @@ Full design rationale, the git-vs-subprocess constraint, credential model, and s
 
 ---
 
+## Phase 17 — Web App (P17)
+
+*Goal: Full editor parity in a browser — create/edit notes, ink, flashcards, search, tags, diagrams, math — joining an existing desktop-created, Git-backed workspace, with no backend server holding note data.* Reopened 2026-09-09 (`TorresVisual/null-notes#24`), scoped 2026-09-16 in `docs/specs/web-app-design.md`, after Phase 16 so the two didn't collide.
+
+Full design rationale, the no-server constraint, credential model, and structural feature cuts (including PDF import, cut entirely for v1) live in `docs/specs/web-app-design.md` — read it before touching any P17 item. None of P17 has started; each item below will link its execution plan under `docs/plans/` once it does.
+
+### P17-1 — Static site scaffold — **M**
+
+- New Vite entry point serving the existing React/TipTap frontend (`src/`) as a static site, with every Tauri `invoke()` call point routed through a platform abstraction (`Platform.isWeb`, alongside the existing `Platform.isMobile`) to a browser-native implementation instead.
+- **Dependency:** none.
+- **DoD:** the existing note-editing UI renders and is interactive in a browser against an in-memory/stub workspace, no Tauri runtime present.
+
+### P17-2 — `gitWeb.ts`: `isomorphic-git` + `lightning-fs` — **L**
+
+- Reimplement `git.rs`/`git_mobile.rs`'s 12 operations a third time (repo-mode detection, unsafe-state, auto-commit, fast-forward pull, diverged/blocked push, rebase-onto-remote, note-history, clone), against `isomorphic-git` backed by `lightning-fs` (IndexedDB).
+- **Dependency:** P17-1.
+- **DoD:** a Vitest suite mirrors `git.rs`'s/`git_mobile.rs`'s existing cases against `lightning-fs`'s in-memory mode and a local git fixture server, not mocked network calls.
+
+### P17-3 — CORS proxy (Cloudflare Worker) — **S**
+
+- A minimal Worker relaying git smart-HTTP traffic to GitHub/GitLab, adding CORS headers, holding no state between requests.
+- **Dependency:** none (parallel to P17-2).
+- **DoD:** a real clone/push/pull round-trip through the deployed Worker against a real GitHub remote succeeds, including a pack transfer large enough to rule out silent truncation.
+
+### P17-4 — Credentials & onboarding (web) — **M**
+
+- HTTPS + personal access token entered once, stored in IndexedDB (no OS Keychain equivalent in a browser — see spec's Credentials section for why this is a genuinely lower bar than mobile, not just a same-idea port). Onboarding clones a pasted repo URL through P17-2/P17-3; no "start a workspace from scratch on web" path, same restriction as mobile.
+- **Dependency:** P17-2, P17-3.
+- **DoD:** a fresh browser session (no prior IndexedDB state) can clone an existing Git-backed workspace (URL + token) and show its notes.
+
+### P17-5 — `sql.js` search index — **M**
+
+- Port `reindex_note`'s SQL schema and queries (not its Rust glue) to run under `sql.js` (SQLite-in-WASM), persisted to IndexedDB as a separate database from the git-backed note files — mirroring the existing `index.db` workspace/app-data split conceptually even though there's no OS app-data dir on web.
+- **Dependency:** P17-1.
+- **DoD:** unit tests covering `reindex_note`'s existing query cases pass against `sql.js`, and a reindex-then-reload-then-query cycle survives a real browser session (proving IndexedDB persistence timing, not just in-memory behavior).
+
+### P17-6 — Structural feature cuts (Run / Open-in-IDE / terminal / PDF import) — **S**
+
+- Same reasoning as mobile's P16-5, plus one more: hide the Run button, "Open in IDE," and the terminal (no subprocess in a browser); also hide PDF import entirely (no pdfium binding — cut for v1, not spiked). Existing PDF sidecars already in a workspace stay fully viewable/editable.
+- **Dependency:** P17-1.
+- **DoD:** the same per-block toolbar mechanism `CodeBlockToolbar.ts`/mobile's `Platform.isMobile` gating already uses gets a `Platform.isWeb` condition; a code block on web shows content and pinned output only, no Run/Open-in-IDE; the PDF-import entry point is absent, not erroring.
+
+### P17-7 — App shell responsive reflow — **M**
+
+- Sidebar becomes a drawer on narrow viewports, touch-sized targets, hover-only affordances get a tap/click-visible equivalent — reusing the same Tailwind v4/shadcn tokens and dialog chrome mobile's P16-6 already established. Unlike mobile, also has to hold up at full desktop-browser width with mouse and keyboard.
+- **Dependency:** P17-1.
+- **DoD:** no horizontal overflow from phone width through desktop width; drawer opens/closes over a backdrop on narrow viewports; touch-only affordances are reachable without hover.
+
+### P17-8 — Cloudflare Pages deploy — **S**
+
+- Wire the static site (P17-1) to Cloudflare Pages, the Worker (P17-3) to Cloudflare Workers, both under one account.
+- **Dependency:** P17-1, P17-3.
+- **DoD:** the deployed Pages URL serves the app and successfully clones a real workspace through the deployed Worker, end to end.
+
+### P17-9 — Web e2e harness — **M**
+
+- No existing e2e coverage applies to a static site (`e2e-verify` drives the compiled Windows Tauri app). New Playwright-based harness against the deployed Cloudflare Pages site.
+- **Dependency:** P17-8.
+- **DoD:** a scripted spec covers onboarding-clone, edit-a-note, and search, run against the real deployed site in CI.
+
+**Milestone M17 (not yet reached):** P17-1…P17-6 would prove the client-only architecture works locally; P17-8/P17-9 are what would make it *usable and verified* in production. None of P17 has started as of this writing.
+
+---
+
 ## 4. Challenged / cut / de-scoped features
 
 Per the mandate to remove work that doesn't earn its keep:
@@ -1363,7 +1427,7 @@ Per the mandate to remove work that doesn't earn its keep:
 | **CodeMirror 6 as the editor** | **Superseded** | The brief named CodeMirror; the app is built on TipTap/ProseMirror, which is what makes WYSIWYG-with-inline-ink possible at all. Recorded so the brief's stack list isn't mistaken for a pending migration. |
 | **Cloud sync** | **Cut (stays out of scope)** | Violates local-first principle; plain `.md` + Git/Syncthing already covers it. Invest in *making manual sync painless* (P3-4), not building sync. **Note (2026-07-29):** P5 automates the user's *own* Git against the user's *own* remote. That is this row's remedy taken further, not a reversal of it — the app still builds no accounts, no server, and no sync protocol, and still needs no network to open a note. |
 | **~~Mobile / tablet app~~** | ~~Reconsidered (2026-09-09)~~ → **Scoped and underway as Phase 16** | Maintainer reopened this — see `TorresVisual/null-notes#23`. Scoping pass is `docs/specs/mobile-app-design.md`; iOS scaffold, git-only storage, credentials, PDF pipeline, feature cuts, and shell reflow are done (P16-1…P16-6), live sync verification and physical-device sideload are not (P16-7/P16-8), Android is a parallel in-progress pass (P16-9). See Phase 16. |
-| **Web app (no local .md files, fully git-backed)** | **Reconsidered (2026-09-09)** | Maintainer reopened this alongside mobile — see `TorresVisual/null-notes#24`. Not yet scoped or designed. |
+| **~~Web app (no local .md files, fully git-backed)~~** | ~~Reconsidered (2026-09-09)~~ → **Scoped as Phase 17** | Maintainer reopened this alongside mobile — see `TorresVisual/null-notes#24`. Scoping pass is `docs/specs/web-app-design.md`; client-only architecture (isomorphic-git, CORS proxy, sql.js index) decided, none of P17-1…P17-9 started. See Phase 17. |
 | **Collaboration / multiplayer** | **Cut** | Single-user tool; enormous complexity for zero personal value. |
 | **Segment-level eraser, hold-to-snap shape recognition** | **Defer indefinitely** | Ink is already a daily-usable subsystem; these are diminishing-returns polish. Only revisit if real use demands it. |
 | **Distribution: installers, auto-update, code-signing, cross-platform** | **Out of scope now** | Personal tool. Revisit only if the audience decision changes to "ship to students." |
