@@ -1,9 +1,10 @@
 import { useState } from 'react'
-import { RefreshCw, X } from 'lucide-react'
+import { ChevronLeft, ChevronRight, RefreshCw, X } from 'lucide-react'
 import { useWorkspaceStore } from '../store/workspace'
 import { useNotesStore, noteTitle } from '../store/notes'
 import { SaveStatus } from './SaveStatus'
 import { GitCommitStatus } from './GitCommitStatus'
+import { goBack, goForward, useNavigationHistoryStore } from '../lib/navigationHistory'
 import type { SaveState } from '../hooks/useNote'
 import type { GitCommitStatus as GitStatus } from '../types'
 
@@ -37,10 +38,19 @@ export function TabBar({
   const repoMode = useWorkspaceStore((s) => s.repoMode)
   const autoCommit = useWorkspaceStore((s) => s.git.autoCommit)
   const notes = useNotesStore((s) => s.notes)
+  const { canGoBack, canGoForward } = useNavigationHistoryStore()
   const [draggedPath, setDraggedPath] = useState<string | null>(null)
   if (openTabs.length === 0) return null
   return (
     <div className="tab-bar" role="tablist">
+      <div className="nav-history">
+        <button onClick={goBack} disabled={!canGoBack} title="Back (Alt+Left)" aria-label="Back">
+          <ChevronLeft size={14} />
+        </button>
+        <button onClick={goForward} disabled={!canGoForward} title="Forward (Alt+Right)" aria-label="Forward">
+          <ChevronRight size={14} />
+        </button>
+      </div>
       <div className="tab-bar-tabs">
         {openTabs.map((path) => {
           const name = noteTitle(notes, path)

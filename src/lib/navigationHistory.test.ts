@@ -1,6 +1,13 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { useWorkspaceStore } from '../store/workspace'
-import { recordJumpFromHere, goBack, goForward, canGoBack, canGoForward, clearNavigationHistory } from './navigationHistory'
+import {
+  goBack,
+  goForward,
+  canGoBack,
+  canGoForward,
+  clearNavigationHistory,
+  useNavigationHistoryStore,
+} from './navigationHistory'
 
 function mountScrollContainer(): HTMLDivElement {
   const el = document.createElement('div')
@@ -10,8 +17,8 @@ function mountScrollContainer(): HTMLDivElement {
 }
 
 beforeEach(() => {
-  clearNavigationHistory()
   useWorkspaceStore.setState({ openTabs: [], activeTab: null })
+  clearNavigationHistory()
   document.body.innerHTML = ''
 })
 
@@ -21,35 +28,38 @@ describe('navigationHistory', () => {
     expect(canGoForward()).toBe(false)
   })
 
-  it('recordJumpFromHere pushes the current note onto the back stack', () => {
+  it('opening the first note does not create back history', () => {
     useWorkspaceStore.getState().openTab('/ws/a.md')
-    recordJumpFromHere()
-    expect(canGoBack()).toBe(true)
-  })
-
-  it('recordJumpFromHere does nothing when there is no active tab', () => {
-    recordJumpFromHere()
     expect(canGoBack()).toBe(false)
   })
 
-  it('recordJumpFromHere clears the forward stack', () => {
+  it('switching to a different note pushes the previous one onto the back stack', () => {
+    useWorkspaceStore.getState().openTab('/ws/a.md')
+    useWorkspaceStore.getState().openTab('/ws/b.md')
+    expect(canGoBack()).toBe(true)
+  })
+
+  it('re-selecting the already-active note does not push history', () => {
+    useWorkspaceStore.getState().openTab('/ws/a.md')
+    useWorkspaceStore.getState().openTab('/ws/a.md')
+    expect(canGoBack()).toBe(false)
+  })
+
+  it('switching notes clears the forward stack', () => {
     mountScrollContainer()
     useWorkspaceStore.getState().openTab('/ws/a.md')
-    recordJumpFromHere()
     useWorkspaceStore.getState().openTab('/ws/b.md')
     goBack()
     expect(canGoForward()).toBe(true)
 
     useWorkspaceStore.getState().openTab('/ws/c.md')
-    recordJumpFromHere()
 
     expect(canGoForward()).toBe(false)
   })
 
-  it('goBack switches to the note that was active when the jump was recorded', () => {
+  it('goBack switches to the previously active note', () => {
     mountScrollContainer()
     useWorkspaceStore.getState().openTab('/ws/a.md')
-    recordJumpFromHere()
     useWorkspaceStore.getState().openTab('/ws/b.md')
 
     goBack()
@@ -69,7 +79,6 @@ describe('navigationHistory', () => {
   it('goBack makes the note you left available to goForward', () => {
     mountScrollContainer()
     useWorkspaceStore.getState().openTab('/ws/a.md')
-    recordJumpFromHere()
     useWorkspaceStore.getState().openTab('/ws/b.md')
 
     goBack()
@@ -91,9 +100,7 @@ describe('navigationHistory', () => {
   it('supports multiple steps back and forward, in order', () => {
     mountScrollContainer()
     useWorkspaceStore.getState().openTab('/ws/a.md')
-    recordJumpFromHere()
     useWorkspaceStore.getState().openTab('/ws/b.md')
-    recordJumpFromHere()
     useWorkspaceStore.getState().openTab('/ws/c.md')
 
     goBack()
@@ -107,10 +114,22 @@ describe('navigationHistory', () => {
     expect(useWorkspaceStore.getState().activeTab).toBe('/ws/c.md')
   })
 
+  it('goBack does not itself get recorded as a new navigation', () => {
+    mountScrollContainer()
+    useWorkspaceStore.getState().openTab('/ws/a.md')
+    useWorkspaceStore.getState().openTab('/ws/b.md')
+    useWorkspaceStore.getState().openTab('/ws/c.md')
+
+    goBack()
+    expect(useWorkspaceStore.getState().activeTab).toBe('/ws/b.md')
+
+    goBack()
+    expect(useWorkspaceStore.getState().activeTab).toBe('/ws/a.md')
+  })
+
   it('clearNavigationHistory empties both stacks', () => {
     mountScrollContainer()
     useWorkspaceStore.getState().openTab('/ws/a.md')
-    recordJumpFromHere()
     useWorkspaceStore.getState().openTab('/ws/b.md')
     goBack()
 
@@ -118,5 +137,20 @@ describe('navigationHistory', () => {
 
     expect(canGoBack()).toBe(false)
     expect(canGoForward()).toBe(false)
+  })
+
+  it('useNavigationHistoryStore tracks canGoBack/canGoForward in step with the functions', () => {
+    mountScrollContainer()
+    expect(useNavigationHistoryStore.getState()).toEqual({ canGoBack: false, canGoForward: false })
+
+    useWorkspaceStore.getState().openTab('/ws/a.md')
+    useWorkspaceStore.getState().openTab('/ws/b.md')
+    expect(useNavigationHistoryStore.getState().canGoBack).toBe(true)
+
+    goBack()
+    expect(useNavigationHistoryStore.getState().canGoForward).toBe(true)
+
+    clearNavigationHistory()
+    expect(useNavigationHistoryStore.getState()).toEqual({ canGoBack: false, canGoForward: false })
   })
 })

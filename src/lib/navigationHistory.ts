@@ -1,16 +1,16 @@
+import { create } from 'zustand'
 import { useWorkspaceStore } from '../store/workspace'
 import { recallPosition } from './notePositions'
 
 /**
- * Back/forward navigation history for link-driven jumps (wiki-links,
- * cross-references) — not every tab switch, which is already its own
- * deliberate action. Session-only, like `notePositions.ts`: cleared on
+ * Back/forward navigation history, browser/Notion-style: every note switch
+ * — sidebar click, tab click, wiki-link, search result — is tracked, not
+ * just link-driven jumps. Session-only, like `notePositions.ts`: cleared on
  * workspace switch (see `useWorkspace.ts`), never persisted.
  *
- * A plain module rather than a Zustand store: nothing here needs to drive a
- * re-render on its own (Alt+Left/Right just call `goBack`/`goForward`
- * directly; there's no button UI to keep in sync), the same shape
- * `notePositions.ts` already uses for the same reason.
+ * The back/forward stacks stay plain arrays, like `notePositions.ts` — only
+ * `canGoBack`/`canGoForward` need to drive a re-render (for the TabBar
+ * buttons), so `useNavigationHistoryStore` just mirrors those two booleans.
  */
 
 interface HistoryEntry {
@@ -21,11 +21,31 @@ interface HistoryEntry {
 const back: HistoryEntry[] = []
 const forward: HistoryEntry[] = []
 
-function currentLocation(): HistoryEntry | null {
-  const notePath = useWorkspaceStore.getState().activeTab
-  if (!notePath) return null
+export const useNavigationHistoryStore = create<{ canGoBack: boolean; canGoForward: boolean }>(
+  () => ({ canGoBack: false, canGoForward: false })
+)
+
+function syncStore(): void {
+  useNavigationHistoryStore.setState({ canGoBack: back.length > 0, canGoForward: forward.length > 0 })
+}
+
+function entryFor(notePath: string): HistoryEntry {
   return { notePath, scrollFraction: recallPosition(notePath)?.scrollFraction ?? 0 }
 }
+
+// True while goBack/goForward is switching the active tab itself — the
+// activeTab subscriber below must not record that as a new navigation, or
+// every step back would immediately push a step forward onto `back`.
+let restoring = false
+
+useWorkspaceStore.subscribe((state, prevState) => {
+  if (restoring) return
+  if (state.activeTab === prevState.activeTab) return
+  if (!prevState.activeTab) return
+  back.push(entryFor(prevState.activeTab))
+  forward.length = 0
+  syncStore()
+})
 
 /** Scrolls `.editor-scroll` to `fraction` of its scrollable height, retrying
  *  across frames — after `openTab` switches to a different note, that
@@ -45,33 +65,28 @@ function scrollToOffset(fraction: number, attempt = 0): void {
 }
 
 function restoreEntry(entry: HistoryEntry): void {
+  restoring = true
   useWorkspaceStore.getState().openTab(entry.notePath)
+  restoring = false
   scrollToOffset(entry.scrollFraction)
-}
-
-/** Call immediately before navigating a link-driven jump — captures where
- *  the click happened so `goBack` can return to it. Clears the forward
- *  stack, matching a browser's "a new jump abandons old forward history." */
-export function recordJumpFromHere(): void {
-  const here = currentLocation()
-  if (here) back.push(here)
-  forward.length = 0
 }
 
 export function goBack(): void {
   const entry = back.pop()
   if (!entry) return
-  const here = currentLocation()
-  if (here) forward.push(here)
+  const here = useWorkspaceStore.getState().activeTab
+  if (here) forward.push(entryFor(here))
   restoreEntry(entry)
+  syncStore()
 }
 
 export function goForward(): void {
   const entry = forward.pop()
   if (!entry) return
-  const here = currentLocation()
-  if (here) back.push(here)
+  const here = useWorkspaceStore.getState().activeTab
+  if (here) back.push(entryFor(here))
   restoreEntry(entry)
+  syncStore()
 }
 
 export function canGoBack(): boolean {
@@ -85,4 +100,5 @@ export function canGoForward(): boolean {
 export function clearNavigationHistory(): void {
   back.length = 0
   forward.length = 0
+  syncStore()
 }

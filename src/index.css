@@ -418,6 +418,25 @@ button, [role="button"], .tree-row, .tab, .search-result, .slash-menu-item,
   flex-shrink: 0;
 }
 
+.nav-history {
+  display: flex;
+  flex-shrink: 0;
+}
+
+.nav-history button {
+  padding: 6px 8px;
+  background: none;
+  border: none;
+  border-right: 1px solid var(--border);
+  color: var(--text-tertiary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+}
+
+.nav-history button:hover:not(:disabled) { color: var(--text-primary); background: var(--bg-hover); }
+.nav-history button:disabled { opacity: 0.4; cursor: default; }
+
 /* Scrolls independently so a long tab list can never push save/git status
    off-screen — status always stays visible in .tab-bar-status. */
 .tab-bar-tabs {

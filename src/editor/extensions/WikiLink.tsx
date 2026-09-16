@@ -5,7 +5,6 @@ import type { ReactNodeViewProps } from '@tiptap/react'
 import { useNotesStore } from '../../store/notes'
 import { useWorkspaceStore } from '../../store/workspace'
 import { useCreateNote } from '../../hooks/useCreateNote'
-import { recordJumpFromHere } from '../../lib/navigationHistory'
 import { excerptForPreview } from '../../lib/notePreview'
 import { api } from '../../lib/tauri'
 import { encodeAttr } from '../../lib/htmlAttr'
@@ -30,7 +29,6 @@ function WikiLinkView({ node }: ReactNodeViewProps) {
   // Creating the missing note is what resolves the link: the new note lands in
   // the store, this view re-renders, and `target` is found on the next pass.
   function handleClick() {
-    recordJumpFromHere()
     if (target) {
       openTab(target.path)
       return
