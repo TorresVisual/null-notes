@@ -1414,6 +1414,21 @@ Full design rationale, the no-server constraint, credential model, and structura
 
 ---
 
+## Phase 18 — LaTeX Authoring & Export (P18)
+
+*Goal: document-level LaTeX interop for students who need to hand work to a LaTeX-only pipeline (a journal template, a submission portal, a co-author) — not just equations, which P6-4/P12 already render via KaTeX.* Proposed 2026-09-16, not yet scoped. Reopens the reasoning behind §4's "TikZ export" row below, whose "only useful when handing work to LaTeX" verdict was scoped to one diagram format — a real document-export path changes that calculus.
+
+Candidate surface, ahead of a scoping pass:
+
+- **Markdown → `.tex` export** — an actual compilable document (preamble, package declarations, heading-to-section mapping), not the existing PDF export (P3-2), which never produces LaTeX source.
+- **Bibliography/citations** — `.bib` support, `\cite{}` reachable from Markdown.
+- **`.tex` → Markdown import** — the reverse direction, for pulling an existing LaTeX paper into the app.
+- Anything else "a LaTeX editor needs" not already covered by P6/P12's equation authoring (snippets, symbol palette, cross-references, error highlighting) — package-specific environments, custom commands, and the like.
+
+No task breakdown (P18-N, dependencies, DoDs) until a spec pins down which of these are real needs versus speculative — the same scoping gate P16 and P17 went through in `docs/specs/` before either got task-level detail.
+
+---
+
 ## 4. Challenged / cut / de-scoped features
 
 Per the mandate to remove work that doesn't earn its keep:
@@ -1423,7 +1438,7 @@ Per the mandate to remove work that doesn't earn its keep:
 | **Automated OCR→LaTeX PDF pipeline (as spec'd)** | **Cut permanently** — superseded by P4, not revived | Broken skeleton, \~500 MB model + external binaries, degenerate bounding boxes, accuracy ceiling. P4 gets the same *outcome* (a sheet becomes editable Markdown) from the embedded text layer, so the OCR path has no remaining justification. The one thing OCR would still buy — scanned, image-only sheets — is handled by falling back to Pages mode (P4-2), which is the honest answer. |
 | **Handwriting search (ink OCR)** | **Cut** | The brief asks search to cover handwritten notes. That needs handwriting recognition — a harder problem than the print OCR just cut, for a much smaller payoff. Ink is for working through a proof, not for archival retrieval; tag or title the note instead. |
 | **Graphviz rendering** | **Challenged — not scheduled** | Mermaid already covers flowcharts, sequence, state and class diagrams. Graphviz means shipping a wasm build for the narrow gap (fine-grained graph layout). Revisit only if a real note actually needs DOT. |
-| **TikZ export** | **Challenged — not scheduled** | Niche even for this audience, and only useful when handing work to LaTeX. P3-2's PDF export already covers submission. |
+| **~~TikZ export~~** | ~~Challenged — not scheduled~~ → **Reopened as part of Phase 18** | Originally: niche even for this audience, and only useful when handing work to LaTeX, which P3-2's PDF export already covers for submission. Proposed 2026-09-16: that verdict was scoped to one diagram format — a genuine Markdown→`.tex` export path (Phase 18) changes the calculus for TikZ specifically. Not yet scoped; revisit within Phase 18's spec pass. |
 | **CodeMirror 6 as the editor** | **Superseded** | The brief named CodeMirror; the app is built on TipTap/ProseMirror, which is what makes WYSIWYG-with-inline-ink possible at all. Recorded so the brief's stack list isn't mistaken for a pending migration. |
 | **Cloud sync** | **Cut (stays out of scope)** | Violates local-first principle; plain `.md` + Git/Syncthing already covers it. Invest in *making manual sync painless* (P3-4), not building sync. **Note (2026-07-29):** P5 automates the user's *own* Git against the user's *own* remote. That is this row's remedy taken further, not a reversal of it — the app still builds no accounts, no server, and no sync protocol, and still needs no network to open a note. |
 | **~~Mobile / tablet app~~** | ~~Reconsidered (2026-09-09)~~ → **Scoped and underway as Phase 16** | Maintainer reopened this — see `TorresVisual/null-notes#23`. Scoping pass is `docs/specs/mobile-app-design.md`; iOS scaffold, git-only storage, credentials, PDF pipeline, feature cuts, and shell reflow are done (P16-1…P16-6), live sync verification and physical-device sideload are not (P16-7/P16-8), Android is a parallel in-progress pass (P16-9). See Phase 16. |
