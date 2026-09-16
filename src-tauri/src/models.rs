@@ -88,6 +88,7 @@ pub struct DiagramMetadata {
 pub struct SearchResult {
     pub path: String,
     pub title: String,
+    pub workspace: String,
     pub snippet: String,
 }
 

@@ -26,6 +26,7 @@ export interface CodeLinkTarget {
 export interface SearchResult {
   path: string
   title: string
+  workspace: string
   snippet: string
 }
 

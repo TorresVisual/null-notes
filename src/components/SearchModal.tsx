@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import type { SearchResult } from '../types'
 import { api } from '../lib/tauri'
 import { useWorkspaceStore } from '../store/workspace'
+import { useWorkspace } from '../hooks/useWorkspace'
 import { parseSearchQuery } from '../lib/searchQuery'
 import { setPendingHighlight } from '../lib/pendingHighlight'
 import {
@@ -21,10 +22,12 @@ interface SearchModalProps {
 export function SearchModal({ onClose }: SearchModalProps) {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<SearchResult[]>([])
+  const [allWorkspaces, setAllWorkspaces] = useState(false)
   const workspacePath = useWorkspaceStore((s) => s.path)
   const openTab = useWorkspaceStore((s) => s.openTab)
   const recentSearches = useWorkspaceStore((s) => s.recentSearches)
   const addRecentSearch = useWorkspaceStore((s) => s.addRecentSearch)
+  const { openWorkspaceAt } = useWorkspace()
 
   useEffect(() => {
     if (!workspacePath) return
@@ -35,15 +38,19 @@ export function SearchModal({ onClose }: SearchModalProps) {
     }
     const timer = setTimeout(() => {
       api.notes
-        .search(workspacePath, text, folder, tag, type)
+        .search(workspacePath, text, folder, tag, type, allWorkspaces)
         .then(setResults)
         .catch(() => setResults([]))
     }, 150)
     return () => clearTimeout(timer)
-  }, [query, workspacePath])
+  }, [query, workspacePath, allWorkspaces])
 
-  function open(path: string) {
+  async function open(result: SearchResult) {
+    const { path, workspace } = result
     addRecentSearch(query)
+    if (workspace !== workspacePath) {
+      await openWorkspaceAt(workspace)
+    }
     openTab(path)
     const { text } = parseSearchQuery(query)
     if (text) {
@@ -72,6 +79,14 @@ export function SearchModal({ onClose }: SearchModalProps) {
           value={query}
           onValueChange={setQuery}
         />
+        <label className="search-scope-toggle">
+          <input
+            type="checkbox"
+            checked={allWorkspaces}
+            onChange={(e) => setAllWorkspaces(e.target.checked)}
+          />
+          Search all workspaces
+        </label>
         <CommandList className="search-results">
           {query.trim() === '' && recentSearches.length > 0 && (
             <CommandGroup className="search-recent">
@@ -85,8 +100,13 @@ export function SearchModal({ onClose }: SearchModalProps) {
           {results.length > 0 && (
             <CommandGroup>
               {results.map((r) => (
-                <CommandItem key={r.path} value={r.path} className="search-result items-stretch [&>svg]:hidden" onSelect={() => open(r.path)}>
-                  <span className="search-result-title">{r.title}</span>
+                <CommandItem key={r.path} value={r.path} className="search-result items-stretch [&>svg]:hidden" onSelect={() => void open(r)}>
+                  <span className="search-result-title">
+                    {r.title}
+                    {allWorkspaces && (
+                      <span className="search-result-workspace">{workspaceName(r.workspace)}</span>
+                    )}
+                  </span>
                   <span className="search-result-snippet">{renderSnippet(r.snippet)}</span>
                 </CommandItem>
               ))}
@@ -105,6 +125,10 @@ export function SearchModal({ onClose }: SearchModalProps) {
       </Command>
     </CommandDialog>
   )
+}
+
+function workspaceName(workspace: string) {
+  return workspace.split(/[/\\]/).pop() || workspace
 }
 
 function renderSnippet(snippet: string) {

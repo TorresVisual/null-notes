@@ -163,23 +163,25 @@ pub async fn remove_from_fts(pool: &SqlitePool, path: &str) -> Result<()> {
 
 /// P6-5's scoping: `folder:`/`tag:`/`type:` narrow a search without leaving
 /// the keyboard, on top of (or instead of) an ordinary free-text query.
-/// Always scoped to `workspace` — search previously reached across every
+/// Scoped to `workspace` by default — search previously reached across every
 /// workspace this app's shared `index.db` has ever indexed, which a folder
-/// or tag filter would otherwise silently inherit.
+/// or tag filter would otherwise silently inherit. `workspace: None` is an
+/// explicit opt-in (issue #53) to search every indexed workspace at once,
+/// for the sibling-course-folders shape `NotesMonorepo` supports.
 ///
 /// Built as one dynamic SQL string rather than `? IS NULL OR …` placeholders
 /// throughout: `rank` is only a meaningful ORDER BY when a `MATCH` clause is
 /// actually present, and a fixed query can't conditionally drop a JOIN.
 pub async fn search_notes(
     pool: &SqlitePool,
-    workspace: &str,
+    workspace: Option<&str>,
     fts_query: Option<&str>,
     folder: Option<&str>,
     tag: Option<&str>,
     block_type: Option<&str>,
 ) -> Result<Vec<SearchResult>> {
     let mut sql = String::from(
-        "SELECT notes_fts.path, notes_fts.title, \
+        "SELECT notes_fts.path, notes_fts.title, n.workspace, \
          snippet(notes_fts, 2, '[[', ']]', '\u{2026}', 20) as snippet \
          FROM notes_fts JOIN notes n ON n.path = notes_fts.path",
     );
@@ -188,15 +190,22 @@ pub async fn search_notes(
             " JOIN note_tags nt ON nt.note_path = notes_fts.path AND nt.tag = ? COLLATE NOCASE",
         );
     }
-    sql.push_str(" WHERE n.workspace = ?");
+    let mut conditions = Vec::new();
+    if workspace.is_some() {
+        conditions.push("n.workspace = ?");
+    }
     if fts_query.is_some() {
-        sql.push_str(" AND notes_fts MATCH ?");
+        conditions.push("notes_fts MATCH ?");
     }
     if folder.is_some() {
-        sql.push_str(" AND n.path LIKE ? ESCAPE '\\'");
+        conditions.push("n.path LIKE ? ESCAPE '\\'");
     }
     if block_type.is_some() {
-        sql.push_str(" AND notes_fts.body LIKE ? ESCAPE '\\'");
+        conditions.push("notes_fts.body LIKE ? ESCAPE '\\'");
+    }
+    if !conditions.is_empty() {
+        sql.push_str(" WHERE ");
+        sql.push_str(&conditions.join(" AND "));
     }
     sql.push_str(if fts_query.is_some() {
         " ORDER BY rank LIMIT 20"
@@ -208,7 +217,9 @@ pub async fn search_notes(
     if let Some(tag) = tag {
         q = q.bind(tag.to_string());
     }
-    q = q.bind(workspace.to_string());
+    if let Some(workspace) = workspace {
+        q = q.bind(workspace.to_string());
+    }
     if let Some(fts_query) = fts_query {
         q = q.bind(fts_query.to_string());
     }
@@ -897,7 +908,7 @@ mod tests {
         let pool = make_pool().await;
         seed_search_fixture(&pool).await;
 
-        let hits = search_notes(&pool, "/ws", Some("\"shortest\"*"), None, None, None)
+        let hits = search_notes(&pool, Some("/ws"), Some("\"shortest\"*"), None, None, None)
             .await
             .unwrap();
 
@@ -910,7 +921,7 @@ mod tests {
         let pool = make_pool().await;
         seed_search_fixture(&pool).await;
 
-        let hits = search_notes(&pool, "/ws", None, Some("CS102"), None, None)
+        let hits = search_notes(&pool, Some("/ws"), None, Some("CS102"), None, None)
             .await
             .unwrap();
 
@@ -923,7 +934,7 @@ mod tests {
         let pool = make_pool().await;
         seed_search_fixture(&pool).await;
 
-        let hits = search_notes(&pool, "/ws", None, None, Some("graphs"), None)
+        let hits = search_notes(&pool, Some("/ws"), None, None, Some("graphs"), None)
             .await
             .unwrap();
 
@@ -936,7 +947,7 @@ mod tests {
         let pool = make_pool().await;
         seed_search_fixture(&pool).await;
 
-        let hits = search_notes(&pool, "/ws", None, None, None, Some("theorem"))
+        let hits = search_notes(&pool, Some("/ws"), None, None, None, Some("theorem"))
             .await
             .unwrap();
 
@@ -951,7 +962,7 @@ mod tests {
 
         let hits = search_notes(
             &pool,
-            "/ws",
+            Some("/ws"),
             Some("\"routing\"*"),
             Some("CS101"),
             None,
@@ -961,6 +972,22 @@ mod tests {
         .unwrap();
 
         assert!(hits.is_empty(), "routing text only appears outside CS101");
+    }
+
+    #[tokio::test]
+    async fn test_search_notes_with_no_workspace_searches_every_workspace() {
+        let pool = make_pool().await;
+        seed_search_fixture(&pool).await;
+
+        let mut hits = search_notes(&pool, None, Some("\"shortest\"*"), None, None, None)
+            .await
+            .unwrap();
+        hits.sort_by(|a, b| a.path.cmp(&b.path));
+
+        let paths: Vec<&str> = hits.iter().map(|h| h.path.as_str()).collect();
+        assert_eq!(paths, vec!["/other/c.md", "/ws/CS101/a.md"]);
+        assert_eq!(hits[0].workspace, "/other");
+        assert_eq!(hits[1].workspace, "/ws");
     }
 
     #[tokio::test]

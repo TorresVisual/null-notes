@@ -1662,6 +1662,7 @@ pub async fn search_notes(
     folder: Option<String>,
     tag: Option<String>,
     block_type: Option<String>,
+    all_workspaces: bool,
     db: State<'_, DbPool>,
 ) -> Result<Vec<SearchResult>, String> {
     let trimmed = query.trim();
@@ -1685,7 +1686,11 @@ pub async fn search_notes(
 
     db::notes::search_notes(
         &db,
-        &workspace,
+        if all_workspaces {
+            None
+        } else {
+            Some(&workspace)
+        },
         fts_query.as_deref(),
         folder.as_deref(),
         tag.as_deref(),
@@ -3386,9 +3391,10 @@ mod save_tests {
         .await
         .unwrap();
 
-        let hits = db::notes::search_notes(&pool, "/ws", Some("\"shortest\"*"), None, None, None)
-            .await
-            .unwrap();
+        let hits =
+            db::notes::search_notes(&pool, Some("/ws"), Some("\"shortest\"*"), None, None, None)
+                .await
+                .unwrap();
         assert_eq!(hits.len(), 1);
         assert_eq!(hits[0].title, "Dijkstra");
 
@@ -3872,9 +3878,10 @@ mod save_tests {
             .await
             .unwrap();
 
-        let results = db::notes::search_notes(&pool, &ws, Some("quicksort"), None, None, None)
-            .await
-            .unwrap();
+        let results =
+            db::notes::search_notes(&pool, Some(&ws), Some("quicksort"), None, None, None)
+                .await
+                .unwrap();
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].path, note.to_string_lossy());
     }
@@ -3912,9 +3919,10 @@ mod save_tests {
             .await
             .unwrap();
 
-        let results = db::notes::search_notes(&pool, &ws, Some("automaton"), None, None, None)
-            .await
-            .unwrap();
+        let results =
+            db::notes::search_notes(&pool, Some(&ws), Some("automaton"), None, None, None)
+                .await
+                .unwrap();
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].path, note.to_string_lossy());
     }

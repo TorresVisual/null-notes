@@ -32,7 +32,16 @@ export const api = {
       folder: string | null,
       tag: string | null,
       blockType: string | null,
-    ) => invoke<SearchResult[]>('search_notes', { workspace, query, folder, tag, blockType }),
+      allWorkspaces = false,
+    ) =>
+      invoke<SearchResult[]>('search_notes', {
+        workspace,
+        query,
+        folder,
+        tag,
+        blockType,
+        allWorkspaces,
+      }),
     listTags: (workspace: string) =>
       invoke<string[]>('list_tags', { workspace }),
     notesWithTag: (workspace: string, tag: string) =>

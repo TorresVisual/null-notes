@@ -192,7 +192,7 @@ describe('Layout overlay exclusivity', () => {
       reloadTheirs: vi.fn(),
     }))
     vi.mocked(api.notes.search).mockResolvedValue([
-      { path: '/ws/Target.md', title: 'Target', snippet: 'zzneedle marks the spot' },
+      { path: '/ws/Target.md', title: 'Target', workspace: '/ws', snippet: 'zzneedle marks the spot' },
     ])
 
     render(<Layout />)

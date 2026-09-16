@@ -2142,6 +2142,17 @@ pre:has(code.language-expect)::before, pre:has(code.language-expected)::before {
 
 .search-modal-input::placeholder { color: var(--text-tertiary); }
 
+.search-scope-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 18px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-tertiary);
+  font-size: 12px;
+  cursor: pointer;
+}
+
 .search-results {
   list-style: none;
   max-height: 400px;
@@ -2165,6 +2176,13 @@ pre:has(code.language-expect)::before, pre:has(code.language-expected)::before {
   font-size: 14px;
   font-weight: 600;
   color: var(--text-primary);
+}
+
+.search-result-workspace {
+  margin-left: 8px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-tertiary);
 }
 
 .search-result-snippet {
