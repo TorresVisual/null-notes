@@ -16,6 +16,7 @@ import { drawShapePreview } from './shapePreview'
 import { drawTextItem } from './textRender'
 import { pointInTextItem, translateTextItem, reachOfTextItem } from './textBounds'
 import { growCanvas, reachOfPoints } from './growCanvas'
+import { straightLineEnds } from './straighten'
 import { paintOrder } from './paintOrder'
 import {
   EMPTY_SELECTION,
@@ -743,16 +744,27 @@ export function useInkCanvas(
         return
       }
 
-      const stroke: Stroke = {
-        id: crypto.randomUUID(),
-        points: snappedPoints(currentStroke.current),
-        color,
-        size,
-        opacity,
-        thinning,
-      }
+      const points = snappedPoints(currentStroke.current)
       currentStroke.current = []
       snapping.current = false
+
+      // A completed pen stroke that is nearly straight becomes an actual
+      // line, the same object a user would get from the line tool — matches
+      // OneNote's auto-straighten rather than leaving a wobbly freehand line
+      // that merely looks straight.
+      const straight = straightLineEnds(points)
+      if (straight) {
+        const shape: Shape = { id: crypto.randomUUID(), kind: 'line', ...straight, color, size }
+        const shapeGrown = growCanvas(
+          inkData.width, inkData.height,
+          reachOfPoints([{ x: straight.x1, y: straight.y1 }, { x: straight.x2, y: straight.y2 }]),
+          autoGrow,
+        )
+        commit({ ...inkData, width: shapeGrown.width, height: shapeGrown.height, shapes: [...inkData.shapes, shape] })
+        return
+      }
+
+      const stroke: Stroke = { id: crypto.randomUUID(), points, color, size, opacity, thinning }
       const strokeGrown = growCanvas(inkData.width, inkData.height, reachOfPoints(stroke.points), autoGrow)
       commit({ ...inkData, width: strokeGrown.width, height: strokeGrown.height, strokes: [...inkData.strokes, stroke] })
     },
