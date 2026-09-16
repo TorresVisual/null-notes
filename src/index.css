@@ -2480,6 +2480,35 @@ pre:has(code.language-expect)::before, pre:has(code.language-expected)::before {
 
 .tab .tab-close:hover { color: var(--danger); background: none; border: none; box-shadow: none; }
 
+.pane-wrapper {
+  position: relative;
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.editor-pane-header {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.editor-pane-header .pane-close {
+  padding: 4px;
+  background: none;
+  border: none;
+  color: var(--text-tertiary);
+  cursor: pointer;
+}
+
+.editor-pane-header .pane-close:hover { color: var(--danger); }
+
 /* Folder context menu */
 .context-menu {
   background: var(--bg-raised);

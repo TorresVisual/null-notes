@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { CSSProperties } from 'react'
 import type { Editor, Range } from '@tiptap/core'
 import { listen } from '@tauri-apps/api/event'
 import { getCurrentWindow } from '@tauri-apps/api/window'
@@ -7,15 +6,10 @@ import { Sidebar } from './Sidebar'
 import { TabBar } from './TabBar'
 import { Titlebar } from './Titlebar'
 import { TooltipProvider } from './ui/tooltip'
-import { NoteEditor } from '../editor/NoteEditor'
-import { RawEditor } from '../editor/RawEditor'
+import { EditorPane } from './EditorPane'
 import { SearchModal } from './SearchModal'
 import { QuickSwitcher } from './QuickSwitcher'
-import { BacklinksPanel } from './BacklinksPanel'
-import { NoteHistoryPanel } from './NoteHistoryPanel'
 import { OutlinePanel } from './OutlinePanel'
-import { WorkspacePicker } from './WorkspacePicker'
-import { LoadingStatus } from './LoadingStatus'
 import { SettingsPanel } from './SettingsPanel'
 import { ShortcutsOverlay } from './ShortcutsOverlay'
 import { PromptDialog } from './PromptDialog'
@@ -44,7 +38,6 @@ import { useCreateCanvasNote } from '../hooks/useCreateCanvasNote'
 import { useScrollRestoration } from '../hooks/useScrollRestoration'
 import { useWindowTitle } from '../hooks/useWindowTitle'
 import { useOverlayManager } from '../hooks/useOverlayManager'
-import { ConflictBar } from './ConflictBar'
 import { GitAutoCommitPrompt } from './GitAutoCommitPrompt'
 import { GitDivergedBar } from './GitDivergedBar'
 import { GitPullBlockedBar } from './GitPullBlockedBar'
@@ -126,7 +119,6 @@ export function Layout() {
   const [pendingCram, setPendingCram] = useState<{ streak: number; struggling: boolean } | null>(
     null,
   )
-  const settings = useSettingsStore((s) => s.settings)
   const setSettings = useSettingsStore((s) => s.setSettings)
   const scrollRef = useScrollRestoration(activeTab, isLoading, viewMode)
 
@@ -566,7 +558,6 @@ export function Layout() {
           onSyncNow={syncNow}
           syncingNow={syncingNow}
         />
-        {conflict && <ConflictBar onKeepMine={keepMine} onReloadTheirs={reloadTheirs} />}
         {gitDiverged && (
           <GitDivergedBar
             ahead={gitDiverged.ahead}
@@ -610,67 +601,40 @@ export function Layout() {
           />
         )}
         <div className="editor-body">
-          <div className="editor-scroll" ref={scrollRef}>
-            <div
+          <div className="pane-wrapper">
+            <EditorPane
               ref={editorPaneRef}
-              className={`editor-pane${!activeTab && !workspacePath ? ' editor-pane--center' : ''}`}
-              style={{ '--editor-max-width': `${settings.editorMaxWidthPx}px` } as CSSProperties}
-            >
-              {isLoading && <LoadingStatus />}
-              {!isLoading && activeTab && viewMode === 'wysiwyg' && (
-                <NoteEditor
-                  content={content}
-                  notePath={activeTab}
-                  spellcheck={settings.spellcheck}
-                  spellcheckLanguage={settings.spellcheckLanguage}
-                  onChange={(md) => void save(md)}
-                  onFlashcardCommand={handleFlashcardCommand}
-                  onDiagramCommand={handleDiagramCommand}
-                />
-              )}
-              {!isLoading && activeTab && viewMode === 'raw' && (
-                <RawEditor
-                  content={content}
-                  notePath={activeTab}
-                  spellcheck={settings.spellcheck}
-                  spellcheckLanguage={settings.spellcheckLanguage}
-                  onChange={(md) => void save(md)}
-                />
-              )}
-              {!activeTab && !workspacePath && <WorkspacePicker />}
-              {!activeTab && workspacePath && notes.length === 0 && (
-                <p className="empty-state">
-                  Press Ctrl N to create your first note, or press ? for shortcuts
-                </p>
-              )}
-              {!activeTab && workspacePath && notes.length > 0 && (
-                <HomeView
-                  onOpenTaskView={() => openOverlay('task')}
-                  onOpenReview={() => {
-                    setPendingCram(null)
-                    openOverlay('review')
-                  }}
-                  onOpenDeckView={() => openOverlay('deck')}
-                  onOpenSettings={() => openOverlay('settings')}
-                  overlayOpen={activeOverlay !== null}
-                />
-              )}
-              {!isLoading && activeTab && currentNote && (
-                <BacklinksPanel notePath={activeTab} noteTitle={currentNote.title} />
-              )}
-              {!isLoading && activeTab && repoMode && (
-                <NoteHistoryPanel
-                  notePath={activeTab}
-                  saveState={saveState}
-                  currentContent={content}
-                  onRestore={(content) => void save(content)}
-                />
-              )}
-            </div>
+              scrollRef={scrollRef}
+              notePath={activeTab}
+              content={content}
+              isLoading={isLoading}
+              saveState={saveState}
+              saveError={saveError}
+              onSave={(md) => void save(md)}
+              onRetrySave={retrySave}
+              onDismissSaveError={dismissError}
+              conflict={conflict}
+              onKeepMine={keepMine}
+              onReloadTheirs={reloadTheirs}
+              viewMode={viewMode}
+              onViewModeChange={setViewMode}
+              onFlashcardCommand={handleFlashcardCommand}
+              onDiagramCommand={handleDiagramCommand}
+              emptyState={{
+                onOpenTaskView: () => openOverlay('task'),
+                onOpenReview: () => {
+                  setPendingCram(null)
+                  openOverlay('review')
+                },
+                onOpenDeckView: () => openOverlay('deck'),
+                onOpenSettings: () => openOverlay('settings'),
+                overlayOpen: activeOverlay !== null,
+              }}
+            />
+            {!isLoading && activeTab && viewMode === 'wysiwyg' && outlineOpen && (
+              <OutlinePanel content={content} containerRef={editorPaneRef} />
+            )}
           </div>
-          {!isLoading && activeTab && viewMode === 'wysiwyg' && outlineOpen && (
-            <OutlinePanel content={content} containerRef={editorPaneRef} />
-          )}
         </div>
         {terminalMounted && workspacePath && (
           <TerminalPane
