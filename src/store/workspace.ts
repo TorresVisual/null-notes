@@ -24,6 +24,13 @@ interface WorkspaceStore {
   path: string | null
   openTabs: string[]
   activeTab: string | null
+  // The second pane's note, or null for today's single-pane layout. A
+  // pointer into openTabs, not a second tab list — see setSecondaryTab.
+  secondaryTab: string | null
+  setSecondaryTab: (notePath: string | null) => void
+  // Primary pane's width as a fraction of the split, 0..1.
+  splitRatio: number
+  setSplitRatio: (ratio: number) => void
   // Ephemeral, session-only — not part of WorkspaceState's saved fields
   // (openTabs/expandedFolders/etc.), the same posture as flashTabPath.
   // Only closeTab pushes here; closeTabsUnder (a folder deleted/renamed)
@@ -110,6 +117,8 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   path: null,
   openTabs: [],
   activeTab: null,
+  secondaryTab: null,
+  splitRatio: 0.5,
   closedTabs: [],
   expandedFolders: [],
   selectedFolder: null,
@@ -141,12 +150,17 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   },
 
   closeTab: (notePath) => {
-    const { openTabs, activeTab, closedTabs } = get()
+    const { openTabs, activeTab, secondaryTab, closedTabs } = get()
     const next = openTabs.filter((p) => p !== notePath)
     const newActive =
       activeTab === notePath ? (next[next.length - 1] ?? null) : activeTab
     const nextClosed = [...closedTabs, notePath].slice(-CLOSED_TABS_CAP)
-    set({ openTabs: next, activeTab: newActive, closedTabs: nextClosed })
+    set({
+      openTabs: next,
+      activeTab: newActive,
+      secondaryTab: secondaryTab === notePath ? null : secondaryTab,
+      closedTabs: nextClosed,
+    })
   },
 
   reopenClosedTab: () => {
@@ -158,6 +172,20 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   },
 
   setActiveTab: (notePath) => set({ activeTab: notePath }),
+
+  setSecondaryTab: (notePath) => {
+    if (notePath === null) {
+      set({ secondaryTab: null })
+      return
+    }
+    const { openTabs } = get()
+    if (!openTabs.includes(notePath)) {
+      set({ openTabs: [...openTabs, notePath] })
+    }
+    set({ secondaryTab: notePath })
+  },
+
+  setSplitRatio: (ratio) => set({ splitRatio: ratio }),
 
   reorderTabs: (fromPath, toPath) => {
     if (fromPath === toPath) return
@@ -190,20 +218,22 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   setSelectedFolder: (path) => set({ selectedFolder: path }),
 
   replaceOpenPath: (oldPrefix, newPrefix) => {
-    const { openTabs, activeTab, expandedFolders, selectedFolder } = get()
+    const { openTabs, activeTab, secondaryTab, expandedFolders, selectedFolder } = get()
     set({
       openTabs: openTabs.map((p) => replacePathPrefix(p, oldPrefix, newPrefix)),
       activeTab: activeTab ? replacePathPrefix(activeTab, oldPrefix, newPrefix) : activeTab,
+      secondaryTab: secondaryTab ? replacePathPrefix(secondaryTab, oldPrefix, newPrefix) : secondaryTab,
       expandedFolders: expandedFolders.map((p) => replacePathPrefix(p, oldPrefix, newPrefix)),
       selectedFolder: selectedFolder ? replacePathPrefix(selectedFolder, oldPrefix, newPrefix) : selectedFolder,
     })
   },
 
   closeTabsUnder: (prefix) => {
-    const { openTabs, activeTab } = get()
+    const { openTabs, activeTab, secondaryTab } = get()
     const next = openTabs.filter((p) => !isUnderPath(p, prefix))
     const newActive = activeTab && isUnderPath(activeTab, prefix) ? (next[next.length - 1] ?? null) : activeTab
-    set({ openTabs: next, activeTab: newActive })
+    const newSecondary = secondaryTab && isUnderPath(secondaryTab, prefix) ? null : secondaryTab
+    set({ openTabs: next, activeTab: newActive, secondaryTab: newSecondary })
   },
 
   setFolderError: (message) => set({ folderError: message }),
@@ -239,6 +269,8 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
     set({
       openTabs: [],
       activeTab: null,
+      secondaryTab: null,
+      splitRatio: 0.5,
       closedTabs: [],
       expandedFolders: [],
       selectedFolder: null,

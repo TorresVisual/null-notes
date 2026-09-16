@@ -6,6 +6,8 @@ const reset = () =>
     path: null,
     openTabs: [],
     activeTab: null,
+    secondaryTab: null,
+    splitRatio: 0.5,
     closedTabs: [],
     expandedFolders: [],
     selectedFolder: null,
@@ -281,5 +283,65 @@ describe('useWorkspaceStore', () => {
     useWorkspaceStore.getState().addGitPendingPath('/ws/a.md')
     useWorkspaceStore.getState().clearGitPendingPaths()
     expect(useWorkspaceStore.getState().gitPendingPaths).toEqual([])
+  })
+
+  it('setSecondaryTab opens a second pane on an already-open tab without changing activeTab', () => {
+    useWorkspaceStore.getState().openTab('/ws/a.md')
+    useWorkspaceStore.getState().openTab('/ws/b.md')
+    useWorkspaceStore.getState().setSecondaryTab('/ws/a.md')
+    expect(useWorkspaceStore.getState().secondaryTab).toBe('/ws/a.md')
+    expect(useWorkspaceStore.getState().activeTab).toBe('/ws/b.md')
+  })
+
+  it('setSecondaryTab adds the path to openTabs if it was not already open', () => {
+    useWorkspaceStore.getState().openTab('/ws/a.md')
+    useWorkspaceStore.getState().setSecondaryTab('/ws/c.md')
+    expect(useWorkspaceStore.getState().openTabs).toEqual(['/ws/a.md', '/ws/c.md'])
+    expect(useWorkspaceStore.getState().secondaryTab).toBe('/ws/c.md')
+  })
+
+  it('setSecondaryTab accepts null to collapse back to single-pane', () => {
+    useWorkspaceStore.getState().openTab('/ws/a.md')
+    useWorkspaceStore.getState().setSecondaryTab('/ws/a.md')
+    useWorkspaceStore.getState().setSecondaryTab(null)
+    expect(useWorkspaceStore.getState().secondaryTab).toBeNull()
+    expect(useWorkspaceStore.getState().openTabs).toEqual(['/ws/a.md'])
+  })
+
+  it('closeTab clears secondaryTab when the closed path is the secondary pane', () => {
+    useWorkspaceStore.getState().openTab('/ws/a.md')
+    useWorkspaceStore.getState().openTab('/ws/b.md')
+    useWorkspaceStore.getState().setSecondaryTab('/ws/b.md')
+    useWorkspaceStore.getState().closeTab('/ws/b.md')
+    expect(useWorkspaceStore.getState().secondaryTab).toBeNull()
+  })
+
+  it('closeTabsUnder clears secondaryTab when it sits under the closed prefix', () => {
+    useWorkspaceStore.getState().openTab('/ws/Course1/a.md')
+    useWorkspaceStore.getState().openTab('/ws/Course10/b.md')
+    useWorkspaceStore.getState().setSecondaryTab('/ws/Course1/a.md')
+    useWorkspaceStore.getState().closeTabsUnder('/ws/Course1')
+    expect(useWorkspaceStore.getState().secondaryTab).toBeNull()
+  })
+
+  it('replaceOpenPath rewrites secondaryTab under the old prefix', () => {
+    useWorkspaceStore.getState().openTab('/ws/Course1/a.md')
+    useWorkspaceStore.getState().setSecondaryTab('/ws/Course1/a.md')
+    useWorkspaceStore.getState().replaceOpenPath('/ws/Course1', '/ws/Renamed')
+    expect(useWorkspaceStore.getState().secondaryTab).toBe('/ws/Renamed/a.md')
+  })
+
+  it('setSplitRatio stores the primary pane width fraction', () => {
+    useWorkspaceStore.getState().setSplitRatio(0.35)
+    expect(useWorkspaceStore.getState().splitRatio).toBe(0.35)
+  })
+
+  it('resetForNewWorkspace clears secondaryTab and splitRatio back to defaults', () => {
+    useWorkspaceStore.getState().openTab('/ws/a.md')
+    useWorkspaceStore.getState().setSecondaryTab('/ws/a.md')
+    useWorkspaceStore.getState().setSplitRatio(0.7)
+    useWorkspaceStore.getState().resetForNewWorkspace()
+    expect(useWorkspaceStore.getState().secondaryTab).toBeNull()
+    expect(useWorkspaceStore.getState().splitRatio).toBe(0.5)
   })
 })
