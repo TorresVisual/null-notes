@@ -88,7 +88,7 @@ The TipTap editor surface and the ink Canvas (`src/ink/`, perfect-freehand) alre
 
 ## Out of scope (v1)
 
-- **Android.** Later, separate pass — this spec's approach (Tauri mobile, git-only storage via `gix`) is expected to transfer, but isn't designed for it yet.
+- **Android.** ~~Later, separate pass~~ — **started 2026-09-16.** iOS CI runs on GitHub Actions macOS runners and consumes Actions minutes; Android builds/runs locally instead, so it's now the active platform while iOS work is paused pending more Actions budget. This spec's approach (git-only storage via `gix`, `git_mobile.rs` reused as-is, `Platform.isMobile` feature-cut gating) carries over unchanged — Android gets its own scaffold plan (`docs/plans/mobile-android-scaffold.md`) mirroring `mobile-ios-scaffold.md`, executed locally rather than via CI.
 - **Issue #24 (web app).** Explicitly deferred to its own brainstorm; this spec makes no architectural commitment that constrains or presumes a web client.
 - **Starting a brand-new workspace from mobile alone.** v1 always joins an existing desktop-created, Git-backed workspace.
 - **The GitHub-repo picker** (`list_own_github_repos`, backed by the `gh` CLI). Mobile onboarding takes a pasted URL instead — see Onboarding above.
