@@ -2509,6 +2509,15 @@ pre:has(code.language-expect)::before, pre:has(code.language-expected)::before {
 
 .editor-pane-header .pane-close:hover { color: var(--danger); }
 
+.pane-divider {
+  width: 4px;
+  flex-shrink: 0;
+  cursor: col-resize;
+  background: var(--border);
+}
+
+.pane-divider:hover { background: var(--accent); }
+
 /* Folder context menu */
 .context-menu {
   background: var(--bg-raised);

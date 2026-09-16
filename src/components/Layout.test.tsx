@@ -299,3 +299,52 @@ describe('Layout note history panel', () => {
     expect(await screen.findByText(/History \(/)).toBeInTheDocument()
   })
 })
+
+describe('Layout split-pane rendering', () => {
+  it('renders two note editors side by side when secondaryTab is set', () => {
+    useWorkspaceStore.setState({
+      path: '/ws',
+      activeTab: '/ws/a.md',
+      secondaryTab: '/ws/b.md',
+      splitRatio: 0.5,
+      tagFilter: null,
+    })
+    useNotesStore.setState({
+      notes: [
+        { id: '1', path: '/ws/a.md', title: 'a', workspace: '/ws', updatedAt: 0 },
+        { id: '2', path: '/ws/b.md', title: 'b', workspace: '/ws', updatedAt: 0 },
+      ],
+      folders: [],
+      tags: [],
+    })
+
+    render(<Layout />)
+
+    expect(document.querySelectorAll('.pane-wrapper')).toHaveLength(2)
+    expect(document.querySelector('.pane-divider')).toBeInTheDocument()
+  })
+
+  it('closing the secondary pane collapses back to a single pane', () => {
+    useWorkspaceStore.setState({
+      path: '/ws',
+      activeTab: '/ws/a.md',
+      secondaryTab: '/ws/b.md',
+      splitRatio: 0.5,
+      tagFilter: null,
+    })
+    useNotesStore.setState({
+      notes: [
+        { id: '1', path: '/ws/a.md', title: 'a', workspace: '/ws', updatedAt: 0 },
+        { id: '2', path: '/ws/b.md', title: 'b', workspace: '/ws', updatedAt: 0 },
+      ],
+      folders: [],
+      tags: [],
+    })
+
+    render(<Layout />)
+    fireEvent.click(screen.getByLabelText('Close split pane'))
+
+    expect(useWorkspaceStore.getState().secondaryTab).toBeNull()
+    expect(document.querySelectorAll('.pane-wrapper')).toHaveLength(1)
+  })
+})

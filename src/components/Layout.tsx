@@ -104,7 +104,26 @@ export function Layout() {
   const createNote = useCreateNote()
   const createFolder = useCreateFolder()
   const createCanvasNote = useCreateCanvasNote()
-  const [viewMode, setViewMode] = useState<ViewMode>('wysiwyg')
+  const [primaryViewMode, setPrimaryViewMode] = useState<ViewMode>('wysiwyg')
+  const [secondaryViewMode, setSecondaryViewMode] = useState<ViewMode>('wysiwyg')
+  const secondaryTab = useWorkspaceStore((s) => s.secondaryTab)
+  const setSecondaryTab = useWorkspaceStore((s) => s.setSecondaryTab)
+  const splitRatio = useWorkspaceStore((s) => s.splitRatio)
+  const setSplitRatio = useWorkspaceStore((s) => s.setSplitRatio)
+  const paneContainerRef = useRef<HTMLDivElement>(null)
+  const {
+    content: secondaryContent,
+    save: saveSecondary,
+    isLoading: secondaryLoading,
+    saveState: secondarySaveState,
+    saveError: secondarySaveError,
+    flush: flushSecondary,
+    retrySave: retrySecondarySave,
+    dismissError: dismissSecondaryError,
+    conflict: secondaryConflict,
+    keepMine: keepMineSecondary,
+    reloadTheirs: reloadTheirsSecondary,
+  } = useNote(secondaryTab)
   const { activeOverlay, openOverlay, closeOverlay } = useOverlayManager()
   const [outlineOpen, setOutlineOpen] = useState(true)
   const editorPaneRef = useRef<HTMLDivElement>(null)
@@ -120,7 +139,7 @@ export function Layout() {
     null,
   )
   const setSettings = useSettingsStore((s) => s.setSettings)
-  const scrollRef = useScrollRestoration(activeTab, isLoading, viewMode)
+  const scrollRef = useScrollRestoration(activeTab, isLoading, primaryViewMode)
 
   // The backend vetoes the close and hands control here so a pending edit
   // reaches disk first; the window only dies once confirmClose is called.
@@ -128,6 +147,7 @@ export function Layout() {
     const unlisten = listen('close-requested', async () => {
       try {
         await flush()
+        await flushSecondary()
         await saveSession()
         await flushGitCommit()
       } finally {
@@ -136,7 +156,7 @@ export function Layout() {
       }
     })
     return () => void unlisten.then((off) => off())
-  }, [flush, saveSession, flushGitCommit])
+  }, [flush, flushSecondary, saveSession, flushGitCommit])
 
   // #77: the open-time check in useWorkspace only ever fires once, so a
   // workspace left open never learns it fell behind a remote another
@@ -233,7 +253,7 @@ export function Layout() {
           if (workspacePath) setActiveTab(null)
           break
         case 'toggle-view':
-          if (activeTab) setViewMode((m) => (m === 'wysiwyg' ? 'raw' : 'wysiwyg'))
+          if (activeTab) setPrimaryViewMode((m) => (m === 'wysiwyg' ? 'raw' : 'wysiwyg'))
           break
         case 'insert-ink':
           window.dispatchEvent(new Event('command:insert-ink'))
@@ -248,12 +268,12 @@ export function Layout() {
           // The print stylesheet only styles the rendered view — switch
           // before the dialog opens so it's already correct by the time
           // the user clicks Export.
-          setViewMode('wysiwyg')
+          setPrimaryViewMode('wysiwyg')
           openOverlay('exportPdf')
           break
         case 'print':
           if (!activeTab) break
-          setViewMode('wysiwyg')
+          setPrimaryViewMode('wysiwyg')
           openOverlay('print')
           break
         case 'shortcuts-help':
@@ -306,7 +326,6 @@ export function Layout() {
     },
     [
       activeTab,
-      viewMode,
       workspacePath,
       openTabs,
       setActiveTab,
@@ -350,6 +369,23 @@ export function Layout() {
     },
     [workspacePath, openOverlay],
   )
+
+  const startPaneResize = useCallback((e: React.MouseEvent) => {
+    e.preventDefault()
+    const container = paneContainerRef.current
+    if (!container) return
+    const rect = container.getBoundingClientRect()
+    const onMove = (moveEvent: MouseEvent) => {
+      const ratio = (moveEvent.clientX - rect.left) / rect.width
+      setSplitRatio(Math.min(0.8, Math.max(0.2, ratio)))
+    }
+    const onUp = () => {
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+    }
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+  }, [setSplitRatio])
 
   useEffect(() => {
     const unlisten = listen<string>('menu-action', (event) => void runCommand(event.payload))
@@ -451,7 +487,7 @@ export function Layout() {
   }, [setSettings, openWorkspaceAt])
 
   useEffect(() => {
-    setViewMode('wysiwyg')
+    setPrimaryViewMode('wysiwyg')
   }, [activeTab])
 
   useEffect(() => {
@@ -547,8 +583,8 @@ export function Layout() {
       )}
       <div className="main">
         <TabBar
-          viewMode={viewMode}
-          onToggleView={() => setViewMode((m) => (m === 'wysiwyg' ? 'raw' : 'wysiwyg'))}
+          viewMode={primaryViewMode}
+          onToggleView={() => setPrimaryViewMode((m) => (m === 'wysiwyg' ? 'raw' : 'wysiwyg'))}
           saveState={saveState}
           saveError={saveError}
           onRetrySave={() => void retrySave()}
@@ -600,8 +636,8 @@ export function Layout() {
             onDecline={() => void updateGit({ prompted: true })}
           />
         )}
-        <div className="editor-body">
-          <div className="pane-wrapper">
+        <div className="editor-body" ref={paneContainerRef}>
+          <div className="pane-wrapper" style={secondaryTab ? { flex: `0 0 ${splitRatio * 100}%` } : undefined}>
             <EditorPane
               ref={editorPaneRef}
               scrollRef={scrollRef}
@@ -616,8 +652,8 @@ export function Layout() {
               conflict={conflict}
               onKeepMine={keepMine}
               onReloadTheirs={reloadTheirs}
-              viewMode={viewMode}
-              onViewModeChange={setViewMode}
+              viewMode={primaryViewMode}
+              onViewModeChange={setPrimaryViewMode}
               onFlashcardCommand={handleFlashcardCommand}
               onDiagramCommand={handleDiagramCommand}
               emptyState={{
@@ -631,10 +667,35 @@ export function Layout() {
                 overlayOpen: activeOverlay !== null,
               }}
             />
-            {!isLoading && activeTab && viewMode === 'wysiwyg' && outlineOpen && (
+            {!isLoading && activeTab && primaryViewMode === 'wysiwyg' && outlineOpen && (
               <OutlinePanel content={content} containerRef={editorPaneRef} />
             )}
           </div>
+          {secondaryTab && (
+            <>
+              <div className="pane-divider" onMouseDown={startPaneResize} />
+              <div className="pane-wrapper" style={{ flex: `0 0 ${(1 - splitRatio) * 100}%` }}>
+                <EditorPane
+                  notePath={secondaryTab}
+                  content={secondaryContent}
+                  isLoading={secondaryLoading}
+                  saveState={secondarySaveState}
+                  saveError={secondarySaveError}
+                  onSave={(md) => void saveSecondary(md)}
+                  onRetrySave={retrySecondarySave}
+                  onDismissSaveError={dismissSecondaryError}
+                  conflict={secondaryConflict}
+                  onKeepMine={keepMineSecondary}
+                  onReloadTheirs={reloadTheirsSecondary}
+                  viewMode={secondaryViewMode}
+                  onViewModeChange={setSecondaryViewMode}
+                  onFlashcardCommand={handleFlashcardCommand}
+                  onDiagramCommand={handleDiagramCommand}
+                  onClose={() => setSecondaryTab(null)}
+                />
+              </div>
+            </>
+          )}
         </div>
         {terminalMounted && workspacePath && (
           <TerminalPane
