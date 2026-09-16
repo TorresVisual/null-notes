@@ -27,7 +27,11 @@ pub fn run() {
     #[cfg(windows)]
     unsafe {
         let _ = windows::Win32::UI::Shell::SetCurrentProcessExplicitAppUserModelID(
-            windows::core::w!("dev.nullnotes.app"),
+            if cfg!(debug_assertions) {
+                windows::core::w!("dev.nullnotes.app.dev")
+            } else {
+                windows::core::w!("dev.nullnotes.app")
+            },
         );
     }
 
