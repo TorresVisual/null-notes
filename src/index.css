@@ -1324,7 +1324,7 @@ code {
   position: relative;
   background: var(--bg-hover);
   --gutter-width: 2.4em;
-  --gutter-gap: 10px;
+  --gutter-gap: 16px;
   padding: 14px 16px 14px calc(16px + var(--gutter-width) + var(--gutter-gap));
   border-radius: 6px;
   overflow-x: auto;
@@ -1358,9 +1358,16 @@ code {
    `user-select: none` keeps a code drag-select from also grabbing numbers. */
 .code-line-number {
   display: inline-block;
-  width: var(--gutter-width);
+  /* box-sizing: border-box folds the gap into the marker's own border-box
+     edge (via padding-right) instead of a trailing margin. On a freshly
+     created empty line, the browser's caret hugs this element's own box
+     edge rather than the space after it — a margin-right gap left the
+     caret sitting flush against the digit; only lines with real text after
+     the marker got the visual gap. */
+  box-sizing: border-box;
+  width: calc(var(--gutter-width) + var(--gutter-gap));
+  padding-right: var(--gutter-gap);
   margin-left: calc(-1 * (var(--gutter-width) + var(--gutter-gap)));
-  margin-right: var(--gutter-gap);
   text-align: right;
   color: var(--text-tertiary);
   user-select: none;
