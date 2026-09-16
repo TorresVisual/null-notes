@@ -113,6 +113,15 @@ pub struct WorkspaceState {
     // tolerate its own absence in a file an older build wrote.
     #[serde(default)]
     pub git: GitWorkspaceConfig,
+    // Split-pane editing (#54). Added after `.workspace.json` shipped, so
+    // both tolerate their own absence in a file an older build wrote —
+    // `None` means "single pane" / "use the default 0.5 ratio", the same
+    // posture the frontend already needs for a workspace that was never
+    // split at all.
+    #[serde(default)]
+    pub secondary_tab: Option<String>,
+    #[serde(default)]
+    pub split_ratio: Option<f64>,
 }
 
 /// Whether *this machine* should auto-commit in this workspace, and whether

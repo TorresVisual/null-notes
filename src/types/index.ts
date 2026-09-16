@@ -52,6 +52,8 @@ export interface GitWorkspaceConfig {
 export interface WorkspaceState {
   openTabs: string[]
   activeTab: string | null
+  secondaryTab?: string | null
+  splitRatio?: number
   expandedFolders: string[]
   recentSearches: string[]
   git: GitWorkspaceConfig

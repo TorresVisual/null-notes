@@ -274,6 +274,43 @@ mod tests {
         assert!(loaded.git.auto_commit);
     }
 
+    #[tokio::test]
+    async fn test_split_pane_state_roundtrips() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().to_string_lossy().into_owned();
+        let original = WorkspaceState {
+            secondary_tab: Some("/ws/solution.md".into()),
+            split_ratio: Some(0.35),
+            ..Default::default()
+        };
+
+        save_workspace_to_dir(&path, &original).await.unwrap();
+        let loaded = load_workspace_from_dir(&path).await.unwrap();
+
+        assert_eq!(loaded.secondary_tab, original.secondary_tab);
+        assert_eq!(loaded.split_ratio, original.split_ratio);
+    }
+
+    // A `.workspace.json` written before split-pane editing shipped has neither
+    // key at all. It must still load as single-pane, not fail the whole open.
+    #[tokio::test]
+    async fn test_load_legacy_file_without_split_pane_fields() {
+        let dir = tempdir().unwrap();
+        tokio::fs::write(
+            dir.path().join(".workspace.json"),
+            r#"{"openTabs":[],"activeTab":null}"#,
+        )
+        .await
+        .unwrap();
+
+        let state = load_workspace_from_dir(&dir.path().to_string_lossy())
+            .await
+            .unwrap();
+
+        assert!(state.secondary_tab.is_none());
+        assert!(state.split_ratio.is_none());
+    }
+
     // idle_minutes/skip_hooks/auto_push are P5-2/P5-3 fields, added after
     // prompted/auto_commit shipped — a file written by that earlier build
     // has none of them and must still load with sane defaults, not zeros.
