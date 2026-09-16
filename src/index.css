@@ -2518,6 +2518,18 @@ pre:has(code.language-expect)::before, pre:has(code.language-expected)::before {
 
 .pane-divider:hover { background: var(--accent); }
 
+.split-drop-zone {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 25%;
+  background: var(--accent-bg-hover);
+  border-left: 2px solid var(--accent);
+  pointer-events: none;
+  z-index: 1;
+}
+
 /* Folder context menu */
 .context-menu {
   background: var(--bg-raised);

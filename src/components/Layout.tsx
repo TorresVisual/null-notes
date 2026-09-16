@@ -387,6 +387,32 @@ export function Layout() {
     window.addEventListener('mouseup', onUp)
   }, [setSplitRatio])
 
+  const [splitDropZoneActive, setSplitDropZoneActive] = useState(false)
+
+  const handleEditorDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    if (!e.dataTransfer.types.includes('text/plain')) return
+    const rect = e.currentTarget.getBoundingClientRect()
+    const inZone = e.clientX > rect.left + rect.width * 0.75
+    if (inZone) e.preventDefault()
+    setSplitDropZoneActive(inZone)
+  }, [])
+
+  const handleEditorDragLeave = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    if (e.currentTarget.contains(e.relatedTarget as Node)) return
+    setSplitDropZoneActive(false)
+  }, [])
+
+  const handleEditorDrop = useCallback(
+    (e: React.DragEvent<HTMLDivElement>) => {
+      const path = e.dataTransfer.getData('text/plain')
+      setSplitDropZoneActive(false)
+      if (!path) return
+      e.preventDefault()
+      setSecondaryTab(path)
+    },
+    [setSecondaryTab],
+  )
+
   useEffect(() => {
     const unlisten = listen<string>('menu-action', (event) => void runCommand(event.payload))
     return () => void unlisten.then((off) => off())
@@ -636,7 +662,14 @@ export function Layout() {
             onDecline={() => void updateGit({ prompted: true })}
           />
         )}
-        <div className="editor-body" ref={paneContainerRef}>
+        <div
+          className="editor-body"
+          ref={paneContainerRef}
+          onDragOver={handleEditorDragOver}
+          onDragLeave={handleEditorDragLeave}
+          onDrop={handleEditorDrop}
+        >
+          {splitDropZoneActive && <div className="split-drop-zone" />}
           <div className="pane-wrapper" style={secondaryTab ? { flex: `0 0 ${splitRatio * 100}%` } : undefined}>
             <EditorPane
               ref={editorPaneRef}

@@ -56,7 +56,10 @@ export function TabBar({
               onAnimationEnd={() => {
                 if (isFlashing) setFlashTabPath(null)
               }}
-              onDragStart={() => setDraggedPath(path)}
+              onDragStart={(e) => {
+                setDraggedPath(path)
+                e.dataTransfer.setData('text/plain', path)
+              }}
               onDragEnd={() => setDraggedPath(null)}
               onDragOver={(e) => e.preventDefault()}
               onDrop={(e) => {
