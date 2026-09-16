@@ -4,10 +4,13 @@ import { EditorToolbar } from './EditorToolbar'
 import { NoteEditor } from '../NoteEditor'
 import { useInkStore } from '../../store/ink'
 import type { CanvasHandle } from '../../store/ink'
+import { insertInk } from './insertInk'
 
 vi.mock('../../lib/ink', () => ({
   inkApi: { ensureDir: () => Promise.resolve('/ws/N.ink'), write: () => Promise.resolve() },
 }))
+
+vi.mock('./insertInk', () => ({ insertInk: vi.fn().mockResolvedValue(undefined) }))
 
 function handle(overrides: Partial<CanvasHandle> = {}): CanvasHandle {
   return {
@@ -216,5 +219,22 @@ describe('the editor toolbar', () => {
     fireEvent.click(getByLabelText('Insert code block'))
 
     await waitFor(() => expect(getByLabelText('Code block language')).toBeInTheDocument())
+  })
+
+  it('command:insert-ink only inserts into the focused editor when two are mounted', async () => {
+    const { container } = render(
+      <>
+        <NoteEditor content="first" notePath="/ws/a.md" spellcheck={false} spellcheckLanguage="en" onChange={() => {}} onFlashcardCommand={() => {}} />
+        <NoteEditor content="second" notePath="/ws/b.md" spellcheck={false} spellcheckLanguage="en" onChange={() => {}} onFlashcardCommand={() => {}} />
+      </>,
+    )
+    const [firstPm, secondPm] = Array.from(container.querySelectorAll('.ProseMirror'))
+    await waitFor(() => expect(firstPm.textContent).toContain('first'))
+    clickInto(secondPm as HTMLElement)
+
+    window.dispatchEvent(new Event('command:insert-ink'))
+
+    await waitFor(() => expect(insertInk).toHaveBeenCalledTimes(1))
+    expect(vi.mocked(insertInk).mock.calls[0][1]).toBe('/ws/b.md')
   })
 })

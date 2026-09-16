@@ -49,7 +49,7 @@ export function EditorToolbar({ editor, notePath }: EditorToolbarProps) {
   // up to Layout — Layout just dispatches a plain window event.
   useEffect(() => {
     function onInsertInk() {
-      if (!editor) return
+      if (!editor || !editor.isFocused) return
       void insertInk(editor, notePath).catch(report)
     }
     window.addEventListener('command:insert-ink', onInsertInk)

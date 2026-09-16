@@ -3,6 +3,12 @@ import { render, cleanup, waitFor } from '@testing-library/react'
 import { NoteEditor } from './NoteEditor'
 import { useSettingsStore, DEFAULT_SETTINGS } from '../store/settings'
 import { rememberPosition } from '../lib/notePositions'
+import { confirm } from '@tauri-apps/plugin-dialog'
+
+vi.mock('@tauri-apps/plugin-dialog', () => ({
+  confirm: vi.fn().mockResolvedValue(false),
+  message: vi.fn().mockResolvedValue(undefined),
+}))
 
 afterEach(() => {
   cleanup()
@@ -122,5 +128,23 @@ describe('NoteEditor cursor restore (#31)', () => {
       const selection = window.getSelection()
       expect(selection?.anchorOffset).toBe(5)
     })
+  })
+})
+
+describe('command:split-tasks focus guard', () => {
+  it('only prompts for the focused editor when two are mounted', async () => {
+    const { container } = render(
+      <>
+        <NoteEditor content="Exercise 1" notePath="/ws/a.md" spellcheck={false} spellcheckLanguage="en" onChange={() => {}} onFlashcardCommand={() => {}} />
+        <NoteEditor content="Exercise 2" notePath="/ws/b.md" spellcheck={false} spellcheckLanguage="en" onChange={() => {}} onFlashcardCommand={() => {}} />
+      </>,
+    )
+    const [firstPm, secondPm] = Array.from(container.querySelectorAll('.ProseMirror'))
+    await waitFor(() => expect(firstPm.textContent).toContain('Exercise 1'))
+    ;(secondPm as HTMLElement).focus()
+
+    window.dispatchEvent(new Event('command:split-tasks'))
+
+    await waitFor(() => expect(confirm).toHaveBeenCalledTimes(1))
   })
 })

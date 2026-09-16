@@ -182,7 +182,7 @@ export function NoteEditor({
   // does it automatically.
   useEffect(() => {
     async function onSplitTasks() {
-      if (!editor) return
+      if (!editor || !editor.isFocused) return
       if (!(await confirm('Rewrite this note into Task / Solution sections, each with a handwriting canvas?'))) return
       try {
         if ((await splitIntoTasks(editor)) === 'no-structure') {
