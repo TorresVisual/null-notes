@@ -1278,6 +1278,78 @@ Hit-testing (`textBounds.ts`) estimates a text item's bounding box from characte
 
 ---
 
+## Phase 16 — Mobile (P16)
+
+*Goal: Full editor parity on iOS — create/edit notes, ink, import PDFs, review flashcards — joining an existing desktop-created, Git-backed workspace. Not a reader, not a "different product."* Reopened 2026-09-09 (`TorresVisual/null-notes#23`), scoped in `docs/specs/mobile-app-design.md`. Android is a later, separate pass on the same architecture (below); the sibling web-app reopening (`#24`) stays its own future brainstorm, out of scope here.
+
+Full design rationale, the git-vs-subprocess constraint, credential model, and structural feature cuts live in `docs/specs/mobile-app-design.md` — read it before touching any P16 item. Each item below links its execution plan under `docs/plans/`.
+
+### P16-1 — iOS scaffold (Tauri mobile target) — **M** ✅
+
+- Add Tauri 2's iOS target to the existing project — same Rust core, same React/TipTap frontend, new build target only.
+- **DoD:** app builds, installs, launches, and responds to touch in the iOS Simulator via CI.
+- *Done — `docs/plans/mobile-ios-scaffold.md`. CI run [34787469034](https://github.com/TorresVisual/null-notes/actions/runs/34787469034), iPhone 15 Simulator.*
+
+### P16-2 — `git_mobile.rs`: in-process Git via `gix` — **L** ✅
+
+- iOS forbids spawning child processes, ruling out desktop's `git.rs` (shells out to the `git` CLI) wholesale. Reimplement its 12 operations against `gix` (gitoxide) — pure Rust, no C library to cross-compile — behind the same Tauri command names and response shapes, so the frontend needs no mobile-specific branches.
+- **Dependency:** P16-1.
+- **DoD:** `git_mobile.rs` unit tests mirror `git.rs`'s cases (repo-mode detection, unsafe-state, auto-commit, fast-forward pull, diverged/blocked push, rebase-onto-remote) against real local repos, not mocked network calls.
+- *Done — `docs/plans/git-mobile-gix.md` (detect/commit/pull/rebase/history/clone; 85 tests passing, CI run [34839161409](https://github.com/TorresVisual/null-notes/actions/runs/34839161409)) plus `docs/plans/git-mobile-push.md` (`push_notes` via `gix`'s low-level transport, initially deferred for lack of reviewed send-pack support, then implemented directly against the wire protocol). `list_own_github_repos` stays a stub — mobile onboarding takes a pasted URL instead (P16-3).*
+
+### P16-3 — Credentials & onboarding — **M** ✅
+
+- HTTPS + personal access token, entered once and stored in the iOS Keychain — no SSH agent inheritance like desktop gets from the real `git` CLI. Onboarding clones a pasted repo URL; there is no "start a workspace from scratch on mobile" path in v1.
+- **Dependency:** P16-2.
+- **DoD:** a fresh iOS install can clone an existing Git-backed workspace (URL + token) and show its notes.
+- *Done — `docs/plans/mobile-credentials-onboarding.md`. The planned `tauri-plugin-keyring` didn't exist on crates.io; built against the `keyring` crate directly (`src-tauri/src/commands/git_credentials.rs`) instead. Verified via CI screenshot round-trip, run [34869255875](https://github.com/TorresVisual/null-notes/actions/runs/34869255875).*
+
+### P16-4 — PDF pipeline on iOS (pdfium) — **M**, decision fork first ✅
+
+- `pdfium-render` binds to a Windows pdfium build; iOS needs its own arm64 binary linked in. Two spikes gate this rather than assuming a build target makes it work: text extraction, then bitmap rendering.
+- **Dependency:** none (parallel to P16-2/3).
+- **DoD:** both extraction and rendering proven against a real fixture PDF on-device (Simulator).
+- *Done — `docs/plans/mobile-pdfium-ios-spike.md` (text extraction: `PASS pages=1 chars=11`, CI run [34907294797](https://github.com/TorresVisual/null-notes/actions/runs/34907294797), vendoring `bblanchon/pdfium-binaries`' iOS-simulator-arm64 `libpdfium.dylib`) and `docs/plans/mobile-pdfium-render-spike.md` (rendering: `PASS pages=1 width=1556 height=2200`, CI run [34998343375](https://github.com/TorresVisual/null-notes/actions/runs/34998343375), visually confirmed as a real readable page). Physical-device pdfium/signing stays open — see P16-8.*
+
+### P16-5 — Structural feature cuts (Run / Open-in-IDE / terminal) — **S** ✅
+
+- Hide, don't error: the Run button and output panel (`code_run.rs`), "Open in IDE" (`editor_launch.rs`), and the P8 terminal (`terminal.rs`) all depend on spawning a subprocess, which iOS's App Sandbox forbids outright. Pinned code-block output still shows — it's note content, not a live run.
+- **Dependency:** none.
+- **DoD:** a code block on iOS shows content and any pinned output, no Run button, no crash/error state; the terminal's `Ctrl+\`` handler is gated too, not just its menu/toolbar entry points.
+- *Done — `docs/plans/mobile-feature-cuts.md`, frontend-only (`Platform.isMobile`/`isMobile()` gating at the same per-block toolbar mechanism `CodeBlockToolbar.ts` already uses); no Rust changes needed.*
+
+### P16-6 — App shell reflow — **M** ✅
+
+- Sidebar becomes a drawer/sheet, touch-sized targets, hover-only affordances get a tap-visible equivalent. Scoped to the app shell only — the TipTap editor and ink canvas already consume pointer events generically and are expected to port with little change.
+- **Dependency:** P16-1.
+- **DoD:** no horizontal overflow at phone width; drawer opens/closes over a backdrop; touch-only affordances (e.g. row rename/delete icons) are reachable without hover.
+- *Done — `docs/plans/mobile-app-shell-reflow.md`, verified via Playwright screenshots against a Tauri-internals stub (real workspace-data verification deferred to `e2e-verify`, which has no mobile equivalent yet).*
+
+### P16-7 — Editor/sync round-trip verification — **S**
+
+- Prove the DoD claim that hasn't been exercised live yet: a note edited on mobile, once synced, shows the edit on desktop and vice versa, over a real HTTP round trip (not `git_mobile.rs`'s local-fixture unit tests).
+- **Dependency:** P16-2, P16-3.
+- **DoD:** a CI-driven push-then-pull round trip against a local HTTP remote confirms `checked_pull`'s fast-forward path and `useGitAutoPull`'s open-time trigger both fire correctly.
+- **Not done** — `docs/plans/mobile-editor-sync-verification.md` is written but unexecuted (`**Result:**` sections still blank). Ink-canvas stroke fidelity and the diverged/blocked pull states are explicitly out of scope for this plan (the former needs real stylus pressure data the Simulator can't produce; the latter is already covered by P16-2's unit tests).
+
+### P16-8 — Physical-device build & sideload — **M**, human-only
+
+- Get the app running on the maintainer's own iPhone with no Mac and no paid Apple Developer Program membership: CI builds an unsigned arm64 `.ipa`; AltServer (Windows) + AltStore (iOS) do the actual free-tier signing on install.
+- **Dependency:** P16-1, P16-4.
+- **DoD:** the `.ipa` installs and launches on a real device via AltStore; the spec's stale "blocked on a paid account" line is replaced with what this actually proved.
+- **Not done** — `docs/plans/mobile-altstore-sideload.md`'s CI task is unexecuted; Task 2 (AltServer pairing, Apple ID sign-in, physical USB sideload) is inherently human-only, not agent-executable. Known limitation once run: the free-tier signing certificate expires every 7 days; AltStore's Wi-Fi auto-refresh covers this only opportunistically.
+
+### P16-9 — Android — **L**, later pass
+
+- Same architecture (`gix`-based git, `Platform.isMobile` feature-cut gating) carried over unchanged, executed locally rather than via CI (Android builds/runs on the maintainer's machine; iOS consumes GitHub Actions minutes, which is why iOS work paused here in favor of Android). Started 2026-09-16, not by original plan but budget pressure on Actions minutes.
+- **Dependency:** P16-2 (architecture, not code — Android still needs `lib.rs`'s target-selection to route it through `git_mobile.rs`, currently iOS-only).
+- **DoD (this pass):** debug APK installs and launches on a local emulator, responds to touch — the same bar P16-1 set for iOS Simulator.
+- **In progress** — `docs/plans/mobile-android-scaffold.md`. Known remaining gaps once this pass completes: `git_mobile.rs` wiring, UI reflow, and a pdfium-for-Android spike are separate follow-up plans, mirroring iOS's own decomposition.
+
+**Milestone M16 (not yet reached):** P16-1…P16-6 done proves the architecture works in CI/Simulator; P16-7 (live sync) and P16-8 (physical device) are what would make it *usable*, and both are unexecuted. Android (P16-9) is a parallel, independent track.
+
+---
+
 ## 4. Challenged / cut / de-scoped features
 
 Per the mandate to remove work that doesn't earn its keep:
@@ -1290,7 +1362,7 @@ Per the mandate to remove work that doesn't earn its keep:
 | **TikZ export** | **Challenged — not scheduled** | Niche even for this audience, and only useful when handing work to LaTeX. P3-2's PDF export already covers submission. |
 | **CodeMirror 6 as the editor** | **Superseded** | The brief named CodeMirror; the app is built on TipTap/ProseMirror, which is what makes WYSIWYG-with-inline-ink possible at all. Recorded so the brief's stack list isn't mistaken for a pending migration. |
 | **Cloud sync** | **Cut (stays out of scope)** | Violates local-first principle; plain `.md` + Git/Syncthing already covers it. Invest in *making manual sync painless* (P3-4), not building sync. **Note (2026-07-29):** P5 automates the user's *own* Git against the user's *own* remote. That is this row's remedy taken further, not a reversal of it — the app still builds no accounts, no server, and no sync protocol, and still needs no network to open a note. |
-| **Mobile / tablet app** | **Reconsidered (2026-09-09)** | Maintainer reopened this — see `TorresVisual/null-notes#23`. Not yet scoped or designed; the "different product" reasoning below no longer stands as a blocker, just unaddressed design work. |
+| **~~Mobile / tablet app~~** | ~~Reconsidered (2026-09-09)~~ → **Scoped and underway as Phase 16** | Maintainer reopened this — see `TorresVisual/null-notes#23`. Scoping pass is `docs/specs/mobile-app-design.md`; iOS scaffold, git-only storage, credentials, PDF pipeline, feature cuts, and shell reflow are done (P16-1…P16-6), live sync verification and physical-device sideload are not (P16-7/P16-8), Android is a parallel in-progress pass (P16-9). See Phase 16. |
 | **Web app (no local .md files, fully git-backed)** | **Reconsidered (2026-09-09)** | Maintainer reopened this alongside mobile — see `TorresVisual/null-notes#24`. Not yet scoped or designed. |
 | **Collaboration / multiplayer** | **Cut** | Single-user tool; enormous complexity for zero personal value. |
 | **Segment-level eraser, hold-to-snap shape recognition** | **Defer indefinitely** | Ink is already a daily-usable subsystem; these are diminishing-returns polish. Only revisit if real use demands it. |
@@ -1407,12 +1479,13 @@ Small, low-effort quality-of-life items collected from two review passes — 202
 - ~~Find/replace within a note.~~ ✅ **Done 2026-08-29** — `Ctrl+F` outside a code block, `src/editor/extensions/FindReplace.ts`. A sibling of the existing in-block find (`CodeBlockSearch.ts`), not a replacement for it; code blocks keep their own. Equations aren't reachable (LaTeX lives in a node attribute, not ProseMirror text).
 - ~~Focus mode / zen mode — hide chrome, dim everything but the active block.~~ ✅ **Done 2026-08-29**, scoped to the sidebar — `Ctrl+Shift+F`, `src/store/focusMode.ts` + `src/editor/extensions/FocusMode.ts`. Session-only, not persisted. Dimming applies at the top-level-block granularity: a list/table stays whole while the caret is inside one of its items/cells.
 - ~~Drag to reorder blocks; duplicate block; move block up/down; convert block type — all "block handle" affordances, natural extensions of the existing `BlockHandle` extension once one of them is actually built.~~ ✅ **Done** — drag-to-reorder and duplicate shipped earlier under P9.5-3 (this entry was stale); move up/down and turn-into added 2026-08-29 to `BlockHandle.tsx`. Turn-into only appears on plain text-block types (paragraph, heading, the three list kinds, blockquote) — never on a code block, table, image, ink, diagram, math node, or callout, where a generic type-swap has no sound meaning.
+- ~~`[[` autocomplete for wiki-links — typing the trigger should suggest existing note titles instead of requiring an exact match.~~ ✅ **Done 2026-09-16** (closes #71's remaining gap, P1-1's create-on-click) — `src/editor/extensions/WikiLink.tsx` reuses the `Suggestion` + portal-menu pattern from `SlashCommands.tsx`: typing `[[` filters existing note titles, with a trailing "create note" entry when nothing matches.
 
 **Navigation**
 
 - ~~Recently closed tabs (reopen).~~ ✅ **Done 2026-08-29** — `Ctrl+Shift+W`, `useWorkspaceStore`'s `closedTabs`/`reopenClosedTab`. Ephemeral (not persisted), same posture as `flashTabPath`.
 - ~~`Ctrl+Tab` tab switching.~~ Already done — `Layout.tsx`'s `next-tab`/`prev-tab` and `KEY_COMMANDS` already wire this up; this entry was stale.
-- ~~Jump back / forward through navigation history — wiki-links, code deep links (P7-1), and cross-references (P6-7) all currently jump one-way with no way back except the tab itself.~~ ✅ **Done 2026-08-29**, scoped to wiki-links and cross-references — `Alt+Left`/`Alt+Right`, `src/lib/navigationHistory.ts`. Code deep links stay out of scope: they hand off to an external editor, so there's nothing in-app to jump back from. Manual tab switching doesn't push history either — it's already its own deliberate navigation, not something to "undo."
+- ~~Jump back / forward through navigation history — wiki-links, code deep links (P7-1), and cross-references (P6-7) all currently jump one-way with no way back except the tab itself.~~ ✅ **Done 2026-08-29**, scoped to wiki-links and cross-references — `Alt+Left`/`Alt+Right`, `src/lib/navigationHistory.ts`. Code deep links stay out of scope: they hand off to an external editor, so there's nothing in-app to jump back from. **Widened 2026-09-16** (closes #70): `navigationHistory.ts` now subscribes to every workspace-store `activeTab` change instead of requiring explicit `recordJumpFromHere()` call sites, so back/forward covers all navigation — sidebar, tabs, search, links — not just wiki-link jumps. `canGoBack`/`canGoForward` are mirrored into a Zustand store backing new back/forward buttons in `TabBar.tsx`, alongside the existing keyboard shortcuts.
 - ~~"Go to definition" for a wiki-link or code deep link under the cursor, without clicking through.~~ ✅ **Done 2026-08-29**, scoped to wiki-links — hovering shows a preview excerpt via the existing shadcn/Radix `Tooltip`. Cross-references and code deep links stay click-through: both are decoration-based (not a React component like `WikiLinkView`), so previewing them would mean a second UI mechanism built from scratch rather than reusing this one.
 
 **Backlinks**
