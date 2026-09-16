@@ -25,6 +25,9 @@ jobs:
       - name: Package identity .msix
         run: ./scripts/windows/package-identity.ps1
 
+      - name: Download pdfium.dll
+        run: ./scripts/download-pdfium.ps1
+
       - uses: dtolnay/rust-toolchain@stable
 
       - uses: Swatinem/rust-cache@v2

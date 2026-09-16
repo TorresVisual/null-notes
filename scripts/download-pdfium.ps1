@@ -26,5 +26,14 @@ if (Test-Path $releaseDir) {
     Write-Host "pdfium.dll -> $releaseDir"
 }
 
+# Bundled into the Windows installer via tauri.windows.conf.json's
+# `bundle.resources` ("vendor/pdfium.dll" -> ""), independent of whatever
+# state target/ is in - unlike the two copies above, this one has to exist
+# before Tauri's bundler runs, not just before the app is launched.
+$vendorDir = Join-Path $PSScriptRoot "..\src-tauri\vendor"
+New-Item -ItemType Directory -Force $vendorDir | Out-Null
+Copy-Item $dll $vendorDir -Force
+Write-Host "pdfium.dll -> $vendorDir"
+
 Remove-Item $tmp -Recurse -Force
 Write-Host "Done."

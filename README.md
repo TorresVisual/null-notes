@@ -77,13 +77,13 @@ npm install
 npm run tauri dev     # launch the desktop app in dev mode
 ```
 
-Importing a PDF needs the native `pdfium` library, which isn't vendored —
-download the release for your platform from
-[bblanchon/pdfium-binaries](https://github.com/bblanchon/pdfium-binaries)
-(the plain `pdfium-*` archive, not the `-v8` one) and place the library file
-(`pdfium.dll` on Windows) next to `src-tauri/target/debug/null-notes.exe`
-(or wherever the built app lives). Everything else about the app works
-without it — this only gates the PDF import feature.
+Importing a PDF needs the native `pdfium` library, which isn't committed to
+git. Windows release builds bundle it automatically; for `npm run tauri dev`,
+fetch it yourself with `./scripts/download-pdfium.ps1` (downloads from
+[bblanchon/pdfium-binaries](https://github.com/bblanchon/pdfium-binaries) and
+drops `pdfium.dll` next to `src-tauri/target/{debug,release}/null-notes.exe`).
+Everything else about the app works without it — this only gates the PDF
+import feature.
 
 ## Commands
 

@@ -30,6 +30,7 @@ src-tauri/context-menu-handler/target/
 
 scripts/windows/.dev-cert/
 identity-package/null-notes-identity.msix
+src-tauri/vendor/
 
 # Workspace state
 .workspace.json

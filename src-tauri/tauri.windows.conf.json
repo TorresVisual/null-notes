@@ -3,6 +3,7 @@
   "bundle": {
     "resources": {
       "../identity-package/null-notes-identity.msix": "",
+      "vendor/pdfium.dll": "",
       "context-menu-handler/target/release/null_notes_context_menu.dll": "shell-integration/null_notes_context_menu.dll"
     }
   }
