@@ -225,6 +225,25 @@ fn render(chars: &[CharBox], base_size: f32, base_y: f32) -> String {
             continue;
         }
 
+        // Every other accent (dot, hat, tilde, ...) instead follows its base
+        // in stream order, same as Unicode's own convention — found on Ue1.pdf
+        // as "∨" then CM's standalone dot-above glyph (U+02D9) for the XOR
+        // operator, the same glyph family `combining_form` composes onto a
+        // letter ("ü"). There is no precomposed codepoint for a maths symbol
+        // to compose onto the way a letter has, so the accent becomes an
+        // explicit command wrapped around it instead. Unhandled, it rendered
+        // as the bare accent glyph glued onto the command that preceded it
+        // ("\vee˙" instead of "\dot{\vee}").
+        if index + 1 < chars.len() {
+            let next = chars[index + 1].ch;
+            let mark = super::layout::combining_form(next).unwrap_or(next);
+            if let Some(command) = accent_command(mark) {
+                push_latex(&mut out, &format!("{command}{{{}}}", glyph(&chars[index])));
+                index += 2;
+                continue;
+            }
+        }
+
         // A radical swallows the rest of the region, so it has to be handled
         // before the per-character path.
         if is_radical(&chars[index]) && RADICAL_TAKES_REST {
@@ -507,6 +526,26 @@ fn glyph(ch: &CharBox) -> String {
         other if other.is_control() => '\u{FFFD}'.to_string(),
         other => other.to_string(),
     }
+}
+
+/// LaTeX's accent commands, keyed by the combining mark that draws them.
+/// Mirrors the accents layout.rs's `combining_form` knows how to compose
+/// onto a letter — the same marks, just wrapped as a command instead, since a
+/// maths symbol has no precomposed form for them to compose onto.
+fn accent_command(c: char) -> Option<&'static str> {
+    Some(match c {
+        '\u{0307}' => "\\dot",
+        '\u{0308}' => "\\ddot",
+        '\u{0301}' => "\\acute",
+        '\u{0300}' => "\\grave",
+        '\u{0302}' => "\\hat",
+        '\u{0303}' => "\\tilde",
+        '\u{0304}' => "\\bar",
+        '\u{030C}' => "\\check",
+        '\u{0306}' => "\\breve",
+        '\u{030A}' => "\\mathring",
+        _ => return None,
+    })
 }
 
 /// Unicode maths characters mapped to the commands that produce them.
@@ -848,6 +887,18 @@ mod tests {
     fn a_vector_arrow_accent_becomes_vec() {
         let chars = run("\u{20D7}v", Family::Italic);
         assert_eq!(to_latex(&chars), r"\vec{v}");
+    }
+
+    // Ue1.pdf's "Beispiel 1.2" XOR operator: Computer Modern's standalone
+    // dot-above glyph (U+02D9, confirmed via dump_around_vee against the real
+    // PDF — not the combining U+0307 the glyph might be mistaken for) directly
+    // after "∨" in stream order, the opposite of \vec's arrow. Unhandled, it
+    // rendered as the bare accent glyph glued onto the command: "\vee˙"
+    // instead of "\dot{\vee}", which KaTeX cannot render sanely (closes #95).
+    #[test]
+    fn a_dot_accent_after_a_symbol_becomes_dot() {
+        let chars = run("\u{2228}\u{02D9}", Family::Symbol);
+        assert_eq!(to_latex(&chars), r"\dot{\vee}");
     }
 
     // Found against a real document: "αf+βg" rendered as `\alphaf+\betag` —

@@ -299,7 +299,12 @@ const PAGE_FURNITURE_MIN_GAP: f32 = 3.0;
 /// a diaeresis positioned over it, so the text layer hands back "fu¨r" where
 /// the document plainly says "für". Rewriting the accent as combining and
 /// normalising puts the word back together.
-fn combining_form(c: char) -> Option<char> {
+///
+/// `pub(super)` because `latex.rs` reuses the same table for a maths symbol
+/// carrying one of these accents (confirmed on Ue1.pdf's "∨˙" for XOR): there
+/// is no precomposed codepoint to normalise to there either, so it wraps the
+/// combining form in a LaTeX accent command instead — see `latex::accent_command`.
+pub(super) fn combining_form(c: char) -> Option<char> {
     Some(match c {
         '\u{00A8}' => '\u{0308}', // diaeresis
         '\u{00B4}' => '\u{0301}', // acute
@@ -311,6 +316,7 @@ fn combining_form(c: char) -> Option<char> {
         '\u{02D8}' => '\u{0306}', // breve
         '\u{02DA}' => '\u{030A}', // ring
         '\u{00B8}' => '\u{0327}', // cedilla
+        '\u{02D9}' => '\u{0307}', // dot above
         _ => return None,
     })
 }
