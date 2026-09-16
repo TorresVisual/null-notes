@@ -16,12 +16,12 @@ Leave every box below unchecked. The executing skill resolves them with
 your human partner before Step 1 and checks the chosen boxes itself.
 
 **Execution Target:**
-- [ ] Current branch (no isolation)
+- [x] Current branch (no isolation)
 - [ ] New feature branch (no worktree)
 - [ ] Worktree (superpowers:using-git-worktrees)
 
 **Execution Mode:**
-- [ ] Inline execution (superpowers:executing-plans)
+- [x] Inline execution (superpowers:executing-plans)
 - [ ] Subagent-driven execution (superpowers:subagent-driven-development)
 
 ## Global Constraints
@@ -48,7 +48,7 @@ Current machine state, already checked before writing this plan (re-verify rathe
 - A JDK is installed (Eclipse Temurin 25) at `C:\Program Files\Eclipse Adoptium\jdk-25.0.1.8-hotspot`, but nothing points `JAVA_HOME` at it.
 - Only `x86_64-pc-windows-msvc` is installed via `rustup target list --installed` — none of the four Android targets are present yet.
 
-- [ ] **Step 1: Set the required environment variables for this session and persistently**
+- [x] **Step 1: Set the required environment variables for this session and persistently**
 
 Persistently (so future sessions/terminals also have them — takes effect in *new* shells only):
 
@@ -66,7 +66,7 @@ $env:NDK_HOME = "C:\Users\Moritz\AppData\Local\Android\Sdk\ndk\29.0.14206865"
 $env:JAVA_HOME = "C:\Program Files\Eclipse Adoptium\jdk-25.0.1.8-hotspot"
 ```
 
-- [ ] **Step 2: Install the Android Rust targets**
+- [x] **Step 2: Install the Android Rust targets**
 
 ```powershell
 rustup target add aarch64-linux-android armv7-linux-androideabi i686-linux-android x86_64-linux-android
@@ -74,7 +74,7 @@ rustup target add aarch64-linux-android armv7-linux-androideabi i686-linux-andro
 
 Expected: all four install cleanly (they're prebuilt `std` targets, no NDK needed for this step itself).
 
-- [ ] **Step 3: Confirm the emulator boots and `adb` sees it**
+- [x] **Step 3: Confirm the emulator boots and `adb` sees it**
 
 ```powershell
 Start-Process -FilePath "$env:ANDROID_HOME\emulator\emulator.exe" -ArgumentList "-avd","Pixel_3a_API_34_extension_level_7_x86_64","-no-snapshot","-no-audio"
@@ -88,9 +88,9 @@ Wait for it to finish booting (first boot can take a minute or two), then:
 
 Expected: one line listing the emulator's serial (e.g. `emulator-5554`) with state `device` — not `offline` and not absent. If nothing shows up, the emulator is still booting; re-run `adb devices` rather than assuming failure.
 
-- [ ] **Step 4: Record the toolchain state**
+- [x] **Step 4: Record the toolchain state**
 
-Note in the executing session (no file to write) that Steps 1-3 passed, and which JDK/NDK/emulator versions were actually used — if any version differed from what's listed above (e.g. the SDK Manager auto-updated NDK to a newer revision), record the actual value, since Task 2's linker paths depend on the NDK version matching what `NDK_HOME` points at.
+**Actual result:** JDK/NDK as listed above, confirmed working — `rustup` installed all four targets cleanly, the AVD booted (`emulator-5554`, state `device`) within ~90s. One thing not anticipated: `PowerShell`'s own shell state doesn't persist between tool calls in this environment (each invocation is a fresh process), so `$env:ANDROID_HOME`/`NDK_HOME`/`JAVA_HOME` had to be re-set inline in every subsequent PowerShell command in this plan rather than relying on Step 1's session-scoped block carrying forward — the `setx` (persistent, HKCU) values also don't propagate to already-running child processes spawned by this session. A second, more consequential finding: the emulator process (`qemu-system`) silently died at some point during Task 2's ~10-minute Gradle build (only its `qemu-ga` helper was still running afterward) — cause not diagnosed (plausibly CPU/RAM contention with the concurrent Gradle/Kotlin build), but it required relaunching and re-polling `adb devices` before Task 3 could proceed. Anyone re-running this plan should expect to re-check `adb devices` right before Task 3, not assume Task 1's boot is still alive.
 
 ---
 
