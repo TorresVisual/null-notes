@@ -33,9 +33,10 @@ export function useWorkspace() {
   const { flushGitCommit } = useGitAutoCommit()
 
   const saveSession = useCallback(async () => {
-    const { path, openTabs, activeTab, expandedFolders, recentSearches, git } = useWorkspaceStore.getState()
+    const { path, openTabs, activeTab, secondaryTab, splitRatio, expandedFolders, recentSearches, git } =
+      useWorkspaceStore.getState()
     if (!path) return
-    await api.workspace.save(path, { openTabs, activeTab, expandedFolders, recentSearches, git })
+    await api.workspace.save(path, { openTabs, activeTab, secondaryTab, splitRatio, expandedFolders, recentSearches, git })
   }, [])
 
   const closeWorkspace = useCallback(async () => {
@@ -53,8 +54,17 @@ export function useWorkspace() {
   const openWorkspaceAt = useCallback(
     async (selected: string, opts: { remember?: boolean } = {}) => {
       const { remember = true } = opts
-      const { setFolderError, setFolderLoading, setRecentWorkspaces, setRecentSearches, setGit, setRepoMode, setGitPriorAutomation } =
-        useWorkspaceStore.getState()
+      const {
+        setFolderError,
+        setFolderLoading,
+        setRecentWorkspaces,
+        setRecentSearches,
+        setGit,
+        setRepoMode,
+        setGitPriorAutomation,
+        setSecondaryTab,
+        setSplitRatio,
+      } = useWorkspaceStore.getState()
       setFolderLoading(true)
       let tree, session
       try {
@@ -80,6 +90,8 @@ export function useWorkspace() {
       setExpandedFolders(session.expandedFolders)
       setRecentSearches(session.recentSearches)
       setGit(session.git)
+      setSecondaryTab(session.secondaryTab ?? null)
+      setSplitRatio(session.splitRatio ?? 0.5)
       for (const tab of session.openTabs) {
         openTab(tab)
       }

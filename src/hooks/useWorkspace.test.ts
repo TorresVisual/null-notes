@@ -238,4 +238,36 @@ describe('useWorkspace', () => {
 
     expect(git.autoCommit).toHaveBeenCalledWith('/old', 'notesOnly', ['/old/a.md'], false)
   })
+
+  it('saveSession persists secondaryTab and splitRatio alongside the rest of the session', async () => {
+    useWorkspaceStore.setState({ path: '/ws', secondaryTab: '/ws/b.md', splitRatio: 0.4 })
+    const { result } = renderHook(() => useWorkspace())
+
+    await result.current.saveSession()
+
+    expect(workspace.save).toHaveBeenCalledWith(
+      '/ws',
+      expect.objectContaining({ secondaryTab: '/ws/b.md', splitRatio: 0.4 }),
+    )
+  })
+
+  it('openWorkspaceAt restores a saved split-pane layout into the store', async () => {
+    workspace.load.mockResolvedValue({ ...emptySession, secondaryTab: '/ws/b.md', splitRatio: 0.4 })
+    const { result } = renderHook(() => useWorkspace())
+
+    await result.current.openWorkspaceAt('/ws')
+
+    expect(useWorkspaceStore.getState().secondaryTab).toBe('/ws/b.md')
+    expect(useWorkspaceStore.getState().splitRatio).toBe(0.4)
+  })
+
+  it('openWorkspaceAt defaults splitRatio to 0.5 for a session saved before split-pane editing shipped', async () => {
+    workspace.load.mockResolvedValue(emptySession)
+    const { result } = renderHook(() => useWorkspace())
+
+    await result.current.openWorkspaceAt('/ws')
+
+    expect(useWorkspaceStore.getState().secondaryTab).toBeNull()
+    expect(useWorkspaceStore.getState().splitRatio).toBe(0.5)
+  })
 })

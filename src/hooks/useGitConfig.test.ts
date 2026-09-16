@@ -41,6 +41,8 @@ describe('useGitConfig', () => {
     expect(workspace.save).toHaveBeenCalledWith('/ws', {
       openTabs: ['/ws/a.md'],
       activeTab: '/ws/a.md',
+      secondaryTab: null,
+      splitRatio: 0.5,
       expandedFolders: [],
       recentSearches: [],
       git: { prompted: true, autoCommit: true, idleMinutes: 10, skipHooks: false, autoPush: true, allowCodeRepoPush: false },
