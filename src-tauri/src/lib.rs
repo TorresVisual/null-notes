@@ -23,6 +23,10 @@ pub fn run() {
             commands::workspace::open_file_from_args(std::env::args().skip(1))
                 .and_then(|file| commands::workspace::temp_workspace_for_file(&file).ok())
         });
+    // Only meaningful alongside a real `--workspace=` (the `--open-file=`
+    // fallback above already lands on its one file via the temp workspace).
+    let initial_select_file =
+        commands::workspace::select_file_from_args(std::env::args().skip(1));
 
     #[cfg(windows)]
     unsafe {
@@ -158,6 +162,7 @@ pub fn run() {
             app.manage(commands::terminal::PtyState::default());
             app.manage(commands::code_run::RunState::default());
             app.manage(commands::workspace::InitialWorkspace(initial_workspace));
+            app.manage(commands::workspace::InitialSelectFile(initial_select_file));
 
             // WebView2 claims some of our menu accelerators for its own browser-chrome
             // shortcuts before our menu ever sees the keystroke: Ctrl+P prints,
@@ -254,6 +259,7 @@ pub fn run() {
             commands::workspace::recent_workspaces,
             commands::workspace::remember_workspace,
             commands::workspace::initial_workspace,
+            commands::workspace::initial_select_file,
             commands::settings::load_settings,
             commands::settings::save_settings,
             commands::error_log::record_error,

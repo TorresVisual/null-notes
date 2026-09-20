@@ -32,7 +32,10 @@ vi.mock('@tauri-apps/plugin-os', () => ({ platform: vi.fn(() => 'windows') }))
 // Inlining the same literal values sidesteps it.
 vi.mock('../lib/tauri', () => ({
   api: {
-    workspace: { initialWorkspace: vi.fn().mockResolvedValue(null) },
+    workspace: {
+      initialWorkspace: vi.fn().mockResolvedValue(null),
+      initialSelectFile: vi.fn().mockResolvedValue(null),
+    },
     settings: {
       load: vi.fn().mockResolvedValue({
         autosaveDebounceMs: 600,

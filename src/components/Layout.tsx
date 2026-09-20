@@ -506,7 +506,12 @@ export function Layout() {
 
   useEffect(() => {
     void api.workspace.initialWorkspace().then((path) => {
-      if (path) void openWorkspaceAt(path, { remember: false })
+      if (!path) return
+      void openWorkspaceAt(path, { remember: false }).then(() => {
+        void api.workspace.initialSelectFile().then((file) => {
+          if (file) useWorkspaceStore.getState().openTab(file)
+        })
+      })
     })
     void refreshRecents()
     void api.settings.load().then(setSettings)

@@ -77,6 +77,16 @@ pub fn open_file_from_args<I: IntoIterator<Item = String>>(args: I) -> Option<St
         .find_map(|arg| arg.strip_prefix("--open-file=").map(str::to_string))
 }
 
+// Pairs with `--workspace=` (not `--open-file=`, which implies "no real
+// workspace, copy into a temp one"): a caller that already has a real
+// workspace folder open elsewhere — e.g. an IDE — sends both flags together
+// to open that folder as-is and land on one file inside it, instead of
+// forking off a throwaway copy.
+pub fn select_file_from_args<I: IntoIterator<Item = String>>(args: I) -> Option<String> {
+    args.into_iter()
+        .find_map(|arg| arg.strip_prefix("--select-file=").map(str::to_string))
+}
+
 // Creates a fresh temp directory and copies `file_path` into it, so the file
 // can be opened through the same `--workspace=` startup path as a folder.
 //
@@ -106,6 +116,13 @@ pub struct InitialWorkspace(pub Option<String>);
 
 #[tauri::command]
 pub fn initial_workspace(state: tauri::State<InitialWorkspace>) -> Option<String> {
+    state.0.clone()
+}
+
+pub struct InitialSelectFile(pub Option<String>);
+
+#[tauri::command]
+pub fn initial_select_file(state: tauri::State<InitialSelectFile>) -> Option<String> {
     state.0.clone()
 }
 
@@ -383,6 +400,24 @@ mod tests {
     fn test_open_file_from_args_ignores_the_workspace_flag() {
         let args = vec!["--workspace=/tmp/ws".to_string()];
         assert_eq!(open_file_from_args(args), None);
+    }
+
+    #[test]
+    fn test_select_file_from_args_finds_the_flag_alongside_workspace() {
+        let args = vec![
+            "--workspace=/tmp/ws".to_string(),
+            "--select-file=/tmp/ws/Lecture 7.md".to_string(),
+        ];
+        assert_eq!(
+            select_file_from_args(args),
+            Some("/tmp/ws/Lecture 7.md".to_string())
+        );
+    }
+
+    #[test]
+    fn test_select_file_from_args_ignores_the_open_file_flag() {
+        let args = vec!["--open-file=/tmp/Lecture 7.pdf".to_string()];
+        assert_eq!(select_file_from_args(args), None);
     }
 
     #[test]

@@ -124,6 +124,8 @@ export const api = {
       invoke<string[]>('remember_workspace', { path }),
     initialWorkspace: () =>
       invoke<string | null>('initial_workspace'),
+    initialSelectFile: () =>
+      invoke<string | null>('initial_select_file'),
   },
   git: {
     detectRepo: (workspace: string) =>
