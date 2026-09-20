@@ -99,32 +99,37 @@ export function useWorkspace() {
       if (remember) {
         setRecentWorkspaces(await api.workspace.remember(selected))
       }
-
-      // Best-effort: a missing `git` binary or any other detection failure
-      // just means no repo prompt, never a blocked workspace open.
-      let mode = null
-      try {
-        mode = await api.git.detectRepo(selected)
-        setRepoMode(mode)
-        if (mode) await checkForUpdates(selected)
-      } catch {
-        setRepoMode(null)
-      }
-
-      // Only worth asking (#78) while the one-time prompt hasn't been
-      // answered yet on this machine — same best-effort posture as detection
-      // above, never blocks the open.
-      let priorAutomation = false
-      if (mode && !session.git.prompted) {
-        try {
-          priorAutomation = await api.git.detectPriorAutomation(selected)
-        } catch {
-          priorAutomation = false
-        }
-      }
-      setGitPriorAutomation(priorAutomation)
-
       setFolderLoading(false)
+
+      // Best-effort and genuinely non-blocking: detached from the returned
+      // promise so a slow/offline `git fetch` can't hold up callers (e.g.
+      // Layout.tsx landing on a --select-file tab) behind network I/O that
+      // has nothing to do with the workspace being ready to use.
+      void (async () => {
+        // Best-effort: a missing `git` binary or any other detection failure
+        // just means no repo prompt, never a blocked workspace open.
+        let mode = null
+        try {
+          mode = await api.git.detectRepo(selected)
+          setRepoMode(mode)
+          if (mode) await checkForUpdates(selected)
+        } catch {
+          setRepoMode(null)
+        }
+
+        // Only worth asking (#78) while the one-time prompt hasn't been
+        // answered yet on this machine — same best-effort posture as
+        // detection above, never blocks the open.
+        let priorAutomation = false
+        if (mode && !session.git.prompted) {
+          try {
+            priorAutomation = await api.git.detectPriorAutomation(selected)
+          } catch {
+            priorAutomation = false
+          }
+        }
+        setGitPriorAutomation(priorAutomation)
+      })()
     },
     [
       setPath,

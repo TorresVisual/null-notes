@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { renderHook } from '@testing-library/react'
+import { renderHook, waitFor } from '@testing-library/react'
 import { useWorkspace } from './useWorkspace'
 import { useWorkspaceStore } from '../store/workspace'
 import { useNotesStore } from '../store/notes'
@@ -130,7 +130,9 @@ describe('useWorkspace', () => {
 
     await result.current.openWorkspaceAt('/ws')
 
-    expect(git.fetchAndCompare).toHaveBeenCalledWith('/ws')
+    // Git detection is detached from the returned promise, so assert via
+    // polling rather than the `await` above.
+    await waitFor(() => expect(git.fetchAndCompare).toHaveBeenCalledWith('/ws'))
   })
 
   it('does not fetch when the workspace is not a git repository', async () => {
@@ -152,7 +154,9 @@ describe('useWorkspace', () => {
 
     await result.current.openWorkspaceAt('/ws')
 
-    expect(git.detectPriorAutomation).toHaveBeenCalledWith('/ws')
+    // Git detection is detached from the returned promise, so assert via
+    // polling rather than the `await` above.
+    await waitFor(() => expect(git.detectPriorAutomation).toHaveBeenCalledWith('/ws'))
     expect(useWorkspaceStore.getState().gitPriorAutomation).toBe(true)
   })
 
