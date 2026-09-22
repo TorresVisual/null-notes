@@ -101,6 +101,13 @@ const COMMANDS: Cmd[] = [
     run: ({ editor, range }) =>
       editor.chain().focus().deleteRange(range).setCodeBlock({ language: 'expect' }).run(),
   },
+  {
+    title: 'Pseudocode Block',
+    description: 'Code block with pseudocode syntax highlighting',
+    aliases: ['pseudo'],
+    run: ({ editor, range }) =>
+      editor.chain().focus().deleteRange(range).setCodeBlock({ language: 'pseudocode' }).run(),
+  },
   // P14-1/P14-2: one entry per named diagram type, each scaffolding a
   // starting point that renders correctly on insertion rather than an empty
   // fence — `MERMAID_TEMPLATES` is the editable table, this just wires each
@@ -135,7 +142,7 @@ const COMMANDS: Cmd[] = [
             { type: 'paragraph', content: [{ type: 'text', text: 'Complexity:', marks: [{ type: 'bold' }] }] },
             { type: 'paragraph' },
             { type: 'paragraph', content: [{ type: 'text', text: 'Pseudocode:', marks: [{ type: 'bold' }] }] },
-            { type: 'codeBlock' },
+            { type: 'codeBlock', attrs: { language: 'pseudocode' } },
             { type: 'paragraph', content: [{ type: 'text', text: 'Implementation:', marks: [{ type: 'bold' }] }] },
             { type: 'codeBlock' },
             { type: 'paragraph', content: [{ type: 'text', text: 'References:', marks: [{ type: 'bold' }] }] },

@@ -11,6 +11,7 @@ import { TaskList } from '@tiptap/extension-task-list'
 import { TaskItem } from '@tiptap/extension-task-item'
 import { Link } from '@tiptap/extension-link'
 import { createLowlight, common } from 'lowlight'
+import { pseudocodeLanguage } from './pseudocodeLanguage'
 import { InkBlock } from './InkBlock'
 import { NoteImage } from './NoteImage'
 import { PdfPageBlock } from './PdfPageBlock'
@@ -55,6 +56,8 @@ import { TableControls } from './TableControls'
 import { TableMarkdown } from './TableMarkdown'
 
 const lowlight = createLowlight(common)
+lowlight.register({ pseudocode: pseudocodeLanguage })
+lowlight.registerAlias({ pseudocode: ['pseudo'] })
 
 // TipTap 3's Code mark uses a function-based find for its input rule.
 // Negative lookbehind regex matches markInputRule's expectation: last capture
