@@ -20,6 +20,7 @@ const EMPTY_INK: InkData = { width: INK_WIDTH, height: INK_HEIGHT, strokes: [], 
 interface Cmd {
   title: string
   description: string
+  aliases?: string[]
   run: (params: { editor: Editor; range: Range }) => void
 }
 
@@ -70,18 +71,21 @@ const COMMANDS: Cmd[] = [
   {
     title: 'Heading 1',
     description: 'Large section heading',
+    aliases: ['h1'],
     run: ({ editor, range }) =>
       editor.chain().focus().deleteRange(range).setHeading({ level: 1 }).run(),
   },
   {
     title: 'Heading 2',
     description: 'Medium section heading',
+    aliases: ['h2'],
     run: ({ editor, range }) =>
       editor.chain().focus().deleteRange(range).setHeading({ level: 2 }).run(),
   },
   {
     title: 'Heading 3',
     description: 'Small section heading',
+    aliases: ['h3'],
     run: ({ editor, range }) =>
       editor.chain().focus().deleteRange(range).setHeading({ level: 3 }).run(),
   },
@@ -368,7 +372,10 @@ export const SlashCommands = Extension.create({
           const q = query.toLowerCase()
           return q
             ? COMMANDS.filter(
-                (c) => c.title.toLowerCase().includes(q) || c.description.toLowerCase().includes(q),
+                (c) =>
+                  c.title.toLowerCase().includes(q) ||
+                  c.description.toLowerCase().includes(q) ||
+                  c.aliases?.some((a) => a.includes(q)),
               )
             : COMMANDS
         },
