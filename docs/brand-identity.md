@@ -1,4 +1,4 @@
-# null-notes — Brand Identity
+# Null Notes — Brand Identity
 
 **Date:** 2026-08-20
 **Scope:** P9.5-1. Extends `docs/specs/visual-design-system-design.md` (the "Terminal Precision" token set, shipped in P2) with the identity decisions that sit above the token layer: what the mark means, what the name means, and how the two aesthetics named in the roadmap — terminal and academic notebook — actually relate rather than just coexist.

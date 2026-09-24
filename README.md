@@ -1,7 +1,7 @@
 <div align="center">
-  <img src="logos/app-icon.svg" alt="null-notes" width="96" height="96">
+  <img src="logos/app-icon.svg" alt="Null Notes" width="96" height="96">
 
-  # null-notes
+  # Null Notes
 
   A WYSIWYG Markdown note-taking app for CS coursework — math, code,
   hand-drawn diagrams with a stylus, and a PDF import pipeline for

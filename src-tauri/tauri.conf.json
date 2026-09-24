@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "null-notes",
+  "productName": "Null Notes",
   "version": "0.1.1",
   "identifier": "dev.nullnotes.app",
   "build": {
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "null-notes",
+        "title": "Null Notes",
         "width": 1280,
         "height": 800,
         "dragDropEnabled": false,

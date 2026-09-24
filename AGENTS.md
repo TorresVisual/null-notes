@@ -1,4 +1,4 @@
-# null-notes — AGENTS.md
+# Null Notes — AGENTS.md
 
 Project instructions for this repo live in [`CLAUDE.md`](./CLAUDE.md) — read that file first. 
 

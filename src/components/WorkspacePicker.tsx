@@ -36,7 +36,7 @@ export function WorkspacePicker() {
   return (
     <div className="workspace-picker">
       <img src="/favicon.svg" alt="" width={56} height={56} className="workspace-picker-mark" />
-      <h1 className="workspace-picker-title">null-notes</h1>
+      <h1 className="workspace-picker-title">Null Notes</h1>
       <p className="workspace-picker-tagline">
         WYSIWYG Markdown for CS coursework — plain <code>.md</code> files you own, not a
         database. Paste in a lecture PDF and get real, editable text and equations back, not a

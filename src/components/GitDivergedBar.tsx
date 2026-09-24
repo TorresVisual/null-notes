@@ -41,7 +41,7 @@ export function GitDivergedBar({
         behind by {behind} ({noteNames(remotePaths)}).{' '}
         {disjoint
           ? "The two sides touch different notes, so this can sync without a conflict."
-          : 'Resolve it in the terminal or your Git tool; null-notes never merges or rebases automatically.'}
+          : 'Resolve it in the terminal or your Git tool; Null Notes never merges or rebases automatically.'}
       </span>
       {disjoint && (
         <button

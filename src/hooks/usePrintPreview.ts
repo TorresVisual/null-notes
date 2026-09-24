@@ -76,7 +76,7 @@ export function usePrintPreview(
   const [contentVersion, setContentVersion] = useState(0)
 
   // WebView2's PrintToPdf/Print read the note's title off `document.title`,
-  // which index.html hardcodes to "null-notes" — left alone, every export
+  // which index.html hardcodes to "Null Notes" — left alone, every export
   // and every physical print job carries that instead of the note's own
   // title. Restored on close so the window's own title (Alt+Tab, taskbar)
   // isn't left stuck on whatever note was last printed.

@@ -8,7 +8,7 @@ export function useWindowTitle(workspacePath: string | null, activeTab: string |
   const title = [
     activeTab ? noteTitle(notes, activeTab) : null,
     workspacePath ? folderName(workspacePath) : null,
-    'null-notes',
+    'Null Notes',
   ]
     .filter((p): p is string => p !== null)
     .join(' — ')

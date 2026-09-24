@@ -25,14 +25,14 @@ afterEach(() => {
 
 describe('Titlebar', () => {
   it('shows the given title', () => {
-    render(<Titlebar title="Lecture 7 — Notes — null-notes" onCommand={vi.fn()} />)
-    expect(screen.getByText('Lecture 7 — Notes — null-notes')).toBeInTheDocument()
+    render(<Titlebar title="Lecture 7 — Notes — Null Notes" onCommand={vi.fn()} />)
+    expect(screen.getByText('Lecture 7 — Notes — Null Notes')).toBeInTheDocument()
   })
 
   it('dispatches the command id when a File menu item is picked', async () => {
     const user = userEvent.setup()
     const onCommand = vi.fn()
-    render(<Titlebar title="null-notes" onCommand={onCommand} />)
+    render(<Titlebar title="Null Notes" onCommand={onCommand} />)
     await user.click(screen.getByText('File'))
     await user.click(await screen.findByText('Open Workspace…'))
     expect(onCommand).toHaveBeenCalledWith('open-workspace')
@@ -41,7 +41,7 @@ describe('Titlebar', () => {
   it('dispatches close-workspace when picked from the File menu', async () => {
     const user = userEvent.setup()
     const onCommand = vi.fn()
-    render(<Titlebar title="null-notes" onCommand={onCommand} />)
+    render(<Titlebar title="Null Notes" onCommand={onCommand} />)
     await user.click(screen.getByText('File'))
     await user.click(await screen.findByText('Close Workspace'))
     expect(onCommand).toHaveBeenCalledWith('close-workspace')
@@ -51,7 +51,7 @@ describe('Titlebar', () => {
     const user = userEvent.setup()
     render(
       <Titlebar
-        title="null-notes"
+        title="Null Notes"
         onCommand={vi.fn()}
         recentWorkspaces={['/ws/Lecture Notes', '/ws/CS 101']}
       />,
@@ -65,7 +65,7 @@ describe('Titlebar', () => {
     const user = userEvent.setup()
     const onCommand = vi.fn()
     render(
-      <Titlebar title="null-notes" onCommand={onCommand} recentWorkspaces={['/ws/Lecture Notes']} />,
+      <Titlebar title="Null Notes" onCommand={onCommand} recentWorkspaces={['/ws/Lecture Notes']} />,
     )
     await user.click(screen.getByText('File'))
     await user.click(await screen.findByText('Lecture Notes'))
@@ -73,7 +73,7 @@ describe('Titlebar', () => {
   })
 
   it('wires the window controls to the Tauri window API', () => {
-    render(<Titlebar title="null-notes" onCommand={vi.fn()} />)
+    render(<Titlebar title="Null Notes" onCommand={vi.fn()} />)
     fireEvent.click(screen.getByLabelText('Minimize'))
     expect(minimize).toHaveBeenCalled()
     fireEvent.click(screen.getByLabelText('Maximize'))
@@ -84,7 +84,7 @@ describe('Titlebar', () => {
 
   it('keeps Toggle Terminal in the View menu on desktop', async () => {
     const user = userEvent.setup()
-    render(<Titlebar title="null-notes" onCommand={vi.fn()} />)
+    render(<Titlebar title="Null Notes" onCommand={vi.fn()} />)
     await user.click(screen.getByText('View'))
     expect(await screen.findByText('Toggle Terminal')).toBeInTheDocument()
   })
