@@ -93,15 +93,19 @@ jobs:
         run: |
           # Tap only the URL field, at the pre-keyboard layout (points, from a
           # CI screenshot): the keyboard shifts everything afterwards. Tab
-          # (HID 43) then reaches the token field and Enter (HID 40) submits.
+          # (HID 43) then reaches the token field. Return (HID 40) did not
+          # submit the form (run 38180844649), so the button is tapped at its
+          # keyboard-open position.
           # Tab alone fails with nothing focused (run 38180210398).
           idb ui tap --udid "$UDID" 196 585
           idb ui text --udid "$UDID" "$FIXTURE_REMOTE_URL"
           idb ui key --udid "$UDID" 43
           idb ui text --udid "$UDID" "dummy-token-for-ci"
           xcrun simctl io "$UDID" screenshot clone-filled.png
-          idb ui key --udid "$UDID" 40
-          sleep 10
+          idb ui tap --udid "$UDID" 196 663
+          sleep 3
+          xcrun simctl io "$UDID" screenshot clone-progress.png
+          sleep 8
           xcrun simctl io "$UDID" screenshot clone-success.png
           idb ui describe-all --udid "$UDID" > ax-clone.json || true
       - name: Read the cloned note off the device
@@ -131,6 +135,7 @@ jobs:
           name: mobile-editor-sync-clone
           path: |
             clone-filled.png
+            clone-progress.png
             clone-success.png
             sidebar-open.png
             ax-clone.json
