@@ -57,10 +57,10 @@ gix-transport = { version = "0.59.2", default-features = false, features = ["blo
 gix-protocol = { version = "0.65.1", default-features = false, features = ["blocking-client"] }
 
 [target.'cfg(target_os = "ios")'.dependencies]
-keyring = "4"
-# keyring's default `v1` feature only turns on apple-native-keyring-store's
-# `keychain` feature; iOS's build of that crate has a compile_error! unless
-# `protected` is also enabled (Cargo unifies this with keyring's own copy).
+keyring-core = "1"
+# keyring's v1 `Entry` auto-selects the macOS keychain store, which doesn't
+# exist on iOS, so every call failed with NoDefaultStore. Using keyring-core
+# with the Apple protected store set explicitly (git_credentials.rs) avoids it.
 apple-native-keyring-store = { version = "1", features = ["protected"] }
 
 [target.'cfg(windows)'.dependencies]
