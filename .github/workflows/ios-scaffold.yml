@@ -195,6 +195,56 @@ jobs:
         run: sleep 5
       - name: Screenshot the result
         run: xcrun simctl io "$UDID" screenshot onboarding-after.png
+      - name: Relaunch for a fresh onboarding form
+        run: |
+          xcrun simctl terminate "$UDID" dev.nullnotes.app || true
+          xcrun simctl launch "$UDID" dev.nullnotes.app
+          sleep 5
+      - name: Clone the fixture remote through the onboarding form
+        run: |
+          # Only the first field is tapped: the keyboard shifts the layout, so
+          # later coordinates are unreliable. Tab (HID 43) moves to the token
+          # field and Enter (HID 40) submits the form.
+          idb ui tap --udid "$UDID" 150 530
+          idb ui text --udid "$UDID" "$FIXTURE_REMOTE_URL"
+          idb ui key --udid "$UDID" 43
+          idb ui text --udid "$UDID" "dummy-token-for-ci"
+          xcrun simctl io "$UDID" screenshot clone-filled.png
+          idb ui key --udid "$UDID" 40
+          sleep 10
+          xcrun simctl io "$UDID" screenshot clone-success.png
+          idb ui describe-all --udid "$UDID" > ax-clone.json || true
+      - name: Read the cloned note off the device
+        run: |
+          set -euo pipefail
+          APP_DATA=$(xcrun simctl get_app_container "$UDID" dev.nullnotes.app data)
+          NOTE_PATH=$(find "$APP_DATA" -iname "note.md" -not -path "*/.git/*" | head -n1)
+          if [ -z "$NOTE_PATH" ]; then
+            echo "note.md not found in the data container"
+            find "$APP_DATA" -maxdepth 4 -not -path "*/Library/*"
+            exit 1
+          fi
+          echo "Found at: $NOTE_PATH"
+          grep -q "Fixture note" "$NOTE_PATH"
+          echo "on-device clone content: OK"
+      - name: Tap the sidebar toggle (exploratory, for the next plan task)
+        if: always()
+        run: |
+          idb ui tap --udid "$UDID" 30 81
+          sleep 1
+          xcrun simctl io "$UDID" screenshot sidebar-open.png
+          idb ui describe-all --udid "$UDID" > ax-sidebar.json || true
+      - name: Upload clone screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mobile-editor-sync-clone
+          path: |
+            clone-filled.png
+            clone-success.png
+            sidebar-open.png
+            ax-clone.json
+            ax-sidebar.json
       - name: Upload onboarding screenshots
         if: always()
         uses: actions/upload-artifact@v4
