@@ -91,10 +91,10 @@ jobs:
           idb connect "$UDID"
       - name: Clone the fixture remote through the onboarding form
         run: |
-          # Only the first field is tapped: the keyboard shifts the layout, so
-          # later coordinates are unreliable. Tab (HID 43) moves to the token
-          # field and Enter (HID 40) submits the form.
-          idb ui tap --udid "$UDID" 150 530
+          # No tap: a tap at a guessed coordinate missed the field (the first
+          # CI run typed the token into the URL field). With nothing focused,
+          # Tab (HID 43) lands on the first input; Enter (HID 40) submits.
+          idb ui key --udid "$UDID" 43
           idb ui text --udid "$UDID" "$FIXTURE_REMOTE_URL"
           idb ui key --udid "$UDID" 43
           idb ui text --udid "$UDID" "dummy-token-for-ci"
