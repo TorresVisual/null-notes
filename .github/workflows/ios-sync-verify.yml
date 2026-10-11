@@ -121,13 +121,48 @@ jobs:
           echo "Found at: $NOTE_PATH"
           grep -q "Fixture note" "$NOTE_PATH"
           echo "on-device clone content: OK"
-      - name: Tap the sidebar toggle (exploratory, for the next plan task)
+      - name: Open the note and try editing it (exploratory tap positions)
         if: always()
         run: |
-          idb ui tap --udid "$UDID" 30 81
-          sleep 1
-          xcrun simctl io "$UDID" screenshot sidebar-open.png
-          idb ui describe-all --udid "$UDID" > ax-sidebar.json || true
+          # Positions are guesses from run 38182288140's dashboard screenshot;
+          # the markers typed at each y show on disk which tap reached the editor.
+          idb ui tap --udid "$UDID" 79 356
+          sleep 3
+          xcrun simctl io "$UDID" screenshot note-open.png
+          idb ui describe-all --udid "$UDID" > ax-note.json || true
+          for y in 200 260 320; do
+            idb ui tap --udid "$UDID" 120 "$y"
+            idb ui text --udid "$UDID" " m$y"
+            sleep 1
+          done
+          sleep 2
+          xcrun simctl io "$UDID" screenshot after-edit.png
+          APP_DATA=$(xcrun simctl get_app_container "$UDID" dev.nullnotes.app data)
+          NOTE_PATH=$(find "$APP_DATA" -iname "note.md" -not -path "*/.git/*" | head -n1)
+          echo "--- note.md on device ---"
+          cat "$NOTE_PATH"
+      - name: Try Sync now and read the remote with a plain git clone
+        if: always()
+        run: |
+          idb ui tap --udid "$UDID" 330 118
+          sleep 8
+          xcrun simctl io "$UDID" screenshot after-sync.png
+          rm -rf /tmp/verify-push
+          git clone "$FIXTURE_REMOTE_URL" /tmp/verify-push
+          git -C /tmp/verify-push log --oneline | head -5
+          echo "--- remote note.md ---"
+          cat /tmp/verify-push/note.md
+      - name: Push a desktop-side commit, relaunch, and capture the picker
+        if: always()
+        run: |
+          echo "desktop edit" >> /tmp/verify-push/note.md
+          git -C /tmp/verify-push -c user.name=desktop-sim -c user.email=desktop-sim@example.com commit -qam "desktop: further edit"
+          git -C /tmp/verify-push push -q origin main
+          xcrun simctl terminate "$UDID" dev.nullnotes.app || true
+          xcrun simctl launch "$UDID" dev.nullnotes.app
+          sleep 5
+          xcrun simctl io "$UDID" screenshot after-relaunch.png
+          idb ui describe-all --udid "$UDID" > ax-relaunch.json || true
       - name: Upload clone screenshots
         if: always()
         uses: actions/upload-artifact@v4
@@ -139,4 +174,9 @@ jobs:
             clone-success.png
             sidebar-open.png
             ax-clone.json
-            ax-sidebar.json
+            note-open.png
+            after-edit.png
+            after-sync.png
+            after-relaunch.png
+            ax-note.json
+            ax-relaunch.json
