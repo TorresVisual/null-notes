@@ -25,8 +25,7 @@ pub fn run() {
         });
     // Only meaningful alongside a real `--workspace=` (the `--open-file=`
     // fallback above already lands on its one file via the temp workspace).
-    let initial_select_file =
-        commands::workspace::select_file_from_args(std::env::args().skip(1));
+    let initial_select_file = commands::workspace::select_file_from_args(std::env::args().skip(1));
 
     #[cfg(windows)]
     unsafe {
