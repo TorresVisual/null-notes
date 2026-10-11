@@ -109,7 +109,7 @@ gh run watch --exit-status
 
 On failure, `gh run view --log-failed`.
 
-**Result:**
+**Result:** Passed in the slim workflow `.github/workflows/ios-sync-verify.yml` (build + boot + clone only; the full `ios-scaffold.yml` stays for release-style runs). Real `git clone` over `http://127.0.0.1:8080/cgi-bin/git-http-backend/fixture-remote.git` works; the earlier "repository not found" was the missing `/cgi-bin/git-http-backend/` prefix (ade39c6).
 
 - [ ] **Step 4: Commit**
 
@@ -197,7 +197,7 @@ gh workflow run ios-scaffold.yml
 gh run watch --exit-status
 ```
 
-**Result:**
+**Result:** Passed, CI run [38182288140](https://github.com/TorresVisual/null-notes/actions/runs/38182288140): `note.md` found in the app's data container with "Fixture note", dashboard lists it under Recent with Git "Up to date". Getting there found and fixed a real bug: `keyring`'s v1 `Entry` has no iOS store, so every token save failed with NoDefaultStore (955ba0c; the earlier unreachable-host onboarding check never reached it). Input method that works: tap the URL field at (196, 585) pt, then `idb ui text`, Tab (`key 43`) to the token field, tap Clone workspace at (196, 663) pt. Return (`key 40`) does not submit; Tab with nothing focused does nothing; `idb ui describe-all` only exposes the app root, so label-based taps are not possible. Observed, not fixed: the post-clone dashboard is clipped on the right edge at 393pt width.
 
 - [ ] **Step 5: Commit**
 
