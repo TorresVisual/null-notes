@@ -28,6 +28,10 @@ describe('centredRuler', () => {
     const ruler = centredRuler(800, 600)
     expect(ruler).toMatchObject({ x: 400, y: 300, angle: 0 })
   })
+
+  it('centres horizontally on the page, wherever its origin is', () => {
+    expect(centredRuler(1200, 600, -400)).toMatchObject({ x: 200, y: 300 })
+  })
 })
 
 describe('rulerEndpoints', () => {

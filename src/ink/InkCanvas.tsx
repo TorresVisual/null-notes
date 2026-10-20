@@ -1,6 +1,6 @@
 import { useRef, useState, useEffect, useCallback } from 'react'
 import type { PointerEvent as ReactPointerEvent } from 'react'
-import { useInkCanvas, isEraserTip } from './useInkCanvas'
+import { useInkCanvas, isEraserTip, toInk } from './useInkCanvas'
 import { pinchZoom, distanceBetween } from './zoom'
 import { useInkStore } from '../store/ink'
 import type { CanvasHandle } from '../store/ink'
@@ -127,7 +127,7 @@ export function InkCanvas({
 
   function pagePoint(target: HTMLElement, clientX: number, clientY: number) {
     const rect = target.getBoundingClientRect()
-    return { x: (clientX - rect.left) / zoom, y: (clientY - rect.top) / zoom }
+    return toInk({ offsetX: clientX - rect.left, offsetY: clientY - rect.top }, zoom, inkData)
   }
 
   function handlePointerDown(e: ReactPointerEvent<HTMLDivElement>) {
@@ -223,6 +223,7 @@ export function InkCanvas({
             width: displayWidth,
             height: displayHeight,
             backgroundSize: `${GRID_SIZE * zoom}px ${GRID_SIZE * zoom}px`,
+            backgroundPosition: `${-inkData.originX * zoom}px ${-inkData.originY * zoom}px`,
             touchAction: 'none',
           }}
         />
@@ -258,8 +259,8 @@ export function InkCanvas({
             rows={Math.max(1, editingText.text.split('\n').length)}
             wrap="off"
             style={{
-              left: editingText.x * zoom,
-              top: editingText.y * zoom,
+              left: (editingText.x - inkData.originX) * zoom,
+              top: (editingText.y - inkData.originY) * zoom,
               color: editingText.color,
               fontSize: editingText.size * zoom,
             }}

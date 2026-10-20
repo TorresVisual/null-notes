@@ -19,8 +19,8 @@ export const RULER_BAND = 36
 export const GRAB_DISTANCE = RULER_BAND / 2
 export const SNAP_DISTANCE = 48
 
-export function centredRuler(width: number, height: number): Ruler {
-  return { x: width / 2, y: height / 2, angle: 0, length: DEFAULT_RULER_LENGTH }
+export function centredRuler(width: number, height: number, originX = 0): Ruler {
+  return { x: originX + width / 2, y: height / 2, angle: 0, length: DEFAULT_RULER_LENGTH }
 }
 
 export function rulerEndpoints(ruler: Ruler): [{ x: number; y: number }, { x: number; y: number }] {

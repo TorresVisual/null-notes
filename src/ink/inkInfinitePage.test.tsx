@@ -100,3 +100,27 @@ describe('pointer mapping', () => {
     expect(lastWrite().shapes[0]).toMatchObject({ x1: 100, y1: 200, x2: 300, y2: 300 })
   })
 })
+
+describe('rendering at a non-zero origin', () => {
+  const GROWN: InkData = { ...PAGE, originX: -400, originY: 0, width: 1200, height: 600 }
+
+  it('places the label editor at the text position minus the origin', async () => {
+    useInkStore.setState({ tool: 'text' })
+    const { canvas, container } = await mountCanvas({ autoGrow: true, growAllSides: true }, GROWN)
+    at(canvas, 'pointerDown', 500, 100)
+    at(canvas, 'pointerUp', 500, 100)
+
+    const editor = await waitFor(() => {
+      const el = container.querySelector<HTMLTextAreaElement>('textarea.ink-text-editor')
+      if (!el) throw new Error('editor not open')
+      return el
+    })
+    expect(editor.style.left).toBe('500px')
+    expect(editor.style.top).toBe('100px')
+  })
+
+  it('keeps the grid aligned to ink coordinates', async () => {
+    const { canvas } = await mountCanvas({ zoom: 2 }, GROWN)
+    expect(canvas.style.backgroundPosition).toBe('800px 0px')
+  })
+})

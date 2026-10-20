@@ -303,8 +303,8 @@ export function useInkCanvas(
   // The ruler arrives lying across the middle of the page you are looking at,
   // not the middle of a page that has grown to twice the screen.
   const toggleRuler = useCallback(() => {
-    setRuler((current) => (current ? null : centredRuler(inkData.width, height)))
-  }, [inkData.width, height])
+    setRuler((current) => (current ? null : centredRuler(inkData.width, height, inkData.originX)))
+  }, [inkData.width, inkData.originX, height])
 
   const clearSelection = useCallback(() => {
     lassoPath.current = []
