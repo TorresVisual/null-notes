@@ -1,17 +1,21 @@
-// A page grows outward from its fixed (0, 0) origin, in whichever direction
-// content is approaching it from — bottom and right, the two edges paper
-// naturally grows towards as you write (P13-4's decision: see docs/ROADMAP.md
-// for the full record). Growing the other two edges would need every
-// existing stroke/shape/text translated by the growth amount, *and* the
-// scroll position compensated by that same amount so nothing already drawn
-// visually jumps — a materially riskier mechanism than "make the box
-// bigger," which is all bottom/right growth has ever needed, and one this
-// deliberately does not attempt.
+// The page grows on a side when ink comes within GROW_MARGIN of it. Right and
+// down just make the box bigger; left and up move the page's origin instead,
+// so no stored coordinate is ever translated (see ink-infinite-page-design.md).
+// Only the full-screen editor asks for all four sides — inline canvases and PDF
+// pages keep a fixed origin.
 import { boundsOfTextItem } from './textBounds'
 import type { InkData } from './types'
 
 export const GROW_MARGIN = 160
 export const PAGE_STEP = 400
+export const MAX_EXTENT = 8000
+
+export interface Page {
+  originX: number
+  originY: number
+  width: number
+  height: number
+}
 
 export interface Bounds {
   minX: number
@@ -48,15 +52,20 @@ export function inkBounds(data: InkData): Bounds {
   return bounds
 }
 
-export function growCanvas(
-  width: number,
-  height: number,
-  reach: Pick<Bounds, 'maxX' | 'maxY'>,
-  autoGrow: boolean,
-): { width: number; height: number } {
-  if (!autoGrow) return { width, height }
-  return {
-    width: reach.maxX > width - GROW_MARGIN ? width + PAGE_STEP : width,
-    height: reach.maxY > height - GROW_MARGIN ? height + PAGE_STEP : height,
-  }
+function stepsFor(needed: number): number {
+  return needed > 0 ? Math.ceil(needed / PAGE_STEP) * PAGE_STEP : 0
+}
+
+function growAxis(origin: number, size: number, min: number, max: number, growStart: boolean) {
+  const room = Math.max(0, Math.floor((MAX_EXTENT - size) / PAGE_STEP) * PAGE_STEP)
+  const start = growStart ? Math.min(stepsFor(origin + GROW_MARGIN - min), room) : 0
+  const end = Math.min(stepsFor(max - (origin + size - GROW_MARGIN)), room - start)
+  return { origin: origin - start, size: size + start + end }
+}
+
+export function growCanvas(page: Page, bounds: Bounds, autoGrow: boolean, growAllSides: boolean): Page {
+  if (!autoGrow) return page
+  const x = growAxis(page.originX, page.width, bounds.minX, bounds.maxX, growAllSides)
+  const y = growAxis(page.originY, page.height, bounds.minY, bounds.maxY, growAllSides)
+  return { originX: x.origin, originY: y.origin, width: x.size, height: y.size }
 }

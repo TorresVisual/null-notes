@@ -32,6 +32,7 @@ interface InkCanvasProps {
   zoom?: number
   onZoomChange?: (zoom: number) => void
   autoGrow?: boolean
+  growAllSides?: boolean
   onSaved?: () => void
   autoActivate?: boolean
 }
@@ -43,6 +44,7 @@ export function InkCanvas({
   zoom = 1,
   onZoomChange,
   autoGrow = false,
+  growAllSides = false,
   onSaved,
   autoActivate = false,
 }: InkCanvasProps) {
@@ -66,7 +68,7 @@ export function InkCanvas({
     updateEditingText,
     commitEditingText,
     cancelEditingText,
-  } = useInkCanvas(svgPath, width, height, { zoom, autoGrow, onSaved })
+  } = useInkCanvas(svgPath, width, height, { zoom, autoGrow, growAllSides, onSaved })
 
   const setActiveCanvas = useInkStore((s) => s.setActiveCanvas)
   const clearActiveCanvas = useInkStore((s) => s.clearActiveCanvas)

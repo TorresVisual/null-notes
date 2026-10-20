@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { GROW_MARGIN, PAGE_STEP, EMPTY_BOUNDS, boundsOfPoints, inkBounds, growCanvas } from './growCanvas'
+import { GROW_MARGIN, PAGE_STEP, MAX_EXTENT, EMPTY_BOUNDS, boundsOfPoints, inkBounds, growCanvas } from './growCanvas'
 import type { InkData } from './types'
 
 describe('boundsOfPoints', () => {
@@ -39,33 +39,76 @@ describe('inkBounds', () => {
   })
 })
 
-const reach = (maxX: number, maxY: number) => ({ minX: 0, minY: 0, maxX, maxY })
+const page = { originX: 0, originY: 0, width: 800, height: 600 }
+const bounds = (minX: number, minY: number, maxX: number, maxY: number) => ({ minX, minY, maxX, maxY })
+const inside = bounds(300, 300, 400, 400)
 
 describe('growCanvas', () => {
-  it('leaves both dimensions alone when nothing is near an edge', () => {
-    expect(growCanvas(800, 600, reach(400, 300), true)).toEqual({ width: 800, height: 600 })
+  it('leaves the page alone when nothing is near an edge', () => {
+    expect(growCanvas(page, inside, true, true)).toEqual(page)
   })
 
-  it('grows width when content nears the right edge', () => {
-    expect(growCanvas(800, 600, reach(800 - GROW_MARGIN + 1, 0), true)).toEqual({ width: 800 + PAGE_STEP, height: 600 })
+  it('does nothing when autoGrow is off, however far the ink reaches', () => {
+    expect(growCanvas(page, bounds(-9000, -9000, 9000, 9000), false, true)).toEqual(page)
   })
 
-  it('grows height when content nears the bottom edge', () => {
-    expect(growCanvas(800, 600, reach(0, 600 - GROW_MARGIN + 1), true)).toEqual({ width: 800, height: 600 + PAGE_STEP })
+  it('grows right and down by one step, as before, without growAllSides', () => {
+    expect(growCanvas(page, bounds(300, 300, 800 - GROW_MARGIN + 1, 400), true, false))
+      .toEqual({ ...page, width: 800 + PAGE_STEP })
+    expect(growCanvas(page, bounds(300, 300, 400, 600 - GROW_MARGIN + 1), true, false))
+      .toEqual({ ...page, height: 600 + PAGE_STEP })
   })
 
-  it('grows both dimensions when content nears the bottom-right corner', () => {
-    expect(growCanvas(800, 600, reach(800 - GROW_MARGIN + 1, 600 - GROW_MARGIN + 1), true)).toEqual({
-      width: 800 + PAGE_STEP,
-      height: 600 + PAGE_STEP,
+  // Review Focus 4: inline canvases share the hook and must keep a fixed origin.
+  it('never moves the origin without growAllSides', () => {
+    expect(growCanvas(page, bounds(-500, -500, 400, 400), true, false)).toEqual(page)
+  })
+
+  it('grows left and up by moving the origin, leaving the far edges where they were', () => {
+    expect(growCanvas(page, bounds(GROW_MARGIN - 1, 300, 400, 400), true, true))
+      .toEqual({ originX: -PAGE_STEP, originY: 0, width: 800 + PAGE_STEP, height: 600 })
+    expect(growCanvas(page, bounds(300, GROW_MARGIN - 1, 400, 400), true, true))
+      .toEqual({ originX: 0, originY: -PAGE_STEP, width: 800, height: 600 + PAGE_STEP })
+  })
+
+  it('treats the margin boundary as inside: exactly GROW_MARGIN from the edge does not grow', () => {
+    expect(growCanvas(page, bounds(GROW_MARGIN, GROW_MARGIN, 800 - GROW_MARGIN, 600 - GROW_MARGIN), true, true))
+      .toEqual(page)
+  })
+
+  it('grows every side at once', () => {
+    expect(growCanvas(page, bounds(0, 0, 800, 600), true, true)).toEqual({
+      originX: -PAGE_STEP, originY: -PAGE_STEP, width: 800 + 2 * PAGE_STEP, height: 600 + 2 * PAGE_STEP,
     })
   })
 
-  it('never grows from content near the origin', () => {
-    expect(growCanvas(800, 600, EMPTY_BOUNDS, true)).toEqual({ width: 800, height: 600 })
+  // Review Focus 3: a lasso drag or paste can overshoot by several steps.
+  it('grows several steps at once for an overshoot, enough to clear the margin', () => {
+    const grown = growCanvas(page, bounds(-1000, 300, 400, 400), true, true)
+    expect(grown.originX).toBe(-3 * PAGE_STEP)
+    expect(grown.width).toBe(800 + 3 * PAGE_STEP)
+    expect(-1000).toBeGreaterThan(grown.originX + GROW_MARGIN - 1)
   })
 
-  it('does nothing when autoGrow is off, regardless of reach', () => {
-    expect(growCanvas(800, 600, reach(10000, 10000), false)).toEqual({ width: 800, height: 600 })
+  // Review Focus 2
+  it('does not grow for empty bounds', () => {
+    expect(growCanvas(page, EMPTY_BOUNDS, true, true)).toEqual(page)
+  })
+
+  it('stops a side at the extent cap', () => {
+    const wide = { ...page, width: MAX_EXTENT }
+    expect(growCanvas(wide, bounds(0, 300, MAX_EXTENT, 400), true, true)).toEqual(wide)
+  })
+
+  it('shares the remaining room, low side first, when both sides want more than fits', () => {
+    const nearCap = { ...page, width: MAX_EXTENT - PAGE_STEP }
+    const grown = growCanvas(nearCap, bounds(0, 300, MAX_EXTENT - PAGE_STEP, 400), true, true)
+    expect(grown.originX).toBe(-PAGE_STEP)
+    expect(grown.width).toBe(MAX_EXTENT)
+  })
+
+  it('does not shrink a page that is already past the cap', () => {
+    const huge = { ...page, width: 9000 }
+    expect(growCanvas(huge, bounds(0, 300, 9000, 400), true, true)).toEqual(huge)
   })
 })

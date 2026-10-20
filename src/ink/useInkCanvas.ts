@@ -15,7 +15,7 @@ import type { Ruler, RulerGrab } from './ruler'
 import { drawShapePreview } from './shapePreview'
 import { drawTextItem } from './textRender'
 import { pointInTextItem, translateTextItem, boundsOfTextItem } from './textBounds'
-import { EMPTY_BOUNDS, growCanvas, boundsOfPoints } from './growCanvas'
+import { EMPTY_BOUNDS, growCanvas, boundsOfPoints, type Bounds } from './growCanvas'
 import { straightLineEnds } from './straighten'
 import { paintOrder } from './paintOrder'
 import {
@@ -107,6 +107,7 @@ function drawRuler(ctx: CanvasRenderingContext2D, ruler: Ruler): void {
 interface InkOptions {
   zoom?: number
   autoGrow?: boolean
+  growAllSides?: boolean
   onSaved?: () => void
 }
 
@@ -200,7 +201,7 @@ export function useInkCanvas(
   svgPath: string,
   width: number,
   height: number,
-  { zoom = 1, autoGrow = false, onSaved }: InkOptions = {},
+  { zoom = 1, autoGrow = false, growAllSides = false, onSaved }: InkOptions = {},
 ) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const tool = useInkStore((s) => s.tool)
@@ -259,6 +260,11 @@ export function useInkCanvas(
       void inkApi.write(svgPath, data).then(() => onSavedRef.current?.())
     },
     [svgPath],
+  )
+
+  const growPage = useCallback(
+    (data: InkData, bounds: Bounds) => growCanvas(data, bounds, autoGrow, growAllSides),
+    [autoGrow, growAllSides],
   )
 
   // The selected preset *is* the pen — colour, width and opacity all come from
@@ -370,15 +376,14 @@ export function useInkCanvas(
         color: current.color,
         size: current.size,
       }
-      const { width, height } = growCanvas(inkData.width, inkData.height, boundsOfTextItem(item), autoGrow)
-      commit({ ...inkData, width, height, texts: [...inkData.texts, item] })
+      commit({ ...inkData, ...growPage(inkData, boundsOfTextItem(item)), texts: [...inkData.texts, item] })
     } else {
       commit({
         ...inkData,
         texts: inkData.texts.map((t) => (t.id === current.id ? { ...t, text: current.text } : t)),
       })
     }
-  }, [editingText, inkData, commit, autoGrow])
+  }, [editingText, inkData, commit, growPage])
 
   // Escape discards rather than commits: a fresh item was never added, and an
   // edited existing one was never mutated until `commitEditingText` runs, so
@@ -692,9 +697,7 @@ export function useInkCanvas(
           setHistory((past) => [...past, snapshot])
           setFuture([])
           const item = inkData.texts.find((t) => t.id === textFrom.id)
-          const reach = item ? boundsOfTextItem(item) : EMPTY_BOUNDS
-          const { width, height } = growCanvas(inkData.width, inkData.height, reach, autoGrow)
-          const grown = { ...inkData, width, height }
+          const grown = { ...inkData, ...growPage(inkData, item ? boundsOfTextItem(item) : EMPTY_BOUNDS) }
           setInkData(grown)
           save(grown)
         } else {
@@ -712,8 +715,7 @@ export function useInkCanvas(
         if (inkData !== dragged) {
           setHistory((past) => [...past, dragged])
           setFuture([])
-          const { width, height } = growCanvas(inkData.width, inkData.height, selectionBounds(inkData, selection), autoGrow)
-          const grown = { ...inkData, width, height }
+          const grown = { ...inkData, ...growPage(inkData, selectionBounds(inkData, selection)) }
           setInkData(grown)
           save(grown)
         }
@@ -749,8 +751,7 @@ export function useInkCanvas(
           { x: shape.x1, y: shape.y1 },
           { x: shape.x2, y: shape.y2 },
         ]
-        const shapeGrown = growCanvas(inkData.width, inkData.height, boundsOfPoints(corners), autoGrow)
-        commit({ ...inkData, width: shapeGrown.width, height: shapeGrown.height, shapes: [...inkData.shapes, shape] })
+        commit({ ...inkData, ...growPage(inkData, boundsOfPoints(corners)), shapes: [...inkData.shapes, shape] })
         return
       }
 
@@ -770,21 +771,16 @@ export function useInkCanvas(
       const straight = straightLineEnds(points)
       if (straight) {
         const shape: Shape = { id: crypto.randomUUID(), kind: 'line', ...straight, color, size }
-        const shapeGrown = growCanvas(
-          inkData.width, inkData.height,
-          boundsOfPoints([{ x: straight.x1, y: straight.y1 }, { x: straight.x2, y: straight.y2 }]),
-          autoGrow,
-        )
-        commit({ ...inkData, width: shapeGrown.width, height: shapeGrown.height, shapes: [...inkData.shapes, shape] })
+        const ends = boundsOfPoints([{ x: straight.x1, y: straight.y1 }, { x: straight.x2, y: straight.y2 }])
+        commit({ ...inkData, ...growPage(inkData, ends), shapes: [...inkData.shapes, shape] })
         return
       }
 
       const stroke: Stroke = { id: crypto.randomUUID(), points, color, size, opacity, thinning }
-      const strokeGrown = growCanvas(inkData.width, inkData.height, boundsOfPoints(stroke.points), autoGrow)
-      commit({ ...inkData, width: strokeGrown.width, height: strokeGrown.height, strokes: [...inkData.strokes, stroke] })
+      commit({ ...inkData, ...growPage(inkData, boundsOfPoints(stroke.points)), strokes: [...inkData.strokes, stroke] })
     },
     [
-      tool, inkData, color, size, opacity, commit, save, zoom, autoGrow, selection,
+      tool, inkData, color, size, opacity, commit, save, zoom, growPage, selection,
       snappedPoints, releaseRuler, startEditText,
     ],
   )
