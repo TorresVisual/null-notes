@@ -19,6 +19,7 @@ import { backingScale } from './zoom'
 import { EMPTY_BOUNDS, growCanvas, boundsOfPoints, type Bounds } from './growCanvas'
 import { straightLineEnds } from './straighten'
 import { paintOrder } from './paintOrder'
+import { strokeOptions } from './strokeOptions'
 import {
   EMPTY_SELECTION,
   isSelectionEmpty,
@@ -55,8 +56,6 @@ export interface EditingText {
 // editor, not start a drag — the same "judge intent once" posture the ruler
 // snap decision already uses.
 const TEXT_DRAG_THRESHOLD = 3
-const DEFAULT_THINNING = 0.5
-const STROKE_OPTIONS = { smoothing: 0.5, streamline: 0.5 }
 
 const LASSO_COLOR = 'rgba(126, 231, 135, 0.9)'
 
@@ -151,11 +150,11 @@ function fillStroke(
   color: string,
   size: number,
   opacity: number,
-  thinning: number = DEFAULT_THINNING,
+  thinning?: number,
 ): void {
   const outline = getStroke(
     points.map((p) => [p.x, p.y, p.pressure]),
-    { size, thinning, ...STROKE_OPTIONS },
+    strokeOptions({ size, opacity, thinning }),
   )
   const first = outline[0]
   if (!first) return

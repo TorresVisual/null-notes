@@ -2,6 +2,7 @@ import { getStroke } from 'perfect-freehand'
 import { paintOrder } from './paintOrder'
 import { GROW_MARGIN, inkBounds } from './growCanvas'
 import { TEXT_LINE_HEIGHT } from './textBounds'
+import { DEFAULT_THINNING, strokeOptions } from './strokeOptions'
 import type { InkData, Stroke, Shape, TextItem } from './types'
 
 function escapeXmlText(text: string): string {
@@ -22,14 +23,9 @@ function pointsToSvgPath(points: number[][]): string {
 }
 
 export function strokeToPath(stroke: Stroke): string {
-  const thinning = stroke.thinning ?? 0.5
+  const thinning = stroke.thinning ?? DEFAULT_THINNING
   const inputPoints = stroke.points.map((p) => [p.x, p.y, p.pressure])
-  const outlinePoints = getStroke(inputPoints, {
-    size: stroke.size,
-    thinning,
-    smoothing: 0.5,
-    streamline: 0.5,
-  })
+  const outlinePoints = getStroke(inputPoints, strokeOptions(stroke))
   const d = pointsToSvgPath(outlinePoints)
   const raw = JSON.stringify(stroke.points)
   return `<path data-id="${stroke.id}" data-points="${encodeURIComponent(raw)}" data-color="${stroke.color}" data-size="${stroke.size}" data-opacity="${stroke.opacity}" data-thinning="${thinning}" d="${d}" fill="${stroke.color}" fill-opacity="${stroke.opacity}" />`
