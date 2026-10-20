@@ -20,6 +20,7 @@ import { EMPTY_BOUNDS, growCanvas, boundsOfPoints, type Bounds } from './growCan
 import { straightLineEnds } from './straighten'
 import { paintOrder } from './paintOrder'
 import { strokeOptions } from './strokeOptions'
+import { sameLayerKey, type LayerKey } from './layerCache'
 import {
   EMPTY_SELECTION,
   isSelectionEmpty,
@@ -171,6 +172,21 @@ function fillStroke(
   ctx.globalAlpha = 1
 }
 
+function paintCommitted(ctx: CanvasRenderingContext2D, data: InkData, editingTextId: string | null): void {
+  for (const stroke of paintOrder(data.strokes)) {
+    fillStroke(ctx, stroke.points, stroke.color, stroke.size, stroke.opacity, stroke.thinning)
+  }
+  for (const shape of data.shapes) {
+    drawShapePreview(ctx, shape)
+  }
+  // The item being typed renders through the overlay textarea instead —
+  // drawing it here too would show it twice, once live and once stale.
+  for (const item of data.texts) {
+    if (editingTextId === item.id) continue
+    drawTextItem(ctx, item)
+  }
+}
+
 // The lasso and the marquee it becomes are drawn the same way — a dashed loop.
 // Nothing about it is ever serialised: a selection is a thing you are holding,
 // not a thing the note contains.
@@ -242,6 +258,7 @@ export function useInkCanvas(
   const [editingText, setEditingText] = useState<EditingText | null>(null)
 
   const currentStroke = useRef<Point[]>([])
+  const committed = useRef<{ canvas: HTMLCanvasElement; key: LayerKey } | null>(null)
   const shapeStart = useRef<{ x: number; y: number } | null>(null)
   const eraseSnapshot = useRef<InkData | null>(null)
   const lassoPath = useRef<LassoPoint[]>([])
@@ -445,21 +462,23 @@ export function useInkCanvas(
         canvas.width = pixelWidth
         canvas.height = pixelHeight
       }
-      ctx.setTransform(scale, 0, 0, scale, -inkData.originX * scale, -inkData.originY * scale)
-      ctx.clearRect(inkData.originX, inkData.originY, inkData.width, inkData.height)
+      const key: LayerKey = { inkData, scale, editingTextId: editingText?.id ?? null }
+      const cached = committed.current
+      const layerCanvas = cached?.canvas ?? document.createElement('canvas')
+      if (!sameLayerKey(cached?.key ?? null, key)) {
+        const layerCtx = layerCanvas.getContext('2d')
+        if (!layerCtx) return
+        layerCanvas.width = pixelWidth
+        layerCanvas.height = pixelHeight
+        layerCtx.setTransform(scale, 0, 0, scale, -inkData.originX * scale, -inkData.originY * scale)
+        paintCommitted(layerCtx, inkData, key.editingTextId)
+        committed.current = { canvas: layerCanvas, key }
+      }
 
-      for (const stroke of paintOrder(inkData.strokes)) {
-        fillStroke(ctx, stroke.points, stroke.color, stroke.size, stroke.opacity, stroke.thinning)
-      }
-      for (const shape of inkData.shapes) {
-        drawShapePreview(ctx, shape)
-      }
-      // The item being typed renders through the overlay textarea instead —
-      // drawing it here too would show it twice, once live and once stale.
-      for (const item of inkData.texts) {
-        if (editingText?.id === item.id) continue
-        drawTextItem(ctx, item)
-      }
+      ctx.setTransform(1, 0, 0, 1, 0, 0)
+      ctx.clearRect(0, 0, pixelWidth, pixelHeight)
+      ctx.drawImage(layerCanvas, 0, 0)
+      ctx.setTransform(scale, 0, 0, scale, -inkData.originX * scale, -inkData.originY * scale)
       if (livePoints.length > 1) {
         fillStroke(ctx, livePoints, color, size, opacity, thinning)
       }
