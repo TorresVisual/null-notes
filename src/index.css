@@ -8,14 +8,14 @@
 
 :root {
   /* Backgrounds */
-  --bg-base: #0d0f12;
-  --bg-raised: #111318;
+  --bg-base: #1f1f1f;
+  --bg-raised: #181818;
   --bg-sunken: #0a0b0d;
-  --bg-hover: #161b22;
+  --bg-hover: #2a2a2a;
 
   /* Borders */
-  --border: #1f242c;
-  --border-strong: #2a2f38;
+  --border: #2c2c2c;
+  --border-strong: #3a3a3a;
 
   /* Text */
   --text-primary: #e6edf3;

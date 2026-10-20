@@ -11,12 +11,12 @@ All values are CSS custom properties in `src/index.css`'s `:root` block unless n
 
 | Token | Value | Use |
 |---|---|---|
-| `--bg-base` | `#0d0f12` | Page / editor background |
-| `--bg-raised` | `#111318` | Sidebar, tab bar, toolbars, modals, popovers |
+| `--bg-base` | `#1f1f1f` | Page / editor background |
+| `--bg-raised` | `#181818` | Sidebar, tab bar, toolbars, modals, popovers |
 | `--bg-sunken` | `#0a0b0d` | Nested rail elements, input backgrounds inside a raised panel |
-| `--bg-hover` | `#161b22` | Hover fill |
-| `--border` | `#1f242c` | Default dividers |
-| `--border-strong` | `#2a2f38` | Emphasized borders (panels, inputs, cards) |
+| `--bg-hover` | `#2a2a2a` | Hover fill |
+| `--border` | `#2c2c2c` | Default dividers |
+| `--border-strong` | `#3a3a3a` | Emphasized borders (panels, inputs, cards) |
 | `--text-primary` | `#e6edf3` | Primary reading text |
 | `--text-secondary` | `#9da7b3` | De-emphasized text that's still read |
 | `--text-tertiary` | `#565f6b` | Labels, metadata, disabled-adjacent text |
