@@ -1,4 +1,4 @@
-import type { Reach } from './growCanvas'
+import { EMPTY_BOUNDS, mergeBounds, boundsOfPoints, type Bounds } from './growCanvas'
 import type { InkData, Shape, Stroke } from './types'
 
 export interface LassoPoint {
@@ -106,23 +106,16 @@ export function deleteSelection(data: InkData, selection: Selection): InkData {
   }
 }
 
-// The furthest point the selection reaches on either axis, so a drag towards
-// the bottom or right edge can grow the page (P13-4) instead of pushing ink
-// off it.
-export function selectionReach(data: InkData, selection: Selection): Reach {
-  let maxX = 0
-  let maxY = 0
+// The extremes the selection covers on either axis, so a drag towards any edge
+// can grow the page instead of pushing ink off it.
+export function selectionBounds(data: InkData, selection: Selection): Bounds {
+  let bounds = EMPTY_BOUNDS
   for (const stroke of data.strokes) {
-    if (!selection.strokeIds.includes(stroke.id)) continue
-    for (const p of stroke.points) {
-      maxX = Math.max(maxX, p.x)
-      maxY = Math.max(maxY, p.y)
-    }
+    if (selection.strokeIds.includes(stroke.id)) bounds = mergeBounds(bounds, boundsOfPoints(stroke.points))
   }
   for (const shape of data.shapes) {
     if (!selection.shapeIds.includes(shape.id)) continue
-    maxX = Math.max(maxX, shape.x1, shape.x2)
-    maxY = Math.max(maxY, shape.y1, shape.y2)
+    bounds = mergeBounds(bounds, boundsOfPoints([{ x: shape.x1, y: shape.y1 }, { x: shape.x2, y: shape.y2 }]))
   }
-  return { maxX, maxY }
+  return bounds
 }

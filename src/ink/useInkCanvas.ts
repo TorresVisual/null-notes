@@ -14,8 +14,8 @@ import {
 import type { Ruler, RulerGrab } from './ruler'
 import { drawShapePreview } from './shapePreview'
 import { drawTextItem } from './textRender'
-import { pointInTextItem, translateTextItem, reachOfTextItem } from './textBounds'
-import { growCanvas, reachOfPoints } from './growCanvas'
+import { pointInTextItem, translateTextItem, boundsOfTextItem } from './textBounds'
+import { EMPTY_BOUNDS, growCanvas, boundsOfPoints } from './growCanvas'
 import { straightLineEnds } from './straighten'
 import { paintOrder } from './paintOrder'
 import {
@@ -23,7 +23,7 @@ import {
   isSelectionEmpty,
   pointInPolygon,
   selectionIn,
-  selectionReach,
+  selectionBounds,
   translatePolygon,
   translateSelection,
   deleteSelection as removeSelection,
@@ -370,7 +370,7 @@ export function useInkCanvas(
         color: current.color,
         size: current.size,
       }
-      const { width, height } = growCanvas(inkData.width, inkData.height, reachOfTextItem(item), autoGrow)
+      const { width, height } = growCanvas(inkData.width, inkData.height, boundsOfTextItem(item), autoGrow)
       commit({ ...inkData, width, height, texts: [...inkData.texts, item] })
     } else {
       commit({
@@ -692,7 +692,7 @@ export function useInkCanvas(
           setHistory((past) => [...past, snapshot])
           setFuture([])
           const item = inkData.texts.find((t) => t.id === textFrom.id)
-          const reach = item ? reachOfTextItem(item) : { maxX: 0, maxY: 0 }
+          const reach = item ? boundsOfTextItem(item) : EMPTY_BOUNDS
           const { width, height } = growCanvas(inkData.width, inkData.height, reach, autoGrow)
           const grown = { ...inkData, width, height }
           setInkData(grown)
@@ -712,7 +712,7 @@ export function useInkCanvas(
         if (inkData !== dragged) {
           setHistory((past) => [...past, dragged])
           setFuture([])
-          const { width, height } = growCanvas(inkData.width, inkData.height, selectionReach(inkData, selection), autoGrow)
+          const { width, height } = growCanvas(inkData.width, inkData.height, selectionBounds(inkData, selection), autoGrow)
           const grown = { ...inkData, width, height }
           setInkData(grown)
           save(grown)
@@ -749,7 +749,7 @@ export function useInkCanvas(
           { x: shape.x1, y: shape.y1 },
           { x: shape.x2, y: shape.y2 },
         ]
-        const shapeGrown = growCanvas(inkData.width, inkData.height, reachOfPoints(corners), autoGrow)
+        const shapeGrown = growCanvas(inkData.width, inkData.height, boundsOfPoints(corners), autoGrow)
         commit({ ...inkData, width: shapeGrown.width, height: shapeGrown.height, shapes: [...inkData.shapes, shape] })
         return
       }
@@ -772,7 +772,7 @@ export function useInkCanvas(
         const shape: Shape = { id: crypto.randomUUID(), kind: 'line', ...straight, color, size }
         const shapeGrown = growCanvas(
           inkData.width, inkData.height,
-          reachOfPoints([{ x: straight.x1, y: straight.y1 }, { x: straight.x2, y: straight.y2 }]),
+          boundsOfPoints([{ x: straight.x1, y: straight.y1 }, { x: straight.x2, y: straight.y2 }]),
           autoGrow,
         )
         commit({ ...inkData, width: shapeGrown.width, height: shapeGrown.height, shapes: [...inkData.shapes, shape] })
@@ -780,7 +780,7 @@ export function useInkCanvas(
       }
 
       const stroke: Stroke = { id: crypto.randomUUID(), points, color, size, opacity, thinning }
-      const strokeGrown = growCanvas(inkData.width, inkData.height, reachOfPoints(stroke.points), autoGrow)
+      const strokeGrown = growCanvas(inkData.width, inkData.height, boundsOfPoints(stroke.points), autoGrow)
       commit({ ...inkData, width: strokeGrown.width, height: strokeGrown.height, strokes: [...inkData.strokes, stroke] })
     },
     [
