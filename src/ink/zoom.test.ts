@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { pinchZoom, clampZoom, distanceBetween, MIN_ZOOM, MAX_ZOOM } from './zoom'
+import { pinchZoom, clampZoom, distanceBetween, backingScale, MAX_CANVAS_DIMENSION, MAX_CANVAS_PIXELS, MIN_ZOOM, MAX_ZOOM } from './zoom'
 
 describe('pinchZoom', () => {
   it('scales with the spread of the fingers', () => {
@@ -41,5 +41,21 @@ describe('clampZoom', () => {
 describe('distanceBetween', () => {
   it('measures the gap between two touches', () => {
     expect(distanceBetween({ x: 0, y: 0 }, { x: 3, y: 4 })).toBe(5)
+  })
+})
+
+describe('backingScale', () => {
+  it('is dpr × zoom for an ordinary page', () => {
+    expect(backingScale(2, 1.5, 800, 600)).toBe(3)
+  })
+
+  it('is capped by the per-axis canvas limit for a long strip', () => {
+    expect(backingScale(4, 1, 8000, 1000)).toBeCloseTo(MAX_CANVAS_DIMENSION / 8000)
+  })
+
+  it('is capped by the pixel budget for a big square page', () => {
+    const scale = backingScale(2, 1, 8000, 8000)
+    expect(scale).toBeCloseTo(Math.sqrt(MAX_CANVAS_PIXELS / (8000 * 8000)))
+    expect(8000 * scale * 8000 * scale).toBeLessThanOrEqual(MAX_CANVAS_PIXELS * 1.0001)
   })
 })

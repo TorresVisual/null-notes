@@ -82,3 +82,21 @@ describe('growing in every direction', () => {
     expect(lastWrite()).toMatchObject({ originX: 0, originY: 0, width: 800, height: 600 })
   })
 })
+
+describe('pointer mapping', () => {
+  const GROWN: InkData = { ...PAGE, originX: -400, originY: -200, width: 1200, height: 800 }
+
+  it('adds the origin to every pointer position', async () => {
+    const { canvas } = await mountCanvas({ autoGrow: true, growAllSides: true }, GROWN)
+    drawRect(canvas, 500, 400, 700, 500)
+
+    expect(lastWrite().shapes[0]).toMatchObject({ x1: 100, y1: 200, x2: 300, y2: 300 })
+  })
+
+  it('divides by zoom before adding the origin', async () => {
+    const { canvas } = await mountCanvas({ autoGrow: true, growAllSides: true, zoom: 2 }, GROWN)
+    drawRect(canvas, 1000, 800, 1400, 1000)
+
+    expect(lastWrite().shapes[0]).toMatchObject({ x1: 100, y1: 200, x2: 300, y2: 300 })
+  })
+})

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
-import { useInkCanvas, isEraserTip } from './useInkCanvas'
+import { useInkCanvas, isEraserTip, toInk } from './useInkCanvas'
 import { DEFAULT_PENS } from './pens'
 import { useInkStore } from '../store/ink'
 
@@ -300,5 +300,15 @@ describe('pen presets', () => {
     const second = render()
     expect(second.result.current.activePenId).toBe('red')
     expect(second.result.current.size).toBe(9)
+  })
+})
+
+describe('toInk', () => {
+  it('divides by zoom, then adds the page origin', () => {
+    expect(toInk({ offsetX: 200, offsetY: 100 }, 2, { originX: -400, originY: -50 })).toEqual({ x: -300, y: 0 })
+  })
+
+  it('is plain offset / zoom for a page at the origin', () => {
+    expect(toInk({ offsetX: 90, offsetY: 30 }, 1.5, { originX: 0, originY: 0 })).toEqual({ x: 60, y: 20 })
   })
 })

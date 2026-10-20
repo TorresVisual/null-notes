@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect, useCallback } from 'react'
+import { useRef, useState, useEffect, useCallback, useMemo } from 'react'
 import { getStroke } from 'perfect-freehand'
 import { inkApi } from '../lib/ink'
 import { erase } from './pointEraser'
@@ -15,6 +15,7 @@ import type { Ruler, RulerGrab } from './ruler'
 import { drawShapePreview } from './shapePreview'
 import { drawTextItem } from './textRender'
 import { pointInTextItem, translateTextItem, boundsOfTextItem } from './textBounds'
+import { backingScale } from './zoom'
 import { EMPTY_BOUNDS, growCanvas, boundsOfPoints, type Bounds } from './growCanvas'
 import { straightLineEnds } from './straighten'
 import { paintOrder } from './paintOrder'
@@ -127,6 +128,19 @@ export function isEraserTip(e: PointerLike): boolean {
   return (e.buttons & ERASER_BUTTONS_MASK) !== 0 || e.button === ERASER_BUTTON
 }
 
+interface OffsetPoint {
+  offsetX: number
+  offsetY: number
+}
+
+export function toInk(
+  e: OffsetPoint,
+  zoom: number,
+  origin: { originX: number; originY: number },
+): { x: number; y: number } {
+  return { x: e.offsetX / zoom + origin.originX, y: e.offsetY / zoom + origin.originY }
+}
+
 function isShapeTool(tool: Tool): boolean {
   return SHAPE_TOOLS.includes(tool)
 }
@@ -216,6 +230,10 @@ export function useInkCanvas(
   const setEraserMode = useInkStore((s) => s.setEraserMode)
   const setEraserSize = useInkStore((s) => s.setEraserSize)
   const [inkData, setInkData] = useState<InkData>({ originX: 0, originY: 0, width, height, strokes: [], shapes: [], texts: [] })
+  const origin = useMemo(
+    () => ({ originX: inkData.originX, originY: inkData.originY }),
+    [inkData.originX, inkData.originY],
+  )
   const [history, setHistory] = useState<InkData[]>([])
   const [future, setFuture] = useState<InkData[]>([])
 
@@ -421,15 +439,15 @@ export function useInkCanvas(
       // Back the canvas with real device pixels — at 1x on a HiDPI pen display
       // every stroke is drawn into a half-resolution buffer and upscaled. Zoom
       // multiplies in here so magnified ink is redrawn, not stretched.
-      const dpr = (window.devicePixelRatio || 1) * zoom
-      const pixelWidth = Math.round(inkData.width * dpr)
-      const pixelHeight = Math.round(inkData.height * dpr)
+      const scale = backingScale(window.devicePixelRatio || 1, zoom, inkData.width, inkData.height)
+      const pixelWidth = Math.round(inkData.width * scale)
+      const pixelHeight = Math.round(inkData.height * scale)
       if (canvas.width !== pixelWidth || canvas.height !== pixelHeight) {
         canvas.width = pixelWidth
         canvas.height = pixelHeight
       }
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
-      ctx.clearRect(0, 0, inkData.width, inkData.height)
+      ctx.setTransform(scale, 0, 0, scale, -inkData.originX * scale, -inkData.originY * scale)
+      ctx.clearRect(inkData.originX, inkData.originY, inkData.width, inkData.height)
 
       for (const stroke of paintOrder(inkData.strokes)) {
         fillStroke(ctx, stroke.points, stroke.color, stroke.size, stroke.opacity, stroke.thinning)
@@ -514,14 +532,15 @@ export function useInkCanvas(
       if (e.pointerType !== 'pen') return
       capturePointer(canvasRef.current, e.pointerId)
       const activeTool = isEraserTip(e) ? 'eraser' : tool
+      const at = toInk(e, zoom, origin)
 
       // The straightedge is grabbed before any tool gets a look in — landing on
       // it always means "put it somewhere else", whatever is in your hand.
-      if (!isEraserTip(e) && grabRuler(e.offsetX / zoom, e.offsetY / zoom)) return
+      if (!isEraserTip(e) && grabRuler(at.x, at.y)) return
 
       if (activeTool === 'eraser') {
         eraseSnapshot.current = inkData
-        eraseAt(e.offsetX / zoom, e.offsetY / zoom)
+        eraseAt(at.x, at.y)
         return
       }
 
@@ -531,8 +550,7 @@ export function useInkCanvas(
         // still being typed would hit-test against a page that doesn't yet
         // reflect it.
         commitEditingText()
-        const x = e.offsetX / zoom
-        const y = e.offsetY / zoom
+        const { x, y } = at
         const hit = [...inkData.texts].reverse().find((t) => pointInTextItem(t, x, y))
         if (hit) {
           textDragSnapshot.current = inkData
@@ -544,8 +562,7 @@ export function useInkCanvas(
       }
 
       if (activeTool === 'lasso') {
-        const x = e.offsetX / zoom
-        const y = e.offsetY / zoom
+        const { x, y } = at
 
         // Landing inside a marquee you already drew means "move this", not
         // "start again" — which is the only way to reposition without a
@@ -562,17 +579,17 @@ export function useInkCanvas(
       }
 
       if (isShapeTool(activeTool)) {
-        shapeStart.current = { x: e.offsetX / zoom, y: e.offsetY / zoom }
+        shapeStart.current = { x: at.x, y: at.y }
         return
       }
-      const start = { x: e.offsetX / zoom, y: e.offsetY / zoom, pressure: e.pressure }
+      const start = { x: at.x, y: at.y, pressure: e.pressure }
       // Judged once, at the start: a stroke that drifted on and off the edge
       // partway through would be worse than one that never snapped at all.
       snapping.current = ruler !== null && shouldSnap(start, ruler)
       currentStroke.current = [start]
     },
     [
-      tool, inkData, eraseAt, zoom, lassoPolygon, selection, clearSelection, ruler, grabRuler,
+      tool, inkData, eraseAt, zoom, origin, lassoPolygon, selection, clearSelection, ruler, grabRuler,
       commitEditingText, startNewText,
     ],
   )
@@ -581,23 +598,23 @@ export function useInkCanvas(
     (e: PointerEvent) => {
       if (e.pointerType !== 'pen') return
       const activeTool = isEraserTip(e) ? 'eraser' : tool
+      const at = toInk(e, zoom, origin)
 
       if (rulerGrab.current) {
-        dragRuler(e.offsetX / zoom, e.offsetY / zoom)
+        dragRuler(at.x, at.y)
         return
       }
 
       if (activeTool === 'eraser') {
         // Only while the tip is actually down — hovering must not erase.
-        if (eraseSnapshot.current) eraseAt(e.offsetX / zoom, e.offsetY / zoom)
+        if (eraseSnapshot.current) eraseAt(at.x, at.y)
         return
       }
 
       if (activeTool === 'text') {
         const from = textDragFrom.current
         if (!from) return
-        const x = e.offsetX / zoom
-        const y = e.offsetY / zoom
+        const { x, y } = at
         const dx = x - from.x
         const dy = y - from.y
         if (!from.moved && Math.hypot(dx, dy) < TEXT_DRAG_THRESHOLD) return
@@ -611,8 +628,7 @@ export function useInkCanvas(
       }
 
       if (activeTool === 'lasso') {
-        const x = e.offsetX / zoom
-        const y = e.offsetY / zoom
+        const { x, y } = at
 
         // The move is applied to the ink as it happens rather than previewed,
         // so a released pen has nothing left to reconcile. History and the file
@@ -639,8 +655,8 @@ export function useInkCanvas(
           kind: activeTool as Shape['kind'],
           x1: shapeStart.current.x,
           y1: shapeStart.current.y,
-          x2: e.offsetX / zoom,
-          y2: e.offsetY / zoom,
+          x2: at.x,
+          y2: at.y,
           color,
           size,
         })
@@ -650,15 +666,11 @@ export function useInkCanvas(
       if (currentStroke.current.length === 0) return
       const events = e.getCoalescedEvents?.() ?? [e]
       for (const ce of events) {
-        currentStroke.current.push({
-          x: ce.offsetX / zoom,
-          y: ce.offsetY / zoom,
-          pressure: ce.pressure,
-        })
+        currentStroke.current.push({ ...toInk(ce, zoom, origin), pressure: ce.pressure })
       }
       redrawCanvas(snappedPoints(currentStroke.current))
     },
-    [tool, size, color, eraseAt, redrawCanvas, zoom, selection, snappedPoints, dragRuler],
+    [tool, size, color, eraseAt, redrawCanvas, zoom, origin, selection, snappedPoints, dragRuler],
   )
 
   const handlePointerUp = useCallback(
@@ -735,13 +747,14 @@ export function useInkCanvas(
       }
 
       if (shapeStart.current) {
+        const end = toInk(e, zoom, origin)
         const shape: Shape = {
           id: crypto.randomUUID(),
           kind: tool as Shape['kind'],
           x1: shapeStart.current.x,
           y1: shapeStart.current.y,
-          x2: e.offsetX / zoom,
-          y2: e.offsetY / zoom,
+          x2: end.x,
+          y2: end.y,
           color,
           size,
         }
@@ -780,7 +793,7 @@ export function useInkCanvas(
       commit({ ...inkData, ...growPage(inkData, boundsOfPoints(stroke.points)), strokes: [...inkData.strokes, stroke] })
     },
     [
-      tool, inkData, color, size, opacity, commit, save, zoom, growPage, selection,
+      tool, inkData, color, size, opacity, commit, save, zoom, origin, growPage, selection,
       snappedPoints, releaseRuler, startEditText,
     ],
   )
