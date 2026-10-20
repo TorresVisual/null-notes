@@ -1,22 +1,24 @@
 import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest'
-import { render, cleanup, fireEvent, waitFor } from '@testing-library/react'
+import { render, cleanup, createEvent, fireEvent, waitFor } from '@testing-library/react'
 import { InkCanvas, scrollAncestors } from './InkCanvas'
 import { useInkStore } from '../store/ink'
 import { DEFAULT_PENS } from './pens'
 import type { InkData } from './types'
 
 const write = vi.fn<(path: string, data: InkData) => Promise<void>>().mockResolvedValue(undefined)
+const read = vi.fn<(path: string) => Promise<InkData | null>>().mockResolvedValue(null)
 
 vi.mock('../lib/ink', () => ({
   inkApi: {
     ensureDir: () => Promise.resolve('/ws/N.ink'),
-    read: () => Promise.resolve(null),
+    read: (path: string) => read(path),
     write: (path: string, data: InkData) => write(path, data),
   },
 }))
 
 beforeEach(() => {
   write.mockReset().mockResolvedValue(undefined)
+  read.mockReset().mockResolvedValue(null)
   useInkStore.setState({
     tool: 'text',
     pens: DEFAULT_PENS,
@@ -133,5 +135,77 @@ describe('scrollAncestors', () => {
 
     expect(page.scrollTop).toBe(80)
     expect(page.scrollLeft).toBe(100)
+  })
+})
+
+describe('Delete reaches only the canvas that owns the selection', () => {
+  const INK_WITH_STROKE: InkData = {
+    width: 700,
+    height: 400,
+    strokes: [
+      {
+        id: 'st1',
+        points: [
+          { x: 120, y: 120, pressure: 0.5 },
+          { x: 150, y: 150, pressure: 0.5 },
+        ],
+        color: '#000000',
+        size: 2,
+        opacity: 1,
+        thinning: 0.5,
+      },
+    ],
+    shapes: [],
+    texts: [],
+  }
+
+  // Lassoes the stroke above, leaving the canvas with a live selection.
+  // jsdom computes no offsetX, so the lasso's page coordinates are set by hand.
+  function selectStrokeIn(container: HTMLElement) {
+    const canvas = container.querySelector('canvas')!
+    const at = (type: 'pointerDown' | 'pointerMove' | 'pointerUp', x: number, y: number) => {
+      const event = createEvent[type](canvas, { pointerType: 'pen', pointerId: 1 })
+      Object.defineProperty(event, 'offsetX', { value: x })
+      Object.defineProperty(event, 'offsetY', { value: y })
+      fireEvent(canvas, event)
+    }
+    at('pointerDown', 100, 100)
+    at('pointerMove', 200, 100)
+    at('pointerMove', 200, 200)
+    at('pointerMove', 100, 200)
+    at('pointerUp', 100, 100)
+  }
+
+  beforeEach(() => {
+    useInkStore.setState({ tool: 'lasso' })
+    read.mockResolvedValue(INK_WITH_STROKE)
+  })
+
+  it('deletes the selection on the canvas that owns it', async () => {
+    const { container } = render(<InkCanvas svgPath="/ws/N.ink/a.svg" width={700} height={400} />)
+    await waitFor(() => expect(read).toHaveBeenCalled())
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    selectStrokeIn(container)
+    write.mockClear()
+
+    fireEvent.keyDown(window, { key: 'Delete' })
+
+    expect(write).toHaveBeenCalledTimes(1)
+  })
+
+  it('leaves a selection on a canvas that no longer owns the slot alone', async () => {
+    const { container } = render(<InkCanvas svgPath="/ws/N.ink/a.svg" width={700} height={400} />)
+    await waitFor(() => expect(read).toHaveBeenCalled())
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    selectStrokeIn(container)
+    useInkStore.getState().setActiveCanvas('/ws/N.ink/b.svg', {
+      undo: vi.fn(), redo: vi.fn(), canUndo: false, canRedo: false, deleteSelected: vi.fn(),
+      hasSelection: false, toggleRuler: vi.fn(), rulerOn: false, zoom: 1, setZoom: vi.fn(),
+    })
+    write.mockClear()
+
+    fireEvent.keyDown(window, { key: 'Delete' })
+
+    expect(write).not.toHaveBeenCalled()
   })
 })

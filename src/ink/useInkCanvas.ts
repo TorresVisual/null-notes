@@ -797,14 +797,17 @@ export function useInkCanvas(
 
   useEffect(() => {
     if (isSelectionEmpty(selection)) return
+    // Every mounted canvas hears window keydown; only the one the user last
+    // pointed at may delete, or a hidden canvas's selection goes with it.
     function handleKeyDown(e: KeyboardEvent) {
       if (e.key !== 'Delete' && e.key !== 'Backspace') return
+      if (useInkStore.getState().activeCanvasId !== svgPath) return
       e.preventDefault()
       deleteSelected()
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [selection, deleteSelected])
+  }, [selection, deleteSelected, svgPath])
 
   useEffect(() => {
     const canvas = canvasRef.current
