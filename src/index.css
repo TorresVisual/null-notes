@@ -4997,15 +4997,16 @@ input[type='checkbox']:focus-visible {
 }
 
 /* Boxed blocks already have their own frame — a green fill behind it reads as
-   a box inside a box, so the selection shows on that frame instead. */
-.note-editor .ProseMirror-selectednode:is(.ink-block, .diagram-block, .mermaid-block, .block-math) {
+   a box inside a box, so the selection shows on that frame instead. React node
+   views get the selection class on TipTap's outer element, not on the
+   `NodeViewWrapper` inside it, hence `:has`. */
+.note-editor :is(.ProseMirror-selectednode, .ProseMirror-selectednoderange):has(> :is(.ink-block, .diagram-block, .mermaid-block, .block-math)) {
   background: transparent;
 }
-.ProseMirror-selectednode .ink-preview,
-.ProseMirror-selectednode .diagram-block-preview {
+:is(.ProseMirror-selectednode, .ProseMirror-selectednoderange) :is(.ink-preview, .diagram-block-preview) {
   border-color: var(--selected-frame);
 }
-.ProseMirror-selectednode.mermaid-block {
+:is(.ProseMirror-selectednode, .ProseMirror-selectednoderange) > .mermaid-block {
   box-shadow: 0 0 0 1px var(--selected-frame);
 }
 
