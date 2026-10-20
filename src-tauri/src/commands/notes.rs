@@ -2268,6 +2268,14 @@ pub async fn generate_formula_sheet(
 }
 
 async fn create_folder_at(parent: &str, name: &str) -> anyhow::Result<String> {
+    use std::path::Component;
+    let mut components = std::path::Path::new(name).components();
+    if !matches!(
+        (components.next(), components.next()),
+        (Some(Component::Normal(_)), None)
+    ) {
+        anyhow::bail!("invalid folder name: {name}");
+    }
     let path = std::path::Path::new(parent).join(name);
     tokio::fs::create_dir(&path).await?;
     Ok(path.to_string_lossy().into_owned())
@@ -4482,6 +4490,15 @@ mod folder_tests {
         let parent = tmp.path().to_string_lossy().into_owned();
         let path = create_folder_at(&parent, "Course101").await.unwrap();
         assert!(std::path::Path::new(&path).is_dir());
+    }
+
+    #[tokio::test]
+    async fn test_create_folder_at_rejects_names_that_leave_the_parent() {
+        let tmp = tempdir().unwrap();
+        let parent = tmp.path().to_string_lossy().into_owned();
+        for name in ["", "..", "a/b", "../escape", "a\\b"] {
+            assert!(create_folder_at(&parent, name).await.is_err(), "{name:?}");
+        }
     }
 
     #[tokio::test]

@@ -4,6 +4,10 @@ export function folderName(path: string): string {
   return path.split(/[\\/]/).filter(Boolean).pop() ?? path
 }
 
+export function isSingleSegmentName(name: string): boolean {
+  return name !== '.' && name !== '..' && !/[\\/]/.test(name)
+}
+
 export function isUnderPath(path: string, prefix: string): boolean {
   return path === prefix || path.startsWith(`${prefix}/`) || path.startsWith(`${prefix}\\`)
 }

@@ -1,5 +1,18 @@
 import { describe, it, expect } from 'vitest'
-import { folderName, isUnderPath, replacePathPrefix } from './pathPrefix'
+import { folderName, isSingleSegmentName, isUnderPath, replacePathPrefix } from './pathPrefix'
+
+describe('isSingleSegmentName', () => {
+  it('accepts a plain name, including spaces and non-Latin text', () => {
+    expect(isSingleSegmentName('Lecture 7')).toBe(true)
+    expect(isSingleSegmentName('線形代数')).toBe(true)
+  })
+
+  it('rejects separators and dot segments that would leave the parent', () => {
+    for (const name of ['a/b', 'a\\b', '..', '.', '../x']) {
+      expect(isSingleSegmentName(name)).toBe(false)
+    }
+  })
+})
 
 describe('folderName', () => {
   it('takes the last segment of a Windows path', () => {

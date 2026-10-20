@@ -6,9 +6,16 @@ import { useNotesStore } from '../store/notes'
 import { promptText } from '../store/promptDialog'
 import { api } from '../lib/tauri'
 import { refreshTree } from '../hooks/useWorkspace'
-import { folderName, isUnderPath, sidecarDir } from '../lib/pathPrefix'
+import { folderName, isSingleSegmentName, isUnderPath, sidecarDir } from '../lib/pathPrefix'
 import type { TreeEntry } from '../lib/folderTree'
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from './ui/context-menu'
+
+// Ignores keys that bubble up from the row's own rename/delete buttons.
+function activateOnKey(e: React.KeyboardEvent, activate: () => void) {
+  if (e.target !== e.currentTarget || (e.key !== 'Enter' && e.key !== ' ')) return
+  e.preventDefault()
+  activate()
+}
 
 interface TreeNodeProps {
   entry: TreeEntry
@@ -65,7 +72,13 @@ export function TreeNode({ entry, depth }: TreeNodeProps) {
     async function handleDelete(e: React.MouseEvent) {
       e.stopPropagation()
       if (!(await confirm(`Delete "${entry.name}"?`))) return
-      await api.notes.delete(workspace, entry.path)
+      try {
+        await api.notes.delete(workspace, entry.path)
+      } catch (err) {
+        setFolderError(err instanceof Error ? err.message : String(err))
+        return
+      }
+      setFolderError(null)
       removeNote(entry.path)
       closeTab(entry.path)
       // Otherwise the deletion never enters the auto-commit's pathspec-scoped
@@ -83,10 +96,13 @@ export function TreeNode({ entry, depth }: TreeNodeProps) {
         className={`tree-row tree-note${isActive ? ' active' : ''}`}
         style={{ paddingLeft: 8 + depth * 14 }}
         draggable
+        tabIndex={0}
+        aria-current={isActive || undefined}
         onDragStart={(e) => e.dataTransfer.setData('text/note-path', entry.path)}
         onClick={() => openTab(entry.path)}
+        onKeyDown={(e) => activateOnKey(e, () => openTab(entry.path))}
       >
-        <span className="tree-label">{entry.name}</span>
+        <span className="tree-label" title={entry.name}>{entry.name}</span>
         <button
           className="tree-rename"
           onClick={(e) => void handleRename(e)}
@@ -109,6 +125,12 @@ export function TreeNode({ entry, depth }: TreeNodeProps) {
 
   const isExpanded = expandedFolders.includes(entry.path)
   const isSelected = selectedFolder === entry.path
+
+  function selectFolder() {
+    toggleFolder(entry.path)
+    setSelectedFolder(entry.path)
+    setTagFilter(null)
+  }
 
   async function handleDrop(e: React.DragEvent) {
     e.preventDefault()
@@ -153,6 +175,10 @@ export function TreeNode({ entry, depth }: TreeNodeProps) {
   async function handleRenameFolder() {
     const name = await promptText('New folder name:', entry.name)
     if (!name || name === entry.name) return
+    if (!isSingleSegmentName(name)) {
+      setFolderError('A folder name cannot contain / or \\.')
+      return
+    }
     const newPath = entry.path.replace(/[^/\\]+$/, name)
     try {
       await api.notes.renameFolder(entry.path, newPath)
@@ -193,12 +219,12 @@ export function TreeNode({ entry, depth }: TreeNodeProps) {
             className={`tree-row tree-folder${isSelected ? ' selected' : ''}${dragOver ? ' drag-over' : ''}`}
             style={{ paddingLeft: 8 + depth * 14 }}
             draggable
+            role="button"
+            tabIndex={0}
+            aria-expanded={isExpanded}
             onDragStart={(e) => e.dataTransfer.setData('text/folder-path', entry.path)}
-            onClick={() => {
-              toggleFolder(entry.path)
-              setSelectedFolder(entry.path)
-              setTagFilter(null)
-            }}
+            onClick={selectFolder}
+            onKeyDown={(e) => activateOnKey(e, selectFolder)}
             onDragOver={(e) => {
               e.preventDefault()
               setDragOver(true)
@@ -209,7 +235,7 @@ export function TreeNode({ entry, depth }: TreeNodeProps) {
             <span className="tree-toggle">
               <ChevronRight size={12} className={`tree-toggle-icon${isExpanded ? ' open' : ''}`} />
             </span>
-            <span className="tree-label">{entry.name}</span>
+            <span className="tree-label" title={entry.name}>{entry.name}</span>
           </div>
         </ContextMenuTrigger>
         <ContextMenuContent className="context-menu">

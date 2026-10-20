@@ -2708,7 +2708,9 @@ pre:has(code.language-expect)::before, pre:has(code.language-expected)::before {
 }
 
 .sidebar .tree-row:hover .tree-delete,
-.sidebar .tree-row:hover .tree-rename { opacity: 1; }
+.sidebar .tree-row:hover .tree-rename,
+.sidebar .tree-row:focus-within .tree-delete,
+.sidebar .tree-row:focus-within .tree-rename { opacity: 1; }
 .sidebar .tree-delete:hover { color: var(--danger); }
 .sidebar .tree-rename:hover { color: var(--accent); }
 

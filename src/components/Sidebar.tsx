@@ -60,6 +60,7 @@ export function Sidebar({
   const openTab = useWorkspaceStore((s) => s.openTab)
   const setActiveTab = useWorkspaceStore((s) => s.setActiveTab)
   const folderError = useWorkspaceStore((s) => s.folderError)
+  const setFolderError = useWorkspaceStore((s) => s.setFolderError)
   const folderLoading = useWorkspaceStore((s) => s.folderLoading)
   const activeTab = useWorkspaceStore((s) => s.activeTab)
   const { openWorkspace } = useWorkspace()
@@ -76,8 +77,21 @@ export function Sidebar({
       setTagFilteredNotes([])
       return
     }
-    api.notes.notesWithTag(workspacePath, tagFilter).then(setTagFilteredNotes)
-  }, [tagFilter, workspacePath])
+    let stale = false
+    api.notes
+      .notesWithTag(workspacePath, tagFilter)
+      .then((found) => {
+        if (!stale) setTagFilteredNotes(found)
+      })
+      .catch((err) => {
+        if (stale) return
+        setTagFilteredNotes([])
+        setFolderError(err instanceof Error ? err.message : String(err))
+      })
+    return () => {
+      stale = true
+    }
+  }, [tagFilter, workspacePath, setFolderError])
 
   const isFirstRender = useRef(true)
   useEffect(() => {
@@ -229,7 +243,7 @@ export function Sidebar({
           <TooltipContent>Generate formula sheet</TooltipContent>
         </Tooltip>
       </div>
-      {folderError && <p className="sidebar-error">{folderError}</p>}
+      {folderError && <p className="sidebar-error" role="alert">{folderError}</p>}
       <TagList />
       {tagFilter ? (
         <ul className="folder-tree">
@@ -237,9 +251,15 @@ export function Sidebar({
             <li
               key={note.path}
               className="tree-row tree-note"
+              tabIndex={0}
               onClick={() => openTab(note.path)}
+              onKeyDown={(e) => {
+                if (e.key !== 'Enter' && e.key !== ' ') return
+                e.preventDefault()
+                openTab(note.path)
+              }}
             >
-              <span className="tree-label">{note.title}</span>
+              <span className="tree-label" title={note.title}>{note.title}</span>
             </li>
           ))}
         </ul>
