@@ -24,7 +24,7 @@ afterEach(cleanup)
 // just made.
 describe('an ink canvas mounted inside a real NoteEditor', () => {
   it('registers as active on pointerdown and stays active', async () => {
-    const fence = '```ink\n{"src":"/ws/N.ink/a.svg","width":700,"height":400}\n```'
+    const fence = '```ink\n{"src":"/ws/N.ink/a.svg","width":700,"height":400,"inline":true}\n```'
     const { container } = render(
       <NoteEditor
         content={fence}
