@@ -501,6 +501,38 @@ export function useInkCanvas(
     redrawCanvas([])
   }, [inkData, redrawCanvas])
 
+  // Pen digitisers report faster than displays refresh, so painting per event
+  // paints frames nobody sees. The latest preview wins; at most one frame is
+  // ever queued.
+  const frame = useRef<number | null>(null)
+  const pendingLive = useRef<Parameters<typeof redrawCanvas>>([[]])
+  const redrawRef = useRef(redrawCanvas)
+  useEffect(() => {
+    redrawRef.current = redrawCanvas
+  }, [redrawCanvas])
+
+  const scheduleRedraw = useCallback((...live: Parameters<typeof redrawCanvas>) => {
+    pendingLive.current = live
+    if (frame.current !== null) return
+    frame.current = requestAnimationFrame(() => {
+      frame.current = null
+      redrawRef.current(...pendingLive.current)
+    })
+  }, [])
+
+  const cancelRedraw = useCallback(() => {
+    if (frame.current === null) return
+    cancelAnimationFrame(frame.current)
+    frame.current = null
+  }, [])
+
+  useEffect(
+    () => () => {
+      if (frame.current !== null) cancelAnimationFrame(frame.current)
+    },
+    [],
+  )
+
   // Positioning the straightedge is a hand job, not a pen one — you hold it
   // with a finger and draw against it with the pen, the way you would on paper.
   // The pen can grab it too, but touch is why these are callable from outside.
@@ -663,13 +695,13 @@ export function useInkCanvas(
 
         if (lassoPath.current.length === 0) return
         lassoPath.current = [...lassoPath.current, { x, y }]
-        redrawCanvas([], null, lassoPath.current)
+        scheduleRedraw([], null, lassoPath.current)
         return
       }
 
       if (isShapeTool(activeTool)) {
         if (!shapeStart.current) return
-        redrawCanvas([], {
+        scheduleRedraw([], {
           kind: activeTool as Shape['kind'],
           x1: shapeStart.current.x,
           y1: shapeStart.current.y,
@@ -686,15 +718,16 @@ export function useInkCanvas(
       for (const ce of events) {
         currentStroke.current.push({ ...toInk(ce, zoom, origin), pressure: ce.pressure })
       }
-      redrawCanvas(snappedPoints(currentStroke.current))
+      scheduleRedraw(snappedPoints(currentStroke.current))
     },
-    [tool, size, color, eraseAt, redrawCanvas, zoom, origin, selection, snappedPoints, dragRuler],
+    [tool, size, color, eraseAt, scheduleRedraw, zoom, origin, selection, snappedPoints, dragRuler],
   )
 
   const handlePointerUp = useCallback(
     (e: PointerEvent) => {
       if (e.pointerType !== 'pen') return
       releasePointer(canvasRef.current, e.pointerId)
+      cancelRedraw()
 
       // Where the ruler ends up is not an edit to the note, so it costs no
       // history entry and no write.
@@ -812,7 +845,7 @@ export function useInkCanvas(
     },
     [
       tool, inkData, color, size, opacity, commit, save, zoom, origin, growPage, selection,
-      snappedPoints, releaseRuler, startEditText,
+      snappedPoints, releaseRuler, startEditText, cancelRedraw,
     ],
   )
 

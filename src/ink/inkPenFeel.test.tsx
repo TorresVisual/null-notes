@@ -170,3 +170,36 @@ describe('committed layer cache', () => {
     }
   })
 })
+
+describe('frame batching', () => {
+  it('paints one frame for several pointer-moves in the same tick', async () => {
+    const fake = installFakeContext()
+    try {
+      const { canvas } = await mountCanvas()
+      fake.calls.fill = 0
+
+      at(canvas, 'pointerDown', 10, 400)
+      at(canvas, 'pointerMove', 40, 410)
+      at(canvas, 'pointerMove', 70, 420)
+      at(canvas, 'pointerMove', 100, 430)
+      await waitFor(() => expect(fake.calls.fill).toBeGreaterThan(0))
+
+      expect(fake.calls.fill).toBe(1)
+    } finally {
+      fake.restore()
+    }
+  })
+
+  // Review Focus 3: a frame that fires after the commit would paint the stale
+  // live stroke over the final ink.
+  it('cancels the pending frame on release', async () => {
+    const cancel = vi.spyOn(window, 'cancelAnimationFrame')
+    try {
+      const { canvas } = await mountCanvas()
+      drawBent(canvas)
+      expect(cancel).toHaveBeenCalled()
+    } finally {
+      cancel.mockRestore()
+    }
+  })
+})
