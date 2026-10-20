@@ -71,6 +71,7 @@ export function InkPreview({ src, width, height, editable }: InkPreviewProps) {
             // The sidecar is a file in a workspace that can be shared or synced — the
             // same trust boundary as a note's own .md, so it gets the same sanitizing
             // pass DiagramBlock gives its SVG.
+            // eslint-disable-next-line react/no-danger
             dangerouslySetInnerHTML={{ __html: sanitizeNoteHtml(inkDataToSvg(data as InkData)) }}
           />
         )}
