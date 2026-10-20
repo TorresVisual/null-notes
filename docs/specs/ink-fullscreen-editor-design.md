@@ -28,12 +28,21 @@ Adding a canvas to a note opens a full-window drawing surface. In the note, an i
 
 A `createPortal` to `document.body` that fills the viewport. Wraps the existing `InkCanvas` (width/height from the block, `autoGrow`, zoom state owned by the overlay), with a Done button and Esc to close. `InkCanvas` already writes the sidecar as strokes are committed, so closing saves nothing — it only reports back so the block can refresh its preview. Follows `DiagramEditorOverlay` (portal, lazy-loaded not needed — `InkCanvas` is already in the main bundle).
 
+The page keeps its stored width/height, centred on a neutral background inside an overlay-owned scroll container; the overlay never resizes the stored page (that is sub-project 3's format decision). `InkCanvas`'s `scrollAncestors` finds the nearest scrolling ancestor (overlay body or `.editor-scroll`) instead of hard-coding `.editor-scroll`, so one-finger touch pan works in the portal.
+
 `InkCanvas` registers itself as the active canvas on pointer-down, so `InkToolGroup` in the editor toolbar works unchanged — but the overlay covers the toolbar, so the overlay must render the ink tool group itself (reuse `InkToolGroup` inside the overlay header).
+
+**Keyboard.** The note editor stays mounted behind the overlay, so the overlay takes focus on open, handles Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y itself via the active canvas's `undo`/`redo`, and stops its keydown events reaching the editor (otherwise undo would silently edit the note behind it). Esc closes only if the key wasn't already handled by the canvas's text editor (`defaultPrevented`, bubble phase). Android Back is out of scope; Done works there.
+
+**Session state.** Closing unmounts the canvas, so undo history and zoom reset on every open; only strokes persist.
 
 ### `InkBlock` view (`src/editor/extensions/InkBlock.ts`)
 
 - `inline` attr (default `false`). When true, render `InkCanvas` exactly as today.
-- Otherwise render a static preview: read the sidecar SVG, pass it through `sanitizeNoteHtml` (same trust boundary as `DiagramBlock` — a synced workspace file), show an Edit button; clicking the preview or Edit opens `InkEditorOverlay`. On close, re-read the preview.
+- Otherwise render a static preview: read the sidecar SVG, pass it through `sanitizeNoteHtml` (same trust boundary as `DiagramBlock` — a synced workspace file), show an Edit button; clicking the preview or Edit opens `InkEditorOverlay`.
+- Preview scales the whole page to fit a max height (~320px), uncropped. An empty drawing shows a placeholder ("Empty drawing — click to draw"); closing without drawing keeps the block and its sidecar.
+- Edit button and click-to-open only work when `editor.isEditable`; otherwise the preview is inert.
+- `InkCanvas` writes are fire-and-forget, so re-reading "on close" could lag the last stroke. `InkCanvas`/`useInkCanvas` take an optional `onSaved` callback fired when a write resolves; the block re-reads the preview on each call (and once on close).
 - `insertInk` dispatches `ink:auto-open` with the new `src` (mirrors `diagram:auto-open`); the matching block opens the overlay immediately.
 
 ### Canvas notes
@@ -56,6 +65,7 @@ Reuse the `.diagram-editor-*` shell classes with a full-window variant (no inset
 | File | Change |
 |---|---|
 | `src/ink/InkEditorOverlay.tsx` | New |
+| `src/ink/InkCanvas.tsx`, `src/ink/useInkCanvas.ts` | `onSaved` callback; `scrollAncestors` finds nearest scrolling ancestor |
 | `src/editor/extensions/InkBlock.ts` | `inline` attr; preview vs inline view; auto-open listener; fence parse/serialize |
 | `src/editor/toolbar/insertInk.ts` | Dispatch `ink:auto-open` after insert |
 | `src/lib/canvasNote.ts` | Write `inline: true` in the fence |
@@ -63,7 +73,8 @@ Reuse the `.diagram-editor-*` shell classes with a full-window variant (no inset
 
 ## Testing
 
-- Mount test for `InkBlock` (preview, inline, auto-open, Esc/Done close), modelled on `diagramBlockMount.test.tsx`.
+- Mount test for `InkBlock` (preview, empty placeholder, inline, auto-open, Esc/Done close, Esc ignored while text editing, inert when not editable, preview refreshes on `onSaved`)
+- Overlay keyboard: Ctrl+Z/Y undo/redo the canvas and don't reach the editor, modelled on `diagramBlockMount.test.tsx`.
 - Fence round-trip: `inline` absent → false → not written; `inline: true` survives parse → serialize.
 - `canvasNote.test.ts` updated for the flag.
 - e2e (`e2e-verify` skill): insert canvas → overlay opens → draw → Done → preview shows the stroke; canvas note stays inline.
