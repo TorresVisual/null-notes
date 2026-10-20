@@ -203,3 +203,22 @@ describe('frame batching', () => {
     }
   })
 })
+
+describe('prediction', () => {
+  // Review Focus 1.
+  it('saves only the points the pen actually reported', async () => {
+    const { canvas } = await mountCanvas()
+    const predicted: Array<[number, number]> = [[777, 777], [888, 888]]
+    drawBent(canvas, { predicted })
+
+    const stroke = lastWrite().strokes[0]
+    expect(stroke?.points).toHaveLength(3)
+    expect(stroke?.points.some((pt) => pt.x === 777 || pt.x === 888)).toBe(false)
+  })
+
+  it('still draws when the browser has no getPredictedEvents', async () => {
+    const { canvas } = await mountCanvas()
+    drawBent(canvas)
+    expect(lastWrite().strokes).toHaveLength(1)
+  })
+})

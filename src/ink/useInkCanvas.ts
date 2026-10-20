@@ -21,6 +21,7 @@ import { straightLineEnds } from './straighten'
 import { paintOrder } from './paintOrder'
 import { strokeOptions } from './strokeOptions'
 import { sameLayerKey, type LayerKey } from './layerCache'
+import { mergePredicted } from './predict'
 import {
   EMPTY_SELECTION,
   isSelectionEmpty,
@@ -139,6 +140,12 @@ export function toInk(
   origin: { originX: number; originY: number },
 ): { x: number; y: number } {
   return { x: e.offsetX / zoom + origin.originX, y: e.offsetY / zoom + origin.originY }
+}
+
+const MOUSE_PRESSURE = 0.5
+
+function pressureOf(e: { pointerType: string; pressure: number }): number {
+  return e.pointerType === 'mouse' ? MOUSE_PRESSURE : e.pressure
 }
 
 function isShapeTool(tool: Tool): boolean {
@@ -632,7 +639,7 @@ export function useInkCanvas(
         shapeStart.current = { x: at.x, y: at.y }
         return
       }
-      const start = { x: at.x, y: at.y, pressure: e.pressure }
+      const start = { x: at.x, y: at.y, pressure: pressureOf(e) }
       // Judged once, at the start: a stroke that drifted on and off the edge
       // partway through would be worse than one that never snapped at all.
       snapping.current = ruler !== null && shouldSnap(start, ruler)
@@ -714,11 +721,13 @@ export function useInkCanvas(
       }
 
       if (currentStroke.current.length === 0) return
+      const toPoint = (ev: PointerEvent): Point => ({ ...toInk(ev, zoom, origin), pressure: pressureOf(ev) })
       const events = e.getCoalescedEvents?.() ?? [e]
       for (const ce of events) {
-        currentStroke.current.push({ ...toInk(ce, zoom, origin), pressure: ce.pressure })
+        currentStroke.current.push(toPoint(ce))
       }
-      scheduleRedraw(snappedPoints(currentStroke.current))
+      const predicted = (e.getPredictedEvents?.() ?? []).map(toPoint)
+      scheduleRedraw(snappedPoints(mergePredicted(currentStroke.current, predicted)))
     },
     [tool, size, color, eraseAt, scheduleRedraw, zoom, origin, selection, snappedPoints, dragRuler],
   )
