@@ -151,7 +151,7 @@ describe('block math editing', () => {
     await waitFor(() => expect(textarea.selectionStart).toBe(13))
     await user.keyboard('2}')
     expect(textarea.value).toBe('\\frac{a}{b}^{2}')
-    expect(textarea.selectionStart).toBe(15)
+    await waitFor(() => expect(textarea.selectionStart).toBe(15))
   })
 
   it('opens the editor via keyboard (Enter) on the rendered formula, not just a click', async () => {
