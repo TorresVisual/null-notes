@@ -2,9 +2,17 @@ import { Node } from '@tiptap/core'
 import { ReactNodeViewRenderer, NodeViewWrapper } from '@tiptap/react'
 import type { ReactNodeViewProps } from '@tiptap/react'
 import { useEffect, useId, useRef, useState } from 'react'
-import mermaid from 'mermaid'
 
-mermaid.initialize({ startOnLoad: false, theme: 'default' })
+// Mermaid is ~700 KB of source; most notes have no diagram, so it loads on the
+// first block that renders rather than at app start.
+let mermaidReady: Promise<typeof import('mermaid').default> | null = null
+function loadMermaid() {
+  mermaidReady ??= import('mermaid').then(({ default: mermaid }) => {
+    mermaid.initialize({ startOnLoad: false, theme: 'default' })
+    return mermaid
+  })
+  return mermaidReady
+}
 
 interface MermaidAttrs {
   code: string
@@ -23,8 +31,8 @@ function MermaidView({ node, editor, updateAttributes }: ReactNodeViewProps) {
   useEffect(() => {
     setError(false)
     if (!code.trim()) return
-    mermaid
-      .render(id, code)
+    loadMermaid()
+      .then((mermaid) => mermaid.render(id, code))
       .then(({ svg: out }) => setSvg(out))
       .catch(() => setError(true))
   }, [code, id])

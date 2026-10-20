@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeAll } from 'vitest'
 import { render, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useEditor, EditorContent } from '@tiptap/react'
@@ -34,6 +34,9 @@ function mermaidCode(editor: Editor): string {
 }
 
 describe('mermaid block click-to-edit', () => {
+  // The block loads mermaid lazily; warm it so a cold import under a loaded suite isn't charged to the first test.
+  beforeAll(() => import('mermaid'), 30_000)
+
   const source = '```mermaid\ngraph TD;\nA-->B;\n```'
 
   it('opens a code editor on click, seeded with the current source', async () => {

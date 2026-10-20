@@ -225,14 +225,14 @@ describe('Layout terminal command on mobile', () => {
     expect(document.querySelector('.terminal-pane')).not.toBeInTheDocument()
   })
 
-  it('still mounts the terminal pane on desktop', () => {
+  it('still mounts the terminal pane on desktop', async () => {
     vi.mocked(platform).mockReturnValue('windows')
     useWorkspaceStore.setState({ path: '/ws', activeTab: null, tagFilter: null })
     render(<Layout />)
 
     act(() => runCommand('toggle-terminal'))
 
-    expect(document.querySelector('.terminal-pane')).toBeInTheDocument()
+    await waitFor(() => expect(document.querySelector('.terminal-pane')).toBeInTheDocument())
   })
 })
 

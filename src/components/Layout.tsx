@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import type { Editor, Range } from '@tiptap/core'
 import { listen } from '@tauri-apps/api/event'
 import { getCurrentWindow } from '@tauri-apps/api/window'
@@ -20,11 +20,8 @@ import { DeckView } from './DeckView'
 import { ReviewSession } from './ReviewSession'
 import { HomeView } from './HomeView'
 import { FormulaSheetPrompt } from './FormulaSheetPrompt'
-import { ExportPdfDialog } from './ExportPdfDialog'
-import { PrintDialog } from './PrintDialog'
 import { FlashcardTypeDialog } from './FlashcardTypeDialog'
 import { DiagramPickerDialog } from './DiagramPickerDialog'
-import { TerminalPane } from './TerminalPane'
 import { ToastStack } from './ToastStack'
 import { useWorkspaceStore } from '../store/workspace'
 import { useNotesStore } from '../store/notes'
@@ -56,6 +53,12 @@ import { useFocusModeStore } from '../store/focusMode'
 import { canPushHere, pushIfAllowed, withGitLock } from '../lib/git'
 import { isMobile } from '../lib/platform'
 import { useMobileSidebarStore } from '../store/mobileSidebar'
+
+// pagedjs (print preview) and xterm (terminal) are ~850 KB of source between
+// them and only load when their overlay/pane is first opened.
+const ExportPdfDialog = lazy(() => import('./ExportPdfDialog').then((m) => ({ default: m.ExportPdfDialog })))
+const PrintDialog = lazy(() => import('./PrintDialog').then((m) => ({ default: m.PrintDialog })))
+const TerminalPane = lazy(() => import('./TerminalPane').then((m) => ({ default: m.TerminalPane })))
 
 type ViewMode = 'wysiwyg' | 'raw'
 
@@ -559,12 +562,14 @@ export function Layout() {
         />
       )}
       {activeOverlay === 'formulaSheet' && <FormulaSheetPrompt onClose={closeOverlay} />}
-      {activeOverlay === 'exportPdf' && currentNote && (
-        <ExportPdfDialog noteTitle={currentNote.title} contentRef={editorPaneRef} onClose={closeOverlay} />
-      )}
-      {activeOverlay === 'print' && currentNote && (
-        <PrintDialog noteTitle={currentNote.title} contentRef={editorPaneRef} onClose={closeOverlay} />
-      )}
+      <Suspense fallback={null}>
+        {activeOverlay === 'exportPdf' && currentNote && (
+          <ExportPdfDialog noteTitle={currentNote.title} contentRef={editorPaneRef} onClose={closeOverlay} />
+        )}
+        {activeOverlay === 'print' && currentNote && (
+          <PrintDialog noteTitle={currentNote.title} contentRef={editorPaneRef} onClose={closeOverlay} />
+        )}
+      </Suspense>
       {activeOverlay === 'flashcard' && pendingFlashcardInsert && (
         <FlashcardTypeDialog
           onPick={(stub) => {
@@ -736,12 +741,14 @@ export function Layout() {
           )}
         </div>
         {terminalMounted && workspacePath && (
-          <TerminalPane
-            workspace={workspacePath}
-            notePath={activeTab}
-            hidden={!terminalOpen}
-            onClose={() => setTerminalOpen(false)}
-          />
+          <Suspense fallback={null}>
+            <TerminalPane
+              workspace={workspacePath}
+              notePath={activeTab}
+              hidden={!terminalOpen}
+              onClose={() => setTerminalOpen(false)}
+            />
+          </Suspense>
         )}
       </div>
     </div>
