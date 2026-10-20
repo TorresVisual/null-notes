@@ -14,12 +14,12 @@ Repository state:
 <commit or branch information>
 
 Last inspected areas:
-- workbench
 - editor
-- terminal
+- ink
+- search
 - Git
-- testing
-- extensions
+- PDF import (UI only)
+- study
 
 Last GitHub issue audit:
 2026-09-25
@@ -31,8 +31,8 @@ Feature inventory confidence:
 medium
 
 Known areas requiring re-audit:
-- testing
-- workspace restoration
+- export
+- multi-machine sync
 
 Last created issues:
 - #123
@@ -43,26 +43,34 @@ Last created issues:
 ## ARCHITECTURE.md
 
 ```markdown
-# NULL IDE Architecture
+# null-notes Architecture
 
-## Workbench
+## Editor (TipTap extensions, markdown round-trip)
 ...
 
-## Editor
+## Save path & storage boundary
 ...
 
-## Terminal
+## Search / index (SQLite)
 ...
 
-## Source Control
+## Ink & diagrams
 ...
 
-## Extensions
+## PDF pipeline (frozen)
+...
+
+## Git automation
+...
+
+## Terminal / code execution / IDE links
+...
+
+## Study (spaced repetition, tasks, formula sheet, dashboard)
 ...
 
 ## AI
-Claude Code extension/chat is the preferred AI workflow.
-The existing AI Agents panel is not the primary AI architecture.
+Gated stretch (docs/ROADMAP.md P10-1); not a roadmap centre.
 
 ## Important Entry Points
 ...
@@ -81,23 +89,22 @@ Statuses: `Implemented`, `Partial`, `Inherited`, `Missing`, `Unknown`.
 ```markdown
 # Feature Inventory
 
-## Workspace
+## Editor
 
 | Capability | Status | Location | Notes |
 |---|---|---|---|
-| Recent projects | Implemented | ... | ... |
-| Workspace restoration | Partial | ... | ... |
-| Workspace profiles | Missing | — | Candidate |
-| Multi-root workspace | Inherited | ... | ... |
+| Find/replace in note | Implemented | src/editor/extensions/FindReplace.ts | ... |
+| Wiki-link rename | Implemented | ... | ... |
+| Note version history | Missing | — | Candidate |
+| Block drag-and-drop | Unknown | — | Re-audit |
 
-## Git
+## Study
 
 | Capability | Status | Location | Notes |
 |---|---|---|---|
-| Commit | Implemented | ... | ... |
-| Branch switching | Implemented | ... | ... |
-| Git graph | Missing | — | Candidate |
-| Worktrees | Unknown | — | Re-audit |
+| Spaced repetition | Implemented | ... | ... |
+| Export to PDF | Partial | ... | via print |
+| Anki export | Missing | — | Candidate |
 ```
 
 ## ISSUES.md
@@ -110,9 +117,9 @@ Last synchronized:
 
 | Issue | Title | Status | Area | Last Audited |
 |---|---|---|---|---|
-| #101 | Project profiles | open | workspace | 2026-09-25 |
-| #104 | Test explorer | open | testing | 2026-09-25 |
-| #87 | Git graph | closed | git | 2026-09-25 |
+| #101 | Note version history | open | editor | 2026-09-25 |
+| #104 | Anki deck export | open | study | 2026-09-25 |
+| #87 | Find/replace in note | closed | editor | 2026-09-25 |
 ```
 
 ## ROADMAP.md
@@ -122,26 +129,31 @@ Last synchronized:
 
 ## Foundation
 
-### Project-aware task system
+### Note version history
 Status: issue created
-Issue: #123
+Issue: #101
 
-### Workspace profiles
+## Core Editing
+
+### Block drag-and-drop
 Status: candidate
 
-## Core IDE
+## Study Workflow
 
-### Project-wide symbol explorer
-Status: candidate
-
-## Developer Workflow
-
-### Integrated test explorer
+### Anki deck export
 Status: issue created
-Issue: #124
+Issue: #104
+
+## Workspace & Sync
+
+### Cross-machine conflict surfacing
+Status: candidate
 
 ## Advanced
 
-### Dependency visualization
+### Handwriting search
 Status: candidate
+
+## Polish
+
 ```
