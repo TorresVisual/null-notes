@@ -32,6 +32,8 @@
 
   /* Semantic */
   --danger: #e05050;
+  --warning: #d29922;
+  --success: var(--accent);
 
   /* Ink */
   --ink-grid: rgba(88, 130, 200, 0.20);
@@ -1795,7 +1797,9 @@ pre:has(code.language-expect)::before, pre:has(code.language-expected)::before {
   white-space: nowrap;
   flex-shrink: 0;
 }
-.git-commit-status.error, .git-commit-status.pushFailed { color: var(--danger); }
+.git-commit-status.committed { color: var(--success); }
+.git-commit-status.skipped, .git-commit-status.pushFailed { color: var(--warning); }
+.git-commit-status.error { color: var(--danger); }
 
 .git-sync-now {
   display: flex;
@@ -2745,10 +2749,10 @@ pre:has(code.language-expect)::before, pre:has(code.language-expected)::before {
 .sidebar-error {
   margin: 4px 0 0;
   padding: 6px 8px;
-  background: #270d0d;
-  border: 1px solid #4a1f1f;
+  background: color-mix(in srgb, var(--danger) 14%, var(--bg-raised));
+  border: 1px solid color-mix(in srgb, var(--danger) 35%, var(--bg-raised));
   border-radius: 4px;
-  color: #e88;
+  color: color-mix(in srgb, var(--danger) 55%, var(--text-primary));
   font-size: 12px;
 }
 
@@ -3485,8 +3489,8 @@ pre:has(code.language-expect)::before, pre:has(code.language-expected)::before {
    not a broken reference. Still clickable — worst case is landing on the wrong
    line, same as before the feature existed. */
 .code-link-stale {
-  color: #c08800;
-  border-bottom: 1px dashed #c08800;
+  color: var(--warning);
+  border-bottom: 1px dashed var(--warning);
   cursor: pointer;
 }
 
@@ -4248,8 +4252,8 @@ pre:has(code.language-expect)::before, pre:has(code.language-expected)::before {
 }
 
 .review-card-suspend:hover {
-  border-color: var(--warning, #d29922);
-  color: var(--warning, #d29922);
+  border-color: var(--warning);
+  color: var(--warning);
 }
 
 .review-card-front, .review-card-back {
@@ -4316,9 +4320,9 @@ pre:has(code.language-expect)::before, pre:has(code.language-expected)::before {
   cursor: pointer;
 }
 
-.review-card-option-correct label { border-color: var(--success, #3fb950); color: var(--success, #3fb950); }
+.review-card-option-correct label { border-color: var(--success); color: var(--success); }
 .review-card-option-incorrect label { border-color: var(--danger); color: var(--danger); }
-.review-card-option-missed label { border-color: var(--warning, #d29922); }
+.review-card-option-missed label { border-color: var(--warning); }
 
 .deck-view-stats {
   display: flex;
@@ -4340,8 +4344,8 @@ pre:has(code.language-expect)::before, pre:has(code.language-expected)::before {
 
 .deck-view-suspended-filter:hover,
 .deck-view-suspended-filter-active {
-  border-color: var(--warning, #d29922);
-  color: var(--warning, #d29922);
+  border-color: var(--warning);
+  color: var(--warning);
 }
 
 .deck-view-item {
@@ -4352,8 +4356,8 @@ pre:has(code.language-expect)::before, pre:has(code.language-expected)::before {
 
 .deck-view-suspended-badge {
   font-size: 11px;
-  color: var(--warning, #d29922);
-  border: 1px solid var(--warning, #d29922);
+  color: var(--warning);
+  border: 1px solid var(--warning);
   border-radius: 3px;
   padding: 0 4px;
   white-space: nowrap;
@@ -4699,6 +4703,8 @@ pre:has(code.language-expect)::before, pre:has(code.language-expected)::before {
   --accent-bg-hover: rgba(26, 127, 55, 0.08);
   --accent-contrast: #ffffff;
   --danger: #b3261e;
+  --warning: #9a6700;
+  --success: #1a7f37;
 }
 
 .print-preview-pages .editor-toolbar,
@@ -4774,6 +4780,7 @@ pre:has(code.language-expect)::before, pre:has(code.language-expected)::before {
     --accent-bg-hover: rgba(26, 127, 55, 0.08);
     --accent-contrast: #ffffff;
     --danger: #b3261e;
+    --warning: #9a6700;
   }
 
   .callout-note, .callout-info { --callout-color: #1c5fa8; --callout-bg: #eaf2fb; }

@@ -26,6 +26,8 @@ All values are CSS custom properties in `src/index.css`'s `:root` block unless n
 | `--accent-bg` / `--accent-bg-hover` | `rgba(126,231,135,0.12/0.22)` | Accent-tinted fills (selection, active row) |
 | `--accent-contrast` | `#0d0f12` | Text/icon color on a solid-accent fill |
 | `--danger` | `#e05050` | Errors, destructive actions |
+| `--warning` | `#d29922` | Soft warnings: stale code links, suspended cards, skipped/push-failed commits (print: `#9a6700`) |
+| `--success` | `var(--accent)` | Confirmations: correct review answer, committed. Aliases the accent rather than adding a second green |
 
 ## Spacing
 
