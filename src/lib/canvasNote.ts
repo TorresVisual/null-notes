@@ -7,6 +7,6 @@ export function canvasNoteBody(
   width: number,
   height: number,
 ): string {
-  const fence = JSON.stringify({ src, width, height })
+  const fence = JSON.stringify({ src, width, height, inline: true })
   return `# ${title}\n\n\`\`\`ink\n${fence}\n\`\`\`\n\n`
 }

@@ -9,7 +9,15 @@ describe('canvasNoteBody', () => {
 
   it('writes an ink block the editor already understands', () => {
     const body = canvasNoteBody('Lecture 07', 'Lecture 07.ink/page.svg', 900, 1200)
-    expect(body).toContain('```ink\n{"src":"Lecture 07.ink/page.svg","width":900,"height":1200}\n```')
+    expect(body).toContain(
+      '```ink\n{"src":"Lecture 07.ink/page.svg","width":900,"height":1200,"inline":true}\n```',
+    )
+  })
+
+  // Without the flag a canvas note would open as a preview, and the page it exists for would need a click.
+  it('marks the block inline', () => {
+    const fence = canvasNoteBody('T', 'x.svg', 900, 1200).match(/```ink\n([\s\S]*?)\n```/)?.[1] ?? ''
+    expect((JSON.parse(fence) as { inline: boolean }).inline).toBe(true)
   })
 
   // Windows paths carry backslashes, which have to survive JSON encoding.

@@ -8,6 +8,7 @@ interface InkBlockAttrs {
   src: string
   width: number
   height: number
+  inline: boolean
 }
 
 // Every React node view has to render a `NodeViewWrapper` at its root:
@@ -48,6 +49,7 @@ export const InkBlock = Node.create({
       src: { default: null },
       width: { default: 700 },
       height: { default: 900 },
+      inline: { default: false },
     }
   },
 
@@ -59,6 +61,7 @@ export const InkBlock = Node.create({
           src: (el as HTMLElement).getAttribute('data-src'),
           width: parseInt((el as HTMLElement).getAttribute('data-width') ?? '700', 10),
           height: parseInt((el as HTMLElement).getAttribute('data-height') ?? '900', 10),
+          inline: (el as HTMLElement).getAttribute('data-inline') === 'true',
         }),
       },
     ]
@@ -76,9 +79,11 @@ export const InkBlock = Node.create({
     return {
       markdown: {
         serialize(state: Record<string, unknown>, node: { attrs: InkBlockAttrs }) {
-          const { src, width, height } = node.attrs
+          const { src, width, height, inline } = node.attrs
           ;(state as { write: (s: string) => void; ensureNewLine: () => void; closeBlock: (n: unknown) => void }).write('```ink\n')
-          ;(state as { write: (s: string) => void }).write(JSON.stringify({ src, width, height }))
+          ;(state as { write: (s: string) => void }).write(
+            JSON.stringify(inline ? { src, width, height, inline } : { src, width, height }),
+          )
           ;(state as { ensureNewLine: () => void }).ensureNewLine()
           ;(state as { write: (s: string) => void }).write('```')
           ;(state as { closeBlock: (n: unknown) => void }).closeBlock(node)
@@ -98,6 +103,7 @@ export const InkBlock = Node.create({
                 div.setAttribute('data-src', data.src ?? '')
                 div.setAttribute('data-width', String(data.width ?? 700))
                 div.setAttribute('data-height', String(data.height ?? 900))
+                div.setAttribute('data-inline', String(data.inline === true))
                 pre.replaceWith(div)
               } catch {
                 // invalid JSON — leave as-is
