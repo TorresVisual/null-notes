@@ -863,17 +863,18 @@ code {
    button. Small width on the number input: it only ever holds a few digits
    and a dot ("3.2"). */
 .block-math-number-input {
-  width: 4em;
-  padding: 3px 6px;
+  width: 3.5em;
+  padding: 2px 4px;
   font-family: var(--font-mono);
   font-size: 12px;
   color: var(--text-primary);
-  background: var(--bg-sunken);
-  border: 1px solid var(--border);
-  border-radius: 5px;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--border-strong);
+  border-radius: 0;
   outline: none;
 }
-.block-math-number-input:focus { border-color: var(--accent); }
+.block-math-number-input:focus { border-bottom-color: var(--accent); }
 
 .math-copy-button {
   margin-top: var(--space-xs);
@@ -1014,7 +1015,7 @@ code {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  color: var(--text-tertiary);
+  color: var(--text-secondary);
   font-size: 11px;
 }
 
@@ -1022,7 +1023,7 @@ code {
   flex: 1;
   min-width: 0;
   overflow: hidden;
-  color: var(--text-tertiary);
+  color: var(--text-secondary);
   font-size: 11px;
   text-align: right;
   text-overflow: ellipsis;
@@ -1032,13 +1033,15 @@ code {
 .block-math-editor-bar .math-copy-button {
   margin: 0;
   padding: 3px 10px;
+  background: transparent;
+  color: var(--text-secondary);
 }
 
 .block-math-editor-preview {
   display: block;
-  min-height: 1.6em;
+  min-height: 4.5em;
   margin-top: var(--space-xs);
-  padding: var(--space-md) 2px var(--space-xs);
+  padding: var(--space-lg) var(--space-sm) var(--space-sm);
   overflow-x: auto;
   text-align: center;
   color: var(--text-primary);
