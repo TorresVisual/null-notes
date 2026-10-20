@@ -1,6 +1,6 @@
 [package]
 name = "null-notes"
-version = "1.0.0"
+version = "1.0.1"
 description = "A WYSIWYG Markdown note app with inline ink and a PDF import pipeline"
 authors = ["Torres"]
 edition = "2021"
