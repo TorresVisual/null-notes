@@ -987,14 +987,12 @@ code {
   font-family: var(--font-mono);
   font-size: 13px;
   color: var(--text-primary);
-  background: var(--bg-sunken);
-  border: 1px solid var(--border);
+  background: transparent;
+  border: 1px solid transparent;
   border-radius: 5px;
   outline: none;
   resize: vertical;
 }
-
-.block-math-editor-input:focus { border-color: var(--accent); }
 
 /* P12-3 — wraps just the textarea (not its sibling number input/copy
    button) so the error overlay's `inset: 0` matches the textarea's own box,
