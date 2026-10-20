@@ -1,6 +1,6 @@
 import { useRef, useState, useEffect, useLayoutEffect, useCallback } from 'react'
 import type { PointerEvent as ReactPointerEvent } from 'react'
-import { useInkCanvas, isEraserTip, toInk } from './useInkCanvas'
+import { useInkCanvas, isDrawingPointer, isEraserTip, toInk } from './useInkCanvas'
 import { pinchZoom, distanceBetween } from './zoom'
 import { scrollShift } from './growCanvas'
 import { useInkStore } from '../store/ink'
@@ -196,7 +196,7 @@ export function InkCanvas({
 
     // The eraser end of the pen erases without changing the selected tool, so
     // the cursor has to follow the hardware, not just the toolbar.
-    const erasing = e.pointerType === 'pen' && (tool === 'eraser' || isEraserTip(e))
+    const erasing = isDrawingPointer(e) && (tool === 'eraser' || isEraserTip(e))
     if (!erasing) {
       if (cursorPos) setCursorPos(null)
       return

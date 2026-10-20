@@ -222,3 +222,63 @@ describe('prediction', () => {
     expect(lastWrite().strokes).toHaveLength(1)
   })
 })
+
+describe('mouse drawing', () => {
+  it('commits a stroke from a mouse sequence, at constant pressure', async () => {
+    const { canvas } = await mountCanvas()
+    drawBent(canvas, { kind: 'mouse' })
+
+    const stroke = lastWrite().strokes[0]
+    expect(stroke?.points).toHaveLength(3)
+    expect(stroke?.points.every((pt) => pt.pressure === 0.5)).toBe(true)
+  })
+
+  // Review Focus 4.
+  it('ignores a touch sequence', async () => {
+    const { canvas } = await mountCanvas()
+    drawBent(canvas, { kind: 'touch' })
+    expect(write).not.toHaveBeenCalled()
+  })
+
+  it('ignores the right and middle mouse buttons', async () => {
+    const { canvas } = await mountCanvas()
+    drawBent(canvas, { kind: 'mouse', button: 2 })
+    drawBent(canvas, { kind: 'mouse', button: 1 })
+    expect(write).not.toHaveBeenCalled()
+  })
+
+  it('does not draw while the mouse only hovers', async () => {
+    const { canvas } = await mountCanvas()
+    at(canvas, 'pointerMove', 60, 80, { kind: 'mouse' })
+    at(canvas, 'pointerMove', 110, 10, { kind: 'mouse' })
+    at(canvas, 'pointerUp', 110, 10, { kind: 'mouse' })
+    expect(write).not.toHaveBeenCalled()
+  })
+
+  it('auto-straightens a near-straight mouse stroke like a pen stroke', async () => {
+    const { canvas } = await mountCanvas()
+    at(canvas, 'pointerDown', 10, 10, { kind: 'mouse' })
+    at(canvas, 'pointerMove', 200, 11, { kind: 'mouse' })
+    at(canvas, 'pointerMove', 400, 10, { kind: 'mouse' })
+    at(canvas, 'pointerUp', 400, 10, { kind: 'mouse' })
+
+    const saved = lastWrite()
+    expect(saved.strokes).toHaveLength(0)
+    expect(saved.shapes[0]).toMatchObject({ kind: 'line' })
+  })
+
+  it('shows the eraser ring for a mouse when the eraser is selected', async () => {
+    useInkStore.setState({ tool: 'eraser' })
+    const { canvas, container } = await mountCanvas()
+    at(canvas, 'pointerMove', 50, 50, { kind: 'mouse' })
+    expect(container.querySelector('.ink-eraser-cursor')).not.toBeNull()
+  })
+
+  it('erases with the mouse', async () => {
+    useInkStore.setState({ tool: 'eraser', eraserMode: 'stroke' })
+    const { canvas } = await mountCanvas({ ...PAGE, strokes: existingStrokes(1) })
+    at(canvas, 'pointerDown', 10, 100, { kind: 'mouse' })
+    at(canvas, 'pointerUp', 10, 100, { kind: 'mouse' })
+    expect(lastWrite().strokes).toHaveLength(0)
+  })
+})

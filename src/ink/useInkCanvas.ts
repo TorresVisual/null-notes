@@ -129,6 +129,11 @@ export function isEraserTip(e: PointerLike): boolean {
   return (e.buttons & ERASER_BUTTONS_MASK) !== 0 || e.button === ERASER_BUTTON
 }
 
+// Touch pans and pinches, so it never draws; pen and mouse do.
+export function isDrawingPointer(e: { pointerType: string }): boolean {
+  return e.pointerType === 'pen' || e.pointerType === 'mouse'
+}
+
 interface OffsetPoint {
   offsetX: number
   offsetY: number
@@ -586,7 +591,7 @@ export function useInkCanvas(
 
   const handlePointerDown = useCallback(
     (e: PointerEvent) => {
-      if (e.pointerType !== 'pen') return
+      if (!isDrawingPointer(e) || (e.pointerType === 'mouse' && e.button !== 0)) return
       capturePointer(canvasRef.current, e.pointerId)
       const activeTool = isEraserTip(e) ? 'eraser' : tool
       const at = toInk(e, zoom, origin)
@@ -653,7 +658,7 @@ export function useInkCanvas(
 
   const handlePointerMove = useCallback(
     (e: PointerEvent) => {
-      if (e.pointerType !== 'pen') return
+      if (!isDrawingPointer(e)) return
       const activeTool = isEraserTip(e) ? 'eraser' : tool
       const at = toInk(e, zoom, origin)
 
@@ -734,7 +739,7 @@ export function useInkCanvas(
 
   const handlePointerUp = useCallback(
     (e: PointerEvent) => {
-      if (e.pointerType !== 'pen') return
+      if (!isDrawingPointer(e)) return
       releasePointer(canvasRef.current, e.pointerId)
       cancelRedraw()
 
