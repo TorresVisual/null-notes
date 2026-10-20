@@ -2689,6 +2689,17 @@ pre:has(code.language-expect)::before, pre:has(code.language-expected)::before {
    that folder's own chevron rather than the tree's left edge. */
 .tree-guide { border-left: 1px solid var(--border); }
 
+/* A folder's children arrive as a short drop from the row that opened them —
+   direction says where they came from. Entrance only, like surface-in: the
+   list unmounts on collapse, so there is no exit to coordinate. */
+@keyframes tree-open {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+li > .folder-tree.tree-guide {
+  animation: tree-open var(--duration-base) var(--ease-standard);
+}
+
 /* Scoped to .sidebar to outrank the generic `.sidebar button` rule, which is
    more specific than a bare `.tree-delete` and would otherwise force the
    button to width:100%, collapsing the flex-basis:0 label to nothing. */
