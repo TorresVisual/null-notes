@@ -54,6 +54,8 @@ Each scale entry is a `font` shorthand string, so a consumer writes one declarat
 | `--text-heading-1` | `700 1.8em/1.3 var(--font-sans)` | `.note-editor h1` |
 | `--text-heading-2` | `700 1.4em/1.3 var(--font-sans)` | `.note-editor h2` |
 | `--text-heading-3` | `700 1.2em/1.3 var(--font-sans)` | `.note-editor h3` |
+| `--text-heading-4` | `700 1.05em/1.4 var(--font-sans)` | `.note-editor h4` |
+| `--text-heading-5` / `-6` | `600 1em` / `600 0.9em`, `1.4` leading | `.note-editor h5` / `h6`, in `--text-secondary` (Tailwind preflight resets headings to body size, so without these `####`+ rendered as plain text) |
 | `--text-body` | `400 15px/1.6 var(--font-sans)` | `body` (the app-wide default) |
 | `--text-metadata` | `600 11px/1.4 var(--font-sans)` | Small uppercase labels — `.workspace-name` |
 | `--text-code` | `400 13px/1.5 var(--font-mono)` | Representative value for UI-chrome monospace (popovers, editor status, kbd) |
