@@ -5095,11 +5095,38 @@ pre:has(code.language-expect)::before, pre:has(code.language-expected)::before {
   flex-shrink: 0;
 }
 
-.ink-editor-header .toolbar-ink {
+/* Tools scroll sideways on a narrow window; undo/redo/zoom/Done stay put. */
+.draw-ribbon {
   flex: 1;
   min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.draw-ribbon-tools {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
   overflow-x: auto;
 }
+.draw-ribbon-tools > * { flex: none; }
+
+.draw-ribbon-pinned {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.draw-ribbon .ink-tool { width: 32px; height: 32px; }
+.draw-ribbon .ink-tool.ink-mode,
+.draw-ribbon .ink-tool.ink-zoom-btn { width: auto; padding: 0 10px; font-size: 12px; }
+.draw-ribbon button:disabled { opacity: 0.35; cursor: not-allowed; }
+.ink-flyout .ink-tool { width: 32px; height: 32px; }
+.ink-flyout .ink-tool.ink-mode { width: auto; }
 
 .ink-editor-done { flex: none; }
 
