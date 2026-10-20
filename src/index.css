@@ -3162,6 +3162,61 @@ pre:has(code.language-expect)::before, pre:has(code.language-expected)::before {
 
 .toolbar-ink button:disabled { opacity: 0.35; cursor: not-allowed; }
 
+/* OneNote-style Draw ribbon. Rules for the bar itself live with the overlay
+   header further down; these are the pieces it is built from. */
+.ink-pen-gallery { display: flex; gap: 4px; }
+
+.ink-pen-card {
+  width: 56px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-hover);
+  border: 1px solid transparent;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.ink-pen-card:hover { background: var(--border-strong); }
+.ink-pen-card.active { border-color: var(--accent); background: var(--bg-base); }
+
+.ink-pen-sample { width: 40px; height: 18px; overflow: visible; }
+.ink-pen-sample.large { width: 160px; height: 48px; }
+
+.ink-flyout {
+  z-index: 110;
+  min-width: 200px;
+  padding: var(--space-md);
+  background: var(--bg-raised);
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  color: var(--text-primary);
+}
+.ink-flyout-body { display: flex; flex-direction: column; gap: var(--space-sm); align-items: stretch; }
+.ink-flyout-row { display: flex; align-items: center; gap: var(--space-sm); font-size: 12px; color: var(--text-secondary); }
+.ink-flyout input[type="range"] { flex: 1; min-width: 120px; accent-color: var(--accent); }
+.ink-flyout .ink-pen-sample.large { align-self: center; }
+
+.ink-color-grid { display: grid; grid-template-columns: repeat(6, 24px); gap: 6px; }
+.ink-color-swatch {
+  width: 24px;
+  height: 24px;
+  border: 2px solid transparent;
+  border-radius: 50%;
+  cursor: pointer;
+}
+.ink-color-swatch.active { border-color: var(--accent); }
+.ink-flyout input[type="color"] {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid var(--border-strong);
+  border-radius: 50%;
+  background: var(--bg-hover);
+  cursor: pointer;
+}
+
 /* Grid lives in CSS, not in the stroke data — it guides handwriting without
    ever being saved into the .svg sidecar. */
 .ink-canvas {
