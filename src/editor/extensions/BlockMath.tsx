@@ -143,7 +143,7 @@ function BlockMathView({ node, editor, getPos, updateAttributes, deleteNode, sel
                 className="block-math-editor-input"
                 value={draft}
                 spellCheck={false}
-                placeholder="e^{i\pi} + 1 = 0  (Mod-Enter to apply, Escape to cancel, / for a snippet)"
+                placeholder="e^{i\pi} + 1 = 0"
                 onChange={(e) => {
                   setDraft(e.target.value)
                   setCursor(e.target.selectionStart ?? e.target.value.length)
@@ -170,31 +170,36 @@ function BlockMathView({ node, editor, getPos, updateAttributes, deleteNode, sel
                 className="block-math-editor-input"
               />
             </div>
-            <input
-              type="text"
-              className="block-math-number-input"
-              value={draftNumber}
-              placeholder="№"
-              title="Equation number (optional) — makes it resolvable as Equation (N)"
-              onChange={(e) => setDraftNumber(e.target.value)}
-              onBlur={() => commitUnlessFocusLeaves(commit)}
-              onKeyDown={(e) => {
-                e.stopPropagation()
-                if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-                  e.preventDefault()
-                  commit(true)
-                } else if (e.key === 'Escape') {
-                  e.preventDefault()
-                  cancel()
-                }
-              }}
-            />
-            <MathCopyButton latex={draft} className="math-copy-button" />
             <MathSnippetMenu
               matches={snippetMenu.matches}
               selected={snippetMenu.selected}
               onSelect={snippetMenu.select}
             />
+          </div>
+          <div className="block-math-editor-bar">
+            <label className="block-math-number-label" title="Equation number (optional) — makes it resolvable as Equation (N)">
+              Number
+              <input
+                type="text"
+                className="block-math-number-input"
+                value={draftNumber}
+                placeholder="—"
+                onChange={(e) => setDraftNumber(e.target.value)}
+                onBlur={() => commitUnlessFocusLeaves(commit)}
+                onKeyDown={(e) => {
+                  e.stopPropagation()
+                  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                    e.preventDefault()
+                    commit(true)
+                  } else if (e.key === 'Escape') {
+                    e.preventDefault()
+                    cancel()
+                  }
+                }}
+              />
+            </label>
+            <span className="block-math-editor-hint">Ctrl+Enter apply · Esc cancel · / snippets</span>
+            <MathCopyButton latex={draft} className="math-copy-button" />
           </div>
           {/* eslint-disable-next-line react/no-danger -- KaTeX's own rendered output, not note-derived HTML. */}
           <div className="block-math-editor-preview" dangerouslySetInnerHTML={{ __html: preview.html }} />

@@ -863,8 +863,7 @@ code {
    button. Small width on the number input: it only ever holds a few digits
    and a dot ("3.2"). */
 .block-math-number-input {
-  width: 3.5em;
-  margin-top: var(--space-xs);
+  width: 4em;
   padding: 3px 6px;
   font-family: var(--font-mono);
   font-size: 12px;
@@ -1005,13 +1004,45 @@ code {
   width: 100%;
 }
 
+.block-math-editor-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.block-math-number-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-tertiary);
+  font-size: 11px;
+}
+
+.block-math-editor-hint {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-tertiary);
+  font-size: 11px;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.block-math-editor-bar .math-copy-button {
+  margin: 0;
+  padding: 3px 10px;
+}
+
 .block-math-editor-preview {
   display: block;
   min-height: 1.6em;
-  padding: var(--space-xs) 2px;
+  margin-top: var(--space-xs);
+  padding: var(--space-md) 2px var(--space-xs);
   overflow-x: auto;
   text-align: center;
   color: var(--text-primary);
+  border-top: 1px solid var(--border);
 }
 
 .block-math-editor-preview .katex { font-size: 1.4em; }
