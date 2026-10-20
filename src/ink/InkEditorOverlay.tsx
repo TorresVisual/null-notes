@@ -70,6 +70,7 @@ export function InkEditorOverlay({ src, width, height, onSaved, onClose }: InkEd
           zoom={zoom}
           onZoomChange={setZoom}
           autoGrow
+          growAllSides
           autoActivate
           onSaved={onSaved}
         />

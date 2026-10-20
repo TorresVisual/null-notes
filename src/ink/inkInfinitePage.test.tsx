@@ -124,3 +124,53 @@ describe('rendering at a non-zero origin', () => {
     expect(canvas.style.backgroundPosition).toBe('800px 0px')
   })
 })
+
+describe('scroll compensation', () => {
+  function withScroll(el: HTMLElement) {
+    Object.defineProperty(el, 'scrollTop', { value: 0, writable: true })
+    Object.defineProperty(el, 'scrollLeft', { value: 0, writable: true })
+    return el
+  }
+
+  async function mountInBody(props: Partial<ComponentProps<typeof InkCanvas>>, loaded: InkData = PAGE) {
+    read.mockResolvedValue(loaded)
+    const view = render(
+      <div className="ink-editor-body">
+        <InkCanvas svgPath={SRC} width={800} height={600} {...props} />
+      </div>,
+    )
+    const body = withScroll(view.container.firstElementChild as HTMLElement)
+    await waitFor(() => expect(read).toHaveBeenCalled())
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    return { ...view, body, canvas: view.container.querySelector('canvas')! }
+  }
+
+  it('advances the scroll when growth adds space before the ink', async () => {
+    const { body, canvas } = await mountInBody({ autoGrow: true, growAllSides: true, zoom: 2 })
+    drawRect(canvas, 100, 100, 600, 600)
+
+    await waitFor(() => expect(body.scrollLeft).toBe(800))
+    expect(body.scrollTop).toBe(800)
+  })
+
+  it('moves the scroll back on undo', async () => {
+    const { body, canvas } = await mountInBody({ autoGrow: true, growAllSides: true, zoom: 2 })
+    drawRect(canvas, 100, 100, 600, 600)
+    await waitFor(() => expect(body.scrollLeft).toBe(800))
+
+    useInkStore.getState().activeCanvas?.undo()
+
+    await waitFor(() => expect(body.scrollLeft).toBe(0))
+    expect(body.scrollTop).toBe(0)
+  })
+
+  // Review Focus 5: opening a file that was saved with a non-zero origin is an
+  // origin change too; the view lands on ink (0, 0), not on the empty margin.
+  it('lands on ink (0, 0) when a grown file is opened', async () => {
+    const { body } = await mountInBody({ autoGrow: true, growAllSides: true, zoom: 1 }, {
+      ...PAGE, originX: -400, originY: -400, width: 1200, height: 1000,
+    })
+    await waitFor(() => expect(body.scrollLeft).toBe(400))
+    expect(body.scrollTop).toBe(400)
+  })
+})

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { GROW_MARGIN, PAGE_STEP, MAX_EXTENT, EMPTY_BOUNDS, boundsOfPoints, inkBounds, growCanvas } from './growCanvas'
+import { GROW_MARGIN, PAGE_STEP, MAX_EXTENT, EMPTY_BOUNDS, boundsOfPoints, inkBounds, growCanvas, scrollShift } from './growCanvas'
 import type { InkData } from './types'
 
 describe('boundsOfPoints', () => {
@@ -110,5 +110,19 @@ describe('growCanvas', () => {
   it('does not shrink a page that is already past the cap', () => {
     const huge = { ...page, width: 9000 }
     expect(growCanvas(huge, bounds(0, 300, 9000, 400), true, true)).toEqual(huge)
+  })
+})
+
+describe('scrollShift', () => {
+  it('advances the scroll by the new space added before the ink, at zoom', () => {
+    expect(scrollShift({ originX: 0, originY: 0 }, { originX: -400, originY: -800 }, 2)).toEqual({ dx: 800, dy: 1600 })
+  })
+
+  it('goes back by the same amount when undo restores the old origin', () => {
+    expect(scrollShift({ originX: -400, originY: 0 }, { originX: 0, originY: 0 }, 2)).toEqual({ dx: -800, dy: 0 })
+  })
+
+  it('is zero when the origin did not move', () => {
+    expect(scrollShift({ originX: -400, originY: 0 }, { originX: -400, originY: 0 }, 1.5)).toEqual({ dx: 0, dy: 0 })
   })
 })

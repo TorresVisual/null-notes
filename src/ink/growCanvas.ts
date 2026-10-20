@@ -69,3 +69,14 @@ export function growCanvas(page: Page, bounds: Bounds, autoGrow: boolean, growAl
   const y = growAxis(page.originY, page.height, bounds.minY, bounds.maxY, growAllSides)
   return { originX: x.origin, originY: y.origin, width: x.size, height: y.size }
 }
+
+// Growing left or up adds screen space *before* the existing ink, so the scroll
+// position has to advance by the same amount or everything drawn jumps. Keyed on
+// any origin change — undo and redo restore the old origin and so shift back.
+export function scrollShift(
+  prev: { originX: number; originY: number },
+  next: { originX: number; originY: number },
+  zoom: number,
+): { dx: number; dy: number } {
+  return { dx: (prev.originX - next.originX) * zoom, dy: (prev.originY - next.originY) * zoom }
+}

@@ -1,7 +1,8 @@
-import { useRef, useState, useEffect, useCallback } from 'react'
+import { useRef, useState, useEffect, useLayoutEffect, useCallback } from 'react'
 import type { PointerEvent as ReactPointerEvent } from 'react'
 import { useInkCanvas, isEraserTip, toInk } from './useInkCanvas'
 import { pinchZoom, distanceBetween } from './zoom'
+import { scrollShift } from './growCanvas'
 import { useInkStore } from '../store/ink'
 import type { CanvasHandle } from '../store/ink'
 
@@ -115,6 +116,17 @@ export function InkCanvas({
   useEffect(() => () => clearActiveCanvas(svgPath), [clearActiveCanvas, svgPath])
 
   const [cursorPos, setCursorPos] = useState<{ x: number; y: number } | null>(null)
+  const pageRef = useRef<HTMLDivElement>(null)
+  const lastOrigin = useRef({ originX: inkData.originX, originY: inkData.originY })
+
+  useLayoutEffect(() => {
+    const { dx, dy } = scrollShift(lastOrigin.current, inkData, zoom)
+    lastOrigin.current = { originX: inkData.originX, originY: inkData.originY }
+    const body = pageRef.current?.closest('.ink-editor-body')
+    if (!body || (dx === 0 && dy === 0)) return
+    body.scrollLeft += dx
+    body.scrollTop += dy
+  }, [inkData.originX, inkData.originY])
 
   // Fingers never draw — the pen owns the ink — so touch is free to mean
   // everything else: hold the straightedge, drag the page, pinch to see more.
@@ -206,6 +218,7 @@ export function InkCanvas({
   return (
     <div className="ink-canvas-wrap">
       <div
+        ref={pageRef}
         style={{ position: 'relative', width: displayWidth, height: displayHeight }}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}

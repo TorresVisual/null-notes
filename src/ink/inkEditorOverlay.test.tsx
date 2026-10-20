@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest'
-import { render, cleanup, fireEvent, waitFor, screen } from '@testing-library/react'
+import { render, cleanup, createEvent, fireEvent, waitFor, screen } from '@testing-library/react'
 import { InkEditorOverlay } from './InkEditorOverlay'
 import { useInkStore } from '../store/ink'
 import type { CanvasHandle } from '../store/ink'
@@ -232,5 +232,24 @@ describe('draw ribbon in the overlay', () => {
 
     fireEvent.keyDown(overlay, { key: 'Escape' })
     expect(onClose).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('infinite page', () => {
+  it('grows left and up when ink nears the top-left corner', async () => {
+    useInkStore.setState({ tool: 'rect' })
+    mount()
+    const canvas = document.querySelector('canvas')!
+    const at = (type: 'pointerDown' | 'pointerUp', x: number, y: number) => {
+      const event = createEvent[type](canvas, { pointerType: 'pen', pointerId: 1 })
+      Object.defineProperty(event, 'offsetX', { value: x })
+      Object.defineProperty(event, 'offsetY', { value: y })
+      fireEvent(canvas, event)
+    }
+    at('pointerDown', 40, 40)
+    at('pointerUp', 200, 200)
+
+    await waitFor(() => expect(write).toHaveBeenCalled())
+    expect(write.mock.calls[0]?.[1]).toMatchObject({ originX: -400, originY: -400 })
   })
 })
