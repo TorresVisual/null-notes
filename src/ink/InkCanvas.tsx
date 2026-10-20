@@ -7,8 +7,15 @@ import type { CanvasHandle } from '../store/ink'
 
 // Dragging a finger moves the content with it, so the scroll offset goes the
 // opposite way. Vertical travel belongs to the note; horizontal only matters
-// once zoom has made the canvas wider than the column.
-function scrollAncestors(from: HTMLElement, dx: number, dy: number): void {
+// once zoom has made the canvas wider than the column. The full-screen editor
+// owns a scroll container that pans on both axes, so it takes precedence.
+export function scrollAncestors(from: HTMLElement, dx: number, dy: number): void {
+  const editor = from.closest('.ink-editor-body')
+  if (editor) {
+    editor.scrollTop -= dy
+    editor.scrollLeft -= dx
+    return
+  }
   const page = from.closest('.editor-scroll')
   if (page) page.scrollTop -= dy
   const canvas = from.closest('.ink-canvas-wrap')
@@ -25,6 +32,8 @@ interface InkCanvasProps {
   zoom?: number
   onZoomChange?: (zoom: number) => void
   autoGrow?: boolean
+  onSaved?: () => void
+  autoActivate?: boolean
 }
 
 export function InkCanvas({
@@ -34,6 +43,8 @@ export function InkCanvas({
   zoom = 1,
   onZoomChange,
   autoGrow = false,
+  onSaved,
+  autoActivate = false,
 }: InkCanvasProps) {
   const {
     canvasRef,
@@ -55,7 +66,7 @@ export function InkCanvas({
     updateEditingText,
     commitEditingText,
     cancelEditingText,
-  } = useInkCanvas(svgPath, width, height, { zoom, autoGrow })
+  } = useInkCanvas(svgPath, width, height, { zoom, autoGrow, onSaved })
 
   const setActiveCanvas = useInkStore((s) => s.setActiveCanvas)
   const clearActiveCanvas = useInkStore((s) => s.clearActiveCanvas)
@@ -88,6 +99,13 @@ export function InkCanvas({
   useEffect(() => {
     if (isActive) setActiveCanvas(svgPath, handle())
   }, [isActive, handle, setActiveCanvas, svgPath])
+
+  // Mount-time only: the tool group renders nothing until a canvas has
+  // registered, and registration otherwise waits for a pointer press. From here
+  // the effect above keeps the handle fresh.
+  useEffect(() => {
+    if (autoActivate) setActiveCanvas(svgPath, handle())
+  }, [autoActivate, svgPath])
 
   // Safe to call unconditionally on every unmount: `clearActiveCanvas` only
   // clears if `svgPath` still owns the slot, so a canvas that already lost it

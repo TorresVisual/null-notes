@@ -107,6 +107,7 @@ function drawRuler(ctx: CanvasRenderingContext2D, ruler: Ruler): void {
 interface InkOptions {
   zoom?: number
   autoGrow?: boolean
+  onSaved?: () => void
 }
 
 // Pointer Events reports the pen's eraser end as bit 5 of `buttons` (32) for
@@ -199,7 +200,7 @@ export function useInkCanvas(
   svgPath: string,
   width: number,
   height: number,
-  { zoom = 1, autoGrow = false }: InkOptions = {},
+  { zoom = 1, autoGrow = false, onSaved }: InkOptions = {},
 ) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const tool = useInkStore((s) => s.tool)
@@ -245,6 +246,20 @@ export function useInkCanvas(
   useEffect(() => {
     inkDataRef.current = inkData
   }, [inkData])
+
+  const onSavedRef = useRef(onSaved)
+  useEffect(() => {
+    onSavedRef.current = onSaved
+  }, [onSaved])
+
+  // Writes are fire-and-forget, so a caller re-reading the sidecar on close could
+  // beat the last stroke to disk. `onSaved` fires from the resolved write instead.
+  const save = useCallback(
+    (data: InkData) => {
+      void inkApi.write(svgPath, data).then(() => onSavedRef.current?.())
+    },
+    [svgPath],
+  )
 
   // The selected preset *is* the pen — colour, width and opacity all come from
   // it, and the toolbar's colour and size controls edit it in place. That is
@@ -294,9 +309,9 @@ export function useInkCanvas(
       setHistory((past) => [...past, inkData])
       setFuture([])
       setInkData(next)
-      void inkApi.write(svgPath, next)
+      save(next)
     },
-    [inkData, svgPath],
+    [inkData, save],
   )
 
   const undo = useCallback(() => {
@@ -305,8 +320,8 @@ export function useInkCanvas(
     setHistory(history.slice(0, -1))
     setFuture([...future, inkData])
     setInkData(previous)
-    void inkApi.write(svgPath, previous)
-  }, [history, future, inkData, svgPath])
+    save(previous)
+  }, [history, future, inkData, save])
 
   const redo = useCallback(() => {
     const next = future[future.length - 1]
@@ -314,8 +329,8 @@ export function useInkCanvas(
     setFuture(future.slice(0, -1))
     setHistory([...history, inkData])
     setInkData(next)
-    void inkApi.write(svgPath, next)
-  }, [history, future, inkData, svgPath])
+    save(next)
+  }, [history, future, inkData, save])
 
   const startNewText = useCallback(
     (x: number, y: number) => {
@@ -387,9 +402,9 @@ export function useInkCanvas(
       const next = current.isNew
         ? { ...base, texts: [...base.texts, { id: current.id, x: current.x, y: current.y, text: current.text, color: current.color, size: current.size }] }
         : { ...base, texts: base.texts.map((t) => (t.id === current.id ? { ...t, text: current.text } : t)) }
-      void inkApi.write(svgPath, next)
+      save(next)
     }
-  }, [svgPath])
+  }, [save])
 
   const redrawCanvas = useCallback(
     (livePoints: Point[], liveShape?: PreviewShape | null, liveLasso?: LassoPoint[] | null) => {
@@ -681,7 +696,7 @@ export function useInkCanvas(
           const { width, height } = growCanvas(inkData.width, inkData.height, reach, autoGrow)
           const grown = { ...inkData, width, height }
           setInkData(grown)
-          void inkApi.write(svgPath, grown)
+          save(grown)
         } else {
           const item = inkData.texts.find((t) => t.id === textFrom.id)
           if (item) startEditText(item)
@@ -700,7 +715,7 @@ export function useInkCanvas(
           const { width, height } = growCanvas(inkData.width, inkData.height, selectionReach(inkData, selection), autoGrow)
           const grown = { ...inkData, width, height }
           setInkData(grown)
-          void inkApi.write(svgPath, grown)
+          save(grown)
         }
         return
       }
@@ -712,7 +727,7 @@ export function useInkCanvas(
         if (inkData !== snapshot) {
           setHistory((past) => [...past, snapshot])
           setFuture([])
-          void inkApi.write(svgPath, inkData)
+          save(inkData)
         }
         return
       }
@@ -769,7 +784,7 @@ export function useInkCanvas(
       commit({ ...inkData, width: strokeGrown.width, height: strokeGrown.height, strokes: [...inkData.strokes, stroke] })
     },
     [
-      tool, inkData, color, size, opacity, commit, svgPath, zoom, autoGrow, selection,
+      tool, inkData, color, size, opacity, commit, save, zoom, autoGrow, selection,
       snappedPoints, releaseRuler, startEditText,
     ],
   )
