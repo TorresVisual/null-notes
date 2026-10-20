@@ -11,6 +11,7 @@
   --bg-base: #1f1f1f;
   --bg-raised: #181818;
   --bg-sunken: #121212;
+  --selected-frame: color-mix(in srgb, var(--accent) 45%, var(--border-strong));
   --bg-hover: #2a2a2a;
 
   /* Borders */
@@ -4993,6 +4994,19 @@ input[type='checkbox']:focus-visible {
   background: var(--accent-bg);
   border-radius: 4px;
   outline: none;
+}
+
+/* Boxed blocks already have their own frame — a green fill behind it reads as
+   a box inside a box, so the selection shows on that frame instead. */
+.note-editor .ProseMirror-selectednode:is(.ink-block, .diagram-block, .mermaid-block, .block-math) {
+  background: transparent;
+}
+.ProseMirror-selectednode .ink-preview,
+.ProseMirror-selectednode .diagram-block-preview {
+  border-color: var(--selected-frame);
+}
+.ProseMirror-selectednode.mermaid-block {
+  box-shadow: 0 0 0 1px var(--selected-frame);
 }
 
 /* Tailwind utility registration for the token bridge above. `inline`
