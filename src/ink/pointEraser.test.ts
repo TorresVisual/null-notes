@@ -86,6 +86,8 @@ describe('erasePoint', () => {
   }
 
   const data: InkData = {
+    originX: 0,
+    originY: 0,
     width: 800,
     height: 600,
     strokes: [stroke('a', points(0, 10, 50, 90, 100))],
@@ -118,6 +120,8 @@ describe('eraseWholeStrokes', () => {
   }
 
   const data: InkData = {
+    originX: 0,
+    originY: 0,
     width: 800,
     height: 600,
     strokes: [stroke('a', points(0, 10, 50, 90, 100)), stroke('b', points(400, 410))],
@@ -147,6 +151,8 @@ describe('eraseWholeStrokes', () => {
 
 describe('erase', () => {
   const data: InkData = {
+    originX: 0,
+    originY: 0,
     width: 800,
     height: 600,
     strokes: [stroke('a', points(0, 10, 50, 90, 100))],

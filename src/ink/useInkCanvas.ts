@@ -214,7 +214,7 @@ export function useInkCanvas(
   const updateActivePen = useInkStore((s) => s.updateActivePen)
   const setEraserMode = useInkStore((s) => s.setEraserMode)
   const setEraserSize = useInkStore((s) => s.setEraserSize)
-  const [inkData, setInkData] = useState<InkData>({ width, height, strokes: [], shapes: [], texts: [] })
+  const [inkData, setInkData] = useState<InkData>({ originX: 0, originY: 0, width, height, strokes: [], shapes: [], texts: [] })
   const [history, setHistory] = useState<InkData[]>([])
   const [future, setFuture] = useState<InkData[]>([])
 

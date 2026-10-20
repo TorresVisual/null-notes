@@ -109,6 +109,8 @@ describe('shapeInLasso', () => {
 
 describe('selectionIn', () => {
   const data: InkData = {
+    originX: 0,
+    originY: 0,
     width: 800,
     height: 600,
     strokes: [stroke('in', [[10, 10], [20, 20]]), stroke('out', [[500, 500]])],
@@ -128,6 +130,8 @@ describe('selectionIn', () => {
 
 describe('translateSelection', () => {
   const data: InkData = {
+    originX: 0,
+    originY: 0,
     width: 800,
     height: 600,
     strokes: [stroke('a', [[10, 10]]), stroke('b', [[10, 10]])],
@@ -161,6 +165,8 @@ describe('translatePolygon', () => {
 describe('deleteSelection', () => {
   it('drops only the selected strokes and shapes', () => {
     const data: InkData = {
+      originX: 0,
+      originY: 0,
       width: 800,
       height: 600,
       strokes: [stroke('a', [[1, 1]]), stroke('b', [[2, 2]])],
@@ -176,6 +182,8 @@ describe('deleteSelection', () => {
 describe('selectionBounds', () => {
   it('reports the extremes the selection covers, on both axes', () => {
     const data: InkData = {
+      originX: 0,
+      originY: 0,
       width: 800,
       height: 600,
       strokes: [stroke('a', [[50, 120], [700, 340]])],
@@ -187,7 +195,7 @@ describe('selectionBounds', () => {
   })
 
   it('is EMPTY_BOUNDS for an empty selection', () => {
-    const data: InkData = { width: 800, height: 600, strokes: [], shapes: [], texts: [] }
+    const data: InkData = { originX: 0, originY: 0, width: 800, height: 600, strokes: [], shapes: [], texts: [] }
     expect(selectionBounds(data, EMPTY_SELECTION)).toEqual(EMPTY_BOUNDS)
   })
 })

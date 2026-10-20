@@ -8,7 +8,7 @@ import type { InkData } from '../../ink/types'
 export const INK_WIDTH = 700
 export const INK_HEIGHT = 900
 
-const EMPTY_INK: InkData = { width: INK_WIDTH, height: INK_HEIGHT, strokes: [], shapes: [], texts: [] }
+const EMPTY_INK: InkData = { originX: 0, originY: 0, width: INK_WIDTH, height: INK_HEIGHT, strokes: [], shapes: [], texts: [] }
 
 // The node view may not have mounted its listener yet when the block is inserted,
 // so the request is also parked here for the preview to claim on mount.

@@ -140,6 +140,8 @@ describe('scrollAncestors', () => {
 
 describe('Delete reaches only the canvas that owns the selection', () => {
   const INK_WITH_STROKE: InkData = {
+    originX: 0,
+    originY: 0,
     width: 700,
     height: 400,
     strokes: [

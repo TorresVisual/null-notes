@@ -1,5 +1,6 @@
 import { getStroke } from 'perfect-freehand'
 import { paintOrder } from './paintOrder'
+import { GROW_MARGIN, inkBounds } from './growCanvas'
 import { TEXT_LINE_HEIGHT } from './textBounds'
 import type { InkData, Stroke, Shape, TextItem } from './types'
 
@@ -86,11 +87,32 @@ export function inkDataToSvg(data: InkData): string {
   const paths = paintOrder(data.strokes).map(strokeToPath).join('\n  ')
   const elements = data.shapes.map(shapeToElement).join('\n  ')
   const texts = data.texts.map(textItemToElement).join('\n  ')
-  return `<svg xmlns="http://www.w3.org/2000/svg" data-width="${data.width}" data-height="${data.height}" width="${data.width}" height="${data.height}" viewBox="0 0 ${data.width} ${data.height}">
+  return `<svg xmlns="http://www.w3.org/2000/svg" data-origin-x="${data.originX}" data-origin-y="${data.originY}" data-width="${data.width}" data-height="${data.height}" width="${data.width}" height="${data.height}" viewBox="${data.originX} ${data.originY} ${data.width} ${data.height}">
   ${paths}
   ${elements}
   ${texts}
 </svg>`
+}
+
+// Older builds rewrite the header as `0 0 w h` but keep every stroke, so a file
+// that grew leftward and was then saved by one comes back with ink outside its
+// page. Only ink actually outside the origin moves it; merely being near the
+// edge must not, or every existing note would shift on first open. The right
+// and bottom edges stay where they were.
+function coverContent(data: InkData): InkData {
+  const { minX, minY } = inkBounds(data)
+  let { originX, originY, width, height } = data
+  if (minX < originX) {
+    const next = minX - GROW_MARGIN
+    width += originX - next
+    originX = next
+  }
+  if (minY < originY) {
+    const next = minY - GROW_MARGIN
+    height += originY - next
+    originY = next
+  }
+  return { ...data, originX, originY, width, height }
 }
 
 export function svgToInkData(svg: string): InkData {
@@ -98,6 +120,8 @@ export function svgToInkData(svg: string): InkData {
   const doc = parser.parseFromString(svg, 'image/svg+xml')
   const root = doc.querySelector('svg')
 
+  const originX = Number(root?.getAttribute('data-origin-x') ?? 0)
+  const originY = Number(root?.getAttribute('data-origin-y') ?? 0)
   const width = Number(root?.getAttribute('data-width') ?? 800)
   const height = Number(root?.getAttribute('data-height') ?? 600)
 
@@ -146,5 +170,5 @@ export function svgToInkData(svg: string): InkData {
     texts.push({ id, x, y, color, size, text })
   }
 
-  return { width, height, strokes, shapes, texts }
+  return coverContent({ originX, originY, width, height, strokes, shapes, texts })
 }

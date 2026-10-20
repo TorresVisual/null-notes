@@ -16,6 +16,8 @@ describe('boundsOfPoints', () => {
 
 describe('inkBounds', () => {
   const data: InkData = {
+    originX: 0,
+    originY: 0,
     width: 800, height: 600, strokes: [], shapes: [], texts: [],
   }
 

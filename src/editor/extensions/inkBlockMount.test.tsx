@@ -21,7 +21,7 @@ vi.mock('../../lib/ink', () => ({
 }))
 
 const SRC = '/ws/N.ink/a.svg'
-const EMPTY: InkData = { width: 700, height: 400, strokes: [], shapes: [], texts: [] }
+const EMPTY: InkData = { originX: 0, originY: 0, width: 700, height: 400, strokes: [], shapes: [], texts: [] }
 const WITH_LINE: InkData = {
   ...EMPTY,
   shapes: [{ id: 's1', kind: 'line', x1: 10, y1: 10, x2: 200, y2: 120, color: '#000000', size: 2 }],

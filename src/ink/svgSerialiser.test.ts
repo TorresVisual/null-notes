@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import { strokeToPath, shapeToElement, textItemToElement, inkDataToSvg, svgToInkData } from './svgSerialiser'
 import type { Stroke, Shape, TextItem, InkData } from './types'
+import { sanitizeNoteHtml } from '../lib/sanitizeHtml'
+import { GROW_MARGIN } from './growCanvas'
 
 const stroke: Stroke = {
   id: 's1',
@@ -90,7 +92,7 @@ describe('textItemToElement', () => {
 
 describe('inkDataToSvg / svgToInkData roundtrip', () => {
   it('round-trips stroke and shape data', () => {
-    const data: InkData = { width: 800, height: 600, strokes: [stroke], shapes: [shape], texts: [] }
+    const data: InkData = { originX: 0, originY: 0, width: 800, height: 600, strokes: [stroke], shapes: [shape], texts: [] }
     const svg = inkDataToSvg(data)
     expect(svg).toContain('<svg')
     expect(svg).toContain('data-width="800"')
@@ -104,7 +106,7 @@ describe('inkDataToSvg / svgToInkData roundtrip', () => {
 
   it('round-trips a highlighter opacity', () => {
     const highlighter: Stroke = { ...stroke, id: 's2', opacity: 0.3 }
-    const data: InkData = { width: 800, height: 600, strokes: [highlighter], shapes: [], texts: [] }
+    const data: InkData = { originX: 0, originY: 0, width: 800, height: 600, strokes: [highlighter], shapes: [], texts: [] }
 
     const restored = svgToInkData(inkDataToSvg(data))
     expect(restored.strokes[0]?.opacity).toBe(0.3)
@@ -130,7 +132,7 @@ describe('inkDataToSvg / svgToInkData roundtrip', () => {
 
   it('round-trips a pencil stroke\'s low thinning value', () => {
     const pencilStroke: Stroke = { ...stroke, id: 'pencil1', thinning: 0.1 }
-    const data: InkData = { width: 800, height: 600, strokes: [pencilStroke], shapes: [], texts: [] }
+    const data: InkData = { originX: 0, originY: 0, width: 800, height: 600, strokes: [pencilStroke], shapes: [], texts: [] }
 
     const svg = inkDataToSvg(data)
     expect(svg).toContain('data-thinning="0.1"')
@@ -139,7 +141,7 @@ describe('inkDataToSvg / svgToInkData roundtrip', () => {
 
   it('writes highlighters before ink so they sit underneath', () => {
     const highlighter: Stroke = { ...stroke, id: 'hl', opacity: 0.3 }
-    const data: InkData = { width: 800, height: 600, strokes: [stroke, highlighter], shapes: [], texts: [] }
+    const data: InkData = { originX: 0, originY: 0, width: 800, height: 600, strokes: [stroke, highlighter], shapes: [], texts: [] }
 
     const svg = inkDataToSvg(data)
     expect(svg.indexOf('data-id="hl"')).toBeLessThan(svg.indexOf('data-id="s1"'))
@@ -147,7 +149,7 @@ describe('inkDataToSvg / svgToInkData roundtrip', () => {
 
   it('round-trips a stroke alongside an arrow without cross-contamination', () => {
     const arrow: Shape = { ...shape, id: 'sh4', kind: 'arrow' }
-    const data: InkData = { width: 800, height: 600, strokes: [stroke], shapes: [arrow], texts: [] }
+    const data: InkData = { originX: 0, originY: 0, width: 800, height: 600, strokes: [stroke], shapes: [arrow], texts: [] }
     const svg = inkDataToSvg(data)
 
     const restored = svgToInkData(svg)
@@ -159,7 +161,7 @@ describe('inkDataToSvg / svgToInkData roundtrip', () => {
   })
 
   it('round-trips a text item', () => {
-    const data: InkData = { width: 800, height: 600, strokes: [], shapes: [], texts: [textItem] }
+    const data: InkData = { originX: 0, originY: 0, width: 800, height: 600, strokes: [], shapes: [], texts: [textItem] }
     const restored = svgToInkData(inkDataToSvg(data))
     expect(restored.texts).toHaveLength(1)
     expect(restored.texts[0]).toEqual(textItem)
@@ -167,7 +169,7 @@ describe('inkDataToSvg / svgToInkData roundtrip', () => {
 
   it('round-trips a multi-line text item byte-identical, including the newline', () => {
     const multiline: TextItem = { ...textItem, id: 'txt2', text: 'first\nsecond' }
-    const data: InkData = { width: 800, height: 600, strokes: [], shapes: [], texts: [multiline] }
+    const data: InkData = { originX: 0, originY: 0, width: 800, height: 600, strokes: [], shapes: [], texts: [multiline] }
     const restored = svgToInkData(inkDataToSvg(data))
     expect(restored.texts[0]?.text).toBe('first\nsecond')
   })
@@ -175,5 +177,62 @@ describe('inkDataToSvg / svgToInkData roundtrip', () => {
   it('reads a note with no text items at all as an empty array, not undefined', () => {
     const legacy = `<svg xmlns="http://www.w3.org/2000/svg" data-width="800" data-height="600"></svg>`
     expect(svgToInkData(legacy).texts).toEqual([])
+  })
+})
+
+describe('page origin', () => {
+  const blank: InkData = { originX: 0, originY: 0, width: 800, height: 600, strokes: [], shapes: [], texts: [] }
+
+  it('writes the origin into viewBox and data attributes', () => {
+    const svg = inkDataToSvg({ ...blank, originX: -400, originY: -800, width: 1200, height: 1400 })
+    expect(svg).toContain('viewBox="-400 -800 1200 1400"')
+    expect(svg).toContain('data-origin-x="-400"')
+    expect(svg).toContain('data-origin-y="-800"')
+  })
+
+  it('round-trips a negative origin', () => {
+    const data = { ...blank, originX: -400, originY: -800, width: 1200, height: 1400 }
+    const restored = svgToInkData(inkDataToSvg(data))
+    expect(restored).toMatchObject({ originX: -400, originY: -800, width: 1200, height: 1400 })
+  })
+
+  it('reads a file written before origins existed as origin 0, 0', () => {
+    const legacy = `<svg xmlns="http://www.w3.org/2000/svg" data-width="800" data-height="600"></svg>`
+    expect(svgToInkData(legacy)).toMatchObject({ originX: 0, originY: 0, width: 800, height: 600 })
+  })
+
+  // Review Focus 1: the margin rule must not move files whose ink merely sits
+  // near the edge — only ink that lies outside the origin widens it.
+  it('leaves a legacy file with ink near the top-left corner exactly as it was', () => {
+    const near = inkDataToSvg({ ...blank, strokes: [{ ...stroke, points: [{ x: 10, y: 10, pressure: 0.5 }] }] })
+    expect(svgToInkData(near)).toMatchObject({ originX: 0, originY: 0, width: 800, height: 600 })
+  })
+
+  it('widens the origin to cover ink outside it, keeping the right and bottom edges fixed', () => {
+    const outside = inkDataToSvg({
+      ...blank,
+      strokes: [{ ...stroke, points: [{ x: -300, y: -50, pressure: 0.5 }, { x: 20, y: 20, pressure: 0.5 }] }],
+    })
+    const restored = svgToInkData(outside)
+    expect(restored.originX).toBe(-300 - GROW_MARGIN)
+    expect(restored.originY).toBe(-50 - GROW_MARGIN)
+    expect(restored.originX + restored.width).toBe(800)
+    expect(restored.originY + restored.height).toBe(600)
+  })
+
+  it('is stable: widening a widened file changes nothing', () => {
+    const outside = inkDataToSvg({
+      ...blank,
+      strokes: [{ ...stroke, points: [{ x: -300, y: 20, pressure: 0.5 }, { x: 20, y: 20, pressure: 0.5 }] }],
+    })
+    const once = svgToInkData(outside)
+    expect(svgToInkData(inkDataToSvg(once))).toMatchObject({
+      originX: once.originX, originY: once.originY, width: once.width, height: once.height,
+    })
+  })
+
+  it('survives the preview sanitiser, so InkPreview needs no change', () => {
+    const svg = inkDataToSvg({ ...blank, originX: -400, width: 1200 })
+    expect(sanitizeNoteHtml(svg)).toContain('viewBox="-400 0 1200 600"')
   })
 })

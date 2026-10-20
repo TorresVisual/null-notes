@@ -9,7 +9,7 @@ import type { InkData } from '../ink/types'
 
 // Fits the note column at 1x and grows downward as you write; zooming past
 // the column width scrolls horizontally rather than clipping.
-const EMPTY_PAGE: InkData = { width: 700, height: 1200, strokes: [], shapes: [], texts: [] }
+const EMPTY_PAGE: InkData = { originX: 0, originY: 0, width: 700, height: 1200, strokes: [], shapes: [], texts: [] }
 
 // Created as a real note first, then rewritten as a canvas body, so it picks
 // up the same naming, indexing and folder rules as any other note. Shared by

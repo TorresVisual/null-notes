@@ -67,6 +67,9 @@ export interface TextItem {
 }
 
 export interface InkData {
+  /** The page's top-left in ink coordinates. Growing left/up moves these, never the ink. */
+  originX: number
+  originY: number
   width: number
   height: number
   strokes: Stroke[]
