@@ -8,14 +8,20 @@ export interface MathSnippet {
 export const MATH_SNIPPETS: MathSnippet[] = [
   { trigger: 'gradient', latex: '\\nabla f(x)', description: 'Gradient' },
   { trigger: 'partial', latex: '\\frac{\\partial f}{\\partial x}', description: 'Partial derivative' },
-  { trigger: 'frac', latex: '\\frac{a}{b}', description: 'Fraction' },
-  { trigger: 'sqrt', latex: '\\sqrt{x}', description: 'Square root' },
+  { trigger: 'frac', latex: '\\frac{}{}', description: 'Fraction' },
+  { trigger: 'sqrt', latex: '\\sqrt{}', description: 'Square root' },
   { trigger: 'sum', latex: '\\sum_{i=1}^{n}', description: 'Summation' },
   { trigger: 'prod', latex: '\\prod_{i=1}^{n}', description: 'Product' },
   { trigger: 'int', latex: '\\int_{a}^{b}', description: 'Definite integral' },
   { trigger: 'lim', latex: '\\lim_{x \\to \\infty}', description: 'Limit' },
-  { trigger: 'vec', latex: '\\vec{v}', description: 'Vector' },
-  { trigger: 'binom', latex: '\\binom{n}{k}', description: 'Binomial coefficient' },
+  { trigger: 'vec', latex: '\\vec{}', description: 'Vector' },
+  { trigger: 'hat', latex: '\\hat{}', description: 'Hat' },
+  { trigger: 'bar', latex: '\\overline{}', description: 'Overline' },
+  { trigger: 'text', latex: '\\text{}', description: 'Text in math' },
+  { trigger: 'mathbb', latex: '\\mathbb{}', description: 'Blackboard bold (\\mathbb{R})' },
+  { trigger: 'mathcal', latex: '\\mathcal{}', description: 'Calligraphic' },
+  { trigger: 'binom', latex: '\\binom{}{}', description: 'Binomial coefficient' },
+  { trigger: 'bmatrix', latex: '\\begin{bmatrix} a & b \\\\ c & d \\end{bmatrix}', description: '2×2 matrix (brackets)' },
   { trigger: 'matrix', latex: '\\begin{pmatrix} a & b \\\\ c & d \\end{pmatrix}', description: '2×2 matrix' },
   { trigger: 'cases', latex: '\\begin{cases} a & x < 0 \\\\ b & x \\ge 0 \\end{cases}', description: 'Piecewise (cases)' },
   // P12-5: `aligned` over `align` — it's the form that renders correctly
@@ -64,5 +70,7 @@ export function applyMathSnippet(
   snippet: MathSnippet,
 ): { text: string; cursor: number } {
   const next = text.slice(0, active.start) + snippet.latex + text.slice(cursor)
-  return { text: next, cursor: active.start + snippet.latex.length }
+  const slot = snippet.latex.indexOf('{}')
+  const offset = slot === -1 ? snippet.latex.length : slot + 1
+  return { text: next, cursor: active.start + offset }
 }

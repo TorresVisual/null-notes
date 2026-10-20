@@ -1,27 +1,27 @@
-import type { MathSnippet } from '../../lib/mathSnippets'
+import type { MathMenuItem } from '../../hooks/useMathSnippetMenu'
 
 interface MathSnippetMenuProps {
-  matches: MathSnippet[]
+  matches: MathMenuItem[]
   selected: number
-  onSelect: (snippet: MathSnippet) => void
+  onSelect: (item: MathMenuItem) => void
 }
 
 export function MathSnippetMenu({ matches, selected, onSelect }: MathSnippetMenuProps) {
   if (!matches.length) return null
   return (
     <div className="math-snippet-menu" contentEditable={false}>
-      {matches.map((s, i) => (
+      {matches.map((item, i) => (
         <button
-          key={s.trigger}
+          key={item.key}
           type="button"
           className={`math-snippet-item${i === selected ? ' selected' : ''}`}
           onMouseDown={(e) => {
             e.preventDefault()
-            onSelect(s)
+            onSelect(item)
           }}
         >
-          <span className="math-snippet-trigger">/{s.trigger}</span>
-          <span className="math-snippet-desc">{s.description}</span>
+          <span className="math-snippet-trigger">{item.label}</span>
+          <span className="math-snippet-desc">{item.description}</span>
         </button>
       ))}
     </div>

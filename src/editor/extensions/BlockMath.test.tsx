@@ -116,6 +116,44 @@ describe('block math editing', () => {
     await waitFor(() => expect(mathNodes(editor!)).toEqual([{ latex: '\\nabla f(x)', number: null }]))
   })
 
+  it('completes a \\command with Tab, keeping Enter as a newline', async () => {
+    const { container } = mount('<p></p>')
+    editor!.commands.insertContent({ type: 'blockMath', attrs: { latex: '' } })
+    const textarea = await waitFor(() => {
+      const el = getTextarea(container)
+      if (!el) throw new Error('editor not open yet')
+      return el
+    })
+    const user = userEvent.setup()
+    await user.type(textarea, '\\alph')
+    await user.keyboard('{Enter}')
+    expect(textarea.value).toBe('\\alph\n')
+    await user.keyboard('{Backspace}{Tab}')
+    await waitFor(() => expect(textarea.value).toBe('\\alpha'))
+  })
+
+  it('pairs braces, Tabs between {} slots, and overtypes the closer', async () => {
+    const { container } = mount('<p></p>')
+    editor!.commands.insertContent({ type: 'blockMath', attrs: { latex: '' } })
+    const textarea = await waitFor(() => {
+      const el = getTextarea(container)
+      if (!el) throw new Error('editor not open yet')
+      return el
+    })
+    const user = userEvent.setup()
+    await user.type(textarea, '/frac{Enter}')
+    await waitFor(() => expect(textarea.selectionStart).toBe(6))
+    await user.keyboard('a{Tab}b')
+    expect(textarea.value).toBe('\\frac{a}{b}')
+
+    await user.keyboard('{Tab}^{{')
+    await waitFor(() => expect(textarea.value).toBe('\\frac{a}{b}^{}'))
+    await waitFor(() => expect(textarea.selectionStart).toBe(13))
+    await user.keyboard('2}')
+    expect(textarea.value).toBe('\\frac{a}{b}^{2}')
+    expect(textarea.selectionStart).toBe(15)
+  })
+
   it('opens the editor via keyboard (Enter) on the rendered formula, not just a click', async () => {
     const user = userEvent.setup()
     const { container } = mount('$\n\ne^{i\\pi} + 1 = 0\n\n$')
@@ -204,7 +242,9 @@ describe('block math editing', () => {
       if (!el) throw new Error('editor not open yet')
       return el
     })
-    await user.type(textarea, 'x_{{')
+    // Pasted, not typed: typing `{` would auto-close it into a valid group.
+    await user.click(textarea)
+    await user.paste('x_{')
     await waitFor(() => expect(container.querySelector('.block-math-editor-error')).toBeInTheDocument())
 
     expect(container.querySelector('.math-error-mark .math-error-caret')).toBeInTheDocument()

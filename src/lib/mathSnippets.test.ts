@@ -53,6 +53,12 @@ describe('applyMathSnippet', () => {
     expect(result.cursor).toBe(4 + snippet.latex.length)
   })
 
+  it('parks the cursor in the first empty {} slot', () => {
+    const snippet = { trigger: 'frac', latex: '\\frac{}{}', description: 'Fraction' }
+    const result = applyMathSnippet('/fr', { start: 0, query: 'fr' }, 3, snippet)
+    expect(result.cursor).toBe(6)
+  })
+
   it('leaves text after the cursor untouched', () => {
     const snippet = { trigger: 'sqrt', latex: '\\sqrt{x}', description: 'Square root' }
     const result = applyMathSnippet('/sq + 1', { start: 0, query: 'sq' }, 3, snippet)

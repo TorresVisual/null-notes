@@ -115,7 +115,9 @@ describe('inline math editing — interactive', () => {
       if (!el) throw new Error('editor not open yet')
       return el
     })
-    await user.type(input, 'x_{{')
+    // Pasted, not typed: typing `{` would auto-close it into a valid group.
+    await user.click(input)
+    await user.paste('x_{')
     await waitFor(() => expect(container.querySelector('.math-editor-error')).toBeInTheDocument())
 
     expect(container.querySelector('.math-error-mark .math-error-caret')).toBeInTheDocument()
