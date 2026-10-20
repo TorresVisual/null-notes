@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import type { KeyboardEvent } from 'react'
 import { createPortal } from 'react-dom'
 import { InkCanvas } from './InkCanvas'
-import { InkToolGroup } from '../editor/toolbar/InkToolGroup'
+import { DrawRibbon } from './DrawRibbon'
+import { toolForShortcut } from './ribbonShortcuts'
 import { useInkStore } from '../store/ink'
 
 interface InkEditorOverlayProps {
@@ -36,6 +37,13 @@ export function InkEditorOverlay({ src, width, height, onSaved, onClose }: InkEd
       else activeCanvas.undo()
       return
     }
+    const tool = toolForShortcut(e)
+    if (tool) {
+      e.preventDefault()
+      e.stopPropagation()
+      useInkStore.getState().setTool(tool)
+      return
+    }
     // The label editor preventDefaults the Escape that cancels a label, so by the
     // time it bubbles here `defaultPrevented` means "already handled".
     if (e.key === 'Escape' && !e.defaultPrevented) onClose()
@@ -52,10 +60,7 @@ export function InkEditorOverlay({ src, width, height, onSaved, onClose }: InkEd
       onKeyDown={handleKeyDown}
     >
       <div className="ink-editor-header">
-        <InkToolGroup />
-        <button type="button" className="dialog-action-primary ink-editor-done" onClick={onClose}>
-          Done
-        </button>
+        <DrawRibbon onDone={onClose} />
       </div>
       <div className="ink-editor-body">
         <InkCanvas

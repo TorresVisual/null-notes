@@ -3198,7 +3198,7 @@ pre:has(code.language-expect)::before, pre:has(code.language-expected)::before {
 .ink-flyout input[type="range"] { flex: 1; min-width: 120px; accent-color: var(--accent); }
 .ink-flyout .ink-pen-sample.large { align-self: center; }
 
-.ink-color-grid { display: grid; grid-template-columns: repeat(6, 24px); gap: 6px; }
+.ink-color-grid { display: grid; grid-template-columns: repeat(7, 24px); gap: 6px; }
 .ink-color-swatch {
   width: 24px;
   height: 24px;

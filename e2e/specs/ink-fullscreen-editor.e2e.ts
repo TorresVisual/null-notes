@@ -80,8 +80,18 @@ describe('full-screen ink editor', () => {
     })
 
     await waitForSelector('.ink-editor-overlay', 'overlay never opened after insert')
-    await waitForSelector('.ink-editor-header .toolbar-ink', 'drawing tools missing in the overlay header')
+    await waitForSelector('.ink-editor-header .draw-ribbon', 'draw ribbon missing in the overlay header')
     await screenshot('ink-fullscreen-open')
+
+    await clickInPage('.ink-pen-card.active')
+    await waitForSelector('.ink-flyout', 'pen flyout never opened')
+    await screenshot('ink-draw-ribbon-flyout')
+    await browser.keys('Escape')
+    await browser.waitUntil(
+      async () => browser.execute(() => !document.querySelector('.ink-flyout')),
+      { timeout: 5000, timeoutMsg: 'Escape did not close the flyout' },
+    )
+    expect(await browser.execute(() => !!document.querySelector('.ink-editor-overlay'))).toBe(true)
 
     await drawZigzag()
     await clickInPage('.ink-editor-done')

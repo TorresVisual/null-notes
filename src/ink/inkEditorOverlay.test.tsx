@@ -81,7 +81,7 @@ describe('the full-screen ink editor', () => {
   it('shows the drawing tools straight away', async () => {
     mount()
 
-    await screen.findByLabelText('Pen')
+    await screen.findByRole('button', { name: 'Fine' })
     expect(useInkStore.getState().activeCanvasId).toBe(SRC)
   })
 
@@ -173,5 +173,64 @@ describe('keyboard', () => {
     expect(write).not.toHaveBeenCalled()
     expect(behind).not.toHaveBeenCalled()
     document.removeEventListener('keydown', behind)
+  })
+})
+
+describe('draw ribbon in the overlay', () => {
+  it('switches tools from the letter shortcuts', () => {
+    const { overlay } = mount()
+
+    fireEvent.keyDown(overlay, { key: 'e' })
+    expect(useInkStore.getState().tool).toBe('eraser')
+    fireEvent.keyDown(overlay, { key: 'L' })
+    expect(useInkStore.getState().tool).toBe('lasso')
+    fireEvent.keyDown(overlay, { key: 'p' })
+    expect(useInkStore.getState().tool).toBe('pen')
+    fireEvent.keyDown(overlay, { key: 't' })
+    expect(useInkStore.getState().tool).toBe('text')
+  })
+
+  it('leaves the tool alone for chords', () => {
+    const { overlay } = mount()
+
+    fireEvent.keyDown(overlay, { key: 'e', ctrlKey: true })
+
+    expect(useInkStore.getState().tool).toBe('text')
+  })
+
+  // `e` and `t` are in the word being typed.
+  it('does not switch tools while a label is being typed', async () => {
+    mount()
+    const editor = await openLabel('start')
+
+    fireEvent.keyDown(editor, { key: 'e' })
+
+    expect(useInkStore.getState().tool).toBe('text')
+  })
+
+  it('does not switch tools while a flyout slider has focus', () => {
+    useInkStore.setState({ tool: 'pen' })
+    mount()
+    fireEvent.click(screen.getByRole('button', { name: 'Fine' }))
+    const slider = screen.getByLabelText('Pen thickness')
+
+    fireEvent.keyDown(slider, { key: 'e' })
+
+    expect(useInkStore.getState().tool).toBe('pen')
+  })
+
+  it('closes an open flyout on Escape without closing the overlay, then closes the overlay', () => {
+    useInkStore.setState({ tool: 'pen' })
+    const { overlay, onClose } = mount()
+    fireEvent.click(screen.getByRole('button', { name: 'Fine' }))
+    const slider = screen.getByLabelText('Pen thickness')
+
+    fireEvent.keyDown(slider, { key: 'Escape' })
+
+    expect(onClose).not.toHaveBeenCalled()
+    expect(screen.queryByLabelText('Pen thickness')).toBeNull()
+
+    fireEvent.keyDown(overlay, { key: 'Escape' })
+    expect(onClose).toHaveBeenCalledTimes(1)
   })
 })
