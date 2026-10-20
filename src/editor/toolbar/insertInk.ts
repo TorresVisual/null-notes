@@ -23,4 +23,6 @@ export async function insertInk(editor: Editor, notePath: string): Promise<void>
     type: 'inkBlock',
     attrs: { src: svgPath, width: INK_WIDTH, height: INK_HEIGHT },
   })
+  // A brand-new drawing has nothing to preview — open straight into the editor.
+  window.dispatchEvent(new CustomEvent('ink:auto-open', { detail: { src: svgPath } }))
 }

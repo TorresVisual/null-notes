@@ -5,17 +5,11 @@ import { ReactRenderer } from '@tiptap/react'
 import { forwardRef, useEffect, useImperativeHandle, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { message } from '@tauri-apps/plugin-dialog'
-import { inkApi } from '../../lib/ink'
 import { nextTaskLabel } from '../../lib/taskScaffold'
 import { nextFootnoteLabel } from '../../lib/footnotes'
 import { splitIntoTasks, addNextTask, report, markdownOf } from '../splitIntoTasks'
 import { MERMAID_TEMPLATES } from '../../lib/mermaidTemplates'
-import type { InkData } from '../../ink/types'
-
-const INK_WIDTH = 700
-const INK_HEIGHT = 900
-
-const EMPTY_INK: InkData = { width: INK_WIDTH, height: INK_HEIGHT, strokes: [], shapes: [], texts: [] }
+import { insertInk } from '../toolbar/insertInk'
 
 interface Cmd {
   title: string
@@ -217,13 +211,7 @@ const COMMANDS: Cmd[] = [
       const notePath = editor.storage.noteContext.notePath
       if (!notePath) return
       editor.chain().focus().deleteRange(range).run()
-      void inkApi.ensureDir(notePath).then((dir) => {
-        const sep = dir.includes('\\') ? '\\' : '/'
-        const svgPath = `${dir}${sep}sketch-${Date.now()}.svg`
-        return inkApi.write(svgPath, EMPTY_INK).then(() => {
-          editor.commands.insertContent({ type: 'inkBlock', attrs: { src: svgPath, width: INK_WIDTH, height: INK_HEIGHT } })
-        })
-      })
+      void insertInk(editor, notePath).catch(report)
     },
   },
   {
