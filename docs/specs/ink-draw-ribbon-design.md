@@ -21,16 +21,20 @@ A OneNote-style Draw tab for the full-screen ink editor: a pen gallery with thic
 
 ### `DrawRibbon` (new, `src/ink/DrawRibbon.tsx`)
 
-The overlay's single top bar. Reads and writes the same `useInkStore` as `InkToolGroup`, so no store changes. Left to right:
+The overlay's single top bar. Reads and writes the same `useInkStore` as `InkToolGroup`, so no store changes. The overlay's canvas registers itself as the active canvas on mount (not on first pointer-down), so undo/redo, ruler, zoom and delete are live as soon as the overlay opens. Left to right:
 
 1. **`PenGallery`** (new) — the pen presets as large swatches, each showing a short stroke sample in its own colour, width and opacity (a highlighter looks like a highlighter). Click selects. Clicking the already-active pen opens a flyout:
    - **Thickness** slider with a live stroke preview.
    - **Colour grid** — about 12 preset swatches plus a custom `input type="color"`.
-   - Edits the active pen through `updateActivePen`.
+   - Edits the active pen through `updateActivePen`. Opacity is not editable: it is part of the preset's identity.
 2. **Eraser** — flyout with the existing point/stroke mode and size slider.
-3. **Lasso**, **Text** (text gets a size flyout), **Ruler** (toggle).
-4. **Shapes** — one gallery button whose flyout offers line / circle / rect / arrow and remembers the last choice.
-5. Right side: **undo / redo**, a **zoom** control (`100%` button opening 75 / 100 / 150 / 200 and fit-width), and **Done**.
+3. **Lasso**, **Text** (text gets a size flyout), **Ruler** (toggle). A **Delete** button sits beside Lasso, shown only while a selection exists.
+4. **Shapes** — one gallery button whose flyout offers line / circle / rect / arrow and remembers the last choice. It reads as active while the tool is any shape.
+5. Right side: **undo / redo**, a **zoom** control (`100%` button opening 75 / 100 / 150 / 200), and **Done**. No fit-width: `CanvasHandle` has no such operation and "width" is undefined until the infinite page lands.
+
+**Flyout rule (all tools).** The first click activates a tool; clicking it again while it is active opens its flyout. Clicking the pen while another tool is active only switches back to the pen.
+
+**Narrow screens.** The ribbon scrolls horizontally (`overflow-x: auto`) with undo/redo and Done pinned right. No separate mobile layout; that belongs to the mobile project.
 
 ### Flyouts
 
@@ -38,7 +42,7 @@ Add the shadcn `Popover` as `src/components/ui/popover.tsx` (`radix-ui` is alrea
 
 ### Keyboard
 
-`P` pen, `E` eraser, `L` lasso, `T` text, `Ctrl+Z` / `Ctrl+Y`, `Esc` closes an open flyout then the overlay. Scoped to the overlay so they cannot collide with editor shortcuts.
+`P` pen, `E` eraser, `L` lasso, `T` text, `Ctrl+Z` / `Ctrl+Y`, `Esc` closes an open flyout then the overlay. Scoped to the overlay so they cannot collide with editor shortcuts. The letter shortcuts ignore events from `input` / `textarea` / `contenteditable`, events already `defaultPrevented`, and events with Ctrl, Meta or Alt held — otherwise typing in the canvas text tool or a flyout field would switch tools.
 
 ### Styling
 
@@ -57,6 +61,6 @@ Ribbon chrome reuses the existing settings-panel / overlay classes; add only the
 ## Testing
 
 - `PenGallery`: selecting a pen; re-clicking opens the flyout; thickness and colour changes update the active pen.
-- `DrawRibbon`: the shapes button remembers its last choice; tool buttons set the store's tool.
+- `DrawRibbon`: the shapes button remembers its last choice; tool buttons set the store's tool; the second click on an active tool opens its flyout; Delete shows only with a selection; letter shortcuts are ignored while typing in an input.
 - e2e screenshot (`e2e-verify`) of the ribbon with a flyout open.
 - `npm run typecheck`, `npm test`.

@@ -30,7 +30,7 @@ A `createPortal` to `document.body` that fills the viewport. Wraps the existing 
 
 The page keeps its stored width/height, centred on a neutral background inside an overlay-owned scroll container; the overlay never resizes the stored page (that is sub-project 3's format decision). `InkCanvas`'s `scrollAncestors` finds the nearest scrolling ancestor (overlay body or `.editor-scroll`) instead of hard-coding `.editor-scroll`, so one-finger touch pan works in the portal.
 
-`InkCanvas` registers itself as the active canvas on pointer-down, so `InkToolGroup` in the editor toolbar works unchanged — but the overlay covers the toolbar, so the overlay must render the ink tool group itself (reuse `InkToolGroup` inside the overlay header).
+`InkCanvas` registers itself as the active canvas on pointer-down, so `InkToolGroup` in the editor toolbar works unchanged — but the overlay covers the toolbar, so the overlay must render its own tools. Sub-project 1 ships by reusing `InkToolGroup` in the overlay header; `ink-draw-ribbon-design.md` then supersedes that with `DrawRibbon`.
 
 **Keyboard.** The note editor stays mounted behind the overlay, so the overlay takes focus on open, handles Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y itself via the active canvas's `undo`/`redo`, and stops its keydown events reaching the editor (otherwise undo would silently edit the note behind it). Esc closes only if the key wasn't already handled by the canvas's text editor (`defaultPrevented`, bubble phase). Android Back is out of scope; Done works there.
 
