@@ -3,6 +3,7 @@ import { InkEditorOverlay } from '../../ink/InkEditorOverlay'
 import { inkDataToSvg } from '../../ink/svgSerialiser'
 import { inkApi } from '../../lib/ink'
 import { sanitizeNoteHtml } from '../../lib/sanitizeHtml'
+import { pendingInkOpens } from '../toolbar/insertInk'
 import type { InkData } from '../../ink/types'
 
 const PREVIEW_MAX_HEIGHT = 320
@@ -41,8 +42,11 @@ export function InkPreview({ src, width, height, editable }: InkPreviewProps) {
   // only the block that was just inserted opens.
   useEffect(() => {
     if (!editable) return
+    if (pendingInkOpens.delete(src)) setEditing(true)
     function onAutoOpen(event: Event) {
-      if ((event as CustomEvent<{ src: string }>).detail.src === src) setEditing(true)
+      if ((event as CustomEvent<{ src: string }>).detail.src !== src) return
+      pendingInkOpens.delete(src)
+      setEditing(true)
     }
     window.addEventListener('ink:auto-open', onAutoOpen)
     return () => window.removeEventListener('ink:auto-open', onAutoOpen)

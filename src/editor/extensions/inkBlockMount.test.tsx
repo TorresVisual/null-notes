@@ -7,6 +7,7 @@ import { coreExtensions } from './index'
 import { useInkStore } from '../../store/ink'
 import { DEFAULT_PENS } from '../../ink/pens'
 import type { InkData } from '../../ink/types'
+import { pendingInkOpens } from '../toolbar/insertInk'
 
 const read = vi.fn<(path: string) => Promise<InkData | null>>()
 const write = vi.fn<(path: string, data: InkData) => Promise<void>>()
@@ -175,6 +176,16 @@ describe('opening the full-screen editor', () => {
     await waitFor(() => expect(overlay()).toBeNull())
     expect(write).not.toHaveBeenCalled()
     expect(container.querySelector('.ink-preview')).not.toBeNull()
+  })
+
+  // insertInk can run before the node view's listener exists; the request must not be lost.
+  it('opens a block that mounts after its auto-open was requested', async () => {
+    pendingInkOpens.add(SRC)
+    const { container } = render(<TestEditor content={PREVIEW_FENCE} />)
+
+    await previewOf(container)
+    await waitFor(() => expect(overlay()).not.toBeNull())
+    expect(pendingInkOpens.has(SRC)).toBe(false)
   })
 
   it('opens when ink:auto-open names this block, and ignores other blocks', async () => {
