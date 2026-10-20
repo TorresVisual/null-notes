@@ -3423,8 +3423,9 @@ li > .folder-tree.tree-guide {
    the unchecked box still renders as the OS/browser default (a stark white
    square on Windows WebView2), which clashes hard against a near-black
    theme. `appearance: none` plus a hand-built checked-state mark is the
-   only way to theme both states. */
-.settings-row-control input[type='checkbox'] {
+   only way to theme both states. Global so every dialog, the search modal
+   and editor task lists match Settings. */
+input[type='checkbox'] {
   appearance: none;
   width: 16px;
   height: 16px;
@@ -3439,14 +3440,14 @@ li > .folder-tree.tree-guide {
   cursor: pointer;
 }
 
-.settings-row-control input[type='checkbox']:hover { border-color: var(--text-secondary); }
+input[type='checkbox']:hover { border-color: var(--text-secondary); }
 
-.settings-row-control input[type='checkbox']:checked {
+input[type='checkbox']:checked {
   background: var(--accent);
   border-color: var(--accent);
 }
 
-.settings-row-control input[type='checkbox']:checked::after {
+input[type='checkbox']:checked::after {
   content: '';
   width: 4px;
   height: 8px;
@@ -3461,7 +3462,7 @@ li > .folder-tree.tree-guide {
   to { transform: scale(1) rotate(45deg) translate(-1px, -1px); opacity: 1; }
 }
 
-.settings-row-control input[type='checkbox']:focus-visible {
+input[type='checkbox']:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
