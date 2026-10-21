@@ -430,6 +430,8 @@ Tell the user: whether Step 7 was needed, the Step 6 at-rest result, the Step 8 
 
 **Fallback if the WebView debug socket is unavailable (Steps 3–5 only):** use the UI path from Step 8 with a token typed into the form, then verify persistence and at-rest storage with Step 6's `run-as` commands, and verify read-back by re-running Step 8's clone attempt with the token field left empty after a `force-stop`/relaunch — a network error rather than a credential error means the stored token was read. This is weaker evidence (no direct read-back value); say so in the report.
 
+**Result:** PASS (2026-10-22). Step 3 read-back: `""`, then `AAAA`, then `BBBB`. Step 5 (after force-stop): `BBBB`. At-rest: `shared_prefs/keyring-default.xml` present, grep for the token matched nothing. Onboarding: "An IO error occurred when talking to the server", token read back `CCCC`. `allowBackup="false"` present in the merged manifest. Ndk-context init was required (commit `6137bb6`). Not exercised: backup/restore onto another device. Side finding: a failed clone leaves `<documents>/notes/.git` behind, so a retry fails with "File exists (os error 17)" (`checked_clone_repo` does `create_dir` with no cleanup).
+
 ---
 
 ## Out of scope (this plan)
