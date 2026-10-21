@@ -7,5 +7,6 @@ class MainActivity : TauriActivity() {
   override fun onCreate(savedInstanceState: Bundle?) {
     enableEdgeToEdge()
     super.onCreate(savedInstanceState)
+    io.crates.keyring.Keyring.initializeNdkContext(applicationContext)
   }
 }
