@@ -140,7 +140,7 @@ describe('ReviewSession — multiple choice', () => {
     await waitFor(() => screen.getByText('What is 2+2?'))
     expect(screen.getByText('Submit')).toBeDisabled()
     fireEvent.click(screen.getByLabelText('4'))
-    expect(screen.getByText('Submit')).not.toBeDisabled()
+    await waitFor(() => expect(screen.getByText('Submit')).not.toBeDisabled())
   })
 
   it('randomizes the displayed option order while keeping each choice gradeable', async () => {
