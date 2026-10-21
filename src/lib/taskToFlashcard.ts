@@ -14,11 +14,12 @@
 
 import type { Editor } from '@tiptap/core'
 import { TASK_HEADING_LINE } from './taskScaffold'
-import { encodeSrc } from '../editor/extensions/NoteImage'
+import { decodeSrc, encodeSrc } from '../editor/extensions/NoteImage'
 import { markdownOf, notePathOf } from '../editor/splitIntoTasks'
 
 const SOLUTION_HEADING_LINE = /^###\s+Solution\s*$/
-const CARD_LINE = /\s::\s.*!\[[^\]]*\]\([^)]+\)/
+const INK_IMAGE_LINE = /^!\[[^\]]*\]\(([^)#]*\.ink\/[^)#]*)#ink=[^)]*\)$/
+const CARD_LINE =/\s::\s.*!\[[^\]]*\]\([^)]+\)/
 
 export type FlashcardOutcome =
   | { kind: 'inserted'; markdown: string }
@@ -82,6 +83,12 @@ export function addFlashcardForLastTask(markdown: string, notePath: string): Fla
   let inkSrc: string | null = null
   let fenceEnd = solutionLine
   for (let i = solutionLine + 1; i < sectionEnd; i++) {
+    const image = INK_IMAGE_LINE.exec(lines[i]!.trim())
+    if (image) {
+      inkSrc = decodeSrc(image[1]!)
+      fenceEnd = i
+      break
+    }
     if (lines[i]!.trim() !== '```ink') continue
     let close = -1
     for (let j = i + 1; j < sectionEnd; j++) {

@@ -20,7 +20,12 @@ declare module '@tiptap/core' {
 
 export const NoteContext = Extension.create({
   name: 'noteContext',
+  // Seeded at construction because the Markdown is parsed before any effect can
+  // assign it, and sidecar links resolve against it while parsing.
+  addOptions() {
+    return { notePath: '' }
+  },
   addStorage() {
-    return { notePath: '' as string, openFlashcardDialog: null, openDiagramDialog: null }
+    return { notePath: this.options.notePath as string, openFlashcardDialog: null, openDiagramDialog: null }
   },
 })

@@ -226,3 +226,7 @@ export const coreExtensions = [
   TextAlignment,
   SmartSymbols,
 ]
+
+export function extensionsFor(notePath: string) {
+  return coreExtensions.map((extension) => (extension === NoteContext ? NoteContext.configure({ notePath }) : extension))
+}

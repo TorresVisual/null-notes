@@ -4,7 +4,7 @@ import type { CSSProperties } from 'react'
 import type { Editor, Range } from '@tiptap/core'
 import { TextSelection } from '@tiptap/pm/state'
 import { confirm, message } from '@tauri-apps/plugin-dialog'
-import { coreExtensions } from './extensions'
+import { extensionsFor } from './extensions'
 import { rememberPosition, recallPosition } from '../lib/notePositions'
 import { takePendingHighlight } from '../lib/pendingHighlight'
 import { highlightSearchMatch } from './extensions/SearchJumpHighlight'
@@ -59,7 +59,7 @@ export function NoteEditor({
   const lastEmitted = useRef<string | null>(null)
 
   const editor = useEditor({
-    extensions: coreExtensions,
+    extensions: extensionsFor(notePath),
     content,
     editorProps: buildEditorProps(spellcheck, spellcheckLanguage),
     onUpdate({ editor }) {
@@ -93,11 +93,12 @@ export function NoteEditor({
       const withInitFlag = editor as unknown as { isEditorContentInitialized?: boolean }
       const wasInitialized = withInitFlag.isEditorContentInitialized
       withInitFlag.isEditorContentInitialized = false
+      editor.storage.noteContext.notePath = notePath
       editor.commands.setContent(content)
       withInitFlag.isEditorContentInitialized = wasInitialized
       isProgrammaticUpdate.current = false
     }
-  }, [content, editor])
+  }, [content, editor, notePath])
 
   useEffect(() => {
     if (!editor) return

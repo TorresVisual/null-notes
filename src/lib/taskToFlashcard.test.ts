@@ -26,6 +26,17 @@ describe('addFlashcardForLastTask', () => {
     )
   })
 
+  it('finds a drawing written in the GitHub-renderable image form', () => {
+    const md = sheet(false) + '![Drawing](Lecture%207.ink/solution-1.svg#ink=700x400)\n'
+    const out = addFlashcardForLastTask(md, NOTE_PATH)
+
+    expect(out.kind).toBe('inserted')
+    if (out.kind !== 'inserted') return
+    expect(out.markdown).toContain(
+      'What is Big-O of binary search? :: ![Task 1 solution](Lecture%207.ink/solution-1.svg)',
+    )
+  })
+
   it('flattens a multi-line problem statement onto one line', () => {
     const md = [
       '## Task 1',
