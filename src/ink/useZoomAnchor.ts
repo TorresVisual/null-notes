@@ -59,8 +59,12 @@ export function useZoomAnchor(
       liveZoom.current = wheelZoom(liveZoom.current, e.deltaY)
       onZoomChange?.(liveZoom.current)
     }
-    page.addEventListener('wheel', onWheel, { passive: false })
-    return () => page.removeEventListener('wheel', onWheel)
+    // On the scroll container, not the page: zoomed out, the page is smaller
+    // than the body, and a pinch over the empty margin would fall through to
+    // the webview's own page zoom.
+    const target = page.closest('.ink-editor-body') ?? page
+    target.addEventListener('wheel', onWheel as EventListener, { passive: false })
+    return () => target.removeEventListener('wheel', onWheel as EventListener)
   }, [pageRef, onZoomChange, zoom])
 
   return anchorAt
