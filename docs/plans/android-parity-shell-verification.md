@@ -16,12 +16,12 @@ Leave every box below unchecked. The executing skill resolves them with
 your human partner before Step 1 and checks the chosen boxes itself.
 
 **Execution Target:**
-- [ ] Current branch (no isolation)
+- [x] Current branch (no isolation)
 - [ ] New feature branch (no worktree)
 - [ ] Worktree (superpowers:using-git-worktrees)
 
 **Execution Mode:**
-- [ ] Inline execution (superpowers:executing-plans)
+- [x] Inline execution (superpowers:executing-plans)
 - [ ] Subagent-driven execution (superpowers:subagent-driven-development)
 
 ## Global Constraints
@@ -197,6 +197,8 @@ Expected: `hoverNone: true` (Review Focus 4 — if `false`, record it now; Task 
 
 Add a **Result:** line here (pass/fail, `hoverNone`, window size, any workaround). Do not commit yet; Task 6 commits all results together.
 
+**Result (2026-10-21):** PASS. Fixture seeded (`cba5eb8`), debug build installed clean, onboarding clone through the real form landed `Cards.md`/`Code.md`. `hoverNone: true`, `pointerCoarse: false`, window 393×808 css px at dpr 2.75 (`wm size` 1080×2220). The WebView is edge-to-edge: its 808 css px span the whole screen, so the status bar (0–66 px) and navigation bar (2154–2220 px) overlay page content. Workarounds: the build emits `app-universal-debug.apk` (the plan's `*x86_64*` filter matches nothing); the typed-into field needs `KEYCODE_BACK` before tapping the next one (the IME covers it and the tap hits a key); the host CDP helper was fixed (exit 0 after the reply, `Eval-Json` reads `.result.value`) and `Tap-El` aims below the status bar.
+
 ---
 
 ### Task 2: Mobile shell on the device
@@ -305,6 +307,8 @@ This leaves the note edited on the device; it is local-only and never synced, so
 
 Add a **Result:** line: pass/fail per step 1–7, the exact numbers for `insetBottom`, sizes, Back behaviour and the keyboard check. Each failure is either fixed in its own commit or filed (`/file-issue`); name which.
 
+**Result (2026-10-21):** Steps 1–3 PASS (hamburger present, no min/max/close, titlebar 44; drawer closed at `right: 0`, opens to `left: 0`, 320 px wide, backdrop closes it when tapped at the right edge since the centre is inside the drawer; tapping a note closes the drawer and mounts the editor; bar is `Home, Search, Tasks, Graph view, Review, Generate formula sheet, Settings`, no Terminal). Step 4 PARTIAL: tree rename/delete icons all `opacity: 1`, titlebar button 44×43.3, but rail buttons are 40×44 (width under 44) and tree rows are 28.8 px high. Step 5 PASS: `insetBottom`/`insetTop` both `0px`, bar bottom edge 2156 px against nav bar top 2154 px, Settings opens. Step 6 FAIL as predicted: Back with the drawer open exits the app (process gone, no resumed activity). Step 7 FAIL: `mInputShown=true`, `visualViewport.height == innerHeight == 808`, so the page is not resized; the caret (803 css px) is hidden behind a keyboard whose top is ~508 css px (`keyboard.png`). New findings, none fixed here, to file: (a) the titlebar is drawn under the status bar, so the hamburger's centre (y≈59 px < 66) is not tappable — only its lower part is; (b) `.home-section` overflows the viewport by 9 css px (right edge 402 vs 393); (c) rail button width 40 and tree-row height 28.8 under 44; (d) Back exits the app; (e) soft keyboard covers the caret. Probable shared root cause for (a) and the status-bar/nav-bar overlay: the WebView is edge-to-edge with no inset handling (`viewport-fit=cover` absent, `env()` is 0).
+
 ---
 
 ### Task 3: Feature cuts on the device
@@ -343,6 +347,8 @@ Expected: the View menu lists items but **not** `Toggle Terminal`; then `pane: f
 - [ ] **Step 3: Record the result**
 
 Add a **Result:** line: pass/fail per step, and the observed View menu item list.
+
+**Result (2026-10-21):** PASS, both steps. `Code.md` renders 3 blocks (`print("hello")`, the two-line `// src/main.rs` block, `hello`); `.code-run-run`, `.code-run-panel`, `.code-block-open-in-ide` and its group are all absent, and `code-cuts.png` shows only Copy/Wrap on each block. View menu: `Home, Search, Quick Switcher, Toggle Source/Preview, Insert Ink Block, Connections Graph, Toggle Outline, Toggle Sidebar, Tasks, Review, Browse All Cards, Keyboard Shortcuts` — no `Toggle Terminal`. A real `Ctrl+`` via `input keycombination` opened no terminal pane and logged no new crash. Cosmetic: the menu still shows `Ctrl+…` hints on a touch device.
 
 ---
 
@@ -443,6 +449,8 @@ Run `node "$env:TEMP\cdp-pen.mjs" $script:ws 150 300 230 360` (CSS px inside the
 
 Add a **Result:** line: the three pointer types and pressures from Step 1, pan yes/no, stroke count after finger and after pen, the pressure set, and whether the fallback was used.
 
+**Result (2026-10-21):** PASS. `adb input touchscreen|stylus|mouse` arrive as `touch:1`, `pen:1`, `mouse:1`, so the pen path is driven by real Android input and the CDP fallback (Step 5) was not needed. The Insert-ink-canvas toolbar button exists on mobile and opens the editor overlay. A finger swipe panned the ink body (scroll 0,0 → 113,191) and saved nothing (0 elements). A stylus swipe saved exactly one element, but a `<line data-kind="line">`, not a path: the default Fine pen straightens a near-straight stroke (`straighten.ts`), so the plan's `<path data-id` count would read 0 for a straight `input stylus swipe`; a curved stroke sent as `input stylus motionevent DOWN/MOVE×14/UP` saved one `<path>` with 15 points. Pressure set across all points: `{1}`, constant — the emulator's synthetic value, nothing about real stylus fidelity (the pointerdown pressure was 1 for touch, pen and mouse alike). Done closed the overlay, `.ink-preview` rendered, and `Draw.md` holds `![Drawing](Draw.ink/sketch-….svg#ink=700x900)`. The ink canvas is 700×900 css px on a 393 px-wide screen, so it is wider than the viewport (usable by panning).
+
 ---
 
 ### Task 5: Flashcards on the device
@@ -502,6 +510,8 @@ Expected: the `changed on disk` check prints `False` (the app's own write is not
 
 Add a **Result:** line: which card came first, both reveal texts, the schedule lines found on disk, and the nothing-due check before and after relaunch.
 
+**Result (2026-10-21):** PASS on the flashcard flow, FAIL on the "no false conflict" expectation. The Review dialog opens from the drawer bar ("Review (2 due)", drawer closed, card and Reveal fit the screen). The Q::A card came first (`What is Big-O of binary search?` → `O(log n)`), then the cloze (`A binary search tree keeps [...] than the node.` → `…keeps all left descendants smaller than the node.`). Both graded Good with taps; `Cards.md` then carries two `<!-- sr due=2026-10-22 ease=2.50 interval=1 reps=1 grade=good streak=1 lapses=0 -->` lines, each directly under its card; the session shows `All done for today.`, and after `am force-stop`, relaunch and reopening from Recent it still does. Selector fixes against the plan: the reveal button is `.review-card-reveal` only while a card is unrevealed (the first Tap-El raced a re-render once). **Finding (f): false conflict on Android.** With `Drawing` open and edited in-app (typed `xyz`, then `abc`), `This note changed on disk while you were editing it.` (`ConflictBar`) appears within 2 s although the disk holds exactly the buffer (`# Drawing||xyzabc`), reproduced three times and again at the first Review run; with a clean note open, grading raises no bar and neither does a fresh open. Suspected cause, not yet verified: `useNote.ts` sets `lastWritten.current` only after `await api.notes.save(…)` returns, so a watcher echo that lands first compares against the old value while the buffer has already moved on (`pendingWrite`/`saveTimer` set) and takes the conflict branch. Not fixed here; to file.
+
 ---
 
 ### Task 6: Tear down and record
@@ -524,6 +534,8 @@ Stop-Process -Id (Get-Content "$env:TEMP\android-fixture.pid") -Force -ErrorActi
 Per task: pass/fail, workarounds, and which findings were fixed (commit) or filed (issue number). Then add this block, adjusted to what was actually observed, for the spec's final "iOS delta" section:
 
 **For the spec's iOS delta:** this proves the shell, feature cuts, ink pointer routing and flashcard flow in Android's WebView (Chromium) only. WKWebView differs on exactly the points this plan probed: `env(safe-area-inset-*)` behaviour with and without `viewport-fit=cover`, `(hover: none)` evaluation, soft-keyboard resizing (iOS does not resize the layout viewport), the pointer type Apple Pencil reports and its pressure range, and there is no system Back — so Review Focus 3 does not transfer. Real stylus pressure and palm rejection are unverified on both platforms.
+
+**Result (2026-10-21):** Fixture stopped (port 8080 down), `tcp:9222` forward removed, `show_ime_with_hard_keyboard` back to `0`. No production source changed in this run and nothing was fixed or filed yet; the findings below are the work list. Android-observed, none yet an issue: (1) titlebar and content run under the status and navigation bars (insets are `0px`, no `viewport-fit=cover`), so the hamburger's centre is untappable (Task 2); (2) System Back with the drawer open exits the app — and on this emulator the exit ends in a native `SIGABRT` (`pthread_mutex_lock` on a destroyed mutex in `libEGL_emulation` during `eglDestroyContext`), likely emulator-specific; (3) the soft keyboard covers the caret, the page is not resized (`visualViewport.height == innerHeight`); (4) rail buttons 40 px wide and tree rows 28.8 px high, under the 44 px target; (5) `.home-section` overflows by 9 css px; (6) false `ConflictBar` after a plain in-app edit (Task 5, suspected `lastWritten` ordering in `useNote.ts`). Environment facts for next plans: the debug build outputs `app-universal-debug.apk`; labels in the drawer tree are note titles (`Drawing`, not `Draw`); a stylus straight swipe becomes a `<line>`, so draw a curve with `input stylus motionevent` for a `<path>`; `pointerCoarse` is `false` in this WebView even though `hover: none` is `true`.
 
 - [ ] **Step 3: Commit**
 
