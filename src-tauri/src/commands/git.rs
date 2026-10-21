@@ -319,47 +319,29 @@ pub(crate) fn resolve(workspace: &str, path: &str) -> PathBuf {
 /// A path that used to be tracked but is now deleted is kept — `git add`
 /// correctly stages that as a removal.
 fn addable_paths(workspace: &str, paths: &[String]) -> anyhow::Result<Vec<String>> {
-    if paths.is_empty() {
-        return Ok(Vec::new());
+    let mut addable = Vec::new();
+    for p in paths {
+        if resolve(workspace, p).exists() || has_tracked_files(workspace, p)? {
+            addable.push(p.clone());
+        }
     }
+    Ok(addable)
+}
 
-    let ls_output = no_window_command("git")
+/// Whether the index holds `path` itself or, for a directory pathspec, any
+/// file under it. Asking git per path (rather than matching `ls-files` output
+/// back against the paths) is what makes a deleted folder or sidecar directory
+/// count: its index entries are `Folder/a.md`, never `Folder`, so a string
+/// match against the path drops it and the deletion never reaches the repo.
+fn has_tracked_files(workspace: &str, path: &str) -> anyhow::Result<bool> {
+    let output = no_window_command("git")
         .arg("-C")
         .arg(workspace)
         .arg("ls-files")
         .arg("--")
-        .args(paths)
+        .arg(path)
         .output()?;
-    let tracked: std::collections::HashSet<String> = String::from_utf8_lossy(&ls_output.stdout)
-        .lines()
-        .map(|s| s.replace('\\', "/"))
-        .collect();
-
-    let toplevel_output = no_window_command("git")
-        .arg("-C")
-        .arg(workspace)
-        .arg("rev-parse")
-        .arg("--show-toplevel")
-        .output()?;
-    let root = String::from_utf8_lossy(&toplevel_output.stdout)
-        .trim()
-        .replace('\\', "/");
-
-    Ok(paths
-        .iter()
-        .filter(|p| {
-            if resolve(workspace, p).exists() {
-                return true;
-            }
-            let normalized = p.replace('\\', "/");
-            let rel = normalized
-                .strip_prefix(&root)
-                .map(|s| s.trim_start_matches('/'))
-                .unwrap_or(normalized.as_str());
-            tracked.contains(rel)
-        })
-        .cloned()
-        .collect())
+    Ok(!output.stdout.is_empty())
 }
 
 fn has_pending_changes(workspace: &str, paths: &[String]) -> anyhow::Result<bool> {
@@ -2592,6 +2574,45 @@ mod tests {
             String::from_utf8_lossy(&tracked.stdout).trim(),
             ".gitattributes",
             ".gitattributes must be committed, not left untracked"
+        );
+    }
+
+    // #111: a deleted folder or sidecar directory is only ever tracked as the
+    // files under it, so the directory pathspec itself must still count as
+    // addable or the deletion never reaches the repo.
+    #[test]
+    fn auto_commit_stages_deleted_directories_and_notes() {
+        let tmp = tempdir().unwrap();
+        git_init(tmp.path());
+        commit_note_file(tmp.path(), "Folder/a.md", "# A\n", "add a");
+        commit_note_file(tmp.path(), "B.md", "# B\n", "add b");
+        commit_note_file(tmp.path(), "B.assets/x.png", "png\n", "add x");
+        std::fs::remove_dir_all(tmp.path().join("Folder")).unwrap();
+        std::fs::remove_dir_all(tmp.path().join("B.assets")).unwrap();
+        std::fs::remove_file(tmp.path().join("B.md")).unwrap();
+
+        let outcome = checked_auto_commit(
+            &tmp.path().to_string_lossy(),
+            RepoMode::NotesOnly,
+            &[
+                tmp.path().join("Folder").to_string_lossy().into_owned(),
+                tmp.path().join("B.md").to_string_lossy().into_owned(),
+                tmp.path().join("B.assets").to_string_lossy().into_owned(),
+            ],
+            false,
+        )
+        .unwrap();
+
+        assert_eq!(outcome, CommitOutcome::Committed);
+        let tracked = no_window_command("git")
+            .arg("-C")
+            .arg(tmp.path())
+            .arg("ls-files")
+            .output()
+            .unwrap();
+        assert_eq!(
+            String::from_utf8_lossy(&tracked.stdout).trim(),
+            ".gitignore"
         );
     }
 
