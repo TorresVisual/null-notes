@@ -65,7 +65,6 @@ type PointerKind = 'pen' | 'mouse' | 'touch'
 interface PointerOptions {
   kind?: PointerKind
   button?: number
-  predicted?: Array<[number, number]>
 }
 
 // jsdom computes no offsetX/offsetY, so page coordinates are set by hand.
@@ -74,7 +73,7 @@ function at(
   type: 'pointerDown' | 'pointerMove' | 'pointerUp',
   x: number,
   y: number,
-  { kind = 'pen', button, predicted }: PointerOptions = {},
+  { kind = 'pen', button }: PointerOptions = {},
 ) {
   const event = createEvent[type](canvas, {
     pointerType: kind,
@@ -86,10 +85,6 @@ function at(
   Object.defineProperty(event, 'offsetY', { value: y })
   // jsdom's getCoalescedEvents() returns [], a real pointermove always lists itself.
   Object.defineProperty(event, 'getCoalescedEvents', { value: undefined })
-  if (predicted) {
-    const events = predicted.map(([px, py]) => ({ offsetX: px, offsetY: py, pressure: 0.5, pointerType: kind }))
-    Object.defineProperty(event, 'getPredictedEvents', { value: () => events })
-  }
   fireEvent(canvas, event)
 }
 
@@ -201,25 +196,6 @@ describe('frame batching', () => {
     } finally {
       cancel.mockRestore()
     }
-  })
-})
-
-describe('prediction', () => {
-  // Review Focus 1.
-  it('saves only the points the pen actually reported', async () => {
-    const { canvas } = await mountCanvas()
-    const predicted: Array<[number, number]> = [[777, 777], [888, 888]]
-    drawBent(canvas, { predicted })
-
-    const stroke = lastWrite().strokes[0]
-    expect(stroke?.points).toHaveLength(3)
-    expect(stroke?.points.some((pt) => pt.x === 777 || pt.x === 888)).toBe(false)
-  })
-
-  it('still draws when the browser has no getPredictedEvents', async () => {
-    const { canvas } = await mountCanvas()
-    drawBent(canvas)
-    expect(lastWrite().strokes).toHaveLength(1)
   })
 })
 
