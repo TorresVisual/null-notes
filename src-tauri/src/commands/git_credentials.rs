@@ -3,7 +3,8 @@
 //! `tauri-plugin-keyring`, whose iOS backend only implements a `ping` stub and
 //! doesn't actually reach the Keychain. Desktop builds don't depend on
 //! `keyring-core` at all (see `Cargo.toml`'s iOS-only target table), so these
-//! commands compile everywhere but only do real work on iOS.
+//! commands compile everywhere but only do real work on iOS (Android storage is added
+//! separately).
 
 #[cfg(target_os = "ios")]
 const SERVICE: &str = "dev.nullnotes.app";
@@ -36,7 +37,7 @@ pub fn get_git_token() -> Result<String, String> {
         }
     }
     #[cfg(not(target_os = "ios"))]
-    Err("git credential storage is only available on iOS".to_string())
+    Err("git credential storage is not available on this platform".to_string())
 }
 
 #[tauri::command]
@@ -49,6 +50,6 @@ pub fn set_git_token(token: String) -> Result<(), String> {
     #[cfg(not(target_os = "ios"))]
     {
         let _ = token;
-        Err("git credential storage is only available on iOS".to_string())
+        Err("git credential storage is not available on this platform".to_string())
     }
 }

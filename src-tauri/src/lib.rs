@@ -9,9 +9,9 @@ use std::path::PathBuf;
 use std::sync::OnceLock;
 use tauri::{Emitter, Manager};
 
-#[cfg(not(target_os = "ios"))]
+#[cfg(not(mobile))]
 use commands::git as git_impl;
-#[cfg(target_os = "ios")]
+#[cfg(mobile)]
 use commands::git_mobile as git_impl;
 
 static ERROR_LOG_DIR: OnceLock<PathBuf> = OnceLock::new();

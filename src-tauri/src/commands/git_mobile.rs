@@ -1,7 +1,7 @@
-//! iOS's mobile-target replacement for `git.rs`: the same 11 operations,
-//! reimplemented against `gix` instead of shelling out to `git` — the App
-//! Sandbox forbids spawning a child process at all, so there is no `git`
-//! binary to shell out to regardless.
+//! The mobile-target replacement for `git.rs` (iOS and Android): the same 11 operations,
+//! reimplemented against `gix` instead of shelling out to `git` — the iOS App
+//! Sandbox forbids spawning a child process at all, and the Android app sandbox ships no
+//! `git` binary, so there is nothing to shell out to regardless.
 //!
 //! Command names and return types match `git.rs` exactly (reusing its
 //! `pub` types directly) so the frontend never branches on platform for
@@ -14,9 +14,9 @@
 //! crate-global helper macro keyed only on the Rust function's name, so a
 //! `detect_repo` wrapper here would collide with `git.rs`'s the moment both
 //! compile for the same target — regardless of which one `generate_handler!`
-//! actually registers. Wrappers (and the matching `#[cfg(not(target_os =
-//! "ios"))]` on `git.rs`'s own, plus `lib.rs`'s dispatch alias) all land
-//! together as one atomic change once the surface is complete.
+//! actually registers. Wrappers (and the matching `#[cfg(not(mobile))]` on
+//! `git.rs`'s own, plus `lib.rs`'s dispatch alias) all land together as one atomic
+//! change once the surface is complete.
 
 use super::git::{
     build_commit_message, derive_clone_dir_name, is_notes_monorepo, resolve, CommitOutcome,
@@ -798,7 +798,7 @@ pub fn list_own_github_repos() -> anyhow::Result<Vec<GithubRepo>> {
 // though most of it is unused, so the frontend never has to branch on
 // platform to know what to pass.
 
-#[cfg(target_os = "ios")]
+#[cfg(mobile)]
 #[tauri::command]
 pub async fn detect_repo(workspace: String) -> Result<Option<RepoMode>, String> {
     tokio::task::spawn_blocking(move || detect_repo_mode(&workspace))
@@ -807,7 +807,7 @@ pub async fn detect_repo(workspace: String) -> Result<Option<RepoMode>, String> 
         .map_err(|e| e.to_string())
 }
 
-#[cfg(target_os = "ios")]
+#[cfg(mobile)]
 #[tauri::command]
 pub async fn detect_prior_automation(workspace: String) -> Result<bool, String> {
     tokio::task::spawn_blocking(move || detect_prior_git_automation(&workspace))
@@ -816,7 +816,7 @@ pub async fn detect_prior_automation(workspace: String) -> Result<bool, String> 
         .map_err(|e| e.to_string())
 }
 
-#[cfg(target_os = "ios")]
+#[cfg(mobile)]
 #[tauri::command]
 pub async fn auto_commit(
     workspace: String,
@@ -830,7 +830,7 @@ pub async fn auto_commit(
         .map_err(|e| e.to_string())
 }
 
-#[cfg(target_os = "ios")]
+#[cfg(mobile)]
 #[tauri::command]
 pub async fn push_notes(
     workspace: String,
@@ -846,7 +846,7 @@ pub async fn push_notes(
     .map_err(|e| e.to_string())
 }
 
-#[cfg(target_os = "ios")]
+#[cfg(mobile)]
 #[tauri::command]
 pub async fn fetch_and_compare(workspace: String, token: String) -> Result<PullOutcome, String> {
     tokio::task::spawn_blocking(move || checked_pull(&workspace, &token))
@@ -855,7 +855,7 @@ pub async fn fetch_and_compare(workspace: String, token: String) -> Result<PullO
         .map_err(|e| e.to_string())
 }
 
-#[cfg(target_os = "ios")]
+#[cfg(mobile)]
 #[tauri::command]
 pub async fn rebase_onto_remote(workspace: String) -> Result<RebaseOutcome, String> {
     tokio::task::spawn_blocking(move || checked_rebase_onto_remote(&workspace))
@@ -864,7 +864,7 @@ pub async fn rebase_onto_remote(workspace: String) -> Result<RebaseOutcome, Stri
         .map_err(|e| e.to_string())
 }
 
-#[cfg(target_os = "ios")]
+#[cfg(mobile)]
 #[tauri::command]
 pub async fn init_notes_repo(
     _workspace: String,
@@ -873,7 +873,7 @@ pub async fn init_notes_repo(
     checked_init_notes_repo().map_err(|e| e.to_string())
 }
 
-#[cfg(target_os = "ios")]
+#[cfg(mobile)]
 #[tauri::command]
 pub async fn list_note_history(
     workspace: String,
@@ -885,7 +885,7 @@ pub async fn list_note_history(
         .map_err(|e| e.to_string())
 }
 
-#[cfg(target_os = "ios")]
+#[cfg(mobile)]
 #[tauri::command]
 pub async fn read_note_at_commit(
     workspace: String,
@@ -898,7 +898,7 @@ pub async fn read_note_at_commit(
         .map_err(|e| e.to_string())
 }
 
-#[cfg(target_os = "ios")]
+#[cfg(mobile)]
 #[tauri::command]
 pub async fn list_github_repos() -> Result<Vec<GithubRepo>, String> {
     tokio::task::spawn_blocking(list_own_github_repos)
@@ -907,7 +907,7 @@ pub async fn list_github_repos() -> Result<Vec<GithubRepo>, String> {
         .map_err(|e| e.to_string())
 }
 
-#[cfg(target_os = "ios")]
+#[cfg(mobile)]
 #[tauri::command]
 pub async fn clone_repo(url: String, parent_dir: String, token: String) -> Result<String, String> {
     tokio::task::spawn_blocking(move || checked_clone_repo(&url, &parent_dir, &token))
