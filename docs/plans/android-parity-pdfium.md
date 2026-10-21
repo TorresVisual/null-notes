@@ -16,12 +16,12 @@ Leave every box below unchecked. The executing skill resolves them with
 your human partner before Step 1 and checks the chosen boxes itself.
 
 **Execution Target:**
-- [ ] Current branch (no isolation)
+- [x] Current branch (no isolation)
 - [ ] New feature branch (no worktree)
 - [ ] Worktree (superpowers:using-git-worktrees)
 
 **Execution Mode:**
-- [ ] Inline execution (superpowers:executing-plans)
+- [x] Inline execution (superpowers:executing-plans)
 - [ ] Subagent-driven execution (superpowers:subagent-driven-development)
 
 ## Global Constraints
@@ -52,7 +52,7 @@ your human partner before Step 1 and checks the chosen boxes itself.
 **Interfaces:**
 - Produces: `src-tauri/gen/android/app/src/main/jniLibs/<abi>/libpdfium.so` for each requested ABI (`x86_64`, `arm64-v8a`); a debug APK containing `lib/x86_64/libpdfium.so`.
 
-- [ ] **Step 1: Write the fetch script**
+- [x] **Step 1: Write the fetch script**
 
 ```powershell
 param([string[]]$Abi = @('x86_64'))
@@ -87,14 +87,14 @@ foreach ($a in $Abi) {
 
 The ELF-magic check is the script's own test: a wrong release layout (the archive structure has changed between releases before) or an HTML error page fails loudly instead of producing a file that Gradle packages and `dlopen` later rejects.
 
-- [ ] **Step 2: Run it and verify**
+- [x] **Step 2: Run it and verify**
 
 Run: `.\scripts\download-pdfium-android.ps1`
 Expected: `libpdfium.so -> ...\jniLibs\x86_64`, no exception. Then `git status --short` must **not** list the `.so` (already ignored).
 
 If the asset name 404s, open `https://github.com/bblanchon/pdfium-binaries/releases/tag/chromium/7763`, read the real Android asset names, and fix the `$asset` table — do not guess.
 
-- [ ] **Step 3: Inspect the library's dependencies and alignment**
+- [x] **Step 3: Inspect the library's dependencies and alignment**
 
 ```powershell
 $readelf = "$env:NDK_HOME\toolchains\llvm\prebuilt\windows-x86_64\bin\llvm-readelf.exe"
@@ -105,7 +105,7 @@ $so = "src-tauri\gen\android\app\src\main\jniLibs\x86_64\libpdfium.so"
 
 Expected: `NEEDED` lists only system libraries (`libc.so`, `libm.so`, `libdl.so`, `liblog.so`…). If it lists `libc++_shared.so`, Gradle will not package that automatically — record it, copy `libc++_shared.so` from `$env:NDK_HOME\toolchains\llvm\prebuilt\windows-x86_64\sysroot\usr\lib\x86_64-linux-android\` into the same `jniLibs` dir, and note it for the iOS-delta/arm64 task. Record the `LOAD` `Align` value (`0x1000` vs `0x4000`) for Task 4.
 
-- [ ] **Step 4: Build and confirm the library is in the APK**
+- [x] **Step 4: Build and confirm the library is in the APK**
 
 ```powershell
 $env:JAVA_HOME = (Get-ChildItem 'C:\Program Files\Eclipse Adoptium' -Directory -Filter 'jdk-21*' | Select-Object -First 1).FullName
@@ -116,7 +116,7 @@ tar -tf $apk | Select-String 'lib/x86_64/'
 
 Expected: both `lib/x86_64/libnull_notes_lib.so` and `lib/x86_64/libpdfium.so`.
 
-- [ ] **Step 5: Install and confirm the app still launches**
+- [x] **Step 5: Install and confirm the app still launches**
 
 ```powershell
 . "$env:TEMP\android-attach.ps1"
@@ -128,12 +128,14 @@ Start-Sleep 5
 
 Expected: a pid. Add a **Result:** line under this task (asset name used, `NEEDED` list, alignment, APK listing).
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add scripts/download-pdfium-android.ps1 docs/plans/android-parity-pdfium.md
 git commit -m "build(mobile): script to fetch Android pdfium into jniLibs"
 ```
+
+**Result:** PASS. Asset `pdfium-android-x64` (chromium/7763) fetched; ELF magic OK, `.so` untracked by git. `NEEDED`: `libdl.so`, `libm.so`, `libc.so` only (no `libc++_shared.so`), SONAME `libpdfium.so`. `LOAD` Align `0x4000` (16 KB-aligned). Debug APK lists `lib/x86_64/libpdfium.so` + `lib/x86_64/libnull_notes_lib.so`; installed on emulator-5554, app launches (pid 9187).
 
 ---
 
