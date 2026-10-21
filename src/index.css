@@ -919,9 +919,7 @@ code {
 }
 
 .color-menu {
-  position: absolute;
-  top: calc(100% + 4px);
-  left: 0;
+  position: fixed;
   z-index: 60;
   display: grid;
   grid-template-columns: repeat(4, 24px);

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 
 export const COLOR_HUES = [
   '#ef4444', '#f97316', '#eab308', '#22c55e', '#3b82f6', '#a855f7', '#ec4899', '#9ca3af',
@@ -16,16 +17,27 @@ interface ColorMenuProps {
 
 export function ColorMenu({ label, icon, toValue, current, onPick }: ColorMenuProps) {
   const [open, setOpen] = useState(false)
-  const ref = useRef<HTMLDivElement>(null)
+  const [position, setPosition] = useState({ top: 0, left: 0 })
+  const buttonRef = useRef<HTMLButtonElement>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (!open) return
     function onMouseDown(event: MouseEvent) {
-      if (!ref.current?.contains(event.target as Node)) setOpen(false)
+      const target = event.target as Node
+      if (!buttonRef.current?.contains(target) && !menuRef.current?.contains(target)) setOpen(false)
     }
     document.addEventListener('mousedown', onMouseDown)
     return () => document.removeEventListener('mousedown', onMouseDown)
   }, [open])
+
+  // Portalled to <body>: the toolbar's scroll region is `overflow-x: auto`,
+  // which clips an absolutely-positioned child on the y axis too.
+  function toggle() {
+    const rect = buttonRef.current?.getBoundingClientRect()
+    if (rect) setPosition({ top: rect.bottom + 4, left: rect.left })
+    setOpen((o) => !o)
+  }
 
   function pick(value: string | null) {
     onPick(value)
@@ -33,18 +45,19 @@ export function ColorMenu({ label, icon, toValue, current, onPick }: ColorMenuPr
   }
 
   return (
-    <div className="symbol-palette-anchor" ref={ref}>
+    <>
       <button
+        ref={buttonRef}
         className={`toolbar-button${current ? ' active' : ''}`}
         aria-label={label}
         aria-expanded={open}
         title={label}
-        onClick={() => setOpen((o) => !o)}
+        onClick={toggle}
       >
         {icon}
       </button>
-      {open && (
-        <div className="color-menu" role="menu" aria-label={label}>
+      {open && createPortal(
+        <div className="color-menu" role="menu" aria-label={label} ref={menuRef} style={position} onMouseDown={(e) => e.preventDefault()}>
           {COLOR_HUES.map((hue) => {
             const value = toValue(hue)
             return (
@@ -63,8 +76,9 @@ export function ColorMenu({ label, icon, toValue, current, onPick }: ColorMenuPr
           <button type="button" role="menuitem" className="color-reset" onClick={() => pick(null)}>
             Default
           </button>
-        </div>
+        </div>,
+        document.body,
       )}
-    </div>
+    </>
   )
 }
