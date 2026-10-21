@@ -228,7 +228,7 @@ Expected: `# Fixture note` and `# Lecture seven`. This (Review Focus 1, clone ha
 
 Fill the **Result** line under this task with what happened (pass/fail, any workaround such as the `input text` split). Do not commit yet; Task 5 commits all results together.
 
-**Result:**
+**Result:** PASS (on the third build; the first two builds exposed the bugs under Task 3). Clone through the onboarding form wrote `note.md` and `Lecture 7.md` (space in the name) with the right content, logcat clean. Workarounds, none an app issue: build with JDK 21 (`JAVA_HOME=...\jdk-21`; Gradle 8.14.3 cannot configure `buildSrc` on JDK 25); the AVD sometimes loses its system services after a Gradle build, so cold-boot it (`-no-snapshot-load`) before installing; `input text` is dropped unless the page holds real focus, so tap the first field with `adb shell input tap` (the DevTools `.focus()` alone is not enough). Facts that differ from the plan: the workspace lives in app-specific external storage (`/sdcard/Android/data/dev.nullnotes.app/files/Documents/<repo>`), readable with plain `adb shell`, not `run-as`; `Get-DeviceNote` was changed to match. `adb exec-out screencap -p > file` corrupts the PNG under Windows PowerShell; use `screencap` to `/sdcard` plus `adb pull`.
 
 ---
 
@@ -285,7 +285,13 @@ Expected: `note.md` contains `edited on android`; the newest log line has a non-
 
 - [ ] **Step 5: Record the result**
 
-**Result:**
+**Result:** PASS after two production fixes (each its own commit, TDD, not folded into this record). The first run FAILED twice over:
+- `2d96bf6` — `checked_clone_repo` set the remote and the fallback committer identity in memory only, so a reopened clone had no `[remote "origin"]` and no `user.name` in `.git/config`. Sync now reported "Commit failed: Author identity is not configured" and nothing could push. Review Focus 3 failed as feared; it is now fixed and the device's commits carry `null-notes <noreply@nullnotes.app>`.
+- `46bfe4c` — `checked_push` never advanced `refs/remotes/origin/<branch>` after a successful push, so the next push sent a stale old value and the remote answered `ng refs/heads/main incorrect old value provided`. Sync now (commit-push then direct push) therefore showed "Push failed" even though the first push landed, and every later push before a fetch would be rejected.
+
+With both fixes: the edit (`edited on android`) reached the host remote as `null-notes | notes: update note`, no failure chip.
+
+**Open finding, not fixed:** on the first edit after a fresh clone the editor shows "This note changed on disk while you were editing it" (Keep mine / Reload theirs) with no external edit. It did not recur on later edits or syncs in the same session. This breaks the save-path rule that the watcher's report of our own write must not raise a conflict; likely the clone's checkout writes being reported by the watcher. Needs its own issue.
 
 ---
 
@@ -356,7 +362,7 @@ Expected: `offline edit` present in the fresh host clone — the commit made whi
 
 - [ ] **Step 5: Record the result**
 
-**Result:**
+**Result:** PASS. Recents survived `force-stop` (`fixture-remote` listed, reopen worked, Review Focus 4). The host's `desktop: further edit` fast-forwarded onto the clean checkout silently on reopen: `note.md` held both edits, `Lecture 7.md` unchanged, no diverged/conflict banner (Review Focus 5). Sync with the server killed: app stayed alive, logcat had no `FATAL`/`panicked`, the offline edit stayed on disk, and the chip read "Push failed ... (An IO error occurred when talking to the server)" with the "commit is safe locally" tooltip (Review Focus 2). After restarting the server one Sync now pushed it: `offline edit` is in a fresh host clone, newest commit `null-notes | notes: update note`. Note: the first offline attempt's keystrokes missed the editor after the relaunch (page not focused), so no commit was made; it was redone after tapping into the editor, and only that second run counts.
 
 ---
 
@@ -377,6 +383,8 @@ Stop-Process -Id (Get-Content "$env:TEMP\android-fixture.pid") -Force -ErrorActi
 - [ ] **Step 2: Fill in the Result lines, listing for the iOS delta**
 
 Record per task: pass/fail, anything that needed a workaround, and these facts for the spec's final "iOS delta" section: the clone/push/pull path proves `git_mobile` over HTTP on Android's `reqwest`/`rustls` stack only (iOS has the same crate but not the same network stack or ATS policy); the `.exe` URL quirk is a Windows-host fixture detail, not an app issue.
+
+**For the spec's iOS delta:** this proves clone/push/pull of `git_mobile` over plain HTTP on Android's `reqwest`/`rustls` stack only; iOS shares the crate but not the network stack or ATS policy. Both fixes (`2d96bf6`, `46bfe4c`) are in shared `git_mobile.rs`, so they apply to iOS too, and the pre-fix behaviour (no origin/identity on disk, stale tracking ref) was never iOS-specific. The `.exe` URL is a Windows-host fixture detail, not an app issue.
 
 - [ ] **Step 3: Commit**
 
