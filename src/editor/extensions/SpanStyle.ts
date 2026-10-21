@@ -1,4 +1,5 @@
 import { Mark, mergeAttributes } from '@tiptap/core'
+import type { CommandProps } from '@tiptap/core'
 import { Plugin } from '@tiptap/pm/state'
 
 interface SpanStyleAttrs {
@@ -23,8 +24,34 @@ function parseStyleAttr(el: HTMLElement): SpanStyleAttrs {
   }
 }
 
+declare module '@tiptap/core' {
+  interface Commands<ReturnType> {
+    spanStyle: {
+      setSpanColor: (color: string | null) => ReturnType
+      setSpanBackground: (backgroundColor: string | null) => ReturnType
+    }
+  }
+}
+
 export const SpanStyle = Mark.create({
   name: 'spanStyle',
+
+  addCommands() {
+    // One mark carries color, background and size together, so changing one
+    // attribute has to carry the others along or it would silently drop them.
+    const apply =
+      (change: Partial<SpanStyleAttrs>) =>
+      ({ editor, chain }: CommandProps) => {
+        const next = { ...editor.getAttributes(this.name), ...change }
+        return Object.values(next).some(Boolean)
+          ? chain().setMark(this.name, next).run()
+          : chain().unsetMark(this.name).run()
+      }
+    return {
+      setSpanColor: (color) => apply({ color }),
+      setSpanBackground: (backgroundColor) => apply({ backgroundColor }),
+    }
+  },
 
   addAttributes() {
     return {

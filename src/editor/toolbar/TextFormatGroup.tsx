@@ -1,6 +1,7 @@
-import { Bold, Italic, List, ListOrdered } from 'lucide-react'
+import { Baseline, Bold, Highlighter, Italic, List, ListOrdered } from 'lucide-react'
 import { useEditorState } from '@tiptap/react'
 import type { Editor } from '@tiptap/core'
+import { ColorMenu } from './ColorMenu'
 
 interface TextFormatGroupProps {
   editor: Editor
@@ -18,6 +19,8 @@ export function TextFormatGroup({ editor }: TextFormatGroupProps) {
     editor,
     selector: ({ editor }) => ({
       bold: editor.isActive('bold'),
+      color: (editor.getAttributes('spanStyle')['color'] as string | null | undefined) ?? null,
+      background: (editor.getAttributes('spanStyle')['backgroundColor'] as string | null | undefined) ?? null,
       italic: editor.isActive('italic'),
       heading: Object.fromEntries(
         HEADINGS.map((level) => [level, editor.isActive('heading', { level })]),
@@ -47,6 +50,20 @@ export function TextFormatGroup({ editor }: TextFormatGroupProps) {
       >
         <Italic size={15} />
       </button>
+      <ColorMenu
+        label="Text color"
+        icon={<Baseline size={15} />}
+        toValue={(hue) => hue}
+        current={active.color}
+        onPick={(color) => editor.chain().focus().setSpanColor(color).run()}
+      />
+      <ColorMenu
+        label="Highlight color"
+        icon={<Highlighter size={15} />}
+        toValue={(hue) => `${hue}59`}
+        current={active.background}
+        onPick={(background) => editor.chain().focus().setSpanBackground(background).run()}
+      />
       <span className="toolbar-sep" aria-hidden />
       {HEADINGS.map((level) => (
         <button

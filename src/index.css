@@ -918,6 +918,43 @@ code {
   box-shadow: var(--shadow-popover);
 }
 
+.color-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 60;
+  display: grid;
+  grid-template-columns: repeat(4, 24px);
+  gap: 6px;
+  padding: var(--space-sm);
+  background: var(--bg-raised);
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  box-shadow: var(--shadow-popover);
+}
+
+.color-swatch {
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--border-strong);
+  border-radius: 5px;
+  cursor: pointer;
+}
+.color-swatch:hover,
+.color-swatch.selected { border-color: var(--text-primary); }
+
+.color-reset {
+  grid-column: 1 / -1;
+  padding: 3px 0;
+  color: var(--text-secondary);
+  background: var(--bg-hover);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.color-reset:hover { color: var(--accent); border-color: var(--accent); }
+
 .symbol-palette-search {
   width: 100%;
   padding: 5px 7px;
