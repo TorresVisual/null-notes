@@ -4,6 +4,7 @@ import { browser, expect } from '@wdio/globals'
 import { fixtureWorkspace } from '../fixtureWorkspace.js'
 import { screenshot } from '../screenshot.js'
 import { fillPromptDialog } from '../promptDialog.js'
+import { clickNewMenuItem } from '../sidebar.js'
 
 async function clickInPage(selector: string): Promise<void> {
   await browser.execute((sel) => {
@@ -37,7 +38,7 @@ async function focusEditorEnd(): Promise<void> {
 async function createNote(title: string): Promise<string> {
   const notePath = join(fixtureWorkspace, `${title}.md`)
   rmSync(notePath, { force: true })
-  await clickInPage('.sidebar-new-actions button')
+  await clickNewMenuItem('Note')
   await fillPromptDialog(title)
   await focusEditorEnd()
   await browser.keys(['End', 'Enter'])
@@ -127,13 +128,7 @@ describe('full-screen ink editor', () => {
     // A leftover note from an earlier run would make the new one a name collision.
     rmSync(join(fixtureWorkspace, 'Ink Canvas Note.md'), { force: true })
     rmSync(join(fixtureWorkspace, 'Ink Canvas Note.ink'), { recursive: true, force: true })
-    await browser.execute(() => {
-      const button = Array.from(document.querySelectorAll('.sidebar button')).find((el) =>
-        el.textContent?.includes('Canvas'),
-      )
-      if (!(button instanceof HTMLElement)) throw new Error('no Canvas button in the sidebar')
-      button.click()
-    })
+    await clickNewMenuItem('Canvas')
     await fillPromptDialog('Ink Canvas Note')
 
     await waitForSelector('.ink-canvas-wrap', 'canvas note did not open inline')

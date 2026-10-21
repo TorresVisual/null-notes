@@ -5,6 +5,7 @@ import { browser, expect } from '@wdio/globals'
 import { fixtureWorkspace } from '../fixtureWorkspace.js'
 import { screenshot } from '../screenshot.js'
 import { fillPromptDialog } from '../promptDialog.js'
+import { clickNewMenuItem } from '../sidebar.js'
 
 // See p11-1's own e2e spec for why this beats stubbing navigator.clipboard
 // from inside browser.execute: the TS-to-JS step some browser.execute
@@ -64,7 +65,7 @@ async function createNote(title: string): Promise<string> {
   const notePath = join(fixtureWorkspace, `${title}.md`)
   rmSync(notePath, { force: true })
 
-  await clickInPage('.sidebar-new-actions button')
+  await clickNewMenuItem('Note')
   await fillPromptDialog(title)
 
   await focusEditorEnd()

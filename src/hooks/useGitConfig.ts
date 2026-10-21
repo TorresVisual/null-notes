@@ -17,12 +17,32 @@ export function useGitConfig() {
 
   const updateGit = useCallback(
     async (patch: Partial<GitWorkspaceConfig>) => {
-      const { path, git, openTabs, activeTab, secondaryTab, splitRatio, expandedFolders, recentSearches } =
-        useWorkspaceStore.getState()
+      const {
+        path,
+        git,
+        openTabs,
+        activeTab,
+        secondaryTab,
+        splitRatio,
+        sidebarCollapsed,
+        tagsCollapsed,
+        expandedFolders,
+        recentSearches,
+      } = useWorkspaceStore.getState()
       if (!path) return
       const next = { ...git, ...patch }
       setGit(next)
-      await api.workspace.save(path, { openTabs, activeTab, secondaryTab, splitRatio, expandedFolders, recentSearches, git: next })
+      await api.workspace.save(path, {
+        openTabs,
+        activeTab,
+        secondaryTab,
+        splitRatio,
+        sidebarCollapsed,
+        tagsCollapsed,
+        expandedFolders,
+        recentSearches,
+        git: next,
+      })
     },
     [setGit],
   )

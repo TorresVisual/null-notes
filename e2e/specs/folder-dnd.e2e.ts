@@ -3,17 +3,8 @@ import { join } from 'node:path'
 import { browser, expect } from '@wdio/globals'
 import { fixtureWorkspace } from '../fixtureWorkspace.js'
 import { fillPromptDialog } from '../promptDialog.js'
+import { clickNewMenuItem } from '../sidebar.js'
 import { screenshot } from '../screenshot.js'
-
-async function clickInPage(selector: string): Promise<void> {
-  await browser.execute((sel) => {
-    const el = document.querySelector(sel)
-    if (!(el instanceof HTMLElement)) {
-      throw new Error(`clickInPage: no element matching ${sel}`)
-    }
-    el.click()
-  }, selector)
-}
 
 // Simulates a real HTML5 drag-and-drop sequence (dragstart -> dragover ->
 // drop) with a live DataTransfer, since our handlers are plain React
@@ -59,7 +50,7 @@ describe('folders: create, reveal, and drag a note back out', () => {
   // each one start from the *other* test's leftover selectedFolder/DOM
   // rather than from the state this flow actually produces.
   it('reveals a note created inside a new folder, then moves it back to the workspace root by dragging it', async () => {
-    await clickInPage('.sidebar-new-actions button:nth-child(2)') // "Folder" button
+    await clickNewMenuItem('Folder') // "Folder" button
     await fillPromptDialog('DragFolder')
     // Folder creation's selectedFolder update (what targets the next note
     // into it) lands after this dialog closes, not before — wait for the
@@ -70,7 +61,7 @@ describe('folders: create, reveal, and drag a note back out', () => {
       timeoutMsg: 'the new folder never appeared in the sidebar tree',
     })
 
-    await clickInPage('.sidebar-new-actions button:nth-child(1)') // "Note" button — targets selectedFolder
+    await clickNewMenuItem('Note') // "Note" button — targets selectedFolder
     await fillPromptDialog('Inside Note')
     await browser.waitUntil(async () => browser.execute(() => !!document.querySelector('.ProseMirror')), {
       timeout: 5000,

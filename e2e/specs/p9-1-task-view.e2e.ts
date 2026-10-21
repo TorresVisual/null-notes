@@ -4,18 +4,7 @@ import { browser, expect } from '@wdio/globals'
 import { fixtureWorkspace } from '../fixtureWorkspace.js'
 import { screenshot } from '../screenshot.js'
 import { fillPromptDialog } from '../promptDialog.js'
-
-async function clickButtonByText(selector: string, text: string): Promise<void> {
-  await browser.execute(
-    (sel, t) => {
-      const btn = Array.from(document.querySelectorAll(sel)).find((el) => el.textContent?.includes(t))
-      if (!(btn instanceof HTMLElement)) throw new Error(`no ${sel} with text "${t}"`)
-      btn.click()
-    },
-    selector,
-    text,
-  )
-}
+import { clickNewMenuItem } from '../sidebar.js'
 
 async function focusEditorEnd(): Promise<void> {
   await browser.execute(() => {
@@ -35,7 +24,7 @@ async function createNote(title: string): Promise<string> {
   const notePath = join(fixtureWorkspace, `${title}.md`)
   rmSync(notePath, { force: true })
 
-  await clickButtonByText('.sidebar-new-actions button', 'Note')
+  await clickNewMenuItem('Note')
   await fillPromptDialog(title)
   await browser.waitUntil(async () => browser.execute(() => !!document.querySelector('.ProseMirror')), {
     timeout: 5000,

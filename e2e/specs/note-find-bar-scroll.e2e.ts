@@ -3,24 +3,14 @@ import { browser } from '@wdio/globals'
 import { rmSync } from 'node:fs'
 import { fixtureWorkspace } from '../fixtureWorkspace.js'
 import { fillPromptDialog } from '../promptDialog.js'
+import { clickNewMenuItem } from '../sidebar.js'
 import { screenshot } from '../screenshot.js'
-
-// WebdriverIO's Element#click() runs its own overlap/visibility readiness
-// check before clicking — see create-note.e2e.ts's clickInPage for why this
-// project always dispatches clicks as plain in-page JS instead.
-async function clickInPage(selector: string): Promise<void> {
-  await browser.execute((sel) => {
-    const el = document.querySelector(sel)
-    if (!(el instanceof HTMLElement)) throw new Error(`clickInPage: no element matching ${sel}`)
-    el.click()
-  }, selector)
-}
 
 describe('note find bar (Ctrl+F) while scrolled mid-file', () => {
   it('stays pinned in view and does not reset the scroll position when opened', async () => {
     rmSync(join(fixtureWorkspace, 'Scroll Find Note.md'), { force: true })
 
-    await clickInPage('.sidebar-new-actions button')
+    await clickNewMenuItem('Note')
     await fillPromptDialog('Scroll Find Note')
     await browser.waitUntil(async () => browser.execute(() => !!document.querySelector('.ProseMirror')), {
       timeout: 5000,

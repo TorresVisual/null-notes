@@ -3,26 +3,15 @@ import { join } from 'node:path'
 import { browser, expect } from '@wdio/globals'
 import { fixtureWorkspace } from '../fixtureWorkspace.js'
 import { fillPromptDialog } from '../promptDialog.js'
+import { clickNewMenuItem } from '../sidebar.js'
 import { screenshot } from '../screenshot.js'
-
-// See create-note.e2e.ts for why in-page clicks are used over WebdriverIO's
-// own Element#click().
-async function clickInPage(selector: string): Promise<void> {
-  await browser.execute((sel) => {
-    const el = document.querySelector(sel)
-    if (!(el instanceof HTMLElement)) {
-      throw new Error(`clickInPage: no element matching ${sel}`)
-    }
-    el.click()
-  }, selector)
-}
 
 describe('issue #74: empty note page reads as broken', () => {
   it('shows the placeholder on the empty body paragraph and focuses the editor on a click below the content', async () => {
     const notePath = join(fixtureWorkspace, 'Empty Note Test.md')
     rmSync(notePath, { force: true })
 
-    await clickInPage('.sidebar-new-actions button')
+    await clickNewMenuItem('Note')
     await fillPromptDialog('Empty Note Test')
     await browser.waitUntil(async () => browser.execute(() => !!document.querySelector('.ProseMirror')), {
       timeout: 5000,

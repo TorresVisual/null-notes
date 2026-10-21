@@ -3,14 +3,7 @@ import { join } from 'node:path'
 import { browser } from '@wdio/globals'
 import { fixtureWorkspace } from '../fixtureWorkspace.js'
 import { fillPromptDialog } from '../promptDialog.js'
-
-async function clickInPage(selector: string): Promise<void> {
-  await browser.execute((sel) => {
-    const el = document.querySelector(sel)
-    if (!(el instanceof HTMLElement)) throw new Error(`clickInPage: no element matching ${sel}`)
-    el.click()
-  }, selector)
-}
+import { clickNewMenuItem } from '../sidebar.js'
 
 async function focusEditorEnd(): Promise<void> {
   await browser.execute(() => {
@@ -39,11 +32,11 @@ describe('block handle on a checklist with checked rows', () => {
     const notePath = join(fixtureWorkspace, `${title}.md`)
     rmSync(notePath, { force: true })
 
-    await browser.waitUntil(async () => browser.execute(() => !!document.querySelector('.sidebar-new-actions button')), {
+    await browser.waitUntil(async () => browser.execute(() => !!document.querySelector('.sidebar-new')), {
       timeout: 10000,
       timeoutMsg: 'sidebar never rendered',
     })
-    await clickInPage('.sidebar-new-actions button')
+    await clickNewMenuItem('Note')
     await fillPromptDialog(title)
     await browser.waitUntil(async () => browser.execute(() => !!document.querySelector('.ProseMirror')), {
       timeout: 5000,

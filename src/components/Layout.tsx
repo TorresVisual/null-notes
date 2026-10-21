@@ -70,6 +70,7 @@ export function Layout() {
   const reopenClosedTab = useWorkspaceStore((s) => s.reopenClosedTab)
   const focusMode = useFocusModeStore((s) => s.enabled)
   const toggleFocusMode = useFocusModeStore((s) => s.toggle)
+  const toggleSidebar = useWorkspaceStore((s) => s.toggleSidebar)
   const mobile = isMobile()
   const mobileSidebarOpen = useMobileSidebarStore((s) => s.open)
   const closeMobileSidebar = useMobileSidebarStore((s) => s.close)
@@ -317,6 +318,9 @@ export function Layout() {
         case 'toggle-focus-mode':
           toggleFocusMode()
           break
+        case 'toggle-sidebar':
+          toggleSidebar()
+          break
         case 'next-tab':
         case 'prev-tab': {
           if (openTabs.length < 2 || !activeTab) break
@@ -335,6 +339,7 @@ export function Layout() {
       closeTab,
       reopenClosedTab,
       toggleFocusMode,
+      toggleSidebar,
       createNote,
       createFolder,
       createCanvasNote,
@@ -492,6 +497,7 @@ export function Layout() {
       w: 'close-tab',
       'shift+w': 'reopen-closed-tab',
       'shift+f': 'toggle-focus-mode',
+      '\\': 'toggle-sidebar',
       Tab: 'next-tab',
       'shift+Tab': 'prev-tab',
     }

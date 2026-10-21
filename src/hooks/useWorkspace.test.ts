@@ -274,4 +274,30 @@ describe('useWorkspace', () => {
     expect(useWorkspaceStore.getState().secondaryTab).toBeNull()
     expect(useWorkspaceStore.getState().splitRatio).toBe(0.5)
   })
+
+  it('saveSession persists the sidebar collapsed state', async () => {
+    useWorkspaceStore.setState({ path: '/ws', sidebarCollapsed: true, tagsCollapsed: true })
+    const { result } = renderHook(() => useWorkspace())
+
+    await result.current.saveSession()
+
+    expect(workspace.save).toHaveBeenCalledWith(
+      '/ws',
+      expect.objectContaining({ sidebarCollapsed: true, tagsCollapsed: true }),
+    )
+  })
+
+  it('openWorkspaceAt restores the sidebar state, defaulting open for an older session', async () => {
+    workspace.load.mockResolvedValue({ ...emptySession, sidebarCollapsed: true, tagsCollapsed: true })
+    const { result } = renderHook(() => useWorkspace())
+
+    await result.current.openWorkspaceAt('/ws')
+    expect(useWorkspaceStore.getState().sidebarCollapsed).toBe(true)
+    expect(useWorkspaceStore.getState().tagsCollapsed).toBe(true)
+
+    workspace.load.mockResolvedValue(emptySession)
+    await result.current.openWorkspaceAt('/ws2')
+    expect(useWorkspaceStore.getState().sidebarCollapsed).toBe(false)
+    expect(useWorkspaceStore.getState().tagsCollapsed).toBe(false)
+  })
 })

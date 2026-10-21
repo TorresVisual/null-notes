@@ -4,26 +4,15 @@ import { browser, expect } from '@wdio/globals'
 import { fixtureWorkspace } from '../fixtureWorkspace.js'
 import { screenshot } from '../screenshot.js'
 import { fillPromptDialog } from '../promptDialog.js'
+import { clickNewMenuItem } from '../sidebar.js'
 
-// See create-note.e2e.ts / p6-academic-blocks.e2e.ts for why these exist.
+// See sidebar.ts / p6-academic-blocks.e2e.ts for why these exist.
 async function clickInPage(selector: string): Promise<void> {
   await browser.execute((sel) => {
     const el = document.querySelector(sel)
     if (!(el instanceof HTMLElement)) throw new Error(`clickInPage: no element matching ${sel}`)
     el.click()
   }, selector)
-}
-
-async function clickButtonByText(selector: string, text: string): Promise<void> {
-  await browser.execute(
-    (sel, t) => {
-      const btn = Array.from(document.querySelectorAll(sel)).find((el) => el.textContent?.includes(t))
-      if (!(btn instanceof HTMLElement)) throw new Error(`no ${sel} with text "${t}"`)
-      btn.click()
-    },
-    selector,
-    text,
-  )
 }
 
 async function focusEditorEnd(): Promise<void> {
@@ -72,7 +61,7 @@ describe('P6-3: templates', () => {
     const notePath = join(fixtureWorkspace, 'Analysis Blatt 4.md')
     rmSync(notePath, { force: true })
 
-    await clickButtonByText('.sidebar-new-actions button', 'Template')
+    await clickNewMenuItem('From template')
     await browser.waitUntil(async () => browser.execute(() => !!document.querySelector('.template-empty-hint')), {
       timeout: 5000,
       timeoutMsg: 'template dialog never showed the empty-state hint',
@@ -137,7 +126,7 @@ describe('P6-4: equation snippets', () => {
     const notePath = join(fixtureWorkspace, 'P6-4 Snippets.md')
     rmSync(notePath, { force: true })
 
-    await clickButtonByText('.sidebar-new-actions button', 'Note')
+    await clickNewMenuItem('Note')
     await fillPromptDialog('P6-4 Snippets')
 
     await focusEditorEnd()

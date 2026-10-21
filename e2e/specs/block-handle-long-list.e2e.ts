@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import { browser } from '@wdio/globals'
 import { fixtureWorkspace } from '../fixtureWorkspace.js'
 import { fillPromptDialog } from '../promptDialog.js'
+import { clickNewMenuItem } from '../sidebar.js'
 import { screenshot } from '../screenshot.js'
 
 async function clickInPage(selector: string): Promise<void> {
@@ -39,7 +40,7 @@ describe('block handle on a long task list', () => {
     const notePath = join(fixtureWorkspace, `${title}.md`)
     rmSync(notePath, { force: true })
 
-    await clickInPage('.sidebar-new-actions button')
+    await clickNewMenuItem('Note')
     await fillPromptDialog(title)
     await browser.waitUntil(async () => browser.execute(() => !!document.querySelector('.ProseMirror')), {
       timeout: 5000,

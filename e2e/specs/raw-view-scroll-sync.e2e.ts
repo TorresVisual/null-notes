@@ -3,9 +3,10 @@ import { join } from 'node:path'
 import { browser, expect } from '@wdio/globals'
 import { fixtureWorkspace } from '../fixtureWorkspace.js'
 import { fillPromptDialog } from '../promptDialog.js'
+import { clickNewMenuItem } from '../sidebar.js'
 
 // WebdriverIO's Element#click() runs its own overlap/visibility readiness
-// check before clicking — see create-note.e2e.ts's clickInPage for why this
+// check before clicking — see sidebar.ts's clickInPage for why this
 // project always dispatches clicks as plain in-page JS instead.
 async function clickInPage(selector: string): Promise<void> {
   await browser.execute((sel) => {
@@ -44,7 +45,7 @@ describe('scroll position sync between rendered and raw view (#31)', () => {
     const notePath = join(fixtureWorkspace, 'Scroll Sync Toggle.md')
     rmSync(notePath, { force: true })
 
-    await clickInPage('.sidebar-new-actions button')
+    await clickNewMenuItem('Note')
     await fillPromptDialog('Scroll Sync Toggle')
     await browser.waitUntil(async () => browser.execute(() => !!document.querySelector('.ProseMirror')), {
       timeout: 5000,

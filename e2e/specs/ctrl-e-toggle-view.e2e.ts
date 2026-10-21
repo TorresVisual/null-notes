@@ -3,14 +3,7 @@ import { join } from 'node:path'
 import { browser, expect } from '@wdio/globals'
 import { fixtureWorkspace } from '../fixtureWorkspace.js'
 import { fillPromptDialog } from '../promptDialog.js'
-
-async function clickInPage(selector: string): Promise<void> {
-  await browser.execute((sel) => {
-    const el = document.querySelector(sel)
-    if (!(el instanceof HTMLElement)) throw new Error(`clickInPage: no element matching ${sel}`)
-    el.click()
-  }, selector)
-}
+import { clickNewMenuItem } from '../sidebar.js'
 
 // The keydown fallback listens on `window`, but WebDriver's key-send targets
 // whatever the page's active element is — with nothing focused there's no
@@ -34,7 +27,7 @@ describe('Ctrl+E toggles source/preview', () => {
     const notePath = join(fixtureWorkspace, 'Ctrl E Toggle.md')
     rmSync(notePath, { force: true })
 
-    await clickInPage('.sidebar-new-actions button')
+    await clickNewMenuItem('Note')
     await fillPromptDialog('Ctrl E Toggle')
 
     await browser.waitUntil(() => existsSync(notePath), {

@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import { browser, expect } from '@wdio/globals'
 import { fixtureWorkspace } from '../fixtureWorkspace.js'
 import { fillPromptDialog } from '../promptDialog.js'
+import { clickNewMenuItem } from '../sidebar.js'
 
 async function clickInPage(selector: string): Promise<void> {
   await browser.execute((sel) => {
@@ -13,7 +14,7 @@ async function clickInPage(selector: string): Promise<void> {
 }
 
 async function createNote(title: string): Promise<void> {
-  await clickInPage('.sidebar-new-actions button')
+  await clickNewMenuItem('Note')
   await fillPromptDialog(title)
   await browser.waitUntil(async () => browser.execute(() => !!document.querySelector('.ProseMirror')), {
     timeout: 5000,

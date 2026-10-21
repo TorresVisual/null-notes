@@ -5,6 +5,7 @@ import { browser, expect } from '@wdio/globals'
 import { fixtureWorkspace } from '../fixtureWorkspace.js'
 import { screenshot } from '../screenshot.js'
 import { fillPromptDialog } from '../promptDialog.js'
+import { clickNewMenuItem } from '../sidebar.js'
 
 // Reads the real OS clipboard rather than stubbing `navigator.clipboard`
 // inside the WebView: a stub needs a nested function literal injected via
@@ -20,7 +21,7 @@ function readClipboardText(): string {
   return execSync('powershell -NoProfile -Command "Get-Clipboard"', { encoding: 'utf-8' }).replace(/\r?\n$/, '')
 }
 
-// See create-note.e2e.ts / p6-academic-blocks.e2e.ts for why these two
+// See sidebar.ts / p6-academic-blocks.e2e.ts for why these two
 // helpers exist: WebdriverIO's own click()/waitForClickable() readiness
 // polling is a slow round trip through this driver, and a plain in-page
 // .click() doesn't give ProseMirror a real cursor position the way a mouse
@@ -74,7 +75,7 @@ async function createNote(title: string): Promise<string> {
   const notePath = join(fixtureWorkspace, `${title}.md`)
   rmSync(notePath, { force: true })
 
-  await clickInPage('.sidebar-new-actions button')
+  await clickNewMenuItem('Note')
   await fillPromptDialog(title)
 
   await focusEditorEnd()

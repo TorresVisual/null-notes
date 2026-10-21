@@ -33,10 +33,30 @@ export function useWorkspace() {
   const { flushGitCommit } = useGitAutoCommit()
 
   const saveSession = useCallback(async () => {
-    const { path, openTabs, activeTab, secondaryTab, splitRatio, expandedFolders, recentSearches, git } =
-      useWorkspaceStore.getState()
+    const {
+      path,
+      openTabs,
+      activeTab,
+      secondaryTab,
+      splitRatio,
+      sidebarCollapsed,
+      tagsCollapsed,
+      expandedFolders,
+      recentSearches,
+      git,
+    } = useWorkspaceStore.getState()
     if (!path) return
-    await api.workspace.save(path, { openTabs, activeTab, secondaryTab, splitRatio, expandedFolders, recentSearches, git })
+    await api.workspace.save(path, {
+      openTabs,
+      activeTab,
+      secondaryTab,
+      splitRatio,
+      sidebarCollapsed,
+      tagsCollapsed,
+      expandedFolders,
+      recentSearches,
+      git,
+    })
   }, [])
 
   const closeWorkspace = useCallback(async () => {
@@ -64,6 +84,8 @@ export function useWorkspace() {
         setGitPriorAutomation,
         setSecondaryTab,
         setSplitRatio,
+        setSidebarCollapsed,
+        setTagsCollapsed,
       } = useWorkspaceStore.getState()
       setFolderLoading(true)
       let tree, session
@@ -92,6 +114,8 @@ export function useWorkspace() {
       setGit(session.git)
       setSecondaryTab(session.secondaryTab ?? null)
       setSplitRatio(session.splitRatio ?? 0.5)
+      setSidebarCollapsed(session.sidebarCollapsed ?? false)
+      setTagsCollapsed(session.tagsCollapsed ?? false)
       for (const tab of session.openTabs) {
         openTab(tab)
       }

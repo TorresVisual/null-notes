@@ -3,15 +3,8 @@ import { join } from 'node:path'
 import { browser, expect } from '@wdio/globals'
 import { fixtureWorkspace } from '../fixtureWorkspace.js'
 import { fillPromptDialog } from '../promptDialog.js'
+import { clickNewMenuItem } from '../sidebar.js'
 import { screenshot } from '../screenshot.js'
-
-async function clickInPage(selector: string): Promise<void> {
-  await browser.execute((sel) => {
-    const el = document.querySelector(sel)
-    if (!(el instanceof HTMLElement)) throw new Error(`clickInPage: no element matching ${sel}`)
-    el.click()
-  }, selector)
-}
 
 async function focusElement(selector: string): Promise<void> {
   await browser.execute((sel) => {
@@ -47,7 +40,7 @@ describe('Content-Security-Policy does not break existing rendering', () => {
       })
     })
 
-    await clickInPage('.sidebar-new-actions button')
+    await clickNewMenuItem('Note')
     await fillPromptDialog('CSP Verify')
     await browser.waitUntil(async () => browser.execute(() => !!document.querySelector('.ProseMirror')), {
       timeout: 5000,

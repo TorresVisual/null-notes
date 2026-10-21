@@ -328,6 +328,32 @@ mod tests {
         assert!(state.split_ratio.is_none());
     }
 
+    #[tokio::test]
+    async fn test_sidebar_state_roundtrips_and_defaults_open() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().to_string_lossy().into_owned();
+        let original = WorkspaceState {
+            sidebar_collapsed: true,
+            tags_collapsed: true,
+            ..Default::default()
+        };
+
+        save_workspace_to_dir(&path, &original).await.unwrap();
+        let loaded = load_workspace_from_dir(&path).await.unwrap();
+        assert!(loaded.sidebar_collapsed);
+        assert!(loaded.tags_collapsed);
+
+        tokio::fs::write(
+            dir.path().join(".workspace.json"),
+            r#"{"openTabs":[],"activeTab":null}"#,
+        )
+        .await
+        .unwrap();
+        let legacy = load_workspace_from_dir(&path).await.unwrap();
+        assert!(!legacy.sidebar_collapsed);
+        assert!(!legacy.tags_collapsed);
+    }
+
     // idle_minutes/skip_hooks/auto_push are P5-2/P5-3 fields, added after
     // prompted/auto_commit shipped — a file written by that earlier build
     // has none of them and must still load with sane defaults, not zeros.

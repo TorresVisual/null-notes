@@ -3,23 +3,7 @@ import { join } from 'node:path'
 import { browser, expect } from '@wdio/globals'
 import { fixtureWorkspace } from '../fixtureWorkspace.js'
 import { fillPromptDialog } from '../promptDialog.js'
-
-// WebdriverIO's Element#click() runs its own overlap/visibility readiness
-// check before clicking. Through @wdio/tauri-service's official
-// driverProvider in this environment, each iteration of that check is a slow
-// round trip, turning a near-instant real UI state into a 10-20s stall per
-// click. Dispatching the click as plain in-page JS bypasses that check
-// entirely — the element already exists by the time findElement resolves it,
-// which is sufficient readiness here.
-async function clickInPage(selector: string): Promise<void> {
-  await browser.execute((sel) => {
-    const el = document.querySelector(sel)
-    if (!(el instanceof HTMLElement)) {
-      throw new Error(`clickInPage: no element matching ${sel}`)
-    }
-    el.click()
-  }, selector)
-}
+import { clickNewMenuItem } from '../sidebar.js'
 
 describe('create note → type → save', () => {
   it('writes the typed content to the .md file on disk', async () => {
@@ -29,7 +13,7 @@ describe('create note → type → save', () => {
     // step can't pass this assertion against stale content.
     rmSync(notePath, { force: true })
 
-    await clickInPage('.sidebar-new-actions button')
+    await clickNewMenuItem('Note')
     await fillPromptDialog('Test Note')
     await browser.waitUntil(async () => browser.execute(() => !!document.querySelector('.ProseMirror')), {
       timeout: 5000,

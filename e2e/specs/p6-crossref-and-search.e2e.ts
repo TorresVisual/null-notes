@@ -4,6 +4,7 @@ import { browser, expect } from '@wdio/globals'
 import { fixtureWorkspace } from '../fixtureWorkspace.js'
 import { screenshot } from '../screenshot.js'
 import { fillPromptDialog } from '../promptDialog.js'
+import { clickNewMenuItem } from '../sidebar.js'
 
 async function clickInPage(selector: string): Promise<void> {
   await browser.execute((sel) => {
@@ -43,7 +44,7 @@ async function createNote(title: string): Promise<string> {
   const notePath = join(fixtureWorkspace, `${title}.md`)
   rmSync(notePath, { force: true })
 
-  await clickButtonByText('.sidebar-new-actions button', 'Note')
+  await clickNewMenuItem('Note')
   await fillPromptDialog(title)
 
   await focusEditorEnd()

@@ -31,6 +31,13 @@ interface WorkspaceStore {
   // Primary pane's width as a fraction of the split, 0..1.
   splitRatio: number
   setSplitRatio: (ratio: number) => void
+  // Sidebar rail+panel UI state, persisted per workspace via WorkspaceState.
+  sidebarCollapsed: boolean
+  toggleSidebar: () => void
+  setSidebarCollapsed: (collapsed: boolean) => void
+  tagsCollapsed: boolean
+  toggleTags: () => void
+  setTagsCollapsed: (collapsed: boolean) => void
   // Ephemeral, session-only — not part of WorkspaceState's saved fields
   // (openTabs/expandedFolders/etc.), the same posture as flashTabPath.
   // Only closeTab pushes here; closeTabsUnder (a folder deleted/renamed)
@@ -119,6 +126,8 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   activeTab: null,
   secondaryTab: null,
   splitRatio: 0.5,
+  sidebarCollapsed: false,
+  tagsCollapsed: false,
   closedTabs: [],
   expandedFolders: [],
   selectedFolder: null,
@@ -186,6 +195,10 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   },
 
   setSplitRatio: (ratio) => set({ splitRatio: ratio }),
+  toggleSidebar: () => set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
+  setSidebarCollapsed: (collapsed) => set({ sidebarCollapsed: collapsed }),
+  toggleTags: () => set((s) => ({ tagsCollapsed: !s.tagsCollapsed })),
+  setTagsCollapsed: (collapsed) => set({ tagsCollapsed: collapsed }),
 
   reorderTabs: (fromPath, toPath) => {
     if (fromPath === toPath) return
@@ -271,6 +284,8 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
       activeTab: null,
       secondaryTab: null,
       splitRatio: 0.5,
+      sidebarCollapsed: false,
+      tagsCollapsed: false,
       closedTabs: [],
       expandedFolders: [],
       selectedFolder: null,

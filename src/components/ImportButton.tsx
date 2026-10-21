@@ -32,7 +32,10 @@ interface PickedPdf {
   title: string
 }
 
-export function ImportButton() {
+// The import flow, separate from any one trigger: `start` opens the picker and
+// `status` is the dialog/progress/error UI, which has to stay mounted for the
+// whole import — so it can't live inside a dropdown item that closes on click.
+export function useImportPdf() {
   const { pickPdf, importPages, isImporting, progress } = usePdfImport()
   const workspacePath = useWorkspaceStore((s) => s.path)
   const selectedFolder = useWorkspaceStore((s) => s.selectedFolder)
@@ -166,8 +169,8 @@ export function ImportButton() {
 
   const busy = isImporting || isConverting || batchProgress !== null
 
-  return (
-    <div className="import-pdf">
+  const status = (
+    <>
       {pending && (
         <ImportModeDialog
           fileName={pending.length === 1 ? pending[0]!.title : `${pending.length} files`}
@@ -176,9 +179,6 @@ export function ImportButton() {
           onCancel={() => setPending(null)}
         />
       )}
-      <button onClick={() => void handleClick()} disabled={busy || !workspacePath}>
-        <FileUp size={14} /> {busy ? 'Importing…' : 'Import PDF'}
-      </button>
       {/* Naming Pages mode without offering it would leave the user stuck on a
           message; the button is the whole point of detecting this early. */}
       {scanned && (
@@ -205,6 +205,20 @@ export function ImportButton() {
         </p>
       )}
       {error && <p className="import-error">{error}</p>}
+    </>
+  )
+
+  return { start: () => void handleClick(), busy, disabled: busy || !workspacePath, status }
+}
+
+export function ImportButton() {
+  const { start, busy, disabled, status } = useImportPdf()
+  return (
+    <div className="import-pdf">
+      <button onClick={start} disabled={disabled}>
+        <FileUp size={14} /> {busy ? 'Importing…' : 'Import PDF'}
+      </button>
+      {status}
     </div>
   )
 }

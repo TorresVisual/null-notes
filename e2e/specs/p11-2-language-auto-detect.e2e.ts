@@ -6,6 +6,7 @@ import { browser, expect } from '@wdio/globals'
 import { fixtureWorkspace } from '../fixtureWorkspace.js'
 import { screenshot } from '../screenshot.js'
 import { fillPromptDialog } from '../promptDialog.js'
+import { clickNewMenuItem } from '../sidebar.js'
 
 // Routes through a real file rather than an inline PowerShell string: the
 // snippet below has its own `$f`/quotes, and escaping those correctly for a
@@ -15,18 +16,6 @@ function setClipboardText(text: string): void {
   const tmpFile = join(tmpdir(), 'null-notes-e2e-clipboard.txt')
   writeFileSync(tmpFile, text, 'utf-8')
   execSync(`powershell -NoProfile -Command "Get-Content -Raw '${tmpFile}' | Set-Clipboard"`)
-}
-
-// See create-note.e2e.ts / p6-academic-blocks.e2e.ts for why these helpers
-// exist: WebdriverIO's own click()/waitForClickable() readiness polling is a
-// slow round trip through this driver, and a plain in-page .click() doesn't
-// give ProseMirror a real cursor position the way a mouse click does.
-async function clickInPage(selector: string): Promise<void> {
-  await browser.execute((sel) => {
-    const el = document.querySelector(sel)
-    if (!(el instanceof HTMLElement)) throw new Error(`clickInPage: no element matching ${sel}`)
-    el.click()
-  }, selector)
 }
 
 async function focusEditorEnd(): Promise<void> {
@@ -66,7 +55,7 @@ async function createNote(title: string): Promise<string> {
   const notePath = join(fixtureWorkspace, `${title}.md`)
   rmSync(notePath, { force: true })
 
-  await clickInPage('.sidebar-new-actions button')
+  await clickNewMenuItem('Note')
   await fillPromptDialog(title)
 
   await focusEditorEnd()

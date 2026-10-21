@@ -4,18 +4,7 @@ import { browser, expect } from '@wdio/globals'
 import { fixtureWorkspace } from '../fixtureWorkspace.js'
 import { screenshot } from '../screenshot.js'
 import { fillPromptDialog } from '../promptDialog.js'
-
-// See create-note.e2e.ts / p11-1-code-block-affordances.e2e.ts for why these
-// exist: WebdriverIO's own click()/waitForClickable() readiness polling is a
-// slow round trip through this driver, and a plain in-page .click() doesn't
-// give ProseMirror a real cursor position the way a mouse click does.
-async function clickInPage(selector: string): Promise<void> {
-  await browser.execute((sel) => {
-    const el = document.querySelector(sel)
-    if (!(el instanceof HTMLElement)) throw new Error(`clickInPage: no element matching ${sel}`)
-    el.click()
-  }, selector)
-}
+import { clickNewMenuItem } from '../sidebar.js'
 
 async function focusEditorEnd(): Promise<void> {
   await browser.execute(() => {
@@ -61,11 +50,11 @@ async function createNoteWithCodeBlock(title: string): Promise<void> {
   rmSync(notePath, { force: true })
 
   await browser.waitUntil(
-    async () => browser.execute(() => !!document.querySelector('.sidebar-new-actions button')),
+    async () => browser.execute(() => !!document.querySelector('.sidebar-new')),
     { timeout: 15000, timeoutMsg: 'app never finished loading (sidebar never appeared)' },
   )
 
-  await clickInPage('.sidebar-new-actions button')
+  await clickNewMenuItem('Note')
   await fillPromptDialog(title)
   await browser.waitUntil(async () => browser.execute(() => !!document.querySelector('.ProseMirror')), {
     timeout: 5000,

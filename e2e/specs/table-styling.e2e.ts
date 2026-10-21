@@ -4,8 +4,9 @@ import { browser, expect } from '@wdio/globals'
 import { fixtureWorkspace } from '../fixtureWorkspace.js'
 import { screenshot } from '../screenshot.js'
 import { fillPromptDialog } from '../promptDialog.js'
+import { clickNewMenuItem } from '../sidebar.js'
 
-// See create-note.e2e.ts for why these two helpers exist.
+// See sidebar.ts for why these two helpers exist.
 async function clickInPage(selector: string): Promise<void> {
   await browser.execute((sel) => {
     const el = document.querySelector(sel)
@@ -34,7 +35,7 @@ async function createNote(title: string): Promise<string> {
   const notePath = join(fixtureWorkspace, `${title}.md`)
   rmSync(notePath, { force: true })
 
-  await clickInPage('.sidebar-new-actions button')
+  await clickNewMenuItem('Note')
   await fillPromptDialog(title)
 
   await focusEditorEnd()

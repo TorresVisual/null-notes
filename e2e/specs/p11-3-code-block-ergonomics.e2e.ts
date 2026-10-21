@@ -4,8 +4,9 @@ import { browser, expect } from '@wdio/globals'
 import { fixtureWorkspace } from '../fixtureWorkspace.js'
 import { screenshot } from '../screenshot.js'
 import { fillPromptDialog } from '../promptDialog.js'
+import { clickNewMenuItem } from '../sidebar.js'
 
-// See create-note.e2e.ts / p6-academic-blocks.e2e.ts for why these helpers
+// See sidebar.ts / p6-academic-blocks.e2e.ts for why these helpers
 // exist: WebdriverIO's own click()/waitForClickable() readiness polling is
 // a slow round trip through this driver, and a plain in-page .click()
 // doesn't give ProseMirror a real cursor position the way a mouse click does.
@@ -57,7 +58,7 @@ async function createNote(title: string): Promise<string> {
   const notePath = join(fixtureWorkspace, `${title}.md`)
   rmSync(notePath, { force: true })
 
-  await clickInPage('.sidebar-new-actions button')
+  await clickNewMenuItem('Note')
   await fillPromptDialog(title)
 
   await focusEditorEnd()

@@ -60,6 +60,7 @@ function buildViewMenu(mobile: boolean): MenuItemSpec[] {
     { id: 'graph-view', label: 'Connections Graph', accel: 'Ctrl+G' },
     { id: 'toggle-terminal', label: 'Toggle Terminal', accel: 'Ctrl+`' },
     { id: 'toggle-outline', label: 'Toggle Outline', accel: 'Ctrl+Shift+O' },
+    { id: 'toggle-sidebar', label: 'Toggle Sidebar', accel: 'Ctrl+\\' },
     { id: 'task-view', label: 'Tasks', accel: 'Ctrl+Shift+K' },
     { id: 'review', label: 'Review', accel: 'Ctrl+Shift+R' },
     { id: 'deck-view', label: 'Browse All Cards', accel: 'Ctrl+Shift+D' },

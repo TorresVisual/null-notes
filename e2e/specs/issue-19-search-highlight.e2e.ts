@@ -4,6 +4,7 @@ import { browser, expect } from '@wdio/globals'
 import { fixtureWorkspace } from '../fixtureWorkspace.js'
 import { screenshot } from '../screenshot.js'
 import { fillPromptDialog } from '../promptDialog.js'
+import { clickNewMenuItem } from '../sidebar.js'
 
 async function clickInPage(selector: string): Promise<void> {
   await browser.execute((sel) => {
@@ -11,18 +12,6 @@ async function clickInPage(selector: string): Promise<void> {
     if (!(el instanceof HTMLElement)) throw new Error(`clickInPage: no element matching ${sel}`)
     el.click()
   }, selector)
-}
-
-async function clickButtonByText(selector: string, text: string): Promise<void> {
-  await browser.execute(
-    (sel, t) => {
-      const btn = Array.from(document.querySelectorAll(sel)).find((el) => el.textContent?.includes(t))
-      if (!(btn instanceof HTMLElement)) throw new Error(`no ${sel} with text "${t}"`)
-      btn.click()
-    },
-    selector,
-    text,
-  )
 }
 
 async function focusEditorEnd(): Promise<void> {
@@ -48,7 +37,7 @@ async function createNote(title: string): Promise<string> {
   const notePath = join(fixtureWorkspace, `${title}.md`)
   rmSync(notePath, { force: true })
 
-  await clickButtonByText('.sidebar-new-actions button', 'Note')
+  await clickNewMenuItem('Note')
   await fillPromptDialog(title)
   await focusEditorEnd()
   await browser.keys(['End', 'Enter'])
@@ -73,7 +62,7 @@ describe('issue #19: free-text search jumps to and highlights the match', () => 
     // Navigate away so the note isn't already the active tab/scroll position.
     await createNote('Other Note To Switch Away')
 
-    await clickButtonByText('.sidebar-nav-btn', 'Search')
+    await clickInPage('.rail-btn[aria-label="Search"]')
     await browser.waitUntil(async () => browser.execute(() => !!document.querySelector('.search-modal-input')), {
       timeout: 5000,
       timeoutMsg: 'search modal never opened',

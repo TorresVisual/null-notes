@@ -122,6 +122,12 @@ pub struct WorkspaceState {
     pub secondary_tab: Option<String>,
     #[serde(default)]
     pub split_ratio: Option<f64>,
+    // Sidebar rail+panel UI state. Both default to false (panel open, Tags
+    // section open), which is also what a file from an older build means.
+    #[serde(default)]
+    pub sidebar_collapsed: bool,
+    #[serde(default)]
+    pub tags_collapsed: bool,
 }
 
 /// Whether *this machine* should auto-commit in this workspace, and whether

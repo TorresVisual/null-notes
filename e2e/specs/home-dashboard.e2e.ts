@@ -4,6 +4,7 @@ import { browser, expect } from '@wdio/globals'
 import { fixtureWorkspace } from '../fixtureWorkspace.js'
 import { screenshot } from '../screenshot.js'
 import { fillPromptDialog } from '../promptDialog.js'
+import { clickNewMenuItem } from '../sidebar.js'
 
 async function clickInPage(selector: string): Promise<void> {
   await browser.execute((sel) => {
@@ -27,7 +28,7 @@ describe('workspace dashboard', () => {
     const notePath = join(fixtureWorkspace, 'Home Dashboard Note.md')
     rmSync(notePath, { force: true })
 
-    await clickInPage('.sidebar-new-actions button')
+    await clickNewMenuItem('Note')
     await fillPromptDialog('Home Dashboard Note')
 
     await browser.waitUntil(() => existsSync(notePath), {

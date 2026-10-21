@@ -85,6 +85,68 @@ describe('Sidebar Open Workspace button', () => {
   })
 })
 
+describe('Sidebar rail and panel', () => {
+  beforeEach(() => {
+    vi.mocked(platform).mockReturnValue('windows')
+    useNotesStore.setState({ notes: [], folders: [], tags: ['algebra'] })
+    useWorkspaceStore.setState({
+      path: '/ws',
+      activeTab: null,
+      tagFilter: null,
+      sidebarCollapsed: false,
+      tagsCollapsed: false,
+    })
+  })
+
+  it('collapses the panel from the rail toggle but keeps the rail', async () => {
+    const user = userEvent.setup()
+    const { container } = renderSidebar()
+    const toggle = screen.getByRole('button', { name: 'Toggle sidebar' })
+    expect(toggle).toHaveAttribute('aria-pressed', 'true')
+
+    await user.click(toggle)
+
+    expect(useWorkspaceStore.getState().sidebarCollapsed).toBe(true)
+    expect(container.querySelector('aside')).toHaveClass('sidebar--collapsed')
+    expect(container.querySelector('.sidebar-panel')).toHaveAttribute('inert')
+    expect(container.querySelector('.sidebar-rail')).toBeInTheDocument()
+    expect(toggle).toHaveAttribute('aria-pressed', 'false')
+  })
+
+  it('rail launchers fire their handlers', async () => {
+    const user = userEvent.setup()
+    renderSidebar()
+
+    await user.click(screen.getByLabelText('Graph view'))
+    await user.click(screen.getByLabelText('Tasks'))
+
+    expect(props.onGraphOpen).toHaveBeenCalled()
+    expect(props.onTaskOpen).toHaveBeenCalled()
+  })
+
+  it('collapses and expands the Tags section', async () => {
+    const user = userEvent.setup()
+    renderSidebar()
+    expect(screen.getByRole('button', { name: '#algebra' })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Tags' }))
+
+    expect(useWorkspaceStore.getState().tagsCollapsed).toBe(true)
+    expect(screen.queryByRole('button', { name: '#algebra' })).not.toBeInTheDocument()
+  })
+
+  it('opens the New menu with every create action', async () => {
+    const user = userEvent.setup()
+    renderSidebar()
+
+    await user.click(screen.getByRole('button', { name: 'New' }))
+
+    for (const name of ['Note', 'Folder', 'Canvas', 'From template…', 'Import PDF…']) {
+      expect(await screen.findByRole('menuitem', { name: new RegExp(name) })).toBeInTheDocument()
+    }
+  })
+})
+
 describe('Sidebar drawer on mobile', () => {
   beforeEach(() => {
     useNotesStore.setState({ notes: [], folders: [], tags: [] })
@@ -126,7 +188,7 @@ describe('Sidebar drawer on mobile', () => {
       </TooltipProvider>,
     )
 
-    await user.click(screen.getByText('Search'))
+    await user.click(screen.getByLabelText('Search'))
 
     expect(onSearchOpen).toHaveBeenCalled()
     expect(useMobileSidebarStore.getState().open).toBe(false)

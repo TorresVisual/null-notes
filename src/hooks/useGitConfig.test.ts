@@ -43,6 +43,8 @@ describe('useGitConfig', () => {
       activeTab: '/ws/a.md',
       secondaryTab: null,
       splitRatio: 0.5,
+      sidebarCollapsed: false,
+      tagsCollapsed: false,
       expandedFolders: [],
       recentSearches: [],
       git: { prompted: true, autoCommit: true, idleMinutes: 10, skipHooks: false, autoPush: true, allowCodeRepoPush: false },

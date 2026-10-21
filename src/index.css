@@ -182,17 +182,16 @@ button, [role="button"], .tree-row, .tab, .search-result, .slash-menu-item,
    items above: scaling a full-width row looks like a glitch, not a press;
    this is reserved for compact, self-contained controls. */
 .toolbar-button:active, .ink-tool:active, .ink-pen:active,
-.sidebar-new-actions button:active, .workspace-picker-browse:active,
+.sidebar .sidebar-new:active, .workspace-picker-browse:active,
 .dialog-action:active, .context-menu button:active, .settings-reset:active,
-.import-mode-option:active, .sidebar-workspace-btn:active {
+.import-mode-option:active, .sidebar .rail-btn:active {
   transform: scale(0.96);
 }
 
 /* Hover lift — the same compact-control set rises slightly rather than just
    swapping color, giving buttons real physical presence instead of reading
    as flat colored rectangles. */
-.toolbar-button:hover, .ink-tool:hover, .ink-pen:hover,
-.sidebar-new-actions button:hover:not(:disabled) {
+.toolbar-button:hover, .ink-tool:hover, .ink-pen:hover {
   transform: translateY(-1px);
 }
 
@@ -320,16 +319,55 @@ button, [role="button"], .tree-row, .tab, .search-result, .slash-menu-item,
   min-height: 0;
 }
 
+/* A fixed icon rail beside a collapsible panel. Collapsing animates the
+   panel's width to 0; the rail never moves, so every launcher stays one click
+   away with the file tree hidden. */
 .sidebar {
-  width: 240px;
-  min-width: 200px;
+  display: flex;
   background: var(--bg-raised);
+  overflow: hidden;
+}
+
+.sidebar-rail {
+  width: 44px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: var(--space-sm) 0;
+  background: var(--bg-sunken);
   border-right: 1px solid var(--border);
+}
+
+.sidebar-rail-end {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.sidebar-panel {
+  width: 240px;
   display: flex;
   flex-direction: column;
   gap: var(--space-sm);
   padding: 12px 8px;
-  overflow-y: auto;
+  border-right: 1px solid var(--border);
+  overflow: hidden;
+  transition:
+    width var(--duration-base) var(--ease-standard),
+    padding var(--duration-base) var(--ease-standard);
+}
+
+/* Children keep their expanded width while the panel shrinks around them, so
+   the collapse reads as a wipe rather than the contents re-wrapping. */
+.sidebar-panel > * { min-width: 224px; }
+
+.sidebar--collapsed .sidebar-panel {
+  width: 0;
+  padding-inline: 0;
+  border-right-width: 0;
 }
 
 .sidebar-backdrop {
@@ -356,6 +394,13 @@ button, [role="button"], .tree-row, .tab, .search-result, .slash-menu-item,
 .sidebar--drawer.sidebar--open {
   transform: translateX(0);
 }
+
+.sidebar--drawer .sidebar-panel {
+  width: 100%;
+  border-right: 0;
+}
+
+.sidebar--drawer .sidebar-panel > * { min-width: 0; }
 
 /* Ghost by default — a filled box on every nav row read as a stack of form
    fields rather than a navigation panel. Background only appears on
@@ -384,29 +429,150 @@ button, [role="button"], .tree-row, .tab, .search-result, .slash-menu-item,
 .sidebar button.is-error { border-color: var(--danger); color: var(--danger); }
 .sidebar button.is-selected { background: var(--accent-bg); color: var(--accent); }
 
-/* The one persistent entry point for switching workspaces — set apart from
-   the plain nav rows below it with real weight (border, bolder label)
-   rather than looking identical to Search/Settings. */
-.sidebar-workspace-btn {
-  font-weight: 600;
-  border-color: var(--border-strong) !important;
-  margin-bottom: 2px;
+/* `.sidebar .x` (two classes) so these outrank the generic `.sidebar button`
+   rule above, same reason as the tree-delete/rename rules further down. */
+.sidebar .rail-btn {
+  position: relative;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  justify-content: center;
+  color: var(--text-secondary);
 }
 
-.sidebar-workspace-btn:hover { background: var(--bg-hover); border-color: var(--text-tertiary) !important; transform: translateY(-1px); }
+.sidebar .rail-btn:hover:not(:disabled) { color: var(--text-primary); }
+.sidebar .rail-btn.is-active { color: var(--accent); }
 
-/* Separates navigation (Search/Settings) from the workspace-content actions
-   above it — a divider encodes the grouping instead of relying on gap alone. */
-.sidebar-group {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-sm);
-  padding-top: var(--space-sm);
-  margin-top: 2px;
+.sidebar .rail-btn.is-active::before {
+  content: '';
+  position: absolute;
+  left: -6px;
+  top: 8px;
+  bottom: 8px;
+  width: 2px;
+  border-radius: 2px;
+  background: var(--accent);
+}
+
+/* The mobile drawer has no rail: the same buttons sit as one bar pinned to
+   the bottom of the panel, thumb-reachable. */
+.sidebar-rail--bar {
+  width: auto;
+  flex-direction: row;
+  justify-content: space-between;
+  margin-top: auto;
+  padding: var(--space-sm) 0 0;
+  background: none;
+  border-right: 0;
   border-top: 1px solid var(--border);
 }
 
-.sidebar > .folder-tree { flex: 1; overflow-y: auto; }
+.sidebar .sidebar-rail--bar .rail-btn {
+  flex: 1;
+  width: auto;
+  height: 44px;
+}
+
+.sidebar-header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  flex-shrink: 0;
+}
+
+.sidebar-header-row { display: flex; gap: var(--space-xs); }
+
+.sidebar .sidebar-workspace { flex: 1; min-width: 0; font-weight: 600; }
+.sidebar-workspace svg { flex-shrink: 0; }
+.sidebar-workspace svg:last-child { margin-left: auto; color: var(--text-tertiary); }
+
+.sidebar-workspace-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sidebar .sidebar-new {
+  width: 32px;
+  flex-shrink: 0;
+  padding: 0;
+  justify-content: center;
+  background: var(--accent-bg);
+  color: var(--accent);
+}
+
+.sidebar .sidebar-new:hover:not(:disabled) { background: var(--accent-bg-hover); }
+
+.sidebar .sidebar-search {
+  background: var(--bg-sunken);
+  border-color: var(--border);
+  color: var(--text-tertiary);
+}
+
+.sidebar .sidebar-search:hover { border-color: var(--border-strong); color: var(--text-secondary); }
+.sidebar-search span { flex: 1; }
+
+.sidebar-panel > .folder-tree {
+  flex: 1;
+  min-height: 0;
+  margin: 0;
+  overflow-y: auto;
+}
+
+.sidebar-tags {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  max-height: 40%;
+  padding-top: var(--space-xs);
+  border-top: 1px solid var(--border);
+}
+
+.sidebar .sidebar-section-toggle {
+  gap: 4px;
+  padding: 4px;
+  font: var(--text-metadata);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-tertiary);
+}
+
+.sidebar-section-toggle svg { transition: transform var(--duration-fast) var(--ease-standard); }
+.sidebar-section-toggle[aria-expanded="true"] svg { transform: rotate(90deg); }
+
+.sidebar-section-hint {
+  margin-left: auto;
+  color: var(--accent);
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.sidebar-tags .tag-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+  margin: 0;
+  padding: var(--space-xs) 0;
+  overflow-y: auto;
+}
+
+/* Chips rather than full-width rows: a handful of tags stay on one or two
+   lines instead of eating a row each. Scoped to .sidebar to outrank the
+   generic `.sidebar button` padding/colour. */
+.sidebar .tag-item {
+  width: auto;
+  padding: 2px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg-sunken);
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.sidebar .tag-item:hover { background: var(--bg-hover); color: var(--text-primary); }
+.sidebar .tag-item.active { background: var(--accent-bg); border-color: transparent; color: var(--accent); }
 
 /* Main area */
 .main {
@@ -700,21 +866,9 @@ code {
   border-radius: 3px;
 }
 
-/* Sidebar extras */
-.workspace-name {
-  font: var(--text-metadata);
-  color: var(--text-tertiary);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  padding: 2px 4px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 /* The root-level folder-tree list itself is the "move back to root" drop
    target (see FolderTree.tsx) — it fills the sidebar's remaining height via
-   `.sidebar > .folder-tree { flex: 1 }`, so the whole background gets the
+   `.sidebar-panel > .folder-tree { flex: 1 }`, so the whole background gets the
    same outline a folder row shows, not just its items. */
 .folder-tree.drag-over { outline: 1px dashed var(--accent); outline-offset: -1px; }
 
@@ -2150,32 +2304,11 @@ pre:has(code.language-expect)::before, pre:has(code.language-expected)::before {
    of source order (see CLAUDE.md's shadcn/Tailwind cascade note). */
 .wiki-link-preview { display: block; white-space: normal; text-align: left; max-width: 280px; }
 
-/* Shared style for every sidebar nav row (Home, Search, Settings, and the
-   secondary-feature icon row below it) — named for what it is, not for
-   which row happened to use it first. */
-.sidebar-nav-btn {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  color: var(--text-tertiary) !important;
-}
-
-/* Secondary features (graph, tasks, review, terminal, formula sheet)
-   previously had no persistent entry point — menu-only, on a platform
-   where WebView2 doesn't reliably fire menu accelerators from the
-   keyboard. One compact icon row, reusing .toolbar-button's established
-   ghost-square look rather than inventing a second button style. */
-.sidebar-secondary-actions {
-  display: flex;
-  gap: var(--space-xs);
-  margin: var(--space-xs) 0;
-}
-
 /* Deliberately more muted and smaller than .shortcuts-row kbd: this is a
    peripheral hint next to the "Search" label, not the point of the row the
    way a shortcuts-overlay entry is — padding matches so the two don't drift
    for no reason, but size/color stay distinct on purpose. */
-.sidebar-nav-btn kbd {
+.sidebar-search kbd {
   font-size: 10px;
   color: var(--text-disabled);
   background: var(--bg-base);
@@ -2194,7 +2327,7 @@ pre:has(code.language-expect)::before, pre:has(code.language-expected)::before {
   padding: var(--space-xs) var(--space-sm);
 }
 
-/* Same key-cap look as .sidebar-nav-btn kbd, reused so a toolbar tooltip's
+/* Same key-cap look as .sidebar-search kbd, reused so a toolbar tooltip's
    shortcut hint doesn't drift into its own one-off style. */
 [data-slot="tooltip-content"] kbd {
   font-size: 10px;
@@ -2679,6 +2812,14 @@ pre:has(code.language-expect)::before, pre:has(code.language-expected)::before {
 .context-menu [data-slot="context-menu-item"][data-variant="destructive"] { color: var(--danger); }
 .context-menu hr,
 .context-menu [data-slot="dropdown-menu-separator"] { border: none; border-top: 1px solid var(--border); margin: 4px 0; height: 0; }
+.context-menu [data-slot="dropdown-menu-label"] {
+  padding: 4px 10px;
+  color: var(--text-tertiary);
+  font: var(--text-metadata);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.context-menu [data-slot="dropdown-menu-item"][data-disabled] { opacity: var(--disabled-opacity); pointer-events: none; }
 .context-menu [data-slot="dropdown-menu-shortcut"] {
   margin-left: auto;
   padding-left: 16px;
@@ -2816,24 +2957,6 @@ li > .folder-tree.tree-guide {
   text-transform: uppercase;
   color: var(--text-tertiary);
   margin: 2px 2px 0;
-}
-
-.sidebar-new-actions {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 6px;
-}
-
-.sidebar-new-actions button {
-  justify-content: center;
-  gap: 5px;
-  background: var(--bg-sunken);
-  border-color: var(--border) !important;
-}
-
-.sidebar-new-actions button:hover:not(:disabled) {
-  background: var(--bg-hover);
-  border-color: var(--border-strong) !important;
 }
 
 .sidebar-error {

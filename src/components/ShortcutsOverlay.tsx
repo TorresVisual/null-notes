@@ -43,6 +43,7 @@ const SHORTCUT_GROUPS: ShortcutGroup[] = [
       { keys: 'Ctrl `', label: 'Toggle terminal' },
       { keys: 'Ctrl Shift O', label: 'Toggle outline' },
       { keys: 'Ctrl Shift F', label: 'Toggle focus mode' },
+      { keys: 'Ctrl \\', label: 'Toggle sidebar' },
     ],
   },
   {
