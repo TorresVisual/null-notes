@@ -539,7 +539,20 @@ pub fn checked_push(
         anyhow::bail!("receive-pack failed to unpack the pushed pack: {unpack_line}");
     }
     match report_lines.get(1) {
-        Some(line) if line.starts_with("ok ") => Ok(PushOutcome::Pushed),
+        Some(line) if line.starts_with("ok ") => {
+            // Like `git push`, advance the tracking ref: it is the next
+            // push's compare-and-swap old value, so a stale one makes the
+            // remote reject every push after the first until a fetch. The
+            // remote already has the commit, so a failure to record it
+            // locally must not report the push as failed.
+            let _ = repo.reference(
+                format!("refs/remotes/origin/{}", head_name.shorten()),
+                new_id,
+                gix::refs::transaction::PreviousValue::Any,
+                "push: update tracking ref",
+            );
+            Ok(PushOutcome::Pushed)
+        }
         Some(line) if line.starts_with("ng ") => Ok(PushOutcome::Rejected {
             output: line.clone(),
         }),
@@ -1365,6 +1378,37 @@ mod tests {
             .output()
             .unwrap();
         assert!(String::from_utf8_lossy(&log.stdout).contains("notes: update b"));
+    }
+
+    #[test]
+    fn a_second_push_without_a_fetch_in_between_is_accepted() {
+        let origin = tempfile::tempdir().unwrap();
+        git_init(origin.path());
+        commit_file(origin.path(), "a.md", "# A\n", "notes: update a");
+        let bare = origin.path().with_extension("bare");
+        assert!(Command::new("git")
+            .arg("clone")
+            .arg("-q")
+            .arg("--bare")
+            .arg(origin.path())
+            .arg(&bare)
+            .status()
+            .unwrap()
+            .success());
+        let clone = tempfile::tempdir().unwrap();
+        git_clone(&bare, clone.path());
+        let workspace = clone.path().to_string_lossy().into_owned();
+
+        commit_file(clone.path(), "b.md", "# B\n", "notes: update b");
+        assert_eq!(
+            checked_push(&workspace, RepoMode::NotesOnly, false, "").unwrap(),
+            PushOutcome::Pushed
+        );
+        commit_file(clone.path(), "c.md", "# C\n", "notes: update c");
+
+        let outcome = checked_push(&workspace, RepoMode::NotesOnly, false, "").unwrap();
+
+        assert_eq!(outcome, PushOutcome::Pushed);
     }
 
     #[test]
