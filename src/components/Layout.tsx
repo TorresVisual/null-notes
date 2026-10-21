@@ -62,6 +62,8 @@ const TerminalPane = lazy(() => import('./TerminalPane').then((m) => ({ default:
 
 type ViewMode = 'wysiwyg' | 'raw'
 
+const GIT_FLUSH_ON_CLOSE_TIMEOUT_MS = 5000
+
 export function Layout() {
   const activeTab = useWorkspaceStore((s) => s.activeTab)
   const setActiveTab = useWorkspaceStore((s) => s.setActiveTab)
@@ -153,10 +155,18 @@ export function Layout() {
         await flush()
         await flushSecondary()
         await saveSession()
-        await flushGitCommit()
+        // A hung commit hook or push must not trap the window open; the
+        // notes are already on disk and the batch is only a convenience.
+        await Promise.race([
+          flushGitCommit(),
+          new Promise((resolve) => setTimeout(resolve, GIT_FLUSH_ON_CLOSE_TIMEOUT_MS)),
+        ])
       } finally {
-        await api.terminal.close()
-        await api.window.confirmClose()
+        try {
+          await api.terminal.close()
+        } finally {
+          await api.window.confirmClose()
+        }
       }
     })
     return () => void unlisten.then((off) => off())
