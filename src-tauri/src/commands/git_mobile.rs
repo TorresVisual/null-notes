@@ -691,6 +691,23 @@ pub fn read_note_at_commit_at(
     Ok(String::from_utf8_lossy(&blob.data).into_owned())
 }
 
+/// `remote_at` and `config_snapshot_mut` only change the in-memory config, so
+/// without this a reopened clone has no `origin` (sync/push find nothing) and
+/// no commit identity.
+fn persist_clone_config(git_dir: &Path, url: &str, fallback_identity: bool) -> anyhow::Result<()> {
+    let path = git_dir.join("config");
+    let mut file =
+        gix::config::File::from_path_no_includes(path.clone(), gix::config::Source::Local)?;
+    file.set_raw_value("remote.origin.url", url)?;
+    file.set_raw_value("remote.origin.fetch", "+refs/heads/*:refs/remotes/origin/*")?;
+    if fallback_identity {
+        file.set_raw_value("user.name", "null-notes")?;
+        file.set_raw_value("user.email", "noreply@nullnotes.app")?;
+    }
+    std::fs::write(path, file.to_bstring())?;
+    Ok(())
+}
+
 /// Clone via fetch into a freshly `gix::init`-ed repo — the documented gix
 /// pattern for cloning (init empty + fetch + checkout), since `gix::init`
 /// doesn't clone on its own and there's no porcelain `gix::clone` distinct
@@ -714,7 +731,8 @@ pub fn checked_clone_repo(url: &str, parent_dir: &str, token: &str) -> anyhow::R
     // repo gets a synthetic local identity up front rather than failing —
     // this isn't attributing authorship to anyone, just letting reflogs
     // work at all on a device that never ran a git identity setup step.
-    if repo.committer().is_none() {
+    let needs_fallback_identity = repo.committer().is_none();
+    if needs_fallback_identity {
         let mut config = repo.config_snapshot_mut();
         config.set_raw_value("user.name", "null-notes")?;
         config.set_raw_value("user.email", "noreply@nullnotes.app")?;
@@ -763,6 +781,7 @@ pub fn checked_clone_repo(url: &str, parent_dir: &str, token: &str) -> anyhow::R
 
     let tree_id = repo.find_commit(commit_id)?.tree_id()?.detach();
     checkout_tree_to_worktree(&repo, tree_id)?;
+    persist_clone_config(repo.git_dir(), url, needs_fallback_identity)?;
 
     Ok(dest)
 }
@@ -1532,6 +1551,42 @@ mod tests {
             .unwrap();
 
         assert!(dest.join("a.md").exists());
+    }
+
+    #[test]
+    fn cloned_repo_reopens_with_origin_as_its_default_remote() {
+        let origin = tempfile::tempdir().unwrap();
+        git_init(origin.path());
+        commit_file(origin.path(), "a.md", "# A\n", "notes: update a");
+        let parent = tempfile::tempdir().unwrap();
+        let url = as_url(origin.path());
+
+        let dest = checked_clone_repo(&url, &parent.path().to_string_lossy(), "").unwrap();
+
+        let repo = gix::open(&dest).unwrap();
+        let remote = repo
+            .find_default_remote(gix::remote::Direction::Fetch)
+            .expect("origin must be persisted in .git/config")
+            .unwrap();
+        assert_eq!(
+            remote
+                .url(gix::remote::Direction::Fetch)
+                .unwrap()
+                .to_bstring(),
+            url
+        );
+    }
+
+    #[test]
+    fn clone_config_persists_the_fallback_identity() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = gix::init(tmp.path()).unwrap();
+
+        persist_clone_config(repo.git_dir(), "https://example.com/n.git", true).unwrap();
+
+        let config = std::fs::read_to_string(repo.git_dir().join("config")).unwrap();
+        assert!(config.contains("name = null-notes"), "{config}");
+        assert!(config.contains("email = noreply@nullnotes.app"), "{config}");
     }
 
     #[test]
