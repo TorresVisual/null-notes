@@ -12,6 +12,18 @@ export function pinchZoom(startZoom: number, startDistance: number, distance: nu
   return clampZoom(Math.round(startZoom * (distance / startDistance) * 100) / 100)
 }
 
+// Exponential, so equal wheel travel is an equal ratio at any zoom level.
+export function wheelZoom(zoom: number, deltaY: number): number {
+  return clampZoom(zoom * Math.exp(-deltaY * 0.002))
+}
+
+// A point `anchor` ink units from the page origin sits at `anchor * zoom` pixels,
+// so changing zoom moves it by `anchor * Δzoom`. Scrolling by that much keeps it
+// under the cursor or fingers instead of the page growing away from its corner.
+export function anchorShift(anchor: number, fromZoom: number, toZoom: number): number {
+  return anchor * (toZoom - fromZoom)
+}
+
 export function distanceBetween(a: { x: number; y: number }, b: { x: number; y: number }): number {
   return Math.hypot(a.x - b.x, a.y - b.y)
 }

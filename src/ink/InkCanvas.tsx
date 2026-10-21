@@ -3,6 +3,7 @@ import type { PointerEvent as ReactPointerEvent } from 'react'
 import { useInkCanvas, isDrawingPointer, isEraserTip, toInk } from './useInkCanvas'
 import { pinchZoom, distanceBetween } from './zoom'
 import { scrollShift } from './growCanvas'
+import { useZoomAnchor } from './useZoomAnchor'
 import { useInkStore } from '../store/ink'
 import type { CanvasHandle } from '../store/ink'
 
@@ -117,6 +118,7 @@ export function InkCanvas({
 
   const [cursorPos, setCursorPos] = useState<{ x: number; y: number } | null>(null)
   const pageRef = useRef<HTMLDivElement>(null)
+  const anchorZoomAt = useZoomAnchor(pageRef, zoom, onZoomChange, scrollAncestors)
   const lastOrigin = useRef({ originX: inkData.originX, originY: inkData.originY })
 
   useLayoutEffect(() => {
@@ -189,6 +191,7 @@ export function InkCanvas({
       const [a, b] = points
       if (!a || !b || !onZoomChange) return
       const distance = distanceBetween(a, b)
+      anchorZoomAt((a.x + b.x) / 2, (a.y + b.y) / 2)
       if (!pinch.current) pinch.current = { distance, zoom }
       else onZoomChange(pinchZoom(pinch.current.zoom, pinch.current.distance, distance))
       return
