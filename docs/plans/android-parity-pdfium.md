@@ -149,7 +149,7 @@ git commit -m "build(mobile): script to fetch Android pdfium into jniLibs"
 - Consumes: Tauri commands `pdf_has_text_layer(pdfPath: string) -> boolean` and `import_pdf_markdown(pdfPath: string) -> { markdown: string, images: [...] }` (`src-tauri/src/commands/pdf.rs`), invoked as `window.__TAURI_INTERNALS__.invoke`.
 - Produces: `Invoke-PdfCmd $name $argsJson` helper (PowerShell) and a PDF on the device at `$pdfDir/sample.pdf`, reused by Task 3.
 
-- [ ] **Step 1: Push the fixture and define the invoke helper**
+- [x] **Step 1: Push the fixture and define the invoke helper**
 
 ```powershell
 . "$env:TEMP\android-attach.ps1"
@@ -166,7 +166,7 @@ function Invoke-PdfCmd($name, $argsJson) {
 
 If the push is refused (scoped storage), push to `/sdcard/Download/` and `adb shell cp` it, or write it with `run-as dev.nullnotes.app` (the debug build is debuggable) into the app's `files/` dir and use that path instead.
 
-- [ ] **Step 2: Run text extraction and check for the pdfium-not-found error**
+- [x] **Step 2: Run text extraction and check for the pdfium-not-found error**
 
 ```powershell
 Invoke-PdfCmd 'pdf_has_text_layer' "{ pdfPath: '$devPdf/sample.pdf' }"
@@ -227,7 +227,7 @@ git add src-tauri/src/pdf/renderer.rs
 git commit -m "fix(mobile): locate libpdfium in the Android native library dir"
 ```
 
-- [ ] **Step 3: Error path — missing and non-PDF files**
+- [x] **Step 3: Error path — missing and non-PDF files**
 
 ```powershell
 Invoke-PdfCmd 'pdf_has_text_layer' "{ pdfPath: '$devPdf/nope.pdf' }"
@@ -238,9 +238,11 @@ Invoke-PdfCmd 'pdf_has_text_layer' "{ pdfPath: '$devPdf/bad.pdf' }"
 
 Expected: both return `ERR …` strings and the pid is unchanged (app alive, `logcat -d | Select-String 'FATAL|panicked'` empty).
 
-- [ ] **Step 4: Record**
+- [x] **Step 4: Record**
 
 Add a **Result:** line: which path `dlopen` took (bare name or fallback), the extracted text summary, the error strings. Do not commit yet; Task 5 commits all results together.
+
+**Result:** PASS. `dlopen("libpdfium.so")` by bare name worked; the `/proc/self/maps` fallback was not needed and `renderer.rs` is untouched. `pdf_has_text_layer` -> `true`; `import_pdf_markdown` returned the fixture's headings, bullets, numbered lists, code line, equation (`MSE = (1 / n) Σ(y − ■)²`) and footnotes, `images: []`. Missing file -> `ERR IoError(Os { code: 2, kind: NotFound ... })`; non-PDF -> `ERR PdfiumLibraryInternalError(FormatError)`; pid unchanged (9187), no `FATAL`/`panicked` for it (older pids in logcat are earlier plans' runs). Plan defect: the Step 1 helper read `.value`, but `cdp-eval.mjs` prints `{"result":{"value":..}}`, so it must read `.result.value`.
 
 ---
 
@@ -253,7 +255,7 @@ Add a **Result:** line: which path `dlopen` took (bare name or fallback), the ex
 - Consumes: `Invoke-PdfCmd`, `$devPdf` from Task 2; `import_pdf_pages(pdfPath: string, notePath: string) -> [{ index, path, width, height }]`.
 - Produces: rendered `page-N.png` files in `<note>.pdf/` next to the note path given.
 
-- [ ] **Step 1: Render the fixture**
+- [x] **Step 1: Render the fixture**
 
 ```powershell
 $note = "$devPdf/sample.md"
@@ -264,7 +266,7 @@ Invoke-PdfCmd 'import_pdf_pages' "{ pdfPath: '$devPdf/sample.pdf', notePath: '$n
 
 Expected: JSON with `index 0`, `width`≤1700, `height`≤2200 (iOS: 1556×2200), `page-0.png` and `text.txt` on disk. Open `$env:TEMP\android-page-0.png` with the Read tool: it must show the real page (two-column layout, headings, code block, equation) — not blank or garbage. A `PASS`-looking reply with a blank image is a finding, not a pass.
 
-- [ ] **Step 2: Space in the path**
+- [x] **Step 2: Space in the path**
 
 ```powershell
 Invoke-PdfCmd 'import_pdf_pages' "{ pdfPath: '$devPdf/Lecture 7.pdf', notePath: '$devPdf/Lecture 7.md' }"
@@ -273,11 +275,11 @@ Invoke-PdfCmd 'import_pdf_pages' "{ pdfPath: '$devPdf/Lecture 7.pdf', notePath: 
 
 Expected: `page-0.png` inside `Lecture 7.pdf/`.
 
-- [ ] **Step 3: Second import in the same process**
+- [x] **Step 3: Second import in the same process**
 
 Run Step 1's `import_pdf_pages` again and then `import_pdf_markdown` (no `force-stop` in between). Expected: both succeed; neither returns "pdfium … not found".
 
-- [ ] **Step 4: Concurrent first bind**
+- [x] **Step 4: Concurrent first bind**
 
 ```powershell
 & $adb shell am force-stop dev.nullnotes.app
@@ -290,7 +292,7 @@ Eval-Page "(async () => { const i = window.__TAURI_INTERNALS__.invoke; const r =
 
 Expected: three `fulfilled`, app alive, no signal. A crash is the iOS bug reproduced on Android: record the logcat tombstone excerpt and file with `/file-issue` (the bind race is in shared code and also reachable on desktop); do not fix here.
 
-- [ ] **Step 5: A real multi-page sheet**
+- [x] **Step 5: A real multi-page sheet**
 
 ```powershell
 & $adb push "notes\exercise_sheets\Analysis_2_Blatt10.pdf" "$devPdf/Blatt10.pdf"
@@ -301,9 +303,11 @@ Measure-Command { Invoke-PdfCmd 'import_pdf_pages' "{ pdfPath: '$devPdf/Blatt10.
 
 (`notes/` is gitignored and local-only; if the file is absent, use any local multi-page PDF.) Expected: one `page-N.png` per page plus `text.txt`, app alive, wall time and PSS recorded (no pass threshold — the numbers feed the iOS delta).
 
-- [ ] **Step 6: Record**
+- [x] **Step 6: Record**
 
 Add a **Result:** line: page dims, image check, space-path, second-import, race outcome, sheet page count/time/PSS. Do not commit yet.
+
+**Result:** Steps 1-3 and 5 PASS, Step 4 FAIL (filed #120). Page dims 1556×2200 (same as iOS); `page-0.png` (398 KB) + `text.txt` written, and the PNG shows the real page (two columns, headings, code, equation). `Lecture 7.pdf/page-0.png` written (space in path). Second `import_pdf_pages` and `import_pdf_markdown` in the same process both succeeded. Concurrent first bind on `pdfium-render 0.9.2`: app killed with SIGTRAP in `tokio-rt-worker`, backtrace `FPDF_InitLibrary` <- `Pdfium::new` <- `bind_pdfium` <- `import_pdf_markdown`, same class as the iOS spike's SIGSEGV; filed as #120, not fixed here. After the Task 4 dependency bump the same race passed 4/4 cold starts (no root cause, no regression test; #120 stays open). Sheet: `Analysis_2_Blatt10.pdf` is 2 pages, the largest in the corpus (195 KB); 4.8 s wall for `import_pdf_pages` including the cold bind, TOTAL PSS 174 MB, Native Heap 27 MB, app alive, `page-0/1.png` + `text.txt` on disk. Plan defect: pushing the source as `sample.pdf` next to `sample.md` collides with the note's `sample.pdf/` sidecar (`File exists (os error 17)`); sources were moved to a `src/` subdir. No ~10-page corpus sheet exists, so the multi-page time/memory number is for 2 pages.
 
 ---
 
@@ -316,7 +320,7 @@ Add a **Result:** line: page dims, image check, space-path, second-import, race 
 - Consumes: `scripts/download-pdfium-android.ps1 -Abi` from Task 1.
 - Produces: an arm64 debug APK listing in the Result.
 
-- [ ] **Step 1: Fetch the arm64 library and inspect it**
+- [x] **Step 1: Fetch the arm64 library and inspect it**
 
 ```powershell
 .\scripts\download-pdfium-android.ps1 -Abi arm64-v8a
@@ -329,7 +333,7 @@ $so = "src-tauri\gen\android\app\src\main\jniLibs\arm64-v8a\libpdfium.so"
 
 Expected: `Machine: AArch64`; same `NEEDED` shape as x86_64; note the `Align` (a `0x1000` value means the library is not 16 KB-aligned, which Google Play will require for apps targeting Android 15+ — record, do not act).
 
-- [ ] **Step 2: Build arm64**
+- [x] **Step 2: Build arm64**
 
 ```powershell
 npx tauri android build --debug --target aarch64
@@ -338,9 +342,11 @@ tar -tf "src-tauri\gen\android\app\build\outputs\apk\universal\debug\app-univers
 
 Expected: the build succeeds and lists `lib/arm64-v8a/libnull_notes_lib.so` and `lib/arm64-v8a/libpdfium.so`. It cannot be executed (no device); say so in the Result. Then rebuild x86_64 (Task 1 Step 4) so the working tree's APK matches the emulator again.
 
-- [ ] **Step 3: Record**
+- [x] **Step 3: Record**
 
 Add a **Result:** line: arm64 build outcome, `Machine`, alignment, `NEEDED`, "compile-only, not run".
+
+**Result:** PASS after two fixes. arm64 `libpdfium.so`: `Machine: AArch64`, `NEEDED` libdl/libm/libc only, `LOAD` Align `0x4000` (16 KB-aligned, same as x86_64). The first `tauri android build --debug --target aarch64` FAILED: `pdfium-render 0.9.2` casts a `*const u8` to `*const i8` in `font/provider.rs:275`, which does not compile where `c_char` is `u8` (aarch64-linux-android). Fixed in its own commit by bumping to 0.9.4 (`4f13457`); that build passed but the x86_64 emulator then failed to bind (`undefined symbol: FPDFTextObj_SetFontSize`) because 0.9.4's default `pdfium_latest` is 7881, not the 7763 we ship (0.9.2's was 7763). Fixed in `37f220e` with `default-features = false, features = ["pdfium_7763", "image_latest", "thread_safe"]` (the other defaults unchanged). Final state: `cargo test` 693 passed, clippy and fmt clean, arm64 APK lists `lib/arm64-v8a/libnull_notes_lib.so` + `libpdfium.so`, x86_64 rebuilt, reinstalled and re-verified on the emulator (text, render, markdown). arm64 is compile-only, not run (no device).
 
 ---
 
@@ -354,7 +360,7 @@ Add a **Result:** line: arm64 build outcome, `Machine`, alignment, `NEEDED`, "co
 **Interfaces:**
 - Consumes: the **Result** lines of all five Android plans (`android-parity-shared-mobile-git.md`, `-credentials.md`, `-live-sync.md`, `-shell-verification.md`, this one) — each already lists its own "for the iOS delta" facts.
 
-- [ ] **Step 1: Tear down**
+- [x] **Step 1: Tear down**
 
 ```powershell
 Remove-Item -Recurse -Force "$env:TEMP\pdfium-android-*" -ErrorAction SilentlyContinue
@@ -365,7 +371,7 @@ git status --short
 
 Expected: `git status` shows only doc/script changes — no `.so`, no `.png`.
 
-- [ ] **Step 2: Append the "iOS delta" section to the spec**
+- [x] **Step 2: Append the "iOS delta" section to the spec**
 
 Append this to `docs/specs/android-parity-design.md`, filling the bracketed pdfium facts from Tasks 1–4 and keeping the other bullets as the plans' Results state them:
 
@@ -389,16 +395,18 @@ What Android proved is below; what it could not prove is the list the single iOS
 
 Verify the issue numbers against `gh issue view` before keeping them; edit the "Open" paragraph to match whatever is actually open.
 
-- [ ] **Step 3: Mark the finish line**
+- [x] **Step 3: Mark the finish line**
 
 In the spec's **Goal**, after the finish-line paragraph add: `**Status:** met on <date>; see "iOS delta" below.` — only if every bullet of the finish line has a PASS Result in some plan; otherwise name the bullet that is not met.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add docs/plans/android-parity-pdfium.md docs/specs/android-parity-design.md docs/plans/mobile-android-scaffold.md
 git commit -m "docs(mobile): record Android pdfium verification and write the iOS delta"
 ```
+
+**Result:** Teardown done (temp archives, device `pdfium-check/` dir, `tcp:9222` forward); `git status` showed no `.so` or `.png`. "iOS delta" appended to the spec with the Android-proved list, the not-provable list, the shared `pdfium-render` bump/pin the iOS run must cover, and open issues #114-#120 (titles checked with `gh issue list`). Finish line NOT marked met: token credentials has no recorded Result in `android-parity-credentials.md`; the spec's Status line names it. `mobile-android-scaffold.md` Tasks 2-3 ticked citing this pass.
 
 ---
 

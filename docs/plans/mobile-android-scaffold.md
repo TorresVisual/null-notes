@@ -106,7 +106,7 @@ Expected: one line listing the emulator's serial (e.g. `emulator-5554`) with sta
 
 Note: unlike iOS (where `cargo check --target aarch64-apple-ios-sim` works standalone because Xcode's toolchain is already on `PATH` on a macOS runner), a bare `cargo check --target x86_64-linux-android` here would fail on a missing linker even for code with no real Android incompatibility, because nothing has told `rustc` where the NDK's clang linker lives yet. `tauri android init` and `tauri android build` set that wiring up themselves, so this task drives the Rust cross-compile check through Tauri's own CLI rather than a raw `cargo check`, mirroring how `mobile-ios-scaffold.md` Task 2 used `tauri ios init` to get a real, working project rather than hand-assembling one.
 
-- [ ] **Step 1: Generate the Android project**
+- [x] **Step 1: Generate the Android project**
 
 From the repo root:
 
@@ -118,14 +118,14 @@ Expected: creates `src-tauri/gen/android/` (Gradle project: `app/`, `build.gradl
 
 If this step errors instead, read the error before continuing — likely causes given the toolchain check in Task 1: `ANDROID_HOME`/`NDK_HOME` not visible in this exact shell (re-set them per Task 1 Step 1's session-scoped block), or a Gradle/JDK version mismatch (Temurin 25 is very new; if Gradle reports it can't run on this JDK, that's a real, no-shortcut blocker — install a JDK in the range the bundled Android Gradle Plugin supports, e.g. 17 or 21, alongside the existing JDK 25, and point `JAVA_HOME` at that one instead of replacing 25 system-wide).
 
-- [ ] **Step 2: Commit the generated project**
+- [x] **Step 2: Commit the generated project**
 
 ```bash
 git add src-tauri/gen/android
 git commit -m "build: generate the Android Studio project via tauri android init"
 ```
 
-- [ ] **Step 3: Attempt a debug build for the emulator's ABI**
+- [x] **Step 3: Attempt a debug build for the emulator's ABI**
 
 ```powershell
 npx tauri android build --debug --target x86_64
@@ -145,7 +145,7 @@ git commit -m "build: gate <whatever actually needed gating> out of the Android 
 
 (Only `git add` the files actually touched — if nothing needed gating, skip this commit entirely, same as iOS's Task 1 Steps 3-4 which turned out unnecessary and were left unchecked.)
 
-- [ ] **Step 4: Confirm the built APK exists**
+- [x] **Step 4: Confirm the built APK exists**
 
 ```powershell
 Get-ChildItem -Recurse "src-tauri\gen\android" -Filter "*.apk" | Select-Object FullName
@@ -163,7 +163,7 @@ Expected: at least one `app-x86_64-debug.apk` (or similarly named) under `gen/an
 - Consumes: the debug APK built in Task 2.
 - Produces: a running app on the emulator, a before/after screenshot pair proving rendering + touch input work — the same kind of evidence `mobile-ios-scaffold.md` Task 3 produced for iOS, which the next Android plan (git_mobile onboarding wiring) can point back to.
 
-- [ ] **Step 1: Install and launch**
+- [x] **Step 1: Install and launch**
 
 ```powershell
 $apk = (Get-ChildItem -Recurse "src-tauri\gen\android" -Filter "*.apk" | Select-Object -First 1).FullName
@@ -175,13 +175,13 @@ Start-Sleep -Seconds 10
 
 (`monkey -p <package> -c android.intent.category.LAUNCHER 1` is the standard `adb`-only way to launch an app by package name without needing its exact launcher-activity class name — no new tooling, just `adb` itself, same "no new project dependency" spirit as iOS's use of `idb`.)
 
-- [ ] **Step 2: Verify the app launched without crashing**
+- [x] **Step 2: Verify the app launched without crashing**
 
 Expected: `before.png` isn't blank/black, and shows null-notes' existing no-workspace screen (sidebar, "Choose a folder…"/"Clone workspace…" buttons) — the same screen `mobile-ios-scaffold.md` Task 3 confirmed for iOS. If it's blank, check `adb logcat -d | Select-String -Pattern "nullnotes|null_notes|FATAL"` for a crash before assuming it just needs more time.
 
 Look at `before.png` directly to confirm — read it as an image, don't just check the file exists.
 
-- [ ] **Step 3: Verify basic touch interaction**
+- [x] **Step 3: Verify basic touch interaction**
 
 Find a real tap target's on-screen pixel coordinates from `before.png` (e.g. a sidebar button), then:
 
@@ -193,7 +193,7 @@ Start-Sleep -Seconds 1
 
 Compare `before.png` and `after.png` — the goal is confirming touch input, rendering, and the WebView/IPC bridge all work (the screen visibly changed), not that any specific feature is functional (a git-backed action won't work yet — see Global Constraints).
 
-- [ ] **Step 4: Record the result and known follow-ups**
+- [x] **Step 4: Record the result and known follow-ups**
 
 Note in the commit/PR description (or directly to the user) that this plan's three tasks are complete once Steps 1-3 above pass, plus the known gaps the next Android plan needs to close:
 - `git_impl` still resolves to desktop's `git.rs` for Android (Global Constraints) — the next plan should extend `src-tauri/src/lib.rs:12`'s `cfg(not(target_os = "ios"))` to also exclude Android, and route it through `git_mobile.rs` instead, same as iOS.
@@ -208,3 +208,6 @@ Note in the commit/PR description (or directly to the user) that this plan's thr
 - pdfium-for-Android (rendering/text-extraction support) — a later spike, exactly as it was for iOS, if Task 2 doesn't already resolve it by finding pdfium simply works ungated.
 - Physical-device builds/signing (a real Android keystore, Play Store or sideload distribution) — emulator only for this plan.
 - Any iOS work — paused on exhausted Actions budget, untouched by this plan.
+
+> Ticked by the Android parity pass (P16-9): the project was generated (`e4f4327`), `tauri android build --debug` succeeds for x86_64 and aarch64, and the APK installs, launches and takes touch on the AVD; see `android-parity-shell-verification.md` and `android-parity-pdfium.md`.
+
