@@ -4,6 +4,7 @@ import { createPortal } from 'react-dom'
 import { InkCanvas } from './InkCanvas'
 import { DrawRibbon } from './DrawRibbon'
 import { toolForShortcut } from './ribbonShortcuts'
+import { zoomForKey } from './zoom'
 import { useInkStore } from '../store/ink'
 
 interface InkEditorOverlayProps {
@@ -36,6 +37,15 @@ export function InkEditorOverlay({ src, width, height, onSaved, onClose }: InkEd
       if (key === 'y' || e.shiftKey) activeCanvas.redo()
       else activeCanvas.undo()
       return
+    }
+    if ((e.ctrlKey || e.metaKey) && !(e.target instanceof HTMLTextAreaElement)) {
+      const next = zoomForKey(e.key, zoom)
+      if (next !== null) {
+        e.preventDefault()
+        e.stopPropagation()
+        setZoom(next)
+        return
+      }
     }
     const tool = toolForShortcut(e)
     if (tool) {

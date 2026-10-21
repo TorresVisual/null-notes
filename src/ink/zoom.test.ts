@@ -1,11 +1,23 @@
 import { describe, it, expect } from 'vitest'
-import { pinchZoom, clampZoom, distanceBetween, backingScale, anchorShift, wheelZoom, MAX_CANVAS_DIMENSION, MAX_CANVAS_PIXELS, MIN_ZOOM, MAX_ZOOM } from './zoom'
+import { pinchZoom, clampZoom, distanceBetween, backingScale, anchorShift, wheelZoom, zoomForKey,MAX_CANVAS_DIMENSION, MAX_CANVAS_PIXELS, MIN_ZOOM, MAX_ZOOM } from './zoom'
 
 describe('anchorShift', () => {
   it('scrolls by the anchor times the zoom change', () => {
     expect(anchorShift(100, 1, 2)).toBe(100)
     expect(anchorShift(100, 2, 1)).toBe(-100)
     expect(anchorShift(0, 1, 3)).toBe(0)
+  })
+})
+
+describe('zoomForKey', () => {
+  it('steps in and out, clamps, resets, and ignores other keys', () => {
+    expect(zoomForKey('=', 1)).toBe(1.25)
+    expect(zoomForKey('+', 1)).toBe(1.25)
+    expect(zoomForKey('-', 1)).toBe(0.8)
+    expect(zoomForKey('+', MAX_ZOOM)).toBe(MAX_ZOOM)
+    expect(zoomForKey('-', MIN_ZOOM)).toBe(MIN_ZOOM)
+    expect(zoomForKey('0', 2)).toBe(1)
+    expect(zoomForKey('a', 1)).toBeNull()
   })
 })
 

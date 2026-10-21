@@ -17,6 +17,16 @@ export function wheelZoom(zoom: number, deltaY: number): number {
   return clampZoom(zoom * Math.exp(-deltaY * 0.002))
 }
 
+const KEY_ZOOM_STEP = 1.25
+
+// Ctrl/Cmd + / - / 0 → the next zoom, or null for any other key.
+export function zoomForKey(key: string, zoom: number): number | null {
+  if (key === '+' || key === '=') return clampZoom(Math.round(zoom * KEY_ZOOM_STEP * 100) / 100)
+  if (key === '-' || key === '_') return clampZoom(Math.round((zoom / KEY_ZOOM_STEP) * 100) / 100)
+  if (key === '0') return 1
+  return null
+}
+
 // A point `anchor` ink units from the page origin sits at `anchor * zoom` pixels,
 // so changing zoom moves it by `anchor * Δzoom`. Scrolling by that much keeps it
 // under the cursor or fingers instead of the page growing away from its corner.
