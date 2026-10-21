@@ -21,6 +21,9 @@ jobs:
       - name: Package identity .msix
         run: ./scripts/windows/package-identity.ps1
 
+      - name: Download pdfium.dll
+        run: ./scripts/download-pdfium.ps1
+
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy, rustfmt
