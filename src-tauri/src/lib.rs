@@ -39,8 +39,8 @@ pub fn run() {
     }
 
     #[cfg(all(target_os = "ios", debug_assertions))]
-    let extract_smoke_test_handle = if std::env::var("NULLNOTES_PDFIUM_SMOKE_TEST").is_ok() {
-        Some(std::thread::spawn(|| {
+    if std::env::var("NULLNOTES_PDFIUM_SMOKE_TEST").is_ok() {
+        std::thread::spawn(|| {
             // CWD at launch isn't guaranteed to be the bundle root on iOS
             // Simulator (confirmed empirically — a CWD-relative path here
             // produced NotFound); anchor off the executable's own directory
@@ -62,22 +62,12 @@ pub fn run() {
 
             let out = std::env::temp_dir().join("pdfium_smoke_result.txt");
             let _ = std::fs::write(&out, result);
-        }))
-    } else {
-        None
-    };
+        });
+    }
 
     #[cfg(all(target_os = "ios", debug_assertions))]
     if std::env::var("NULLNOTES_PDFIUM_SMOKE_TEST").is_ok() {
         std::thread::spawn(move || {
-            // bind_pdfium() (pdf/renderer.rs) only handles a *second* bind
-            // arriving after the first has finished — two threads racing to
-            // bind for the first time at once segfaulted in CI. Join the
-            // extract-check thread first so the two binds are sequential.
-            if let Some(handle) = extract_smoke_test_handle {
-                let _ = handle.join();
-            }
-
             let fixture = std::env::current_exe()
                 .ok()
                 .and_then(|p| {

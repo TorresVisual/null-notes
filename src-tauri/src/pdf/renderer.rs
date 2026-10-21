@@ -31,6 +31,13 @@ pub async fn render_pages(
 pub fn bind_pdfium() -> Result<pdfium_render::prelude::Pdfium> {
     use pdfium_render::prelude::{Pdfium, PdfiumError};
 
+    // FPDF_InitLibrary is not safe to enter from two threads at once; the
+    // loser of a first-bind race aborts the process (SIGTRAP/SIGSEGV).
+    // Serialising bind + Pdfium::new makes every later caller take the
+    // already-initialised path below.
+    static BIND_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+    let _guard = BIND_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+
     let exe_dir_candidate = std::env::current_exe()
         .ok()
         .and_then(|p| p.parent().map(|p| p.to_path_buf()));
@@ -139,6 +146,26 @@ mod tests {
     #[ignore = "requires pdfium native library"]
     fn test_bind_pdfium_finds_the_native_library() {
         bind_pdfium().unwrap();
+    }
+
+    // Only meaningful as the first bind in the process: run it alone,
+    // `cargo test concurrent_first_bind -- --ignored`.
+    #[test]
+    #[ignore = "requires pdfium native library; must be the first bind in its process"]
+    fn test_concurrent_first_bind_does_not_crash() {
+        let barrier = std::sync::Arc::new(std::sync::Barrier::new(4));
+        let handles: Vec<_> = (0..4)
+            .map(|_| {
+                let barrier = barrier.clone();
+                std::thread::spawn(move || {
+                    barrier.wait();
+                    bind_pdfium().is_ok()
+                })
+            })
+            .collect();
+        for h in handles {
+            assert!(h.join().unwrap());
+        }
     }
 
     #[tokio::test]
