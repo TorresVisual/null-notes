@@ -134,12 +134,10 @@ jobs:
       - name: Open the note and try editing it (exploratory tap positions)
         if: always()
         run: |
-          # Positions are guesses from run 38182288140's dashboard screenshot;
-          # the markers typed at each y show on disk which tap reached the editor.
-          idb ui tap --udid "$UDID" 100 769
-          sleep 2
-          xcrun simctl io "$UDID" screenshot notes-tab.png
-          idb ui tap --udid "$UDID" 79 356
+          # Recent row: (60,154)pt from run 39860641583's post-clone dashboard.
+          # Editor positions are still guesses; the markers typed at each y show
+          # on disk which tap reached the editor.
+          idb ui tap --udid "$UDID" 60 154
           sleep 3
           xcrun simctl io "$UDID" screenshot note-open.png
           idb ui describe-all --udid "$UDID" > ax-note.json || true
@@ -157,7 +155,12 @@ jobs:
       - name: Try Sync now and read the remote with a plain git clone
         if: always()
         run: |
-          idb ui tap --udid "$UDID" 330 118
+          # Sync now lives in the More sheet: More tab ~(385,779)pt, and the
+          # sheet's last row sits ~786pt (48pt rows above a 34pt safe area).
+          idb ui tap --udid "$UDID" 385 779
+          sleep 2
+          xcrun simctl io "$UDID" screenshot more-sheet.png
+          idb ui tap --udid "$UDID" 100 786
           sleep 8
           xcrun simctl io "$UDID" screenshot after-sync.png
           rm -rf /tmp/verify-push
@@ -176,6 +179,16 @@ jobs:
           sleep 5
           xcrun simctl io "$UDID" screenshot after-relaunch.png
           idb ui describe-all --udid "$UDID" > ax-relaunch.json || true
+          # Recent workspace row on the picker: (106,316)pt from the relaunch screenshot.
+          idb ui tap --udid "$UDID" 106 316
+          sleep 8
+          xcrun simctl io "$UDID" screenshot after-pull.png
+          APP_DATA=$(xcrun simctl get_app_container "$UDID" dev.nullnotes.app data)
+          NOTE_PATH=$(find "$APP_DATA" -iname "note.md" -not -path "*/.git/*" | head -n1)
+          echo "--- note.md on device after reopen ---"
+          cat "$NOTE_PATH"
+          grep -q "desktop edit" "$NOTE_PATH"
+          echo "pull round trip: OK"
       - name: Upload clone screenshots
         if: always()
         uses: actions/upload-artifact@v4
@@ -188,9 +201,10 @@ jobs:
             sidebar-open.png
             ax-clone.json
             note-open.png
-            notes-tab.png
+            more-sheet.png
             after-edit.png
             after-sync.png
             after-relaunch.png
+            after-pull.png
             ax-note.json
             ax-relaunch.json
