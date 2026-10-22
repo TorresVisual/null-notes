@@ -217,6 +217,70 @@ describe('useNote', () => {
     expect(result.current.content).toBe('# Note\nfirst and more')
   })
 
+  it('does not prompt when the watcher echoes a save that has not resolved yet', async () => {
+    const { result } = await mountNote()
+    let finishSave: () => void = () => {}
+    notes.save.mockImplementationOnce(
+      () => new Promise<void>((resolve) => (finishSave = resolve)),
+    )
+
+    act(() => result.current.save('# Note\nfirst'))
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(PAST_SAVE)
+    })
+    act(() => result.current.save('# Note\nfirst and more'))
+    notes.open.mockResolvedValue('# Note\nfirst')
+    await act(async () => {
+      await emitWorkspaceChanged({ payload: ['/ws/note.md'] })
+    })
+
+    expect(result.current.conflict).toBe(false)
+    await act(async () => finishSave())
+  })
+
+  it('does not prompt when two saves are in flight and the watcher reads the older one', async () => {
+    const { result } = await mountNote()
+    const finish: Array<() => void> = []
+    notes.save.mockImplementation(
+      () => new Promise<void>((resolve) => finish.push(resolve)),
+    )
+
+    act(() => result.current.save('# Note\none'))
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(PAST_SAVE)
+    })
+    act(() => result.current.save('# Note\ntwo'))
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(PAST_SAVE)
+    })
+    act(() => result.current.save('# Note\nthree'))
+    notes.open.mockResolvedValue('# Note\none')
+    await act(async () => {
+      await emitWorkspaceChanged({ payload: ['/ws/note.md'] })
+    })
+
+    expect(result.current.conflict).toBe(false)
+    await act(async () => finish.forEach((f) => f()))
+  })
+
+  it('clears the prompt once the disk again matches the buffer', async () => {
+    const { result } = await mountNote()
+
+    act(() => result.current.save('# Note\nmine'))
+    notes.open.mockResolvedValue('# Note\ntheirs')
+    await act(async () => {
+      await emitWorkspaceChanged({ payload: ['/ws/note.md'] })
+    })
+    expect(result.current.conflict).toBe(true)
+
+    notes.open.mockResolvedValue('# Note\nmine')
+    await act(async () => {
+      await emitWorkspaceChanged({ payload: ['/ws/note.md'] })
+    })
+
+    expect(result.current.conflict).toBe(false)
+  })
+
   it('prompts instead of clobbering when the buffer is dirty', async () => {
     const { result } = await mountNote()
 

@@ -11,6 +11,7 @@ export const SAVE_DEBOUNCE_MS = 600
 // Indexing is deliberately lazier than the file write: search may lag behind,
 // the file on disk may not.
 export const REINDEX_DEBOUNCE_MS = 2500
+const RECENT_WRITES = 4
 
 interface PendingWrite {
   path: string
@@ -34,7 +35,7 @@ export function useNote(path: string | null) {
   const indexTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const contentRef = useRef('')
   const incoming = useRef<string | null>(null)
-  const lastWritten = useRef<string | null>(null)
+  const recentWrites = useRef<string[]>([])
 
   const setContentAndRef = useCallback((value: string) => {
     contentRef.current = value
@@ -50,7 +51,7 @@ export function useNote(path: string | null) {
     setSaveState('clean')
     setSaveError(null)
     setConflict(false)
-    lastWritten.current = null
+    recentWrites.current = []
     api.notes
       .open(workspacePath, path)
       .then(setContentAndRef)
@@ -94,9 +95,9 @@ export function useNote(path: string | null) {
     if (!job) return
     pendingWrite.current = null
     setSaveState('saving')
+    recentWrites.current = [...recentWrites.current.slice(1 - RECENT_WRITES), job.content]
     try {
       await api.notes.save(job.workspace, job.path, job.content)
-      lastWritten.current = job.content
       useWorkspaceStore.getState().addGitPendingPath(job.path)
       if (!pendingWrite.current) {
         setSaveState('clean')
@@ -147,10 +148,14 @@ export function useNote(path: string | null) {
     const unlisten = listen<string[]>('workspace-changed', async (event) => {
       if (!event.payload.includes(path)) return
       const fresh = await api.notes.open(workspacePath, path)
-      // Our own save echoes back through the watcher. If the disk holds
-      // either the buffer or exactly what we last wrote, nobody else touched
-      // it — typing past a save must not read as an external edit.
-      if (fresh === contentRef.current || fresh === lastWritten.current) return
+      // Our own save echoes back through the watcher, possibly while the write
+      // is still in flight. If the disk holds the buffer or anything we just
+      // wrote, nobody else touched it — and any earlier prompt is stale.
+      if (fresh === contentRef.current || recentWrites.current.includes(fresh)) {
+        incoming.current = null
+        setConflict(false)
+        return
+      }
       if (pendingWrite.current || saveTimer.current) {
         incoming.current = fresh
         setConflict(true)
@@ -178,7 +183,7 @@ export function useNote(path: string | null) {
       saveTimer.current = null
     }
     pendingWrite.current = null
-    lastWritten.current = fresh
+    recentWrites.current = [fresh]
     setContentAndRef(fresh)
     setSaveState('clean')
     setSaveError(null)
