@@ -110,6 +110,7 @@ export const api = {
   },
   window: {
     confirmClose: () => invoke<void>('confirm_close'),
+    exitApp: () => invoke<void>('exit_app'),
   },
   workspace: {
     watch: (workspace: string) =>

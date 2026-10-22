@@ -7,3 +7,10 @@ use tauri::Window;
 pub fn confirm_close(window: Window) -> Result<(), String> {
     window.destroy().map_err(|e| e.to_string())
 }
+
+// Android's window.close() does not finish the activity, so system Back at the
+// root has to end the process itself.
+#[tauri::command]
+pub fn exit_app(app: tauri::AppHandle) {
+    app.exit(0)
+}

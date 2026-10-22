@@ -270,6 +270,7 @@ pub fn run() {
             commands::assets::read_note_asset,
             commands::assets::gc_note_assets,
             commands::window::confirm_close,
+            commands::window::exit_app,
             commands::printing::list_printers,
             commands::printing::export_pdf,
             commands::printing::print_document,

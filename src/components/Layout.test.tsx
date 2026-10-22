@@ -27,6 +27,7 @@ vi.mock('@tauri-apps/plugin-dialog', () => ({
   open: vi.fn(),
 }))
 vi.mock('@tauri-apps/plugin-os', () => ({ platform: vi.fn(() => 'windows') }))
+vi.mock('@tauri-apps/api/app', () => ({ onBackButtonPress: vi.fn().mockResolvedValue({ unregister: vi.fn() }) }))
 // Cannot reference the top-level DEFAULT_SETTINGS import here — vi.mock
 // factories are hoisted above imports, so that would be a TDZ access.
 // Inlining the same literal values sidesteps it.

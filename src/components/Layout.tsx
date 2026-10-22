@@ -35,6 +35,7 @@ import { useCreateCanvasNote } from '../hooks/useCreateCanvasNote'
 import { useScrollRestoration } from '../hooks/useScrollRestoration'
 import { useWindowTitle } from '../hooks/useWindowTitle'
 import { useOverlayManager } from '../hooks/useOverlayManager'
+import { useBackButton } from '../hooks/useBackButton'
 import { GitAutoCommitPrompt } from './GitAutoCommitPrompt'
 import { GitDivergedBar } from './GitDivergedBar'
 import { GitPullBlockedBar } from './GitPullBlockedBar'
@@ -131,6 +132,15 @@ export function Layout() {
     reloadTheirs: reloadTheirsSecondary,
   } = useNote(secondaryTab)
   const { activeOverlay, openOverlay, closeOverlay } = useOverlayManager()
+  useBackButton(
+    { overlayOpen: activeOverlay !== null, sheetOpen: mobileSidebarOpen, editorOpen: activeTab !== null, tab: 'home' },
+    {
+      'close-overlay': closeOverlay,
+      'close-sheet': closeMobileSidebar,
+      'close-editor': () => setActiveTab(null),
+      'go-home': () => undefined,
+    },
+  )
   const [outlineOpen, setOutlineOpen] = useState(true)
   const editorPaneRef = useRef<HTMLDivElement>(null)
   const [terminalMounted, setTerminalMounted] = useState(false)
