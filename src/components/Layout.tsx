@@ -54,7 +54,6 @@ import { goBack, goForward } from '../lib/navigationHistory'
 import { useFocusModeStore } from '../store/focusMode'
 import { canPushHere, pushIfAllowed, withGitLock } from '../lib/git'
 import { isMobile } from '../lib/platform'
-import { useMobileSidebarStore } from '../store/mobileSidebar'
 
 // pagedjs (print preview) and xterm (terminal) are ~850 KB of source between
 // them and only load when their overlay/pane is first opened.
@@ -76,8 +75,6 @@ export function Layout() {
   const toggleFocusMode = useFocusModeStore((s) => s.toggle)
   const toggleSidebar = useWorkspaceStore((s) => s.toggleSidebar)
   const mobile = isMobile()
-  const mobileSidebarOpen = useMobileSidebarStore((s) => s.open)
-  const closeMobileSidebar = useMobileSidebarStore((s) => s.close)
   const workspacePath = useWorkspaceStore((s) => s.path)
   const recentWorkspaces = useWorkspaceStore((s) => s.recentWorkspaces)
   const notes = useNotesStore((s) => s.notes)
@@ -736,9 +733,6 @@ export function Layout() {
     <Titlebar title={windowTitle} onCommand={runCommand} recentWorkspaces={recentWorkspaces} />
     <div className="layout">
       {overlays}
-      {mobile && mobileSidebarOpen && (
-        <div className="sidebar-backdrop" onClick={closeMobileSidebar} />
-      )}
       {!focusMode && (
         <Sidebar
           onSearchOpen={() => openOverlay('search')}
@@ -752,7 +746,6 @@ export function Layout() {
           }}
           onFormulaSheetOpen={() => openOverlay('formulaSheet')}
           onTerminalToggle={() => {
-            if (mobile) return
             setTerminalMounted(true)
             setTerminalOpen((o) => !o)
           }}

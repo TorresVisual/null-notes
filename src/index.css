@@ -313,13 +313,6 @@ button, [role="button"], .tree-row, .tab, .search-result, .slash-menu-item,
 .titlebar-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
 .titlebar-btn-close:hover { background: var(--danger); color: #fff; }
 
-.titlebar-menu-toggle { margin-right: 4px; }
-
-@media (hover: none) {
-  .titlebar { height: calc(44px + var(--safe-top)); padding-top: var(--safe-top); }
-  .titlebar-btn { width: 44px; }
-}
-
 .layout {
   display: flex;
   flex: 1;
@@ -376,38 +369,6 @@ button, [role="button"], .tree-row, .tab, .search-result, .slash-menu-item,
   padding-inline: 0;
   border-right-width: 0;
 }
-
-.sidebar-backdrop {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.5);
-  z-index: 90;
-}
-
-.sidebar--drawer {
-  position: fixed;
-  top: calc(44px + var(--safe-top));
-  bottom: 0;
-  left: 0;
-  width: 85vw;
-  max-width: 320px;
-  z-index: 91;
-  transform: translateX(-100%);
-  transition: transform var(--duration-base) var(--ease-standard);
-  box-shadow: var(--shadow-modal);
-  padding-bottom: max(12px, var(--safe-bottom));
-}
-
-.sidebar--drawer.sidebar--open {
-  transform: translateX(0);
-}
-
-.sidebar--drawer .sidebar-panel {
-  width: 100%;
-  border-right: 0;
-}
-
-.sidebar--drawer .sidebar-panel > * { min-width: 0; }
 
 /* Phone shell: screen above a bottom tab bar, or a full-screen editor. */
 .mobile-shell { padding-left: var(--safe-left); padding-right: var(--safe-right); }
@@ -567,25 +528,6 @@ button, [role="button"], .tree-row, .tab, .search-result, .slash-menu-item,
   width: 2px;
   border-radius: 2px;
   background: var(--accent);
-}
-
-/* The mobile drawer has no rail: the same buttons sit as one bar pinned to
-   the bottom of the panel, thumb-reachable. */
-.sidebar-rail--bar {
-  width: auto;
-  flex-direction: row;
-  justify-content: space-between;
-  margin-top: auto;
-  padding: var(--space-sm) 0 0;
-  background: none;
-  border-right: 0;
-  border-top: 1px solid var(--border);
-}
-
-.sidebar .sidebar-rail--bar .rail-btn {
-  flex: 1;
-  width: auto;
-  height: 44px;
 }
 
 .sidebar-header {

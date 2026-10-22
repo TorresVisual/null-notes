@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { getCurrentWindow } from '@tauri-apps/api/window'
-import { Menu, Copy, Minus, Square, X } from 'lucide-react'
+import { Copy, Minus, Square, X } from 'lucide-react'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -10,8 +10,6 @@ import {
   DropdownMenuTrigger,
 } from './ui/dropdown-menu'
 import { folderName } from '../lib/pathPrefix'
-import { isMobile } from '../lib/platform'
-import { useMobileSidebarStore } from '../store/mobileSidebar'
 
 interface MenuEntry {
   id: string
@@ -49,26 +47,23 @@ function buildFileMenu(recentWorkspaces: string[]): MenuItemSpec[] {
   ]
 }
 
-function buildViewMenu(mobile: boolean): MenuItemSpec[] {
-  const items: MenuItemSpec[] = [
-    { id: 'home', label: 'Home', accel: 'Ctrl+H' },
-    { separator: true },
-    { id: 'search', label: 'Search', accel: 'Ctrl+K' },
-    { id: 'quick-switch', label: 'Quick Switcher', accel: 'Ctrl+P' },
-    { id: 'toggle-view', label: 'Toggle Source/Preview', accel: 'Ctrl+E' },
-    { id: 'insert-ink', label: 'Insert Ink Block', accel: 'Ctrl+Shift+I' },
-    { id: 'graph-view', label: 'Connections Graph', accel: 'Ctrl+G' },
-    { id: 'toggle-terminal', label: 'Toggle Terminal', accel: 'Ctrl+`' },
-    { id: 'toggle-outline', label: 'Toggle Outline', accel: 'Ctrl+Shift+O' },
-    { id: 'toggle-sidebar', label: 'Toggle Sidebar', accel: 'Ctrl+\\' },
-    { id: 'task-view', label: 'Tasks', accel: 'Ctrl+Shift+K' },
-    { id: 'review', label: 'Review', accel: 'Ctrl+Shift+R' },
-    { id: 'deck-view', label: 'Browse All Cards', accel: 'Ctrl+Shift+D' },
-    { separator: true },
-    { id: 'shortcuts-help', label: 'Keyboard Shortcuts' },
-  ]
-  return mobile ? items.filter((item) => !('id' in item && item.id === 'toggle-terminal')) : items
-}
+const VIEW_MENU: MenuItemSpec[] = [
+  { id: 'home', label: 'Home', accel: 'Ctrl+H' },
+  { separator: true },
+  { id: 'search', label: 'Search', accel: 'Ctrl+K' },
+  { id: 'quick-switch', label: 'Quick Switcher', accel: 'Ctrl+P' },
+  { id: 'toggle-view', label: 'Toggle Source/Preview', accel: 'Ctrl+E' },
+  { id: 'insert-ink', label: 'Insert Ink Block', accel: 'Ctrl+Shift+I' },
+  { id: 'graph-view', label: 'Connections Graph', accel: 'Ctrl+G' },
+  { id: 'toggle-terminal', label: 'Toggle Terminal', accel: 'Ctrl+`' },
+  { id: 'toggle-outline', label: 'Toggle Outline', accel: 'Ctrl+Shift+O' },
+  { id: 'toggle-sidebar', label: 'Toggle Sidebar', accel: 'Ctrl+\\' },
+  { id: 'task-view', label: 'Tasks', accel: 'Ctrl+Shift+K' },
+  { id: 'review', label: 'Review', accel: 'Ctrl+Shift+R' },
+  { id: 'deck-view', label: 'Browse All Cards', accel: 'Ctrl+Shift+D' },
+  { separator: true },
+  { id: 'shortcuts-help', label: 'Keyboard Shortcuts' },
+]
 
 interface TitlebarProps {
   title: string
@@ -86,19 +81,11 @@ export function Titlebar({ title, onCommand, recentWorkspaces = [] }: TitlebarPr
     return () => void unlisten.then((off) => off())
   }, [])
 
-  const toggleSidebar = useMobileSidebarStore((s) => s.toggle)
-  const mobile = isMobile()
-
   return (
     <div className="titlebar" data-tauri-drag-region>
-      {mobile && (
-        <button className="titlebar-btn titlebar-menu-toggle" aria-label="Toggle sidebar" onClick={toggleSidebar}>
-          <Menu size={16} />
-        </button>
-      )}
       <div className="titlebar-menus">
         <TitlebarMenu label="File" items={buildFileMenu(recentWorkspaces)} onCommand={onCommand} />
-        <TitlebarMenu label="View" items={buildViewMenu(mobile)} onCommand={onCommand} />
+        <TitlebarMenu label="View" items={VIEW_MENU} onCommand={onCommand} />
       </div>
       <div
         className="titlebar-title"
@@ -107,31 +94,29 @@ export function Titlebar({ title, onCommand, recentWorkspaces = [] }: TitlebarPr
       >
         {title}
       </div>
-      {!mobile && (
-        <div className="titlebar-controls">
-          <button
-            className="titlebar-btn"
-            aria-label="Minimize"
-            onClick={() => void getCurrentWindow().minimize()}
-          >
-            <Minus size={14} />
-          </button>
-          <button
-            className="titlebar-btn"
-            aria-label={maximized ? 'Restore' : 'Maximize'}
-            onClick={() => void getCurrentWindow().toggleMaximize()}
-          >
-            {maximized ? <Copy size={12} /> : <Square size={12} />}
-          </button>
-          <button
-            className="titlebar-btn titlebar-btn-close"
-            aria-label="Close"
-            onClick={() => void getCurrentWindow().close()}
-          >
-            <X size={14} />
-          </button>
-        </div>
-      )}
+      <div className="titlebar-controls">
+        <button
+          className="titlebar-btn"
+          aria-label="Minimize"
+          onClick={() => void getCurrentWindow().minimize()}
+        >
+          <Minus size={14} />
+        </button>
+        <button
+          className="titlebar-btn"
+          aria-label={maximized ? 'Restore' : 'Maximize'}
+          onClick={() => void getCurrentWindow().toggleMaximize()}
+        >
+          {maximized ? <Copy size={12} /> : <Square size={12} />}
+        </button>
+        <button
+          className="titlebar-btn titlebar-btn-close"
+          aria-label="Close"
+          onClick={() => void getCurrentWindow().close()}
+        >
+          <X size={14} />
+        </button>
+      </div>
     </div>
   )
 }

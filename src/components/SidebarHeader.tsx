@@ -20,10 +20,9 @@ import {
 interface SidebarHeaderProps {
   onSearchOpen: () => void
   onTemplateOpen: () => void
-  afterAction: () => void
 }
 
-export function SidebarHeader({ onSearchOpen, onTemplateOpen, afterAction }: SidebarHeaderProps) {
+export function SidebarHeader({ onSearchOpen, onTemplateOpen }: SidebarHeaderProps) {
   const workspacePath = useWorkspaceStore((s) => s.path)
   const folderLoading = useWorkspaceStore((s) => s.folderLoading)
   const recentWorkspaces = useWorkspaceStore((s) => s.recentWorkspaces)
@@ -67,14 +66,14 @@ export function SidebarHeader({ onSearchOpen, onTemplateOpen, afterAction }: Sid
               <>
                 <DropdownMenuLabel>Recent</DropdownMenuLabel>
                 {others.map((p) => (
-                  <DropdownMenuItem key={p} title={p} onSelect={() => { void openWorkspaceAt(p); afterAction() }}>
+                  <DropdownMenuItem key={p} title={p} onSelect={() => void openWorkspaceAt(p)}>
                     {folderName(p)}
                   </DropdownMenuItem>
                 ))}
                 <DropdownMenuSeparator />
               </>
             )}
-            <DropdownMenuItem onSelect={() => { void openWorkspace(); afterAction() }}>
+            <DropdownMenuItem onSelect={() => void openWorkspace()}>
               <FolderOpen size={14} /> Open workspace…
               <DropdownMenuShortcut>Ctrl O</DropdownMenuShortcut>
             </DropdownMenuItem>
@@ -98,18 +97,18 @@ export function SidebarHeader({ onSearchOpen, onTemplateOpen, afterAction }: Sid
             <DropdownMenuItem onSelect={() => void handleCreateCanvasNote()}>
               <PenLine size={14} /> Canvas
             </DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => { onTemplateOpen(); afterAction() }}>
+            <DropdownMenuItem onSelect={onTemplateOpen}>
               <LayoutTemplate size={14} /> From template…
               <DropdownMenuShortcut>Ctrl Shift T</DropdownMenuShortcut>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem disabled={importPdf.disabled} onSelect={() => { importPdf.start(); afterAction() }}>
+            <DropdownMenuItem disabled={importPdf.disabled} onSelect={() => importPdf.start()}>
               <FileUp size={14} /> Import PDF…
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
-      <button className="sidebar-search" onClick={() => { onSearchOpen(); afterAction() }}>
+      <button className="sidebar-search" onClick={onSearchOpen}>
         <Search size={14} />
         <span>Search notes</span>
         <kbd>Ctrl K</kbd>

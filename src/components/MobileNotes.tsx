@@ -10,7 +10,7 @@ interface MobileNotesProps {
 export function MobileNotes({ onSearchOpen, onTemplateOpen }: MobileNotesProps) {
   return (
     <div className="mobile-notes sidebar-panel">
-      <SidebarHeader onSearchOpen={onSearchOpen} onTemplateOpen={onTemplateOpen} afterAction={() => undefined} />
+      <SidebarHeader onSearchOpen={onSearchOpen} onTemplateOpen={onTemplateOpen} />
       <NoteList />
       <TagList />
     </div>

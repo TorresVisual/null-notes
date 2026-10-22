@@ -5,7 +5,6 @@ import { platform } from '@tauri-apps/plugin-os'
 import { Sidebar } from './Sidebar'
 import { useWorkspaceStore } from '../store/workspace'
 import { useNotesStore } from '../store/notes'
-import { useMobileSidebarStore } from '../store/mobileSidebar'
 import { TooltipProvider } from './ui/tooltip'
 
 vi.mock('@tauri-apps/plugin-os', () => ({ platform: vi.fn() }))
@@ -144,72 +143,5 @@ describe('Sidebar rail and panel', () => {
     for (const name of ['Note', 'Folder', 'Canvas', 'From template…', 'Import PDF…']) {
       expect(await screen.findByRole('menuitem', { name: new RegExp(name) })).toBeInTheDocument()
     }
-  })
-})
-
-describe('Sidebar drawer on mobile', () => {
-  beforeEach(() => {
-    useNotesStore.setState({ notes: [], folders: [], tags: [] })
-    useWorkspaceStore.setState({ path: '/ws', activeTab: null, tagFilter: null })
-    useMobileSidebarStore.setState({ open: true })
-  })
-
-  it('has the drawer class and is open when the store says open', () => {
-    vi.mocked(platform).mockReturnValue('ios')
-    const { container } = renderSidebar()
-
-    const aside = container.querySelector('aside')
-    expect(aside).toHaveClass('sidebar--drawer')
-    expect(aside).toHaveClass('sidebar--open')
-  })
-
-  it('closes when activeTab changes', () => {
-    vi.mocked(platform).mockReturnValue('ios')
-    const { rerender } = renderSidebar()
-    expect(useMobileSidebarStore.getState().open).toBe(true)
-
-    useWorkspaceStore.setState({ activeTab: '/ws/note.md' })
-    rerender(
-      <TooltipProvider>
-        <Sidebar {...props} />
-      </TooltipProvider>,
-    )
-
-    expect(useMobileSidebarStore.getState().open).toBe(false)
-  })
-
-  it('closes when a secondary action (e.g. Search) is triggered', async () => {
-    const user = userEvent.setup()
-    vi.mocked(platform).mockReturnValue('ios')
-    const onSearchOpen = vi.fn()
-    render(
-      <TooltipProvider>
-        <Sidebar {...props} onSearchOpen={onSearchOpen} />
-      </TooltipProvider>,
-    )
-
-    await user.click(screen.getByLabelText('Search'))
-
-    expect(onSearchOpen).toHaveBeenCalled()
-    expect(useMobileSidebarStore.getState().open).toBe(false)
-  })
-
-  it('has no drawer class on desktop', () => {
-    vi.mocked(platform).mockReturnValue('windows')
-    const { container } = renderSidebar()
-
-    expect(container.querySelector('aside')).not.toHaveClass('sidebar--drawer')
-  })
-
-  it('hides the terminal toolbar button on iOS', () => {
-    vi.mocked(platform).mockReturnValue('ios')
-    renderSidebar()
-    expect(screen.queryByLabelText('Terminal')).not.toBeInTheDocument()
-  })
-
-  it('still shows the terminal toolbar button on desktop', () => {
-    vi.mocked(platform).mockReturnValue('windows')
-    renderSidebar()
-    expect(screen.getByLabelText('Terminal')).toBeInTheDocument()
   })
 })

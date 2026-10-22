@@ -23,9 +23,6 @@ interface RailItem {
 }
 
 interface SidebarRailProps {
-  // The mobile drawer shows the same buttons as a horizontal bar instead of a
-  // vertical rail, and has no panel to collapse.
-  bar?: boolean
   onSearchOpen: () => void
   onSettingsOpen: () => void
   onGraphOpen: () => void
@@ -33,10 +30,9 @@ interface SidebarRailProps {
   onReviewOpen: () => void
   onFormulaSheetOpen: () => void
   onTerminalToggle: () => void
-  afterAction: () => void
 }
 
-function RailButton({ item, side }: { item: RailItem; side: 'right' | 'top' }) {
+function RailButton({ item }: { item: RailItem }) {
   return (
     <Tooltip>
       <TooltipTrigger asChild>
@@ -50,7 +46,7 @@ function RailButton({ item, side }: { item: RailItem; side: 'right' | 'top' }) {
           <item.icon size={16} />
         </button>
       </TooltipTrigger>
-      <TooltipContent side={side}>
+      <TooltipContent side="right">
         {item.label}
         {item.shortcut && <kbd>{item.shortcut}</kbd>}
       </TooltipContent>
@@ -59,7 +55,6 @@ function RailButton({ item, side }: { item: RailItem; side: 'right' | 'top' }) {
 }
 
 export function SidebarRail({
-  bar = false,
   onSearchOpen,
   onSettingsOpen,
   onGraphOpen,
@@ -67,7 +62,6 @@ export function SidebarRail({
   onReviewOpen,
   onFormulaSheetOpen,
   onTerminalToggle,
-  afterAction,
 }: SidebarRailProps) {
   const workspacePath = useWorkspaceStore((s) => s.path)
   const setActiveTab = useWorkspaceStore((s) => s.setActiveTab)
@@ -75,44 +69,27 @@ export function SidebarRail({
   const toggleSidebar = useWorkspaceStore((s) => s.toggleSidebar)
   const noWorkspace = !workspacePath
 
-  function run(action: () => void) {
-    return () => {
-      action()
-      afterAction()
-    }
-  }
-
   const home: RailItem = {
     label: 'Home',
     icon: Home,
     shortcut: 'Ctrl H',
-    onClick: run(() => setActiveTab(null)),
+    onClick: () => setActiveTab(null),
     disabled: noWorkspace,
   }
-  const search: RailItem = { label: 'Search', icon: Search, shortcut: 'Ctrl K', onClick: run(onSearchOpen) }
-  const settings: RailItem = { label: 'Settings', icon: Settings, shortcut: 'Ctrl ,', onClick: run(onSettingsOpen) }
+  const search: RailItem = { label: 'Search', icon: Search, shortcut: 'Ctrl K', onClick: onSearchOpen }
+  const settings: RailItem = { label: 'Settings', icon: Settings, shortcut: 'Ctrl ,', onClick: onSettingsOpen }
   const features: RailItem[] = [
-    { label: 'Tasks', icon: ListChecks, shortcut: 'Ctrl Shift K', onClick: run(onTaskOpen), disabled: noWorkspace },
-    { label: 'Graph view', icon: Network, shortcut: 'Ctrl G', onClick: run(onGraphOpen), disabled: noWorkspace },
-    { label: 'Review', icon: GraduationCap, shortcut: 'Ctrl Shift R', onClick: run(onReviewOpen), disabled: noWorkspace },
-    { label: 'Generate formula sheet', icon: Sigma, onClick: run(onFormulaSheetOpen), disabled: noWorkspace },
+    { label: 'Tasks', icon: ListChecks, shortcut: 'Ctrl Shift K', onClick: onTaskOpen, disabled: noWorkspace },
+    { label: 'Graph view', icon: Network, shortcut: 'Ctrl G', onClick: onGraphOpen, disabled: noWorkspace },
+    { label: 'Review', icon: GraduationCap, shortcut: 'Ctrl Shift R', onClick: onReviewOpen, disabled: noWorkspace },
+    { label: 'Generate formula sheet', icon: Sigma, onClick: onFormulaSheetOpen, disabled: noWorkspace },
   ]
   const terminal: RailItem = {
     label: 'Terminal',
     icon: SquareTerminal,
     shortcut: 'Ctrl `',
-    onClick: run(onTerminalToggle),
+    onClick: onTerminalToggle,
     disabled: noWorkspace,
-  }
-
-  if (bar) {
-    return (
-      <nav className="sidebar-rail sidebar-rail--bar" aria-label="Quick actions">
-        {[home, search, ...features, settings].map((item) => (
-          <RailButton key={item.label} item={item} side="top" />
-        ))}
-      </nav>
-    )
   }
 
   const files: RailItem = {
@@ -126,11 +103,11 @@ export function SidebarRail({
   return (
     <nav className="sidebar-rail" aria-label="Quick actions">
       {[files, search, ...features, terminal].map((item) => (
-        <RailButton key={item.label} item={item} side="right" />
+        <RailButton key={item.label} item={item} />
       ))}
       <div className="sidebar-rail-end">
-        <RailButton item={home} side="right" />
-        <RailButton item={settings} side="right" />
+        <RailButton item={home} />
+        <RailButton item={settings} />
       </div>
     </nav>
   )
