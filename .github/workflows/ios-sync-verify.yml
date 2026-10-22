@@ -103,12 +103,15 @@ jobs:
           # submit the form (run 38180844649), so the button is tapped at its
           # keyboard-open position.
           # Tab alone fails with nothing focused (run 38180210398).
-          idb ui tap --udid "$UDID" 196 585
+          # Run 39827443493: the phone-native shell moved the form up (URL field
+          # y=392pt, button y=559pt, no shift while typing). The old y=585 tap
+          # missed, so Tab focused the URL field and the token typed into it.
+          idb ui tap --udid "$UDID" 196 392
           idb ui text --udid "$UDID" "$FIXTURE_REMOTE_URL"
           idb ui key --udid "$UDID" 43
           idb ui text --udid "$UDID" "dummy-token-for-ci"
           xcrun simctl io "$UDID" screenshot clone-filled.png
-          idb ui tap --udid "$UDID" 196 663
+          idb ui tap --udid "$UDID" 196 559
           sleep 3
           xcrun simctl io "$UDID" screenshot clone-progress.png
           sleep 8
