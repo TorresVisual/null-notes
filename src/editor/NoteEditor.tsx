@@ -13,6 +13,7 @@ import { splitIntoTasks, report, markdownOf } from './splitIntoTasks'
 import { EditorStatusBar } from './EditorStatusBar'
 import { BlockHandle } from './extensions/BlockHandle'
 import { EditorToolbar } from './toolbar/EditorToolbar'
+import { useKeepCaretVisible } from './useKeepCaretVisible'
 import { useInkStore } from '../store/ink'
 import { useSettingsStore } from '../store/settings'
 
@@ -69,6 +70,8 @@ export function NoteEditor({
       onChange(markdown)
     },
   })
+
+  useKeepCaretVisible(editor)
 
   // ProseMirror re-applies editorProps.attributes to the DOM on every state
   // update, so setting the attribute by hand would be undone on the next
