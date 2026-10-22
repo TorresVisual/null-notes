@@ -6,7 +6,7 @@ Android is the local, cheap place to finish and verify everything in Phase 16 th
 
 **Finish line:** full P16 parity on the Android emulator — build and launch, git over `git_mobile`, token credentials, clone/edit/sync round trip with desktop, mobile shell and feature cuts verified in a real WebView, pdfium text extraction and rendering, ink pointer/touch input, flashcards.
 
-**Status:** not fully met on 2026-10-21; see "iOS delta" below. Every finish-line bullet has a PASS Result in some plan except **token credentials**: `android-parity-credentials.md` recorded no Result (its Keystore read-back, at-rest and `allowBackup` checks were never run on the device), so the Keystore is only exercised indirectly by the live-sync round trip.
+**Status:** met on 2026-10-22. Every finish-line bullet has a PASS Result in a plan; the Keystore Result is in `android-parity-credentials.md`.
 
 **Not in scope:** a physical Android device (none available) and therefore real stylus pressure; the iOS CI work itself.
 
@@ -48,7 +48,7 @@ What Android proved is below; what it could not prove is the list the single iOS
 **Proved on Android (do not re-verify on iOS):** shared mobile `cfg` routing to `git_mobile`; clone, edit, sync and offline-then-push round trips against a smart-HTTP remote; mobile shell reflow and feature cuts in a real WebView; touch-pans / pen-draws ink input; flashcard review and schedule persistence; pdfium text extraction and page rendering on x86_64 via `dlopen` by bare name (no path fallback needed on Android, unlike iOS's `assets/`).
 
 **Not provable on Android:**
-- Keychain behaviour. Android Keystore proves nothing about it, and the Keystore store itself has no recorded device Result (see Status), so token store/read-back is unverified on both platforms.
+- Keychain behaviour. Android Keystore proves nothing about it, Android's Keystore store round-trips a token and holds it ciphertext-only at rest (credentials plan Result); that is evidence for the keyring-core path, not for Keychain.
 - Network stack and ATS policy: git ran over Android's `reqwest`/`rustls` only; cleartext needed a debug-only allowance there, iOS has its own App Transport Security rules.
 - The pdfium dylib and its resource path: already proven on the Simulator (`assets/` fallback); the signed-device arm64 dylib is still unproven. Android arm64 only compiled and packaged (`libpdfium.so` AArch64, `NEEDED` libc/libm/libdl, `LOAD` align `0x4000`); it did not run.
 - Signing and AltStore sideload.
@@ -57,4 +57,4 @@ What Android proved is below; what it could not prove is the list the single iOS
 
 **Shared-dependency changes the iOS run must cover.** Android forced two `Cargo.toml`/`Cargo.lock` changes that iOS builds inherit: `pdfium-render` 0.9.2 -> 0.9.4 (0.9.2 does not compile for aarch64-linux-android), and the binding set pinned to `pdfium_7763` (0.9.4's default is 7881, which needs symbols the 7763 binaries lack). The iOS workflows download `pdfium-ios-simulator-arm64.tgz` from `releases/latest`, not 7763, so confirm the iOS dylib still binds under the 7763 feature set, or pin the workflow to `chromium/7763`.
 
-**Open from the Android pass (file or fix before the iOS run):** #114 false `ConflictBar` after an in-app edit (shared `useNote.ts`, will reproduce on iOS), #115-#119 shell findings, and #120 concurrent first `bind_pdfium()` crash (crashed on Android with `pdfium-render` 0.9.2; clean on 0.9.4, and clean 5/5 cold starts with the `BIND_LOCK` fix in `894332f`). The host regression test `test_concurrent_first_bind_does_not_crash` also passes with the lock removed, so it does not discriminate on desktop; the crash has only ever reproduced on the Android emulator on 0.9.2. The iOS spike hit the same race.
+**Open from the Android pass (file or fix before the iOS run):** ~~#114 false `ConflictBar` after an in-app edit~~ (fixed in `ec2269b`, verified on the emulator: ~8 s of continuous typing raised no bar), #115-#119 shell findings, and #120 concurrent first `bind_pdfium()` crash (crashed on Android with `pdfium-render` 0.9.2; clean on 0.9.4, and clean 5/5 cold starts with the `BIND_LOCK` fix in `894332f`). The host regression test `test_concurrent_first_bind_does_not_crash` also passes with the lock removed, so it does not discriminate on desktop; the crash has only ever reproduced on the Android emulator on 0.9.2. The iOS spike hit the same race.
