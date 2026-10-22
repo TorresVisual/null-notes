@@ -4818,8 +4818,11 @@ input[type='checkbox']:focus-visible {
    columns of whatever width auto-fit lands on, so they read as the primary
    surface rather than sitting flush with Tasks/Study/Git. */
 .home-section--primary {
-  grid-column: span 2;
   padding: var(--space-lg) var(--space-lg) var(--space-md);
+}
+
+@media (min-width: 560px) {
+  .home-section--primary { grid-column: span 2; }
 }
 
 /* Git's only content is a one-line status (or an empty-state CTA) — a full
