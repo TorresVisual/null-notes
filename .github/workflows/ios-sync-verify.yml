@@ -22,6 +22,9 @@ jobs:
           find src-tauri/gen/pdfium-ios -iname "*pdfium*"
       - name: Copy pdfium smoke-test fixture
         run: cp src-tauri/tests/fixtures/sample.pdf src-tauri/gen/pdfium-smoke-fixture.pdf
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'  # http.server --cgi was removed in 3.15, which macos-latest now ships
       - name: Stand up a local git HTTP remote
         run: |
           set -euo pipefail
