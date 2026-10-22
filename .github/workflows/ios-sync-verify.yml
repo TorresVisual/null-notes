@@ -53,7 +53,10 @@ jobs:
               python3 -m http.server --cgi 8080 &
             echo $! > /tmp/git-http-server.pid
           )
-          sleep 1
+          for _ in $(seq 20); do
+            curl -s -o /dev/null http://127.0.0.1:8080/ && break
+            sleep 0.5
+          done
 
           # Python's CGIHTTPRequestHandler only execs a script for paths under
           # a cgi_directories entry (default "/cgi-bin"); it appends whatever
