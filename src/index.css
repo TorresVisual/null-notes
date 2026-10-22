@@ -527,8 +527,12 @@ button, [role="button"], .tree-row, .tab, .search-result, .slash-menu-item,
   padding-bottom: calc(72px + var(--safe-bottom));
 }
 
+.mobile-screen > .home-view { padding: var(--space-xl) var(--space-lg); }
+
 @media (hover: none) {
   .tree-row { min-height: 44px; }
+  .home-section-item { min-height: 44px; }
+  .home-view-all { display: flex; align-items: center; min-height: 44px; }
   .mobile-sheet-action { min-height: 48px; }
   .nav-history button { min-width: 44px; min-height: 44px; }
 }

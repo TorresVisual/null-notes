@@ -1346,6 +1346,7 @@ Full design rationale, the git-vs-subprocess constraint, credential model, and s
 - Same architecture (`gix`-based git, `Platform.isMobile` feature-cut gating) carried over unchanged, executed locally rather than via CI (Android builds/runs on the maintainer's machine; iOS consumes GitHub Actions minutes, which is why iOS work paused here in favor of Android). Started 2026-09-16, not by original plan but budget pressure on Actions minutes.
 - **Dependency:** P16-2 (architecture, not code — Android still needs `lib.rs`'s target-selection to route it through `git_mobile.rs`, currently iOS-only).
 - **DoD (this pass):** debug APK installs and launches on a local emulator, responds to touch — the same bar P16-1 set for iOS Simulator.
+- Phone-native shell (bottom tabs, full-screen editor, system Back, safe areas, keyboard) landed 2026-10-22 — `docs/plans/mobile-native-shell.md`; emulator result recorded there.
 - **In progress** — `docs/plans/mobile-android-scaffold.md`. Known remaining gaps once this pass completes: `git_mobile.rs` wiring, UI reflow, and a pdfium-for-Android spike are separate follow-up plans, mirroring iOS's own decomposition.
 
 **Milestone M16 (not yet reached):** P16-1…P16-6 done proves the architecture works in CI/Simulator; P16-7 (live sync) and P16-8 (physical device) are what would make it *usable*, and both are unexecuted. Android (P16-9) is a parallel, independent track.

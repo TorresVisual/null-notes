@@ -16,12 +16,12 @@ Leave every box below unchecked. The executing skill resolves them with
 your human partner before Step 1 and checks the chosen boxes itself.
 
 **Execution Target:**
-- [ ] Current branch (no isolation)
+- [x] Current branch (no isolation)
 - [ ] New feature branch (no worktree)
 - [ ] Worktree (superpowers:using-git-worktrees)
 
 **Execution Mode:**
-- [ ] Inline execution (superpowers:executing-plans)
+- [x] Inline execution (superpowers:executing-plans)
 - [ ] Subagent-driven execution (superpowers:subagent-driven-development)
 
 ## Global Constraints
@@ -1552,6 +1552,22 @@ Expected: all clean (`cargo` only matters if the Task 2 `exit_app` fallback was 
 - [ ] **Step 5: Record the result**
 
 Append a `**Result:**` paragraph below this step listing each table row with the measured values, which conditional branches were taken (Task 1 Step 5; Task 2 Step 10 exit fallback; Task 9 keyboard-padding fix), and: *iOS behaviour unverified — WKWebView does not resize for the keyboard, so Task 3's `visualViewport` fallback is untested on iOS and may need `Keyboard` insets there.* Close #115–#119 with `gh issue close <n> --repo TorresVisual/null-notes --comment "<commit hash>"` only after the user confirms.
+
+**Result:** (Pixel 3a API 34 emulator, x86_64 debug APK, 393×808 CSS px, dpr 2.75)
+
+| Criterion | Measured | Pass |
+|---|---|---|
+| Inside system bars | `env(safe-area-inset-top)` probe was `0px`, so Task 1 Step 5 applied (native `systemBars` + `ime` padding in `MainActivity.kt`); `innerHeight` 808 → 760; top bar starts below the status bar, tab bar bottom = 760 = `innerHeight` (clear of the gesture bar) | yes |
+| Tab bar targets | five `.mobile-tab` at 79 × 56 | yes |
+| Rows / sheet / back arrow | `.tree-row` 44, `.mobile-sheet-action` 48, `.mobile-topbar-back` 44 × 44, Home rows and "View all" buttons 44 | yes |
+| Home overflow | `scrollWidth` 393 = `innerWidth` 393 (editor, Home and Notes) | yes |
+| Keyboard | full IME (`show_ime_with_hard_keyboard=1`): `innerHeight` 760 → 485; toolbar bottom 485.1 (within 1 px of `innerHeight`); caret bottom 405.2 ≤ toolbar top 422.5. First measurement failed (caret 480 under the toolbar) and was fixed with ProseMirror `scrollMargin`/`scrollThreshold` (`caretScrollProps`) | yes |
+| Back order | Settings from More: Back → overlay closed, Back → Notes tab → Home, Back → process exited (`pidof` empty) | yes |
+| Back keeps edits | typed `backkeeps42`, back arrow, reopened from Notes: text present | yes |
+
+Branches taken: Task 1 Step 5 (insets supplied natively; CSS `--safe-*` stay `0px` on device, so no double padding and the Task 9 keyboard-padding fix did not apply); Task 2 Step 10 exit fallback (`window.close()` left the activity alive, so `exit_app` / `api.window.exitApp`); Task 9 keyboard fix was the `scrollMargin` change above, not the padding one. Home also got horizontal padding and 44 px rows under `.mobile-screen`, which the plan did not list.
+
+*iOS behaviour unverified — WKWebView does not resize for the keyboard, so Task 3's `visualViewport` fallback is untested on iOS and may need `Keyboard` insets there.* Builds need JDK 21 (Gradle's `buildSrc` fails on JDK 25). Not done here: the Notes tab's workspace header (`SidebarHeader`) wraps awkwardly at 393 px and still shows the `Ctrl K` hint; #115–#119 are not closed yet (needs your confirmation).
 
 - [ ] **Step 6: Commit**
 
