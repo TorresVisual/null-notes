@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { renderHook } from '@testing-library/react'
 import type { Editor } from '@tiptap/core'
 import { platform } from '@tauri-apps/plugin-os'
-import { useKeepCaretVisible } from './useKeepCaretVisible'
+import { useKeepCaretVisible, caretScrollProps } from './useKeepCaretVisible'
 
 vi.mock('@tauri-apps/plugin-os', () => ({ platform: vi.fn() }))
 
@@ -41,5 +41,17 @@ describe('useKeepCaretVisible', () => {
     renderHook(() => useKeepCaretVisible(editor)).unmount()
     window.dispatchEvent(new Event('resize'))
     expect(scrollIntoView).not.toHaveBeenCalled()
+  })
+})
+
+describe('caretScrollProps', () => {
+  it('keeps the caret clear of the bottom-pinned toolbar on mobile', () => {
+    const { scrollMargin, scrollThreshold } = caretScrollProps(true)
+    expect(scrollMargin?.bottom).toBeGreaterThanOrEqual(64)
+    expect(scrollThreshold?.bottom).toBeGreaterThanOrEqual(64)
+  })
+
+  it('adds nothing on desktop', () => {
+    expect(caretScrollProps(false)).toEqual({})
   })
 })

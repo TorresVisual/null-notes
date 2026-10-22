@@ -524,7 +524,7 @@ button, [role="button"], .tree-row, .tab, .search-result, .slash-menu-item,
 }
 
 [data-shell='mobile'] .mobile-screen--editor .editor-scroll {
-  padding-bottom: calc(56px + var(--safe-bottom));
+  padding-bottom: calc(72px + var(--safe-bottom));
 }
 
 @media (hover: none) {

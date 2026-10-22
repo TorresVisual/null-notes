@@ -13,7 +13,8 @@ import { splitIntoTasks, report, markdownOf } from './splitIntoTasks'
 import { EditorStatusBar } from './EditorStatusBar'
 import { BlockHandle } from './extensions/BlockHandle'
 import { EditorToolbar } from './toolbar/EditorToolbar'
-import { useKeepCaretVisible } from './useKeepCaretVisible'
+import { useKeepCaretVisible, caretScrollProps } from './useKeepCaretVisible'
+import { isMobile } from '../lib/platform'
 import { useInkStore } from '../store/ink'
 import { useSettingsStore } from '../store/settings'
 
@@ -37,6 +38,7 @@ function buildEditorProps(spellcheck: boolean, language: string) {
     attributes: { spellcheck: String(spellcheck), lang: language },
     handleKeyDown: handleEditorKeyDown,
     handleTextInput: handleEditorTextInput,
+    ...caretScrollProps(isMobile()),
   }
 }
 
