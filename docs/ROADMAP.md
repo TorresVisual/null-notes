@@ -1347,7 +1347,7 @@ Full design rationale, the git-vs-subprocess constraint, credential model, and s
 - **Dependency:** P16-2 (architecture, not code — Android still needs `lib.rs`'s target-selection to route it through `git_mobile.rs`, currently iOS-only).
 - **DoD (this pass):** debug APK installs and launches on a local emulator, responds to touch — the same bar P16-1 set for iOS Simulator.
 - Phone-native shell (bottom tabs, full-screen editor, system Back, safe areas, keyboard) landed 2026-10-22 — `docs/plans/mobile-native-shell.md`; emulator result recorded there.
-- **In progress** — `docs/plans/mobile-android-scaffold.md`. Known remaining gaps once this pass completes: `git_mobile.rs` wiring, UI reflow, and a pdfium-for-Android spike are separate follow-up plans, mirroring iOS's own decomposition.
+- **Parity pass done (emulator)** — finish line met 2026-10-22, see `docs/specs/android-parity-design.md`; scaffold in `docs/plans/mobile-android-scaffold.md`. Known remaining gaps once this pass completes: `git_mobile.rs` wiring, UI reflow, and a pdfium-for-Android spike are separate follow-up plans, mirroring iOS's own decomposition.
 
 **Milestone M16 (not yet reached):** P16-1…P16-6 done proves the architecture works in CI/Simulator; P16-7 (live sync) and P16-8 (physical device) are what would make it *usable*, and both are unexecuted. Android (P16-9) is a parallel, independent track.
 
@@ -1359,11 +1359,12 @@ Full design rationale, the git-vs-subprocess constraint, credential model, and s
 
 Full design rationale, the no-server constraint, credential model, and structural feature cuts (including PDF import, cut entirely for v1) live in `docs/specs/web-app-design.md` — read it before touching any P17 item. None of P17 has started; each item below will link its execution plan under `docs/plans/` once it does.
 
-### P17-1 — Static site scaffold — **M**
+### P17-1 — Static site scaffold — **M** ✅
 
 - New Vite entry point serving the existing React/TipTap frontend (`src/`) as a static site, with every Tauri `invoke()` call point routed through a platform abstraction (`Platform.isWeb`, alongside the existing `Platform.isMobile`) to a browser-native implementation instead.
 - **Dependency:** none.
 - **DoD:** the existing note-editing UI renders and is interactive in a browser against an in-memory/stub workspace, no Tauri runtime present.
+- *Done 2026-10-22 — `vite.web.config.ts` (`npm run dev:web` / `build:web`, port 1422) aliases every `@tauri-apps/*` import to a browser shim under `src/web/`, so no call site changed. `src/web/memoryWorkspace.ts` is the stub workspace (`/demo`: list, open, create, save, delete notes, settings); every other command rejects with "not available in the web app yet" until its own P17 item replaces it. Verified in a real browser: shell renders, a note opens in the TipTap editor, typing lands. `Platform.isWeb` is deferred to P17-6, where it first has a consumer; the custom titlebar's window buttons still show and belong to P17-7.*
 
 ### P17-2 — `gitWeb.ts`: `isomorphic-git` + `lightning-fs` — **L**
 
