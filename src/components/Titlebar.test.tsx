@@ -1,10 +1,7 @@
-import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest'
+import { describe, it, expect, vi, afterEach } from 'vitest'
 import { render, screen, cleanup, fireEvent } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { platform } from '@tauri-apps/plugin-os'
 import { Titlebar } from './Titlebar'
-
-vi.mock('@tauri-apps/plugin-os', () => ({ platform: vi.fn() }))
 
 const setTitle = vi.fn()
 const isMaximized = vi.fn().mockResolvedValue(false)
