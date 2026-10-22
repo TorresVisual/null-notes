@@ -478,6 +478,61 @@ button, [role="button"], .tree-row, .tab, .search-result, .slash-menu-item,
 
 .mobile-sheet-action:disabled { opacity: 0.5; }
 
+/* Phone: every overlay is a full screen with the close control first (left),
+   not a centred card. */
+[data-shell='mobile'] .settings-panel,
+[data-shell='mobile'] .search-modal,
+[data-shell='mobile'] .graph-view,
+[data-shell='mobile'] .task-view,
+[data-shell='mobile'] .review-session,
+[data-shell='mobile'] .formula-sheet-prompt {
+  position: fixed;
+  inset: 0;
+  translate: none;
+  scale: none;
+  width: 100%;
+  max-width: none;
+  height: 100dvh;
+  max-height: none;
+  border: 0;
+  border-radius: 0;
+  padding-top: calc(var(--space-lg) + var(--safe-top));
+  padding-bottom: calc(var(--space-lg) + var(--safe-bottom));
+}
+
+[data-shell='mobile'] .settings-panel-header { flex-direction: row; }
+[data-shell='mobile'] .settings-panel-close {
+  order: -1;
+  min-width: 44px;
+  min-height: 44px;
+}
+
+/* The viewport bottom is the keyboard top (MainActivity lifts the WebView), so
+   a fixed bottom bar sits directly on the IME. The scroll area gets matching
+   bottom padding so the last line is never under it. */
+[data-shell='mobile'] .editor-toolbar {
+  position: fixed;
+  top: auto;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  margin: 0;
+  padding: 6px var(--space-sm) calc(6px + var(--safe-bottom));
+  border-top: 1px solid var(--border);
+  border-bottom: 0;
+  z-index: 20;
+}
+
+[data-shell='mobile'] .mobile-screen--editor .editor-scroll {
+  padding-bottom: calc(56px + var(--safe-bottom));
+}
+
+@media (hover: none) {
+  .tree-row { min-height: 44px; }
+  .mobile-sheet-action { min-height: 48px; }
+  .nav-history button { min-width: 44px; min-height: 44px; }
+}
+
 /* Ghost by default — a filled box on every nav row read as a stack of form
    fields rather than a navigation panel. Background only appears on
    interaction; grouping and the New-actions toolbar (below) carry hierarchy
