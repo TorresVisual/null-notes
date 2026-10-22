@@ -9,7 +9,7 @@ import { api } from '../../lib/tauri'
 import { useCodeRunConfirmStore } from '../../store/codeRunConfirm'
 import { useSettingsStore } from '../../store/settings'
 import { useWorkspaceStore } from '../../store/workspace'
-import { isMobile } from '../../lib/platform'
+import { isMobile, isWeb } from '../../lib/platform'
 
 /**
  * Run button + output panel on every `python`/`cpp`/`c++`/`c` code block
@@ -263,7 +263,7 @@ export function formatRunOutput(entry: RunEntry): string {
 }
 
 function decorate(state: EditorState): DecorationSet {
-  if (isMobile()) return DecorationSet.empty
+  if (isMobile() || isWeb()) return DecorationSet.empty
 
   const decorations: Decoration[] = []
   state.doc.descendants((node, pos) => {

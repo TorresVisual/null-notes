@@ -1390,11 +1390,12 @@ Full design rationale, the no-server constraint, credential model, and structura
 - **Dependency:** P17-1.
 - **DoD:** unit tests covering `reindex_note`'s existing query cases pass against `sql.js`, and a reindex-then-reload-then-query cycle survives a real browser session (proving IndexedDB persistence timing, not just in-memory behavior).
 
-### P17-6 — Structural feature cuts (Run / Open-in-IDE / terminal / PDF import) — **S**
+### P17-6 — Structural feature cuts (Run / Open-in-IDE / terminal / PDF import) — **S** ✅
 
 - Same reasoning as mobile's P16-5, plus one more: hide the Run button, "Open in IDE," and the terminal (no subprocess in a browser); also hide PDF import entirely (no pdfium binding — cut for v1, not spiked). Existing PDF sidecars already in a workspace stay fully viewable/editable.
 - **Dependency:** P17-1.
 - **DoD:** the same per-block toolbar mechanism `CodeBlockToolbar.ts`/mobile's `Platform.isMobile` gating already uses gets a `Platform.isWeb` condition; a code block on web shows content and pinned output only, no Run/Open-in-IDE; the PDF-import entry point is absent, not erroring.
+- *Done 2026-10-22 — `isWeb()` in `src/lib/platform.ts` reads a build-time `VITE_WEB` that only `vite.web.config.ts` defines. Gates: `CodeBlockRun`/`CodeBlockOpenInIde` decorations, the `toggle-terminal` command and its rail button, and the sidebar's "Import PDF…" menu item. Checked in a real browser: no terminal button, New menu has no Import PDF. `ImportButton` (standalone) has no consumer, so it needed no gate.*
 
 ### P17-7 — App shell responsive reflow — **M**
 

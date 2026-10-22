@@ -1,5 +1,6 @@
 import { ChevronsUpDown, FilePlus, FileUp, FolderOpen, FolderPlus, LayoutTemplate, PenLine, Plus, Search } from 'lucide-react'
 import { useWorkspaceStore } from '../store/workspace'
+import { isWeb } from '../lib/platform'
 import { useWorkspace } from '../hooks/useWorkspace'
 import { useCreateNote } from '../hooks/useCreateNote'
 import { useCreateFolder } from '../hooks/useCreateFolder'
@@ -101,10 +102,14 @@ export function SidebarHeader({ onSearchOpen, onTemplateOpen }: SidebarHeaderPro
               <LayoutTemplate size={14} /> From template…
               <DropdownMenuShortcut>Ctrl Shift T</DropdownMenuShortcut>
             </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem disabled={importPdf.disabled} onSelect={() => importPdf.start()}>
-              <FileUp size={14} /> Import PDF…
-            </DropdownMenuItem>
+            {!isWeb() && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem disabled={importPdf.disabled} onSelect={() => importPdf.start()}>
+                  <FileUp size={14} /> Import PDF…
+                </DropdownMenuItem>
+              </>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
       </div>

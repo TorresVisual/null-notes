@@ -11,6 +11,7 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { useWorkspaceStore } from '../store/workspace'
+import { isWeb } from '../lib/platform'
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip'
 
 interface RailItem {
@@ -102,7 +103,7 @@ export function SidebarRail({
 
   return (
     <nav className="sidebar-rail" aria-label="Quick actions">
-      {[files, search, ...features, terminal].map((item) => (
+      {[files, search, ...features, ...(isWeb() ? [] : [terminal])].map((item) => (
         <RailButton key={item.label} item={item} />
       ))}
       <div className="sidebar-rail-end">

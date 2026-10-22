@@ -8,6 +8,7 @@ const web = (file: string) => fileURLToPath(new URL(`./src/web/${file}`, import.
 // The web build never loads a Tauri runtime: every @tauri-apps module the
 // frontend imports is swapped for a browser shim under src/web/.
 export default defineConfig({
+  define: { "import.meta.env.VITE_WEB": JSON.stringify("1") },
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: {

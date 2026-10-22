@@ -53,7 +53,7 @@ import type { DiagramMetadata } from '../types'
 import { goBack, goForward } from '../lib/navigationHistory'
 import { useFocusModeStore } from '../store/focusMode'
 import { canPushHere, pushIfAllowed, withGitLock } from '../lib/git'
-import { isMobile } from '../lib/platform'
+import { isMobile, isWeb } from '../lib/platform'
 
 // pagedjs (print preview) and xterm (terminal) are ~850 KB of source between
 // them and only load when their overlay/pane is first opened.
@@ -311,7 +311,7 @@ export function Layout() {
           if (workspacePath) openOverlay('formulaSheet')
           break
         case 'toggle-terminal':
-          if (!workspacePath || mobile) break
+          if (!workspacePath || mobile || isWeb()) break
           setTerminalMounted(true)
           setTerminalOpen((o) => !o)
           break
