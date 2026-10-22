@@ -409,6 +409,114 @@ button, [role="button"], .tree-row, .tab, .search-result, .slash-menu-item,
 
 .sidebar--drawer .sidebar-panel > * { min-width: 0; }
 
+/* Phone shell: screen above a bottom tab bar, or a full-screen editor. */
+.mobile-shell { padding-left: var(--safe-left); padding-right: var(--safe-right); }
+
+.mobile-screen {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-top: var(--safe-top);
+}
+
+.mobile-screen--editor { padding-top: 0; display: flex; flex-direction: column; }
+
+.mobile-tabbar {
+  display: flex;
+  flex-shrink: 0;
+  background: var(--bg-raised);
+  border-top: 1px solid var(--border);
+  padding-bottom: var(--safe-bottom);
+}
+
+.mobile-tab {
+  flex: 1;
+  min-height: 56px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  background: none;
+  border: none;
+  color: var(--text-tertiary);
+  font-size: 11px;
+}
+
+.mobile-tab.is-active { color: var(--accent); }
+.mobile-tab:disabled { opacity: 0.4; }
+
+.mobile-topbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  flex-shrink: 0;
+  padding: var(--safe-top) var(--space-sm) 0;
+  min-height: calc(48px + var(--safe-top));
+  background: var(--bg-raised);
+  border-bottom: 1px solid var(--border);
+}
+
+.mobile-topbar-back {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+}
+
+.mobile-topbar-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+  color: var(--text-primary);
+}
+
+.mobile-notes { width: 100%; border-right: 0; }
+
+.mobile-sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 90;
+}
+
+.mobile-sheet {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 91;
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-sm) var(--space-sm) calc(var(--space-sm) + var(--safe-bottom));
+  background: var(--bg-raised);
+  border-top: 1px solid var(--border-strong);
+  border-radius: 12px 12px 0 0;
+  box-shadow: var(--shadow-modal);
+}
+
+.mobile-sheet-action {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  min-height: 48px;
+  padding: 0 var(--space-md);
+  background: none;
+  border: none;
+  color: var(--text-primary);
+  font-size: 15px;
+  text-align: left;
+}
+
+.mobile-sheet-action:disabled { opacity: 0.5; }
+
 /* Ghost by default — a filled box on every nav row read as a stack of form
    fields rather than a navigation panel. Background only appears on
    interaction; grouping and the New-actions toolbar (below) carry hierarchy

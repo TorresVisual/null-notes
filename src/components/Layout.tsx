@@ -19,6 +19,8 @@ import { TaskView } from './TaskView'
 import { DeckView } from './DeckView'
 import { ReviewSession } from './ReviewSession'
 import { HomeView } from './HomeView'
+import { MobileShell } from './MobileShell'
+import { SaveStatus } from './SaveStatus'
 import { FormulaSheetPrompt } from './FormulaSheetPrompt'
 import { FlashcardTypeDialog } from './FlashcardTypeDialog'
 import { DiagramPickerDialog } from './DiagramPickerDialog'
@@ -35,7 +37,6 @@ import { useCreateCanvasNote } from '../hooks/useCreateCanvasNote'
 import { useScrollRestoration } from '../hooks/useScrollRestoration'
 import { useWindowTitle } from '../hooks/useWindowTitle'
 import { useOverlayManager } from '../hooks/useOverlayManager'
-import { useBackButton } from '../hooks/useBackButton'
 import { GitAutoCommitPrompt } from './GitAutoCommitPrompt'
 import { GitDivergedBar } from './GitDivergedBar'
 import { GitPullBlockedBar } from './GitPullBlockedBar'
@@ -132,15 +133,6 @@ export function Layout() {
     reloadTheirs: reloadTheirsSecondary,
   } = useNote(secondaryTab)
   const { activeOverlay, openOverlay, closeOverlay } = useOverlayManager()
-  useBackButton(
-    { overlayOpen: activeOverlay !== null, sheetOpen: mobileSidebarOpen, editorOpen: activeTab !== null, tab: 'home' },
-    {
-      'close-overlay': closeOverlay,
-      'close-sheet': closeMobileSidebar,
-      'close-editor': () => setActiveTab(null),
-      'go-home': () => undefined,
-    },
-  )
   const [outlineOpen, setOutlineOpen] = useState(true)
   const editorPaneRef = useRef<HTMLDivElement>(null)
   const [terminalMounted, setTerminalMounted] = useState(false)
@@ -554,11 +546,8 @@ export function Layout() {
     void refreshTags()
   }, [activeTab])
 
-  return (
-    <TooltipProvider>
-    <div className="app-shell">
-    <Titlebar title={windowTitle} onCommand={runCommand} recentWorkspaces={recentWorkspaces} />
-    <div className="layout">
+  const overlays = (
+    <>
       {activeOverlay === 'search' && <SearchModal onClose={closeOverlay} />}
       {activeOverlay === 'switcher' && <QuickSwitcher onClose={closeOverlay} />}
       {activeOverlay === 'settings' && <SettingsPanel onClose={closeOverlay} />}
@@ -621,6 +610,132 @@ export function Layout() {
           }}
         />
       )}
+    </>
+  )
+
+  const gitBars = (
+    <>
+      {gitDiverged && (
+        <GitDivergedBar
+          ahead={gitDiverged.ahead}
+          behind={gitDiverged.behind}
+          localPaths={gitDiverged.localPaths}
+          remotePaths={gitDiverged.remotePaths}
+          onSync={async () => {
+            if (!workspacePath) return
+            try {
+              // #87: queues behind, and is fully awaited before, any other
+              // git-mutating call — this can otherwise fire alongside the
+              // idle-commit timer, the pull interval, or a focus refresh.
+              await withGitLock(() => api.git.rebaseOntoRemote(workspacePath))
+            } catch (e) {
+              console.error('git rebase-onto-remote failed', e)
+            }
+            await checkForUpdates(workspacePath)
+          }}
+          onDismiss={() => useWorkspaceStore.getState().setGitDiverged(null)}
+        />
+      )}
+      {gitPullBlocked && (
+        <GitPullBlockedBar
+          output={gitPullBlocked.output}
+          paths={gitPullBlocked.paths}
+          onDismiss={() => useWorkspaceStore.getState().setGitPullBlocked(null)}
+        />
+      )}
+      {gitAhead !== null && (
+        <GitAheadBar
+          ahead={gitAhead}
+          onDismiss={() => useWorkspaceStore.getState().setGitAhead(null)}
+        />
+      )}
+      {repoMode && !gitPrompted && (
+        <GitAutoCommitPrompt
+          mode={repoMode}
+          priorAutomation={gitPriorAutomation}
+          onEnable={() => void updateGit({ prompted: true, autoCommit: true })}
+          onDecline={() => void updateGit({ prompted: true })}
+        />
+      )}
+    </>
+  )
+
+  const primaryEditorPane = (
+    <EditorPane
+      ref={editorPaneRef}
+      scrollRef={scrollRef}
+      notePath={activeTab}
+      content={content}
+      isLoading={isLoading}
+      saveState={saveState}
+      saveError={saveError}
+      onSave={(md) => void save(md)}
+      onRetrySave={retrySave}
+      onDismissSaveError={dismissError}
+      conflict={conflict}
+      onKeepMine={keepMine}
+      onReloadTheirs={reloadTheirs}
+      viewMode={primaryViewMode}
+      onViewModeChange={setPrimaryViewMode}
+      onFlashcardCommand={handleFlashcardCommand}
+      onDiagramCommand={handleDiagramCommand}
+      emptyState={{
+        onOpenTaskView: () => openOverlay('task'),
+        onOpenReview: () => {
+          setPendingCram(null)
+          openOverlay('review')
+        },
+        onOpenDeckView: () => openOverlay('deck'),
+        onOpenSettings: () => openOverlay('settings'),
+        overlayOpen: activeOverlay !== null,
+      }}
+    />
+  )
+
+  if (mobile) {
+    return (
+      <TooltipProvider>
+        <MobileShell
+          activeOverlay={activeOverlay}
+          openOverlay={openOverlay}
+          closeOverlay={closeOverlay}
+          onReviewOpen={() => {
+            setPendingCram(null)
+            openOverlay('review')
+          }}
+          hasWorkspace={workspacePath !== null}
+          noteTitle={currentNote?.title ?? ''}
+          home={
+            <HomeView
+              onOpenTaskView={() => openOverlay('task')}
+              onOpenReview={() => {
+                setPendingCram(null)
+                openOverlay('review')
+              }}
+              onOpenDeckView={() => openOverlay('deck')}
+              onOpenSettings={() => openOverlay('settings')}
+              overlayOpen={activeOverlay !== null}
+            />
+          }
+          editor={primaryEditorPane}
+          saveStatus={
+            <SaveStatus state={saveState} error={saveError} onRetry={() => void retrySave()} onDismiss={dismissError} />
+          }
+          gitBars={gitBars}
+          overlays={overlays}
+          onSyncNow={repoMode ? () => void syncNow() : null}
+          syncing={syncingNow}
+        />
+      </TooltipProvider>
+    )
+  }
+
+  return (
+    <TooltipProvider>
+    <div className="app-shell">
+    <Titlebar title={windowTitle} onCommand={runCommand} recentWorkspaces={recentWorkspaces} />
+    <div className="layout">
+      {overlays}
       {mobile && mobileSidebarOpen && (
         <div className="sidebar-backdrop" onClick={closeMobileSidebar} />
       )}
@@ -656,48 +771,7 @@ export function Layout() {
           onSyncNow={syncNow}
           syncingNow={syncingNow}
         />
-        {gitDiverged && (
-          <GitDivergedBar
-            ahead={gitDiverged.ahead}
-            behind={gitDiverged.behind}
-            localPaths={gitDiverged.localPaths}
-            remotePaths={gitDiverged.remotePaths}
-            onSync={async () => {
-              if (!workspacePath) return
-              try {
-                // #87: queues behind, and is fully awaited before, any other
-                // git-mutating call — this can otherwise fire alongside the
-                // idle-commit timer, the pull interval, or a focus refresh.
-                await withGitLock(() => api.git.rebaseOntoRemote(workspacePath))
-              } catch (e) {
-                console.error('git rebase-onto-remote failed', e)
-              }
-              await checkForUpdates(workspacePath)
-            }}
-            onDismiss={() => useWorkspaceStore.getState().setGitDiverged(null)}
-          />
-        )}
-        {gitPullBlocked && (
-          <GitPullBlockedBar
-            output={gitPullBlocked.output}
-            paths={gitPullBlocked.paths}
-            onDismiss={() => useWorkspaceStore.getState().setGitPullBlocked(null)}
-          />
-        )}
-        {gitAhead !== null && (
-          <GitAheadBar
-            ahead={gitAhead}
-            onDismiss={() => useWorkspaceStore.getState().setGitAhead(null)}
-          />
-        )}
-        {repoMode && !gitPrompted && (
-          <GitAutoCommitPrompt
-            mode={repoMode}
-            priorAutomation={gitPriorAutomation}
-            onEnable={() => void updateGit({ prompted: true, autoCommit: true })}
-            onDecline={() => void updateGit({ prompted: true })}
-          />
-        )}
+        {gitBars}
         <div
           className="editor-body"
           ref={paneContainerRef}
@@ -707,35 +781,7 @@ export function Layout() {
         >
           {splitDropZoneActive && <div className="split-drop-zone" />}
           <div className="pane-wrapper" style={secondaryTab ? { flex: `0 0 ${splitRatio * 100}%` } : undefined}>
-            <EditorPane
-              ref={editorPaneRef}
-              scrollRef={scrollRef}
-              notePath={activeTab}
-              content={content}
-              isLoading={isLoading}
-              saveState={saveState}
-              saveError={saveError}
-              onSave={(md) => void save(md)}
-              onRetrySave={retrySave}
-              onDismissSaveError={dismissError}
-              conflict={conflict}
-              onKeepMine={keepMine}
-              onReloadTheirs={reloadTheirs}
-              viewMode={primaryViewMode}
-              onViewModeChange={setPrimaryViewMode}
-              onFlashcardCommand={handleFlashcardCommand}
-              onDiagramCommand={handleDiagramCommand}
-              emptyState={{
-                onOpenTaskView: () => openOverlay('task'),
-                onOpenReview: () => {
-                  setPendingCram(null)
-                  openOverlay('review')
-                },
-                onOpenDeckView: () => openOverlay('deck'),
-                onOpenSettings: () => openOverlay('settings'),
-                overlayOpen: activeOverlay !== null,
-              }}
-            />
+            {primaryEditorPane}
             {!isLoading && activeTab && primaryViewMode === 'wysiwyg' && outlineOpen && (
               <OutlinePanel content={content} containerRef={editorPaneRef} />
             )}

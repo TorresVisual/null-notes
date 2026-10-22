@@ -352,3 +352,15 @@ describe('Layout split-pane rendering', () => {
     expect(document.querySelectorAll('.pane-wrapper')).toHaveLength(1)
   })
 })
+
+describe('Layout on a phone', () => {
+  it('renders the phone shell instead of the desktop chrome on mobile', () => {
+    vi.mocked(platform).mockReturnValue('android')
+    useWorkspaceStore.setState({ path: '/ws', activeTab: null, tagFilter: null })
+    const { container } = render(<Layout />)
+    expect(container.querySelector('.mobile-shell')).not.toBeNull()
+    expect(container.querySelector('.titlebar')).toBeNull()
+    expect(container.querySelector('aside.sidebar')).toBeNull()
+    vi.mocked(platform).mockReturnValue('windows')
+  })
+})
