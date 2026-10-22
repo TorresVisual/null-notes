@@ -152,10 +152,10 @@ jobs:
           idb ui tap --udid "$UDID" 68 281
           sleep 3
           xcrun simctl io "$UDID" screenshot note-open.png
-          # The note is one H1 line near y=191pt; three taps along it, each with a
+          # The H1 line sits at y~241pt below the git bar (run 39873960659); three taps along it, each with a
           # marker, show on disk which one focused the editor.
-          for y in 180 195 210; do
-            idb ui tap --udid "$UDID" 180 "$y"
+          for y in 235 241 247; do
+            idb ui tap --udid "$UDID" 150 "$y"
             idb ui text --udid "$UDID" " m$y"
             sleep 1
           done
@@ -165,7 +165,7 @@ jobs:
           NOTE_PATH=$(find "$APP_DATA" -iname "note.md" -not -path "*/.git/*" | head -n1)
           echo "--- note.md on device ---"
           cat "$NOTE_PATH"
-          grep -Eq " m(180|195|210)" "$NOTE_PATH"
+          grep -Eq " m(235|241|247)" "$NOTE_PATH"
           echo "on-device edit write: OK"
       - name: Relaunch, press Sync now in the More sheet, and read the remote with a plain git clone
         if: always()
@@ -183,7 +183,7 @@ jobs:
           git -C /tmp/verify-push log --oneline | head -5
           echo "--- remote note.md ---"
           cat /tmp/verify-push/note.md
-          grep -Eq " m(180|195|210)" /tmp/verify-push/note.md
+          grep -Eq " m(235|241|247)" /tmp/verify-push/note.md
           echo "push round trip: OK"
       - name: Push a desktop-side commit, relaunch, reopen, and assert the pull
         if: always()
