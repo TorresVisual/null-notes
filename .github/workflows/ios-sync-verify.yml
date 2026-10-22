@@ -104,14 +104,15 @@ jobs:
           # keyboard-open position.
           # Tab alone fails with nothing focused (run 38180210398).
           # Run 39827443493: the phone-native shell moved the form up (URL field
-          # y=392pt, button y=559pt, no shift while typing). The old y=585 tap
+          # y=392pt before typing; the page scrolls up ~90pt once a field is focused, so
+          # the button is at y=469pt). The old y=585 tap
           # missed, so Tab focused the URL field and the token typed into it.
           idb ui tap --udid "$UDID" 196 392
           idb ui text --udid "$UDID" "$FIXTURE_REMOTE_URL"
           idb ui key --udid "$UDID" 43
           idb ui text --udid "$UDID" "dummy-token-for-ci"
           xcrun simctl io "$UDID" screenshot clone-filled.png
-          idb ui tap --udid "$UDID" 196 559
+          idb ui tap --udid "$UDID" 196 469
           sleep 3
           xcrun simctl io "$UDID" screenshot clone-progress.png
           sleep 8
@@ -135,6 +136,9 @@ jobs:
         run: |
           # Positions are guesses from run 38182288140's dashboard screenshot;
           # the markers typed at each y show on disk which tap reached the editor.
+          idb ui tap --udid "$UDID" 100 769
+          sleep 2
+          xcrun simctl io "$UDID" screenshot notes-tab.png
           idb ui tap --udid "$UDID" 79 356
           sleep 3
           xcrun simctl io "$UDID" screenshot note-open.png
@@ -184,6 +188,7 @@ jobs:
             sidebar-open.png
             ax-clone.json
             note-open.png
+            notes-tab.png
             after-edit.png
             after-sync.png
             after-relaunch.png
