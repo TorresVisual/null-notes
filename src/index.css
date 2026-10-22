@@ -242,6 +242,13 @@ button, [role="button"], .tree-row, .tab, .search-result, .slash-menu-item,
 ::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--text-tertiary); }
 
+:root {
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+}
+
 /* Layout */
 .app-shell {
   display: flex;
@@ -309,7 +316,7 @@ button, [role="button"], .tree-row, .tab, .search-result, .slash-menu-item,
 .titlebar-menu-toggle { margin-right: 4px; }
 
 @media (hover: none) {
-  .titlebar { height: 44px; }
+  .titlebar { height: calc(44px + var(--safe-top)); padding-top: var(--safe-top); }
   .titlebar-btn { width: 44px; }
 }
 
@@ -379,7 +386,7 @@ button, [role="button"], .tree-row, .tab, .search-result, .slash-menu-item,
 
 .sidebar--drawer {
   position: fixed;
-  top: 44px; /* below the mobile titlebar, see Task 2 */
+  top: calc(44px + var(--safe-top));
   bottom: 0;
   left: 0;
   width: 85vw;
@@ -388,7 +395,7 @@ button, [role="button"], .tree-row, .tab, .search-result, .slash-menu-item,
   transform: translateX(-100%);
   transition: transform var(--duration-base) var(--ease-standard);
   box-shadow: var(--shadow-modal);
-  padding-bottom: max(12px, env(safe-area-inset-bottom));
+  padding-bottom: max(12px, var(--safe-bottom));
 }
 
 .sidebar--drawer.sidebar--open {
