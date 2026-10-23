@@ -356,6 +356,53 @@ fn changed_paths_between(
     Ok(paths)
 }
 
+/// Tracked files whose worktree bytes no longer match `head_id`'s blob.
+/// `checkout_tree_to_worktree` rewrites every tracked file, so a pull has to
+/// know these both to refuse overwriting the ones the incoming commits touch
+/// and to put the rest back afterwards.
+fn worktree_edits(
+    repo: &gix::Repository,
+    head_id: gix::ObjectId,
+) -> anyhow::Result<Vec<(String, Vec<u8>)>> {
+    let Some(workdir) = repo.workdir() else {
+        return Ok(Vec::new());
+    };
+    let mut recorder = gix::traverse::tree::Recorder::default();
+    repo.find_commit(head_id)?
+        .tree()?
+        .traverse()
+        .breadthfirst(&mut recorder)?;
+    let mut edits = Vec::new();
+    for entry in recorder.records {
+        if !entry.mode.is_blob() {
+            continue;
+        }
+        let path = entry.filepath.to_string();
+        let Ok(on_disk) = std::fs::read(workdir.join(&path)) else {
+            continue;
+        };
+        if on_disk != repo.find_object(entry.oid)?.data {
+            edits.push((path, on_disk));
+        }
+    }
+    Ok(edits)
+}
+
+/// Writes `edits` back over a fresh checkout, via a sibling temp file and a
+/// rename so an interruption can't leave a half-written note.
+fn restore_edits(repo: &gix::Repository, edits: &[(String, Vec<u8>)]) -> anyhow::Result<()> {
+    let Some(workdir) = repo.workdir() else {
+        return Ok(());
+    };
+    for (path, bytes) in edits {
+        let target = workdir.join(path);
+        let tmp = target.with_extension("restore.tmp");
+        std::fs::write(&tmp, bytes)?;
+        std::fs::rename(&tmp, &target)?;
+    }
+    Ok(())
+}
+
 /// `token` authenticates over HTTPS when the remote actually requires it —
 /// this module's tests use local filesystem-path remotes, which need no
 /// credential, so an empty token is fine there.
@@ -411,9 +458,33 @@ pub fn checked_pull(workspace: &str, token: &str) -> anyhow::Result<PullOutcome>
         });
     }
 
-    // Pure fast-forward: no local commits since the merge-base, so moving
-    // the branch ref (and checking out the new tree) is safe unconditionally
-    // — the same case desktop's `merge --ff-only` always succeeds for.
+    // No local commits, but an edit may be uncommitted (the auto-commit batch
+    // lives in memory, so a relaunch drops it). Desktop's `merge --ff-only`
+    // refuses when the incoming commits touch such a note and leaves the rest
+    // alone; the checkout below rewrites everything, so do the same by hand.
+    let edits = worktree_edits(&repo, head_id)?;
+    let incoming = changed_paths_between(&repo, head_id, upstream_id)?;
+    let (overwritten, untouched): (Vec<_>, Vec<_>) = edits
+        .into_iter()
+        .partition(|(path, _)| incoming.contains(path));
+    if !overwritten.is_empty() {
+        let paths: Vec<String> = overwritten.into_iter().map(|(path, _)| path).collect();
+        return Ok(PullOutcome::Blocked {
+            output: format!(
+                "Your local changes to the following files would be overwritten by merge:
+	{}
+",
+                paths.join(
+                    "
+	"
+                )
+            ),
+            paths,
+        });
+    }
+
+    // Pure fast-forward onto a clean tree: moving the branch ref (and checking
+    // out the new tree) is safe.
     repo.reference(
         head_name,
         upstream_id,
@@ -422,6 +493,7 @@ pub fn checked_pull(workspace: &str, token: &str) -> anyhow::Result<PullOutcome>
     )?;
     let upstream_tree = repo.find_commit(upstream_id)?.tree_id()?.detach();
     checkout_tree_to_worktree(&repo, upstream_tree)?;
+    restore_edits(&repo, &untouched)?;
     Ok(PullOutcome::FastForwarded)
 }
 
@@ -1256,6 +1328,90 @@ mod tests {
 
         assert_eq!(outcome, PullOutcome::FastForwarded);
         assert!(clone.path().join("b.md").exists());
+    }
+
+    #[test]
+    fn blocked_when_the_fast_forward_would_overwrite_an_uncommitted_edit() {
+        let origin = tempfile::tempdir().unwrap();
+        git_init(origin.path());
+        commit_file(
+            origin.path(),
+            "note.md",
+            "# Note
+",
+            "notes: update note",
+        );
+        let clone = tempfile::tempdir().unwrap();
+        git_clone(origin.path(), clone.path());
+        commit_file(
+            origin.path(),
+            "note.md",
+            "# Note
+from origin
+",
+            "notes: update note",
+        );
+        std::fs::write(
+            clone.path().join("note.md"),
+            "# Note
+local, uncommitted
+",
+        )
+        .unwrap();
+
+        let outcome = checked_pull(&clone.path().to_string_lossy(), "").unwrap();
+
+        let PullOutcome::Blocked { paths, .. } = &outcome else {
+            panic!("expected Blocked, got {outcome:?}");
+        };
+        assert_eq!(paths, &vec!["note.md".to_string()]);
+        let content = std::fs::read_to_string(clone.path().join("note.md")).unwrap();
+        assert_eq!(
+            content,
+            "# Note
+local, uncommitted
+"
+        );
+    }
+
+    #[test]
+    fn fast_forwards_past_an_uncommitted_edit_to_an_untouched_note() {
+        let origin = tempfile::tempdir().unwrap();
+        git_init(origin.path());
+        commit_file(
+            origin.path(),
+            "a.md",
+            "# A
+",
+            "notes: update a",
+        );
+        let clone = tempfile::tempdir().unwrap();
+        git_clone(origin.path(), clone.path());
+        commit_file(
+            origin.path(),
+            "b.md",
+            "# B
+",
+            "notes: update b",
+        );
+        std::fs::write(
+            clone.path().join("a.md"),
+            "# A
+local, uncommitted
+",
+        )
+        .unwrap();
+
+        let outcome = checked_pull(&clone.path().to_string_lossy(), "").unwrap();
+
+        assert_eq!(outcome, PullOutcome::FastForwarded);
+        let content = std::fs::read_to_string(clone.path().join("a.md")).unwrap();
+        assert_eq!(
+            content,
+            "# A
+local, uncommitted
+"
+        );
     }
 
     #[test]
