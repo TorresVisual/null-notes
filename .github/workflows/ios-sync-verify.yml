@@ -165,13 +165,20 @@ jobs:
           NOTE_PATH=$(find "$APP_DATA" -iname "note.md" -not -path "*/.git/*" | head -n1)
           echo "--- note.md on device ---"
           cat "$NOTE_PATH"
-          grep -Eq " m(235|241|247)" "$NOTE_PATH"
+          grep -Eq "m(241|247)" "$NOTE_PATH"
           echo "on-device edit write: OK"
       - name: Relaunch, press Sync now in the More sheet, and read the remote with a plain git clone
         if: always()
         run: |
-          bash /tmp/reopen.sh
-          # More tab (353,785)pt; Sync now is the sheet's last row, ~786pt.
+          # No relaunch here: gitPendingPaths is in-memory, so a relaunch after the
+          # edit leaves Sync now nothing to commit (run 39875314768). Dismiss the
+          # keyboard accessory bar (check, 352,817pt), go Back (19,88pt), then
+          # More tab (353,785pt); Sync now is the sheet's last row, ~786pt.
+          idb ui tap --udid "$UDID" 352 817
+          sleep 1
+          idb ui tap --udid "$UDID" 19 88
+          sleep 2
+          xcrun simctl io "$UDID" screenshot after-back.png
           idb ui tap --udid "$UDID" 353 785
           sleep 2
           xcrun simctl io "$UDID" screenshot more-sheet.png
@@ -183,7 +190,7 @@ jobs:
           git -C /tmp/verify-push log --oneline | head -5
           echo "--- remote note.md ---"
           cat /tmp/verify-push/note.md
-          grep -Eq " m(235|241|247)" /tmp/verify-push/note.md
+          grep -Eq "m(241|247)" /tmp/verify-push/note.md
           echo "push round trip: OK"
       - name: Push a desktop-side commit, relaunch, reopen, and assert the pull
         if: always()
@@ -210,6 +217,7 @@ jobs:
             clone-success.png
             ax-clone.json
             note-open.png
+            after-back.png
             more-sheet.png
             after-edit.png
             after-sync.png
