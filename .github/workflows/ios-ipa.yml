@@ -23,6 +23,8 @@ jobs:
           mkdir -p src-tauri/gen/pdfium-ios
           tar -xzf pdfium-ios-device.tgz -C src-tauri/gen/pdfium-ios
           find src-tauri/gen/pdfium-ios -iname "*pdfium*"
+      - name: Copy pdfium smoke-test fixture
+        run: cp src-tauri/tests/fixtures/sample.pdf src-tauri/gen/pdfium-smoke-fixture.pdf
       - name: Build unsigned device archive
         run: |
           set -euo pipefail
