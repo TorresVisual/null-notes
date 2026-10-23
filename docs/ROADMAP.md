@@ -1339,7 +1339,7 @@ Full design rationale, the git-vs-subprocess constraint, credential model, and s
 - Get the app running on the maintainer's own iPhone with no Mac and no paid Apple Developer Program membership: CI builds an unsigned arm64 `.ipa`; AltServer (Windows) + AltStore (iOS) do the actual free-tier signing on install.
 - **Dependency:** P16-1, P16-4.
 - **DoD:** the `.ipa` installs and launches on a real device via AltStore; the spec's stale "blocked on a paid account" line is replaced with what this actually proved.
-- **Not done** — `docs/plans/mobile-altstore-sideload.md`'s CI task is unexecuted; Task 2 (AltServer pairing, Apple ID sign-in, physical USB sideload) is inherently human-only, not agent-executable. Known limitation once run: the free-tier signing certificate expires every 7 days; AltStore's Wi-Fi auto-refresh covers this only opportunistically.
+- **CI half done 2026-10-23** — `.github/workflows/ios-ipa.yml` builds an unsigned arm64 `.ipa` (run [39881856064](https://github.com/TorresVisual/null-notes/actions/runs/39881856064), artifact `mobile-altstore-ipa`). **Sideload not done** — Task 2 (AltServer pairing, Apple ID sign-in, physical USB sideload) is inherently human-only, not agent-executable. Known limitation once run: the free-tier signing certificate expires every 7 days; AltStore's Wi-Fi auto-refresh covers this only opportunistically.
 
 ### P16-9 — Android — **L**, later pass
 

@@ -132,7 +132,7 @@ unzip -l null-notes-unsigned.ipa | grep "Payload/null-notes_iOS.app/null-notes_i
 
 If the executable isn't listed, the archive step produced an empty or wrongly-shaped `.app` — check `Step 3`'s `find` output in the run log before re-running.
 
-**Result:**
+**Result:** Done 2026-10-23 via a slim dedicated workflow, `.github/workflows/ios-ipa.yml` (not `ios-scaffold.yml`, to avoid its ~110 billed minutes), CI run [39881856064](https://github.com/TorresVisual/null-notes/actions/runs/39881856064). `tauri ios build --help` lists `--no-sign`/`--archive-only`, so Step 2a ran. The first run (39881635619) failed on the missing `gen/pdfium-smoke-fixture.pdf` bundle resource; the workflow now copies it. The `.ipa` is 32.9 MB; its app bundle is `Payload/Null Notes.app/` with executable `Null Notes` (not `null-notes_iOS`), and bundles `assets/libpdfium.dylib` (iOS device build, pinned to `chromium/7763` with a SHA-256 check).
 
 - [ ] **Step 6: Commit**
 
