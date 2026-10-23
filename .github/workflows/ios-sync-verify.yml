@@ -170,24 +170,22 @@ jobs:
       - name: Relaunch, press Sync now in the More sheet, and read the remote with a plain git clone
         if: always()
         run: |
-          # No relaunch here: gitPendingPaths is in-memory, so a relaunch after the
-          # edit leaves Sync now nothing to commit (run 39875314768). Dismiss the
-          # keyboard accessory bar (check, 352,817pt), go Back (19,88pt), then
-          # More tab (353,785pt); Sync now is the sheet's last row, ~786pt.
+          # No relaunch: the dashboard's "2 unpushed" is gitPendingPaths.length,
+          # an in-memory list of uncommitted notes, so a relaunch (runs 39875314768,
+          # 39878142632) leaves Sync now nothing to commit. Dismiss the keyboard
+          # accessory bar (check, 352,817pt), go Back (19,88pt). Back leaves the
+          # viewport shifted (~12pt left, ~53pt down, run 39878142632's after-back
+          # screenshot), so More is at (364,832)pt and the sheet's Sync now row
+          # at ~(80,839)pt instead of the unshifted (353,785) / (100,786).
           idb ui tap --udid "$UDID" 352 817
           sleep 1
           idb ui tap --udid "$UDID" 19 88
           sleep 2
           xcrun simctl io "$UDID" screenshot after-back.png
-          # Going Back commits the edit (dashboard shows "2 unpushed", run
-          # 39876523671) but leaves the viewport shifted so More is off its
-          # usual spot; relaunch to reset it. Sync now then has no pending paths
-          # but still pushes the unpushed commits.
-          bash /tmp/reopen.sh
-          idb ui tap --udid "$UDID" 353 785
+          idb ui tap --udid "$UDID" 364 832
           sleep 2
           xcrun simctl io "$UDID" screenshot more-sheet.png
-          idb ui tap --udid "$UDID" 100 786
+          idb ui tap --udid "$UDID" 80 839
           sleep 8
           xcrun simctl io "$UDID" screenshot after-sync.png
           rm -rf /tmp/verify-push
