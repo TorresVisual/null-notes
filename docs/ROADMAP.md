@@ -1327,12 +1327,12 @@ Full design rationale, the git-vs-subprocess constraint, credential model, and s
 - **DoD:** no horizontal overflow at phone width; drawer opens/closes over a backdrop; touch-only affordances (e.g. row rename/delete icons) are reachable without hover.
 - *Done — `docs/plans/mobile-app-shell-reflow.md`, verified via Playwright screenshots against a Tauri-internals stub (real workspace-data verification deferred to `e2e-verify`, which has no mobile equivalent yet).*
 
-### P16-7 — Editor/sync round-trip verification — **S**
+### P16-7 — Editor/sync round-trip verification — **S** ✅
 
 - Prove the DoD claim that hasn't been exercised live yet: a note edited on mobile, once synced, shows the edit on desktop and vice versa, over a real HTTP round trip (not `git_mobile.rs`'s local-fixture unit tests).
 - **Dependency:** P16-2, P16-3.
 - **DoD:** a CI-driven push-then-pull round trip against a local HTTP remote confirms `checked_pull`'s fast-forward path and `useGitAutoPull`'s open-time trigger both fire correctly.
-- **Not done** — `docs/plans/mobile-editor-sync-verification.md` is written but unexecuted (`**Result:**` sections still blank). Ink-canvas stroke fidelity and the diverged/blocked pull states are explicitly out of scope for this plan (the former needs real stylus pressure data the Simulator can't produce; the latter is already covered by P16-2's unit tests).
+- *Done 2026-10-23 — `docs/plans/mobile-editor-sync-verification.md`, slim workflow `ios-sync-verify.yml`, CI run [39879801363](https://github.com/TorresVisual/null-notes/actions/runs/39879801363): clone → touch edit → Sync now push (read back by plain `git clone`) → desktop push → reopen fast-forward. Found and fixed `checked_pull` overwriting uncommitted edits (`ecde4d0`). Ink stroke fidelity and live diverged/blocked states stay out of scope (Simulator has no stylus pressure; unit tests cover the latter).*
 
 ### P16-8 — Physical-device build & sideload — **M**, human-only
 
@@ -1349,7 +1349,7 @@ Full design rationale, the git-vs-subprocess constraint, credential model, and s
 - Phone-native shell (bottom tabs, full-screen editor, system Back, safe areas, keyboard) landed 2026-10-22 — `docs/plans/mobile-native-shell.md`; emulator result recorded there.
 - **Parity pass done (emulator)** — finish line met 2026-10-22, see `docs/specs/android-parity-design.md`; scaffold in `docs/plans/mobile-android-scaffold.md`. Known remaining gaps once this pass completes: `git_mobile.rs` wiring, UI reflow, and a pdfium-for-Android spike are separate follow-up plans, mirroring iOS's own decomposition.
 
-**Milestone M16 (not yet reached):** P16-1…P16-6 done proves the architecture works in CI/Simulator; P16-7 (live sync) and P16-8 (physical device) are what would make it *usable*, and both are unexecuted. Android (P16-9) is a parallel, independent track.
+**Milestone M16 (not yet reached):** P16-1…P16-7 done proves the architecture and live sync work in CI/Simulator; P16-8 (physical device) is what would make it *usable*, and it is human-only and unexecuted. Android (P16-9) is a parallel, independent track.
 
 ---
 

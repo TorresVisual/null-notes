@@ -293,9 +293,9 @@ gh workflow run ios-scaffold.yml
 gh run watch --exit-status
 ```
 
-**Result:**
+**Result:** Passed in the slim workflow, CI run [39879801363](https://github.com/TorresVisual/null-notes/actions/runs/39879801363): the edit is on disk (typed via `idb`, which garbles case/digits — the marker is matched loosely), Back → More → Sync now in the same session pushes it, and a fresh host-side `git clone` shows commit `notes: update note` with the edit. Same-session matters: the dashboard's "N unpushed" is `gitPendingPaths`, in memory, so a relaunch between edit and Sync now commits nothing. Tap positions are in `ios-sync-verify.yml`; Back leaves the WebView shifted (~12pt left, ~53pt down), so More/Sync now sit off their unshifted spots.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add .github/workflows/ios-scaffold.yml
@@ -382,9 +382,9 @@ gh run watch --exit-status
 
 On failure: `gh run view --log-failed`. A failure in Step 3's `grep` with the file present but stale content is real evidence `checked_pull`'s fast-forward path or `useGitAutoPull`'s open-time trigger has a real bug — read it before assuming a CI plumbing issue, per this whole plan set's established discipline.
 
-**Result:**
+**Result:** Passed, same run [39879801363](https://github.com/TorresVisual/null-notes/actions/runs/39879801363): after a desktop-side push, relaunch + reopening the Recent workspace fast-forwarded `note.md` to include "desktop edit" alongside the mobile edit. An earlier run (39875314768) exposed a real bug here — `checked_pull` checked out the whole upstream tree over an uncommitted edit; fixed in `ecde4d0` (`Blocked` when the incoming commits touch an edited note, other edits restored) with two regression tests.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add .github/workflows/ios-scaffold.yml
