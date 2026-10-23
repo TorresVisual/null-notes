@@ -1,5 +1,7 @@
 name: iOS unsigned ipa
 on: workflow_dispatch
+permissions:
+  contents: read
 jobs:
   ipa:
     runs-on: macos-latest
@@ -16,7 +18,8 @@ jobs:
         run: |
           set -euo pipefail
           curl -L -o pdfium-ios-device.tgz \
-            "https://github.com/bblanchon/pdfium-binaries/releases/latest/download/pdfium-ios-device-arm64.tgz"
+            "https://github.com/bblanchon/pdfium-binaries/releases/download/chromium%2F7763/pdfium-ios-device-arm64.tgz"
+          echo "e43621e6e509fb9b06b94e1158192a3798558ac4f4c11e206a940440229bf03d  pdfium-ios-device.tgz" | shasum -a 256 -c
           mkdir -p src-tauri/gen/pdfium-ios
           tar -xzf pdfium-ios-device.tgz -C src-tauri/gen/pdfium-ios
           find src-tauri/gen/pdfium-ios -iname "*pdfium*"
