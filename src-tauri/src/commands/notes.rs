@@ -803,6 +803,12 @@ const SIDECAR_SUFFIXES: [&str; 4] = [".ink", ".pdf", ".assets", ".diagrams"];
 /// business showing up in the tree or the search index.
 const TEMPLATES_DIR: &str = "templates";
 
+/// Dropped into every folder `create_folder` makes. It lives in the folder, not
+/// in `.workspace.json`, so it survives rename/move and travels with the notes
+/// while staying a plain dotfile the scan already ignores. Without it an empty
+/// folder is indistinguishable from one some other tool made.
+const FOLDER_MARKER: &str = ".nullnotes";
+
 pub(crate) fn is_excluded_dir(name: &str) -> bool {
     name.starts_with('.')
         || SIDECAR_SUFFIXES.iter().any(|suffix| name.ends_with(suffix))
@@ -817,12 +823,18 @@ async fn scan_dir_recursive(
     let mut notes = Vec::new();
     let mut folders = Vec::new();
     let mut stack = vec![root.to_path_buf()];
+    let mut shown = std::collections::HashSet::new();
 
     while let Some(dir) = stack.pop() {
         let mut entries = tokio::fs::read_dir(&dir).await?;
         while let Some(entry) = entries.next_entry().await? {
             let path = entry.path();
             let file_type = entry.file_type().await?;
+
+            if entry.file_name() == FOLDER_MARKER {
+                shown.insert(dir.clone());
+                continue;
+            }
 
             if file_type.is_dir() {
                 let name = entry.file_name().to_string_lossy().into_owned();
@@ -837,6 +849,7 @@ async fn scan_dir_recursive(
             if path.extension().and_then(|e| e.to_str()) != Some("md") {
                 continue;
             }
+            shown.insert(dir.clone());
             let path_str = path.to_string_lossy().into_owned();
             let title = match tokio::fs::read_to_string(&path).await {
                 Ok(content) => title_from_content(&content),
@@ -863,6 +876,10 @@ async fn scan_dir_recursive(
             });
         }
     }
+
+    // Ancestors of a kept folder need no entry: the tree builder recreates
+    // every intermediate segment from the deeper path.
+    folders.retain(|f| shown.contains(std::path::Path::new(f)));
 
     Ok((notes, folders))
 }
@@ -2278,6 +2295,7 @@ async fn create_folder_at(parent: &str, name: &str) -> anyhow::Result<String> {
     }
     let path = std::path::Path::new(parent).join(name);
     tokio::fs::create_dir(&path).await?;
+    tokio::fs::write(path.join(FOLDER_MARKER), "").await?;
     Ok(path.to_string_lossy().into_owned())
 }
 
@@ -3271,16 +3289,33 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_scan_dir_recursive_lists_empty_folders() {
+    async fn test_scan_dir_recursive_lists_empty_folders_created_by_the_app() {
         let tmp = tempdir().unwrap();
         let root = tmp.path();
-        std::fs::create_dir_all(root.join("Empty")).unwrap();
-
         let ws = root.to_string_lossy().into_owned();
+        create_folder_at(&ws, "Empty").await.unwrap();
+
         let (notes, folders) = scan_dir_recursive(root, &ws).await.unwrap();
 
         assert!(notes.is_empty());
         assert_eq!(folders.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_scan_dir_recursive_hides_external_folders_without_notes() {
+        let tmp = tempdir().unwrap();
+        let root = tmp.path();
+        std::fs::create_dir_all(root.join("Foreign/deep")).unwrap();
+        std::fs::write(root.join("Foreign/deep/data.txt"), "x").unwrap();
+        std::fs::create_dir_all(root.join("Mine/sub")).unwrap();
+        std::fs::write(root.join("Mine/sub/n.md"), "# n").unwrap();
+
+        let ws = root.to_string_lossy().into_owned();
+        let (_, folders) = scan_dir_recursive(root, &ws).await.unwrap();
+
+        assert_eq!(folders.len(), 1);
+        assert!(folders[0].ends_with("sub"));
+        assert!(root.join("Foreign/deep/data.txt").exists());
     }
 }
 
