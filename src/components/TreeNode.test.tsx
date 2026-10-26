@@ -71,7 +71,7 @@ describe('TreeNode delete (note)', () => {
   it('queues the deleted note path for auto-commit', async () => {
     dialog.confirm.mockResolvedValue(true)
     notesApi.delete.mockResolvedValue(undefined)
-    render(<TreeNode entry={noteEntry} depth={0} />)
+    render(<TreeNode entry={noteEntry} />)
 
     await userEvent.click(screen.getByRole('button', { name: `Delete ${noteEntry.name}` }))
 
@@ -89,7 +89,7 @@ describe('TreeNode delete (note)', () => {
 
   it('does nothing when the confirm dialog is declined', async () => {
     dialog.confirm.mockResolvedValue(false)
-    render(<TreeNode entry={noteEntry} depth={0} />)
+    render(<TreeNode entry={noteEntry} />)
 
     await userEvent.click(screen.getByRole('button', { name: `Delete ${noteEntry.name}` }))
 
@@ -114,7 +114,7 @@ describe('TreeNode delete (folder, via right-click context menu)', () => {
     })
     dialog.confirm.mockResolvedValue(true)
     notesApi.deleteFolder.mockResolvedValue(undefined)
-    render(<TreeNode entry={folderEntry} depth={0} />)
+    render(<TreeNode entry={folderEntry} />)
 
     fireEvent.contextMenu(screen.getByText('Target').closest('.tree-folder')!)
     await userEvent.click(await screen.findByRole('menuitem', { name: /Delete/ }))
@@ -125,7 +125,7 @@ describe('TreeNode delete (folder, via right-click context menu)', () => {
 
   it('does nothing when the confirm dialog is declined', async () => {
     dialog.confirm.mockResolvedValue(false)
-    render(<TreeNode entry={folderEntry} depth={0} />)
+    render(<TreeNode entry={folderEntry} />)
 
     fireEvent.contextMenu(screen.getByText('Target').closest('.tree-folder')!)
     await userEvent.click(await screen.findByRole('menuitem', { name: /Delete/ }))
@@ -138,7 +138,7 @@ describe('TreeNode delete (folder, via right-click context menu)', () => {
 describe('TreeNode drop (folder)', () => {
   it('nests a dropped folder inside the target folder', async () => {
     notesApi.renameFolder.mockResolvedValue(undefined)
-    render(<TreeNode entry={folderEntry} depth={0} />)
+    render(<TreeNode entry={folderEntry} />)
 
     const row = screen.getByText('Target').closest('.tree-folder')!
     dropWithPaths(row, { 'text/folder-path': '/ws/Source' })
@@ -149,7 +149,7 @@ describe('TreeNode drop (folder)', () => {
   })
 
   it('refuses to drop a folder onto itself', () => {
-    render(<TreeNode entry={folderEntry} depth={0} />)
+    render(<TreeNode entry={folderEntry} />)
 
     const row = screen.getByText('Target').closest('.tree-folder')!
     dropWithPaths(row, { 'text/folder-path': '/ws/Target' })
@@ -159,7 +159,7 @@ describe('TreeNode drop (folder)', () => {
 
   it('refuses to drop a folder onto its own descendant', () => {
     const nested: FolderTreeNode = { ...folderEntry, path: '/ws/Source/Nested' }
-    render(<TreeNode entry={nested} depth={0} />)
+    render(<TreeNode entry={nested} />)
 
     const row = screen.getByText('Target').closest('.tree-folder')!
     dropWithPaths(row, { 'text/folder-path': '/ws/Source' })
@@ -169,7 +169,7 @@ describe('TreeNode drop (folder)', () => {
 
   it('moves a dropped note into the target folder', async () => {
     notesApi.moveNote.mockResolvedValue('/ws/Target/a.md')
-    render(<TreeNode entry={folderEntry} depth={0} />)
+    render(<TreeNode entry={folderEntry} />)
 
     const row = screen.getByText('Target').closest('.tree-folder')!
     dropWithPaths(row, { 'text/note-path': '/ws/a.md' })
@@ -184,7 +184,7 @@ describe('TreeNode drop (folder)', () => {
   // folder had nothing on screen to show it had landed anywhere.
   it('expands the target folder after a successful drop', async () => {
     notesApi.moveNote.mockResolvedValue('/ws/Target/a.md')
-    render(<TreeNode entry={folderEntry} depth={0} />)
+    render(<TreeNode entry={folderEntry} />)
 
     const row = screen.getByText('Target').closest('.tree-folder')!
     dropWithPaths(row, { 'text/note-path': '/ws/a.md' })

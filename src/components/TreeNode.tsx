@@ -19,10 +19,9 @@ function activateOnKey(e: React.KeyboardEvent, activate: () => void) {
 
 interface TreeNodeProps {
   entry: TreeEntry
-  depth: number
 }
 
-export function TreeNode({ entry, depth }: TreeNodeProps) {
+export function TreeNode({ entry }: TreeNodeProps) {
   const [dragOver, setDragOver] = useState(false)
   const expandedFolders = useWorkspaceStore((s) => s.expandedFolders)
   const selectedFolder = useWorkspaceStore((s) => s.selectedFolder)
@@ -94,7 +93,6 @@ export function TreeNode({ entry, depth }: TreeNodeProps) {
     return (
       <li
         className={`tree-row tree-note${isActive ? ' active' : ''}`}
-        style={{ paddingLeft: 8 + depth * 14 }}
         draggable
         tabIndex={0}
         aria-current={isActive || undefined}
@@ -217,7 +215,6 @@ export function TreeNode({ entry, depth }: TreeNodeProps) {
         <ContextMenuTrigger asChild>
           <div
             className={`tree-row tree-folder${isSelected ? ' selected' : ''}${dragOver ? ' drag-over' : ''}`}
-            style={{ paddingLeft: 8 + depth * 14 }}
             draggable
             role="button"
             tabIndex={0}
@@ -248,9 +245,9 @@ export function TreeNode({ entry, depth }: TreeNodeProps) {
         </ContextMenuContent>
       </ContextMenu>
       {isExpanded && (
-        <ul className="folder-tree tree-guide" style={{ marginLeft: 8 + depth * 14 + 6 }}>
+        <ul className="folder-tree tree-guide" style={{ marginLeft: 14 }}>
           {entry.children.map((child) => (
-            <TreeNode key={child.path} entry={child} depth={depth + 1} />
+            <TreeNode key={child.path} entry={child} />
           ))}
         </ul>
       )}

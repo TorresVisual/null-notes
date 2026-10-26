@@ -8,7 +8,6 @@ import type { TreeEntry } from '../lib/folderTree'
 
 interface FolderTreeProps {
   entries: TreeEntry[]
-  depth?: number
 }
 
 // This component only ever renders the root-level list — nested folders
@@ -19,7 +18,7 @@ interface FolderTreeProps {
 // target: a root-level folder's own onDrop already stops the event before it
 // gets here, so only a drop that isn't already claimed by a folder — empty
 // space, or a note row, which has no handler of its own — reaches this one.
-export function FolderTree({ entries, depth = 0 }: FolderTreeProps) {
+export function FolderTree({ entries }: FolderTreeProps) {
   const [dragOver, setDragOver] = useState(false)
   const workspacePath = useWorkspaceStore((s) => s.path)
   const replaceOpenPath = useWorkspaceStore((s) => s.replaceOpenPath)
@@ -86,7 +85,7 @@ export function FolderTree({ entries, depth = 0 }: FolderTreeProps) {
       onDragEnd={() => setDragOver(false)}
     >
       {entries.map((entry) => (
-        <TreeNode key={entry.path} entry={entry} depth={depth} />
+        <TreeNode key={entry.path} entry={entry} />
       ))}
     </ul>
   )
