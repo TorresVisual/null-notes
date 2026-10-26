@@ -69,3 +69,12 @@ Issue: #127 (Workspace & Sync)
 ### Jump from a card to its line in the note
 Status: issue created
 Issue: #128 (Study Workflow)
+
+## Added from competitive gap analysis (2026-10-26)
+
+Report: docs/competitive-gap-analysis-2026-10-26.md
+
+- #135 Single-file Explorer open edits a temp copy (Workspace & Sync, bug/high)
+- #136 Action palette Ctrl+Shift+P (Core Editing)
+- #137 FSRS opt-in scheduler (Study Workflow; gated on review-log storage decision, with #67)
+- Not filed (candidates): saved searches, export bundle/Pandoc (with #68, P18), P15-1 recognizer spike, note embeds
