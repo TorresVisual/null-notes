@@ -219,6 +219,10 @@ export const api = {
     close: () =>
       invoke<void>('terminal_close'),
   },
+  codeFormat: {
+    format: (language: string, source: string, indentWidth: number, useTab: boolean) =>
+      invoke<string>('format_code', { language, source, indentWidth, useTab }),
+  },
   codeRun: {
     run: (runId: string, language: string, source: string, timeoutSecs: number) =>
       invoke<void>('run_code', { runId, language, source, timeoutSecs }),

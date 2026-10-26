@@ -5,6 +5,9 @@ import type { EditorState } from '@tiptap/pm/state'
 import type { Node as ProseMirrorNode } from '@tiptap/pm/model'
 import type { EditorView } from '@tiptap/pm/view'
 import { writeToClipboard } from '../../lib/clipboard'
+import { FORMATTABLE_LANGUAGES, formatCode } from '../../lib/codeFormat'
+import { isMobile, isWeb } from '../../lib/platform'
+import { useSettingsStore } from '../../store/settings'
 
 /**
  * P11-1 read-only affordances: a line-number gutter and a copy button on
@@ -149,7 +152,7 @@ function codeBlockDecorations(node: ProseMirrorNode, pos: number, folded: Set<nu
   return decorations
 }
 
-function blockActions(pos: number, wrap: boolean): HTMLElement {
+function blockActions(pos: number, wrap: boolean, formattable: boolean): HTMLElement {
   const container = document.createElement('div')
   container.className = 'code-block-actions'
   container.contentEditable = 'false'
@@ -160,9 +163,15 @@ function blockActions(pos: number, wrap: boolean): HTMLElement {
   container.innerHTML = `
     <button type="button" class="code-block-copy" data-action="copy" title="Copy code">Copy</button>
     <button type="button" class="code-block-wrap-toggle${wrap ? ' active' : ''}" data-action="wrap" aria-pressed="${wrap}" title="${wrap ? 'Disable word wrap' : 'Enable word wrap'}">Wrap</button>
+    ${formattable ? '<button type="button" class="code-block-format" data-action="format" title="Format code">Format</button>' : ''}
   `
 
   return container
+}
+
+function canFormat(node: ProseMirrorNode): boolean {
+  const language = node.attrs['language']
+  return typeof language === 'string' && FORMATTABLE_LANGUAGES.has(language) && !isMobile() && !isWeb()
 }
 
 function decorate(state: EditorState, folded: Set<number>): DecorationSet {
@@ -171,9 +180,10 @@ function decorate(state: EditorState, folded: Set<number>): DecorationSet {
   state.doc.descendants((node, pos) => {
     if (node.type.name !== 'codeBlock') return true
 
+    const formattable = canFormat(node)
     decorations.push(
       ...codeBlockDecorations(node, pos, folded),
-      Decoration.widget(pos + 1, () => blockActions(pos, node.attrs['wrap'] === true), {
+      Decoration.widget(pos + 1, () => blockActions(pos, node.attrs['wrap'] === true, formattable), {
         side: -1,
         ignoreSelection: true,
       }),
@@ -184,14 +194,39 @@ function decorate(state: EditorState, folded: Set<number>): DecorationSet {
   return DecorationSet.create(state.doc, decorations)
 }
 
-function showCopiedFeedback(button: HTMLElement) {
+function flashButton(button: HTMLElement, label: string, className: string, title?: string) {
   const original = button.textContent
-  button.textContent = 'Copied'
-  button.classList.add('copied')
+  const originalTitle = button.title
+  button.textContent = label
+  button.classList.add(className)
+  if (title) button.title = title
   setTimeout(() => {
     button.textContent = original
-    button.classList.remove('copied')
+    button.title = originalTitle
+    button.classList.remove(className)
   }, 1200)
+}
+
+async function formatBlock(view: EditorView, pos: number, button: HTMLElement) {
+  const node = view.state.doc.nodeAt(pos)
+  const language = node?.attrs['language']
+  if (!node || typeof language !== 'string') return
+
+  const source = node.textContent
+  const { codeIndentWidth, codeIndentChar } = useSettingsStore.getState().settings
+  try {
+    const formatted = await formatCode(language, source, codeIndentWidth, codeIndentChar === 'tab')
+    // An edit during the async call wins — the formatted text is of the old content.
+    const current = view.state.doc.nodeAt(pos)
+    if (!current || current.textContent !== source) return
+    if (formatted !== source && formatted.length > 0) {
+      view.dispatch(view.state.tr.replaceWith(pos + 1, pos + 1 + current.content.size, view.state.schema.text(formatted)))
+    }
+    flashButton(button, 'Formatted', 'copied')
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    flashButton(button, /not installed/.test(message) ? 'Not installed' : 'Failed', 'failed', message)
+  }
 }
 
 export const CodeBlockToolbar = Extension.create({
@@ -230,7 +265,7 @@ export const CodeBlockToolbar = Extension.create({
               return
             }
 
-            const button = target?.closest?.('.code-block-copy, .code-block-wrap-toggle')
+            const button = target?.closest?.('.code-block-copy, .code-block-wrap-toggle, .code-block-format')
             if (!(button instanceof HTMLElement)) return
 
             const container = button.closest('.code-block-actions')
@@ -242,7 +277,12 @@ export const CodeBlockToolbar = Extension.create({
             event.preventDefault()
 
             if (button.dataset['action'] === 'copy') {
-              void writeToClipboard(node.textContent).then(() => showCopiedFeedback(button))
+              void writeToClipboard(node.textContent).then(() => flashButton(button, 'Copied', 'copied'))
+              return
+            }
+
+            if (button.dataset['action'] === 'format') {
+              void formatBlock(view, pos, button)
               return
             }
 

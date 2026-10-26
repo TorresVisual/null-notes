@@ -237,6 +237,7 @@ pub fn run() {
             commands::terminal::terminal_write,
             commands::terminal::terminal_resize,
             commands::terminal::terminal_close,
+            commands::code_format::format_code,
             commands::code_run::run_code,
             commands::code_run::send_input,
             commands::code_run::stop_run,

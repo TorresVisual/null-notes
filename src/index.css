@@ -1768,7 +1768,7 @@ code {
   display: flex;
   gap: 6px;
 }
-.code-block-copy, .code-block-wrap-toggle {
+.code-block-copy, .code-block-wrap-toggle, .code-block-format {
   padding: 2px 8px;
   background: var(--bg-raised);
   border: 1px solid var(--border);
@@ -1778,7 +1778,7 @@ code {
   font-family: var(--font-mono);
   cursor: pointer;
 }
-.code-block-copy:hover, .code-block-wrap-toggle:hover { color: var(--accent); border-color: var(--accent); }
+.code-block-copy:hover, .code-block-wrap-toggle:hover, .code-block-format:hover { color: var(--accent); border-color: var(--accent); }
 
 /* P11-3 in-block search — floats over the top of the block on `Ctrl+F`,
    since it's transient/on-demand rather than always visible like the
@@ -2038,7 +2038,8 @@ pre:has(code.language-expect)::before, pre:has(code.language-expected)::before {
 
 /* Focus mode (Ctrl+Shift+F) — every top-level block but the active one. */
 .focus-mode-dim { opacity: 0.35; transition: opacity 0.15s ease; }
-.code-block-copy.copied { color: var(--accent); border-color: var(--accent); }
+.code-block-copy.copied, .code-block-format.copied { color: var(--accent); border-color: var(--accent); }
+.code-block-format.failed { color: var(--danger); border-color: var(--danger); }
 .code-block-wrap-toggle.active { color: var(--accent); border-color: var(--accent); background: var(--accent-bg); }
 
 /* lowlight / highlight.js token colours — "Material Ocean" (P11-4's default

@@ -20,7 +20,7 @@ use std::process::Command;
 /// GUI app. Windows shows one by default for any child process that has no
 /// parent console of its own — every `git`/`gh` call this module makes, run
 /// from the built app rather than a terminal, would otherwise pop one.
-fn no_window_command(program: &str) -> Command {
+pub(super) fn no_window_command(program: &str) -> Command {
     #[cfg(windows)]
     {
         use std::os::windows::process::CommandExt;
