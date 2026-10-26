@@ -181,7 +181,7 @@ export const coreExtensions = [
   Markdown.configure({
     html: true,
     transformPastedText: true,
-    transformCopiedText: true,
+    transformCopiedText: false,
   }),
   Placeholder.configure({ placeholder: 'Start writing…' }),
   TaskBracketFix,
