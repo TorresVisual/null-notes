@@ -1,78 +1,67 @@
-# null-notes — Release Pipeline Design
+# Release pipeline: auto-update, draft releases, retag
 
-**Date:** 2026-09-13
-**Scope:** closes #84
+Extends the existing tag-triggered `release.yml` (CI gate → `tauri-action` → GitHub Release). Small change; this is the whole design.
 
----
+## Intent
 
-## Problem
+Users on v1.0.4 reinstall by hand to update. Releases publish the moment CI is green with no review step and no notes. A failed CI run on a tag forces a version bump to retry. Fix all three.
 
-Version is hardcoded at `0.1.0` independently in `package.json`, `src-tauri/tauri.conf.json`, and `src-tauri/Cargo.toml` — never bumped, no single source of truth. No git tags exist, no GitHub Releases have been published. `npm run tauri build` produces an installer locally but nothing bumps the version or ships it anywhere.
+## Goals
 
----
+- Installed apps find and install new releases themselves.
+- A release is reviewed as a draft before anyone, including the updater, can see it.
+- Release notes are generated from commits.
+- A failed release is retried at the same version, without a bump.
+- Releases stay visible and downloadable on the private `TorresVisual/null-notes`.
+
+## Non-goals
+
+- Code-signing the installer (still the throwaway dev cert; see `docs/installing.md`).
+- A "Check for updates" button in Settings; the check runs on startup only.
+- Update channels (beta/stable), delta updates, rollback.
+
+## Constraint that shapes it
+
+`null-notes` is private, and Tauri's updater fetches `latest.json` and the installer anonymously, which GitHub 404s for private-repo assets. So updater traffic goes through a **public, binaries-only repo** (`TorresVisual/null-notes-releases`) that mirrors each published release. Source stays private.
+
+## Approaches considered
+
+- **A. Public releases-only repo mirrored from the private one (picked).** Private repo remains the source of truth and download page; the public repo exists only to serve the updater. Cost: one extra repo and a PAT secret.
+- B. Make `null-notes` public. Simplest, but exposes source, `docs/` and issues. Rejected.
+- C. Self-hosted storage (S3/R2). Extra infrastructure to maintain. Rejected.
 
 ## Design
 
-### 1. Version bump script
+**Flow**
 
-`scripts/release.mjs`, run as `npm run release -- patch|minor|major`.
+1. `npm run release -- patch|minor|major` bumps, commits, tags, pushes (unchanged).
+2. Tag push → `release.yml`: CI gate → build → `tauri-action` creates a **draft** release on `null-notes` with installers, `.sig` files and `latest.json`. Release notes are the commit subjects since the previous tag, excluding `chore: release` commits (needs `fetch-depth: 0`), passed as `releaseBody`.
+3. You review the draft and publish it (UI or `gh release edit --draft=false`).
+4. Publishing triggers a second workflow (`on: release: published`, manual `workflow_dispatch` with a tag input to re-run it). It downloads the release's assets, rewrites the asset URLs inside `latest.json` to point at the public repo, and creates/updates the same-tag release on `null-notes-releases` using the PAT. It is idempotent so a re-run just overwrites.
 
-1. `npm version <bump> --no-git-tag-version` bumps `package.json` only (explicitly no commit, no tag — the script controls that step).
-2. Read the resulting version back out of `package.json`.
-3. Write that version into `src-tauri/tauri.conf.json`'s top-level `version` field (JSON parse/stringify — the file is already read as JSON elsewhere in the codebase, e.g. by Tauri itself).
-4. Write that version into `src-tauri/Cargo.toml`'s `[package] version = "..."` line via a regex replace (no TOML parser dependency exists in this repo; the line has a fixed, simple shape).
-5. `git add package.json src-tauri/tauri.conf.json src-tauri/Cargo.toml`, commit `chore: release vX.Y.Z`.
-6. `git tag vX.Y.Z`.
-7. `git push --follow-tags`.
+Drafts are never "latest", so the updater cannot see a release until step 4 has run.
 
-`Cargo.lock`'s own-package version entry is left untouched. Cargo rewrites it silently on the next `cargo build`/`cargo check`, and no CI step passes `--locked`, so a momentarily stale lock entry has no effect.
+**Retag.** `npm run release -- retag`: reads the current version, refuses if that version's release is already published (then bump instead), deletes any leftover draft for the tag, moves the tag to `HEAD`, pushes `main`, then force-pushes the tag. That re-runs CI and the build. A transient CI failure with no code change needs only "Re-run failed jobs" in the Actions UI.
 
-This is the one manual step a developer runs to cut a release. It is a local Node script (`tsx`/plain Node, matching the repo's existing `tsx` devDependency), not a GitHub Actions workflow — the trigger for CI is the tag it pushes, not the script itself.
+**App side**
 
-### 2. `ci.yml` becomes reusable
+- `tauri-plugin-updater` (Rust + `@tauri-apps/plugin-updater`), capability `updater:default`.
+- `tauri.conf.json`: `bundle.createUpdaterArtifacts: true`, `plugins.updater.pubkey`, and the endpoint `https://github.com/TorresVisual/null-notes-releases/releases/latest/download/latest.json`.
+- On startup, one silent check. Failure or offline is ignored. If an update exists, show a dialog (version + notes, "Install and restart" / "Later") using the existing `.settings-panel` dialog classes. Windows quits the app itself during install, so no process plugin.
+- Checks run in release builds only, which keeps the e2e suite (a `tauri build --debug` binary) free of network calls and surprise dialogs.
+- The CSP is untouched: the updater runs in Rust.
 
-Add `workflow_call:` alongside the existing `pull_request:` / `workflow_dispatch:` triggers on `check`. No behavior change to the existing triggers or steps — this only adds a third way to invoke the same job.
+**Manual setup, yours (one-time)**
 
-### 3. New `release.yml`
+1. Create the public repo `TorresVisual/null-notes-releases`.
+2. `npx tauri signer generate`. Commit the public key into `tauri.conf.json`; store the private key and its password as secrets `TAURI_SIGNING_PRIVATE_KEY` / `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`. **Losing this key strands every installed copy.** Back it up outside the repo.
+3. A fine-grained PAT with Contents: read/write on the releases repo, stored as secret `RELEASES_REPO_TOKEN`.
 
-Trigger: `on: push: tags: ['v*']`.
+v1.0.4 installs have no updater, so they need one manual install of the first updater-enabled release.
 
-**Job `checks`:** `uses: ./.github/workflows/ci.yml`. Reruns the existing gate (typecheck, lint, vitest, cargo fmt --check, cargo clippy -D warnings, cargo test, cargo audit) against the tagged commit. Necessary because this repo commits straight to `main` with no required PR check — a tag could otherwise point at an unverified commit.
+## Left to the builder
 
-**Job `release`:** `needs: checks`, `runs-on: windows-latest`, `permissions: contents: write`.
-
-Steps: checkout, Rust toolchain + `Swatinem/rust-cache` (mirrors `ci.yml`), Node setup + `npm ci`, then `tauri-apps/tauri-action@v0` with `tagName: ${{ github.ref_name }}` and `releaseName: 'null-notes ${{ github.ref_name }}'`. The action runs `npm run tauri build`, collects the Windows bundle(s) per `tauri.conf.json`'s `bundle.targets: "all"`, and attaches them to a new GitHub Release published (not draft) on the pushed tag.
-
----
-
-## Data Flow
-
-```
-developer:
-  npm run release -- patch
-    → bump package.json, tauri.conf.json, Cargo.toml
-    → commit + tag vX.Y.Z + push --follow-tags
-
-GitHub Actions (on tag push):
-  release.yml
-    → checks: ci.yml (workflow_call) — typecheck/lint/test/clippy/fmt/audit
-    → release (needs: checks): tauri-action
-        → npm run tauri build
-        → upload installer(s) to GitHub Release vX.Y.Z
-```
-
----
-
-## Error Handling
-
-- If `checks` fails, `release` never runs — no partial/broken release is published. The pushed tag stays, pointing at a commit that failed CI; re-tagging after a fix means bumping again (acceptable — this mirrors the existing manual-recovery pattern in `format.yml`).
-- The bump script does not attempt to undo a partial bump (e.g. `package.json` bumped but `git push` rejected) — normal `git status`/`git reset` recovery applies, matching how the rest of this repo handles local script failures (no rollback machinery elsewhere).
-
----
-
-## What Is Explicitly Out of Scope
-
-- macOS/Linux builds — `bundle.targets: "all"` already resolves to Windows-only artifacts (NSIS installer, MSIX resource, context-menu DLL are Windows-specific), and CI itself only runs `windows-latest`.
-- Changelog generation — release body is `tauri-action`'s default (tag name), not auto-generated notes.
-- Draft-and-review before publish — the release is published directly; the bump command is itself the human confirmation step.
-- A rollback/yank command for a bad release — not requested, no existing pattern to extend.
+- Whether `tauri-action` reuses/overwrites a leftover draft on retag; if not, the script's draft deletion covers it.
+- The exact mechanism for "release builds only" (e.g. `cfg!(debug_assertions)` exposed via a command).
+- Flat vs. grouped (feat/fix) release-note formatting; default is a flat list.
+- Updating `docs/installing.md` (auto-update, public mirror).
