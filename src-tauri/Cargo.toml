@@ -81,6 +81,9 @@ windows = { version = "0.61", features = [
     "Win32_Storage_EnhancedStorage",
 ] }
 
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+tauri-plugin-updater = "2"
+
 [features]
 default = ["pdf-native"]
 pdf-native = ["pdfium-render"]

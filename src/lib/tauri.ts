@@ -111,6 +111,7 @@ export const api = {
   window: {
     confirmClose: () => invoke<void>('confirm_close'),
     exitApp: () => invoke<void>('exit_app'),
+    isReleaseBuild: () => invoke<boolean>('is_release_build'),
   },
   workspace: {
     watch: (workspace: string) =>

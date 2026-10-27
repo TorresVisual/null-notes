@@ -14,3 +14,11 @@ pub fn confirm_close(window: Window) -> Result<(), String> {
 pub fn exit_app(app: tauri::AppHandle) {
     app.exit(0)
 }
+
+// Debug builds include the e2e binary (`tauri build --debug`), which must not
+// reach the network or raise an update dialog, so the startup update check is
+// gated on this rather than on the frontend's own build mode.
+#[tauri::command]
+pub fn is_release_build() -> bool {
+    !cfg!(debug_assertions)
+}

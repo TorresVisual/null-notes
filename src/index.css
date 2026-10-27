@@ -211,7 +211,7 @@ button, [role="button"], .tree-row, .tab, .search-result, .slash-menu-item,
 
 .context-menu, .slash-menu, .math-editor, .math-snippet-menu, .block-handle-menu,
 .search-modal, .settings-panel, .import-mode-dialog, .graph-view, .task-view,
-.review-session, .formula-sheet-prompt, .toast, .error-log-dialog {
+.review-session, .formula-sheet-prompt, .toast, .error-log-dialog, .update-dialog {
   animation: surface-in var(--duration-base) var(--ease-spring);
 }
 
@@ -5586,3 +5586,28 @@ input[type='checkbox']:focus-visible {
 .ink-preview-edit:focus-visible {
   opacity: 1;
 }
+
+/* Update dialog — reuses .settings-panel for chrome, .settings-reset for the
+   buttons and .settings-error for failures; only the width, notes block and
+   footer layout are its own. */
+.update-dialog {
+  width: min(480px, calc(100vw - 40px));
+  max-height: min(480px, calc(100vh - 60px));
+}
+
+.update-notes {
+  margin: 0;
+  white-space: pre-wrap;
+  font: inherit;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.update-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-sm);
+}
+
+.update-install { color: var(--accent); border-color: var(--accent); }
+.update-install:disabled, .update-actions .settings-reset:disabled { opacity: 0.5; cursor: default; }

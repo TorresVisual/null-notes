@@ -25,6 +25,7 @@ import { FormulaSheetPrompt } from './FormulaSheetPrompt'
 import { FlashcardTypeDialog } from './FlashcardTypeDialog'
 import { DiagramPickerDialog } from './DiagramPickerDialog'
 import { ToastStack } from './ToastStack'
+import { UpdateDialog } from './UpdateDialog'
 import { useWorkspaceStore } from '../store/workspace'
 import { useNotesStore } from '../store/notes'
 import { useSettingsStore } from '../store/settings'
@@ -551,6 +552,7 @@ export function Layout() {
       {activeOverlay === 'shortcuts' && <ShortcutsOverlay onClose={closeOverlay} />}
       <PromptDialog />
       <ToastStack />
+      <UpdateDialog />
       {activeOverlay === 'template' && <TemplateDialog onClose={closeOverlay} />}
       {activeOverlay === 'graph' && <GraphView onClose={closeOverlay} />}
       {activeOverlay === 'task' && <TaskView onClose={closeOverlay} />}

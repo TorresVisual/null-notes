@@ -108,10 +108,13 @@ pub fn run() {
         });
     }
 
-    tauri::Builder::default()
+    let builder = tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
-        .plugin(tauri_plugin_os::init())
+        .plugin(tauri_plugin_os::init());
+    #[cfg(desktop)]
+    let builder = builder.plugin(tauri_plugin_updater::Builder::new().build());
+    builder
         // Veto the close so the UI can flush unsaved edits; it calls
         // `confirm_close` once the buffer is safely on disk.
         .on_window_event(|window, event| {
@@ -272,6 +275,7 @@ pub fn run() {
             commands::assets::gc_note_assets,
             commands::window::confirm_close,
             commands::window::exit_app,
+            commands::window::is_release_build,
             commands::printing::list_printers,
             commands::printing::export_pdf,
             commands::printing::print_document,
