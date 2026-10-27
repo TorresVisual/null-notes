@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { RefObject } from 'react'
 import { Previewer } from 'pagedjs'
 import { buildPageCss, formatPrintDate } from '../lib/printPreviewCss'
+import { teardown, withPrintMount } from '../lib/printMount'
 
 /** Paged.js keeps a placeholder copy of the top-level node's own tag/class
  *  around while it splits content across pages. Left as `.editor-pane`,
@@ -10,8 +11,10 @@ import { buildPageCss, formatPrintDate } from '../lib/printPreviewCss'
  *  layout rather than one page — blows its width out to several page-widths
  *  and corrupts the pagination. The class does nothing useful once Paged.js
  *  owns layout, so it's dropped from the clone before handing it off. */
-function stripScreenClasses(el: HTMLElement): void {
-  el.removeAttribute('class')
+function cloneForPagination(el: HTMLElement): HTMLElement {
+  const clone = el.cloneNode(true) as HTMLElement
+  clone.removeAttribute('class')
+  return clone
 }
 
 interface UsePrintPreviewResult {
@@ -30,23 +33,14 @@ interface UsePrintPreviewResult {
   setShowDate: (value: boolean) => void
   isRendering: boolean
   error: string | null
+  /** Paginates the note again into a bare `#print-root` and runs `run` while
+   *  only that is visible — the one place Export and Print get their pages. */
+  printPages: <T>(run: () => Promise<T>) => Promise<T>
 }
 
 // Re-rendering on every keystroke-speed checkbox toggle would thrash
 // Paged.js's real layout pass; this waits for toggling to settle first.
 const RERENDER_DEBOUNCE_MS = 250
-
-/** A `Previewer` outlives the promise `preview()` returns: every page it
- *  built keeps a `ResizeObserver` on its own wrapper, and its `Polisher`
- *  keeps the `<style>` tags it appended to `<head>`. Emptying the container
- *  without this fires those observers against pages whose content is gone —
- *  `checkUnderflowAfterResize` then walks off the end of the tree and throws
- *  `Cannot read properties of null (reading 'nextSibling')`. */
-function teardown(previewer: Previewer): void {
-  previewer.chunker.stop()
-  previewer.chunker.removePages()
-  previewer.polisher.destroy()
-}
 
 /**
  * Clones `contentRef.current` and paginates it through Paged.js into
@@ -111,25 +105,31 @@ export function usePrintPreview(
     }
   }, [contentRef])
 
-  useEffect(() => {
-    const contentEl = contentRef.current
-    if (!contentEl || !container) return
-
-    // Handed to Paged.js rather than appended to `<head>`: Paged.js only
-    // scrapes the document's own stylesheets when the argument is *omitted*,
-    // and that path deletes them from the page. An empty array means it
-    // parses nothing, so a `<head>` `@page` rule reaches neither Paged.js
-    // (page-number/title/date margin boxes silently never render) nor,
-    // reliably, the real print job — where a stray `margin: 1in` landing
-    // after Paged.js's own `@page { margin: 0 }` shrinks the printable area
-    // below the 8.5x11in sheet Paged.js laid out, clipping every page.
-    const pageCss = { [window.location.href]: buildPageCss({
+  // The `@page` CSS goes to Paged.js as an argument, never into `<head>`:
+  // Paged.js only scrapes the document's own stylesheets when the argument is
+  // *omitted*, and that path deletes them from the page. An empty array means
+  // it parses nothing, so a `<head>` `@page` rule would never reach the
+  // page-number/title/date margin boxes.
+  const currentPageCss = () =>
+    buildPageCss({
       showPageNumber,
       showTitle,
       showDate,
       title: noteTitle,
       date: formatPrintDate(new Date()),
-    }) }
+    })
+
+  function printPages<T>(run: () => Promise<T>): Promise<T> {
+    const contentEl = contentRef.current
+    if (!contentEl) return Promise.reject(new Error('Nothing to print.'))
+    return withPrintMount(cloneForPagination(contentEl), currentPageCss(), run)
+  }
+
+  useEffect(() => {
+    const contentEl = contentRef.current
+    if (!contentEl || !container) return
+
+    const pageCss = { [window.location.href]: currentPageCss() }
 
     let cancelled = false
     let previewer: Previewer | null = null
@@ -137,11 +137,9 @@ export function usePrintPreview(
     setError(null)
     const timer = setTimeout(() => {
       container.innerHTML = ''
-      const clone = contentEl.cloneNode(true) as HTMLElement
-      stripScreenClasses(clone)
       previewer = new Previewer()
       previewer
-        .preview(clone, [pageCss], container)
+        .preview(cloneForPagination(contentEl), [pageCss], container)
         .then(() => {
           if (!cancelled) setIsRendering(false)
         })
@@ -169,5 +167,6 @@ export function usePrintPreview(
     setShowDate,
     isRendering,
     error,
+    printPages,
   }
 }

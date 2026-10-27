@@ -10,6 +10,12 @@ describe('buildPageCss', () => {
     expect(css).toContain('@page')
   })
 
+  it('sets an A4 page with 20mm margins', () => {
+    const css = buildPageCss({ showPageNumber: false, showTitle: false, showDate: false, title: 'Lecture 7', date: 'August 31, 2026' })
+    expect(css).toContain('size: A4')
+    expect(css).toContain('margin: 20mm')
+  })
+
   it('includes a page-number counter only when showPageNumber is true', () => {
     const css = buildPageCss({ showPageNumber: true, showTitle: false, showDate: false, title: 'Lecture 7', date: 'August 31, 2026' })
     expect(css).toContain('@bottom-center')

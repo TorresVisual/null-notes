@@ -24,6 +24,7 @@ export function ExportPdfDialog({ noteTitle, contentRef, onClose }: ExportPdfDia
     setShowDate,
     isRendering,
     error,
+    printPages,
   } = usePrintPreview(contentRef, noteTitle)
   const [isExporting, setIsExporting] = useState(false)
 
@@ -40,7 +41,7 @@ export function ExportPdfDialog({ noteTitle, contentRef, onClose }: ExportPdfDia
     if (!path) return
     setIsExporting(true)
     try {
-      await api.printing.exportPdf(path)
+      await printPages(() => api.printing.exportPdf(path))
       showToast(`Exported "${noteTitle}.pdf"`)
       onClose()
     } catch (e) {

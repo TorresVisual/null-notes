@@ -33,6 +33,7 @@ function makePreviewResult(overrides: Partial<ReturnType<typeof usePrintPreview>
     setShowDate: vi.fn(),
     isRendering: false,
     error: null,
+    printPages: <T,>(run: () => Promise<T>) => run(),
     ...overrides,
   }
 }

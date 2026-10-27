@@ -5062,7 +5062,7 @@ input[type='checkbox']:focus-visible {
    the live (possibly dark) theme and reads as a copy of the editor rather
    than a print preview. Unscoped from `@media print` (unlike the palette
    swap below) because this has to look right before the user ever prints. */
-.print-preview-pages {
+:is(.print-preview-pages, #print-root) {
   --bg-base: #ffffff;
   --bg-raised: #ffffff;
   --bg-sunken: #f5f5f5;
@@ -5083,17 +5083,17 @@ input[type='checkbox']:focus-visible {
   --success: #1a7f37;
 }
 
-.print-preview-pages .editor-toolbar,
-.print-preview-pages .editor-status,
-.print-preview-pages .backlinks-panel,
-.print-preview-pages .outline-panel,
-.print-preview-pages .search-overlay,
-.print-preview-pages .code-block-open-in-ide-group,
-.print-preview-pages .code-block-actions,
-.print-preview-pages .code-run-panel,
-.print-preview-pages .note-find-bar,
-.print-preview-pages .note-history-panel,
-.print-preview-pages .drag-handle {
+:is(.print-preview-pages, #print-root) .editor-toolbar,
+:is(.print-preview-pages, #print-root) .editor-status,
+:is(.print-preview-pages, #print-root) .backlinks-panel,
+:is(.print-preview-pages, #print-root) .outline-panel,
+:is(.print-preview-pages, #print-root) .search-overlay,
+:is(.print-preview-pages, #print-root) .code-block-open-in-ide-group,
+:is(.print-preview-pages, #print-root) .code-block-actions,
+:is(.print-preview-pages, #print-root) .code-run-panel,
+:is(.print-preview-pages, #print-root) .note-find-bar,
+:is(.print-preview-pages, #print-root) .note-history-panel,
+:is(.print-preview-pages, #print-root) .drag-handle {
   display: none !important;
 }
 
@@ -5101,9 +5101,9 @@ input[type='checkbox']:focus-visible {
    itself must go, and any line hidden by an in-progress fold has to come
    back — a printed note can't silently drop code its author folded away
    while editing. Same principle as the collapsed-section rule above. */
-.print-preview-pages .code-line-number.foldable::before { display: none; }
-.print-preview-pages .code-fold-placeholder { display: none !important; }
-.print-preview-pages .code-fold-hidden { display: inline !important; }
+:is(.print-preview-pages, #print-root) .code-line-number.foldable::before { display: none; }
+:is(.print-preview-pages, #print-root) .code-fold-placeholder { display: none !important; }
+:is(.print-preview-pages, #print-root) .code-fold-hidden { display: inline !important; }
 
 .print-preview-pages .pagedjs_page {
   background: #fff;
@@ -5112,32 +5112,33 @@ input[type='checkbox']:focus-visible {
 }
 
 /* Paged.js, not Chromium, decides page breaks now, and it does that by
-   reading computed styles off the clone *while it sits in this container*,
-   on screen. Scoped here rather than left in `@media print`, where the real
-   print job — which only ever prints already-paginated `.pagedjs_page`
-   boxes — would apply them far too late to move a break. */
-.print-preview-pages h1, .print-preview-pages h2, .print-preview-pages h3,
-.print-preview-pages h4, .print-preview-pages h5, .print-preview-pages h6 {
+   reading computed styles off the clone *while it sits in its container* — the
+   preview pane or `#print-root` — on screen. Scoped here rather than left in
+   `@media print`, where the real print job — which only ever prints
+   already-paginated `.pagedjs_page` boxes — would apply them far too late
+   to move a break. */
+:is(.print-preview-pages, #print-root) h1, :is(.print-preview-pages, #print-root) h2, :is(.print-preview-pages, #print-root) h3,
+:is(.print-preview-pages, #print-root) h4, :is(.print-preview-pages, #print-root) h5, :is(.print-preview-pages, #print-root) h6 {
   break-after: avoid;
 }
-.print-preview-pages pre, .print-preview-pages .pdf-page-block,
-.print-preview-pages .ink-block-wrapper, .print-preview-pages table,
-.print-preview-pages .note-image, .print-preview-pages .callout,
-.print-preview-pages .details-wrapper, .print-preview-pages .block-math,
-.print-preview-pages .mermaid-block, .print-preview-pages .diagram-block-preview {
+:is(.print-preview-pages, #print-root) pre, :is(.print-preview-pages, #print-root) .pdf-page-block,
+:is(.print-preview-pages, #print-root) .ink-block-wrapper, :is(.print-preview-pages, #print-root) table,
+:is(.print-preview-pages, #print-root) .note-image, :is(.print-preview-pages, #print-root) .callout,
+:is(.print-preview-pages, #print-root) .details-wrapper, :is(.print-preview-pages, #print-root) .block-math,
+:is(.print-preview-pages, #print-root) .mermaid-block, :is(.print-preview-pages, #print-root) .diagram-block-preview {
   break-inside: avoid;
 }
 
 /* A collapsed section is a screen-only affordance — a printed note must show
    every section's content regardless of its current open/closed state. */
-.print-preview-pages .details-body { display: block !important; }
-.print-preview-pages .details-chevron { display: none; }
+:is(.print-preview-pages, #print-root) .details-body { display: block !important; }
+:is(.print-preview-pages, #print-root) .details-chevron { display: none; }
 
-/* Export to PDF (File > Export to PDF, or the OS print dialog directly)
-   leans on the WebView's own print pipeline rather than a custom renderer —
-   math, Mermaid, ink and code all print exactly as they're already shown on
-   screen. This block only swaps the dark UI palette for a printable light
-   one and hides app chrome; it changes nothing about screen rendering. */
+/* Export to PDF and Print paginate the note into `#print-root` (see
+   lib/printMount.ts) and hide everything else with `body.printing`, so the
+   print job sees nothing but the page stack. This block only swaps the dark
+   UI palette for a printable light one; it changes nothing about screen
+   rendering. */
 @media print {
   :root {
     --bg-base: #ffffff;
@@ -5175,70 +5176,19 @@ input[type='checkbox']:focus-visible {
 
   html, body { background: #fff; height: auto; overflow: visible; }
 
-  /* Printing only ever goes through Export to PDF / Print now, both of
-     which render a Paged.js clone into `.print-preview-pages` (its own
-     chrome-hiding rules above apply here too, print or not) inside a
-     dialog portaled to document.body — the live app behind it never needs
-     to print and, left visible, bleeds its full-bleed, unpaginated content
-     in behind/around the real paginated pages.
+  body.printing > *:not(#print-root) { display: none !important; }
 
-     `#root`, not `.layout`: the title bar is a *sibling* of `.layout`, so
-     hiding `.layout` alone printed the window chrome, and both `.app-shell`
-     and `#root` carry their own full-height rule, which still reserved a
-     blank viewport-tall block above the first page once the children were
-     hidden. `#root` is the one node the whole live app hangs off, and the
-     dialog is portaled to `body` outside it. */
-  #root, [data-slot="dialog-overlay"] { display: none !important; }
-  [data-slot="dialog-content"]:not(:has(.print-preview-pages)) { display: none !important; }
-  [data-slot="dialog-content"]:has(.print-preview-pages) > *:not(.print-preview-pages) { display: none !important; }
-
-  /* The dialog shell (fixed/centered/width-capped/padded) and the
-     scrollable preview pane (bordered, backgrounded, clipped to 60vh) are
-     screen-only chrome around the Paged.js page boxes — left unreset here,
-     they add their own margins around, and clip, the real printed pages. */
-  [data-slot="dialog-content"]:has(.print-preview-pages) {
-    position: static;
-    inset: auto;
-    /* Tailwind v4's `-translate-x-1/2`/`-translate-y-1/2` compile to the
-       standalone `translate` property, and `zoom-in-95` to `scale` — neither
-       is reset by `transform: none`. Left set, the centring offset survives
-       into the print job and drags the page boxes off the top-left of the
-       sheet, clipping every page. */
-    transform: none;
-    translate: none;
-    scale: none;
-    width: auto;
-    max-width: none;
-    max-height: none;
-    padding: 0;
-    margin: 0;
-    border: none;
-    box-shadow: none;
-    background: transparent;
-  }
-  .print-preview-pages {
-    overflow: visible;
-    max-height: none;
-    padding: 0;
-    border: none;
-    background: transparent;
-  }
-  /* The on-screen drop-shadow/inter-page gap (index.css above) makes the
-     preview read as a stack of pages — printed verbatim it leaves a
-     shadowed inset card on each physical page instead of a full-bleed one
-     and throws off Paged.js's 1:1 page-to-page mapping. */
-  .print-preview-pages .pagedjs_page {
+  #print-root .pagedjs_page {
+    background: #fff;
     box-shadow: none;
     margin: 0;
   }
   /* Paged.js's own inserted stylesheet puts `break-after: page` on every
      `.pagedjs_page`, including the last one — Chromium's print/PrintToPdf
-     honors that literally and emits a trailing blank page after it. Only
-     the last page needs the break suppressed; every other page still
-     needs its break to separate it from the next. Must out-specificity
-     Paged.js's own `!important` rule, which is appended to `<head>` after
-     ours and would otherwise win on source order. */
-  .print-preview-pages .pagedjs_page:last-of-type {
+     honors that literally and emits a trailing blank page after it. Must
+     out-specificity Paged.js's own `!important` rule, which is appended to
+     `<head>` after ours and would otherwise win on source order. */
+  #print-root .pagedjs_page:last-of-type {
     break-after: auto !important;
     page-break-after: auto !important;
   }

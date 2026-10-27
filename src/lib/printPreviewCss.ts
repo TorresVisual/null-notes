@@ -30,7 +30,7 @@ export function buildPageCss({ showPageNumber, showTitle, showDate, title, date 
   if (showDate) {
     marginBoxes.push(`@top-right { content: "${escapeCssString(date)}"; }`)
   }
-  return `@page { size: letter; margin: 1in; ${marginBoxes.join(' ')} }`
+  return `@page { size: A4; margin: 20mm;${marginBoxes.join(' ')} }`
 }
 
 export function formatPrintDate(date: Date): string {

@@ -27,6 +27,7 @@ export function PrintDialog({ noteTitle, contentRef, onClose }: PrintDialogProps
     setShowDate,
     isRendering,
     error,
+    printPages,
   } = usePrintPreview(contentRef, noteTitle)
 
   useEffect(() => {
@@ -44,7 +45,7 @@ export function PrintDialog({ noteTitle, contentRef, onClose }: PrintDialogProps
     if (isPrinting || isRendering || !selected) return
     setIsPrinting(true)
     try {
-      await api.printing.printDocument(selected)
+      await printPages(() => api.printing.printDocument(selected))
       showToast('Sent to printer')
       onClose()
     } catch (e) {

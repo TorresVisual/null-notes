@@ -101,6 +101,11 @@ pub fn list_printers() -> Result<Vec<PrinterInfo>, String> {
     }
 }
 
+#[cfg_attr(not(windows), allow(dead_code))]
+const A4_WIDTH_IN: f64 = 210.0 / 25.4;
+#[cfg_attr(not(windows), allow(dead_code))]
+const A4_HEIGHT_IN: f64 = 297.0 / 25.4;
+
 #[cfg(windows)]
 fn build_print_settings(
     core_webview: &webview2_com::Microsoft::Web::WebView2::Win32::ICoreWebView2,
@@ -121,12 +126,12 @@ fn build_print_settings(
         // docs/specs/better-printing-design.md) — WebView2's native,
         // all-or-nothing bundle stays off unconditionally.
         settings.SetShouldPrintHeaderAndFooter(false)?;
-        // Fixed Letter size with zero WebView2-side margin so a Paged.js
-        // page (which sets its own `@page { size: letter; margin: 1in }`)
+        // Fixed A4 size with zero WebView2-side margin so a Paged.js
+        // page (which sets its own `@page { size: A4; margin: 20mm }`)
         // maps to exactly one physical page — Paged.js's margin is the
         // only margin in effect.
-        settings.SetPageWidth(8.5)?;
-        settings.SetPageHeight(11.0)?;
+        settings.SetPageWidth(A4_WIDTH_IN)?;
+        settings.SetPageHeight(A4_HEIGHT_IN)?;
         settings.SetMarginTop(0.0)?;
         settings.SetMarginBottom(0.0)?;
         settings.SetMarginLeft(0.0)?;
@@ -280,6 +285,12 @@ pub async fn print_document(app: tauri::AppHandle, printer_name: String) -> Resu
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn page_size_is_a4_in_inches() {
+        assert!((A4_WIDTH_IN - 8.2677).abs() < 1e-4);
+        assert!((A4_HEIGHT_IN - 11.6929).abs() < 1e-4);
+    }
 
     #[test]
     fn marks_the_matching_name_as_default() {
