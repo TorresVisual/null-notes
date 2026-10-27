@@ -55,3 +55,10 @@ describe('table column alignment', () => {
     expect(getMarkdown(e)).toContain('| --- | --- |')
   })
 })
+
+describe('table cells holding only an atom node', () => {
+  it('keeps inline math that is the sole content of a cell', () => {
+    const e = mount('| A | B |\n| --- | --- |\n| $x^2$ | plain |')
+    expect(getMarkdown(e)).toContain('| $x^2$ | plain |')
+  })
+})

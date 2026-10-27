@@ -37,7 +37,7 @@ export const TableMarkdown = Table.extend({
             row.forEach((cell, _cellOffset, colIndex) => {
               if (colIndex) state.write(' | ')
               const content = cell.firstChild
-              if (content && content.textContent.trim()) {
+              if (content && content.content.size > 0) {
                 state.renderInline(content)
               }
             })
