@@ -220,3 +220,138 @@ describe('table grip menus', () => {
     expect(second instanceof HTMLDetailsElement && second.open).toBe(true)
   })
 })
+
+function colMenuAction(col: number, action: string, e: Editor): void {
+  openMenu(`.table-col-menu[data-col-index="${col}"]`, e)
+  click(`.table-col-menu[data-col-index="${col}"] [data-action="${action}"]`, e)
+}
+
+function rowMenuAction(row: number, action: string, e: Editor): void {
+  openMenu(`.table-row-menu[data-row-index="${row}"]`, e)
+  click(`.table-row-menu[data-row-index="${row}"] [data-action="${action}"]`, e)
+}
+
+function bodyTexts(table: PMNode): string[][] {
+  const rows: string[][] = []
+  table.forEach((row, _offset, i) => {
+    if (i > 0) rows.push(rowTexts(row))
+  })
+  return rows
+}
+
+describe('table row operations', () => {
+  it('moves a row down and up from its menu', () => {
+    const e = mount(TABLE_HTML)
+    rowMenuAction(1, 'move-down', e)
+    expect(bodyTexts(findTable(e))).toEqual([['4', '5', '6'], ['1', '2', '3']])
+    rowMenuAction(2, 'move-up', e)
+    expect(bodyTexts(findTable(e))).toEqual([['1', '2', '3'], ['4', '5', '6']])
+  })
+
+  it('offers no move or duplicate on the header row, and no move past its edge', () => {
+    const e = mount(TABLE_HTML)
+    expect(e.view.dom.querySelector('.table-row-menu[data-row-index="0"] [data-action="move-down"]')).toBeNull()
+    expect(e.view.dom.querySelector('.table-row-menu[data-row-index="0"] [data-action="duplicate"]')).toBeNull()
+    const up = e.view.dom.querySelector('.table-row-menu[data-row-index="1"] [data-action="move-up"]')
+    expect((up as HTMLButtonElement).disabled).toBe(true)
+  })
+
+  it('duplicates a row directly after the original', () => {
+    const e = mount(TABLE_HTML)
+    rowMenuAction(1, 'duplicate', e)
+    expect(bodyTexts(findTable(e))).toEqual([['1', '2', '3'], ['1', '2', '3'], ['4', '5', '6']])
+  })
+
+  it('restores the order with a single undo', () => {
+    const e = mount(TABLE_HTML)
+    rowMenuAction(1, 'move-down', e)
+    e.commands.undo()
+    expect(bodyTexts(findTable(e))).toEqual([['1', '2', '3'], ['4', '5', '6']])
+  })
+})
+
+describe('table column operations', () => {
+  it('moves a column right and keeps its alignment with it', () => {
+    const e = mount(TABLE_HTML)
+    colMenuAction(0, 'align', e)
+    colMenuAction(0, 'move-right', e)
+    const table = findTable(e)
+    expect(rowTexts(table.firstChild!)).toEqual(['B', 'A', 'C'])
+    expect(columnAligns(table, 1)).toEqual(['center', 'center', 'center'])
+    expect(columnAligns(table, 0)).toEqual([null, null, null])
+  })
+
+  it('duplicates a column directly after the original, content and alignment included', () => {
+    const e = mount(TABLE_HTML)
+    colMenuAction(1, 'align', e)
+    colMenuAction(1, 'duplicate', e)
+    const table = findTable(e)
+    expect(rowTexts(table.firstChild!)).toEqual(['A', 'B', 'B', 'C'])
+    expect(rowTexts(table.child(1))).toEqual(['1', '2', '2', '3'])
+    expect(columnAligns(table, 2)).toEqual(['center', 'center', 'center'])
+  })
+
+  it('disables moving the first column left and the last column right', () => {
+    const e = mount(TABLE_HTML)
+    const left = e.view.dom.querySelector('.table-col-menu[data-col-index="0"] [data-action="move-left"]')
+    const right = e.view.dom.querySelector('.table-col-menu[data-col-index="2"] [data-action="move-right"]')
+    expect((left as HTMLButtonElement).disabled).toBe(true)
+    expect((right as HTMLButtonElement).disabled).toBe(true)
+  })
+})
+
+describe('table sort', () => {
+  const sortable = (cells: string[]) =>
+    '<table><tr><th>K</th><th>V</th></tr>' + cells.map((c, i) => `<tr><td>${c}</td><td>r${i}</td></tr>`).join('') + '</table>'
+  const firstColumn = (e: Editor) => bodyTexts(findTable(e)).map((r) => r[0])
+
+  it('sorts numerically when every non-empty cell is a number, header fixed', () => {
+    const e = mount(sortable(['10', '9', '', '100']))
+    colMenuAction(0, 'sort-asc', e)
+    expect(firstColumn(e)).toEqual(['9', '10', '100', ''])
+    expect(rowTexts(findTable(e).firstChild!)).toEqual(['K', 'V'])
+  })
+
+  it('sorts descending with empty cells still last', () => {
+    const e = mount(sortable(['10', '', '9', '100']))
+    colMenuAction(0, 'sort-desc', e)
+    expect(firstColumn(e)).toEqual(['100', '10', '9', ''])
+  })
+
+  it('falls back to case-insensitive text for mixed content', () => {
+    const e = mount(sortable(['banana', 'Apple', '10', 'cherry']))
+    colMenuAction(0, 'sort-asc', e)
+    expect(firstColumn(e)).toEqual(['10', 'Apple', 'banana', 'cherry'])
+  })
+
+  it('is stable for equal keys', () => {
+    const e = mount(sortable(['b', 'a', 'b', 'a']))
+    colMenuAction(0, 'sort-asc', e)
+    expect(bodyTexts(findTable(e)).map((r) => r[1])).toEqual(['r1', 'r3', 'r0', 'r2'])
+  })
+
+  it('does not treat a math-only cell as empty', () => {
+    const math = '<span data-type="inline-math" data-latex="a"></span>'
+    const e = mount(sortable([math, 'z', '']))
+    colMenuAction(0, 'sort-asc', e)
+    expect(bodyTexts(findTable(e)).map((r) => r[1])).toEqual(['r0', 'r1', 'r2'])
+  })
+})
+
+describe('pasting tables', () => {
+  const EXCEL_HTML =
+    '<html><body><!--StartFragment--><table border=0 cellpadding=0 cellspacing=0><col width=64><tr height=20><td>Name</td><td>Score</td></tr>' +
+    '<tr height=20><td>Ada</td><td align=right>9</td></tr></table><!--EndFragment--></body></html>'
+
+  it('turns a spreadsheet HTML table into a table whose first row is the header', () => {
+    const e = mount('<p></p>')
+    const paste = new Event('paste', { bubbles: true, cancelable: true })
+    const data: Record<string, string> = { 'text/html': EXCEL_HTML, 'text/plain': 'Name\tScore\nAda\t9' }
+    Object.assign(paste, { clipboardData: { types: Object.keys(data), getData: (type: string) => data[type] ?? '' } })
+    e.view.dom.dispatchEvent(paste)
+    const table = findTable(e)
+    expect(rowTexts(table.child(0))).toEqual(['Name', 'Score'])
+    expect(table.child(0).child(0).type.name).toBe('tableHeader')
+    expect(bodyTexts(table)).toEqual([['Ada', '9']])
+  })
+})

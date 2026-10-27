@@ -4,6 +4,8 @@ import { Plugin } from '@tiptap/pm/state'
 import type { EditorView } from '@tiptap/pm/view'
 import type { Node as PMNode } from '@tiptap/pm/model'
 import { TableMap } from '@tiptap/pm/tables'
+import { attachGripDrag } from './tableDrag'
+import { duplicateColumn, duplicateRow, moveColumn, moveRow, sortByColumn } from './tableOps'
 
 interface TableInfo {
   pos: number
@@ -82,6 +84,16 @@ const ICON_ALIGN: Record<'left' | 'center' | 'right', string> = {
   center: '<path d="M21 6H3"/><path d="M17 12H7"/><path d="M19 18H5"/>',
   right: '<path d="M21 6H3"/><path d="M21 12H9"/><path d="M21 18H7"/>',
 }
+const ICON_ARROW_LEFT = '<path d="m12 19-7-7 7-7"/><path d="M19 12H5"/>'
+const ICON_ARROW_RIGHT = '<path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>'
+const ICON_ARROW_UP = '<path d="m5 12 7-7 7 7"/><path d="M12 19V5"/>'
+const ICON_ARROW_DOWN = '<path d="M12 5v14"/><path d="m19 12-7 7-7-7"/>'
+const ICON_COPY =
+  '<rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>'
+const ICON_SORT_ASC =
+  '<path d="m3 8 4-4 4 4"/><path d="M7 4v16"/><path d="M11 12h4"/><path d="M11 16h7"/><path d="M11 20h10"/>'
+const ICON_SORT_DESC =
+  '<path d="m3 16 4 4 4-4"/><path d="M7 20V4"/><path d="M11 4h10"/><path d="M11 8h7"/><path d="M11 12h4"/>'
 const ICON_DOTS_HORIZONTAL =
   '<circle cx="6" cy="12" r="1.6" fill="currentColor"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/><circle cx="18" cy="12" r="1.6" fill="currentColor"/>'
 const ICON_DOTS_VERTICAL =
@@ -120,9 +132,16 @@ function iconButton(className: string, label: string, iconInner: string, onActiv
   return el
 }
 
-function menuItem(label: string, action: string, iconInner: string, onActivate: () => void, danger = false): HTMLButtonElement {
+function menuItem(
+  label: string,
+  action: string,
+  iconInner: string,
+  onActivate: () => void,
+  { danger = false, disabled = false } = {},
+): HTMLButtonElement {
   const el = document.createElement('button')
   el.type = 'button'
+  el.disabled = disabled
   el.dataset.action = action
   if (danger) el.className = 'danger'
   el.appendChild(svgIcon(iconInner, true))
@@ -132,6 +151,21 @@ function menuItem(label: string, action: string, iconInner: string, onActivate: 
     onActivate()
   })
   return el
+}
+
+// The table wrapper scrolls horizontally, which clips anything hanging below
+// a short table — and these menus are taller than a two-row table. Fixed
+// positioning lets the panel escape that clip; it is anchored to the grip's
+// screen rect when it opens and kept inside the viewport.
+function placeMenuPanel(details: HTMLDetailsElement, axis: 'col' | 'row'): void {
+  const grip = details.querySelector('summary')
+  const panel = details.querySelector('.table-menu-panel')
+  if (!grip || !(panel instanceof HTMLElement)) return
+  const r = grip.getBoundingClientRect()
+  panel.style.position = 'fixed'
+  panel.style.left = `${axis === 'col' ? r.left + r.width / 2 : r.right + 2}px`
+  const top = axis === 'col' ? r.bottom + 2 : r.top
+  panel.style.top = `${Math.max(8, Math.min(top, window.innerHeight - panel.offsetHeight - 8))}px`
 }
 
 // Only one grip menu open at a time, Notion-style — opening one closes any
@@ -227,9 +261,27 @@ function buildColumnMenu(
     }),
   )
   panel.appendChild(
+    menuItem('Move left', 'move-left', ICON_ARROW_LEFT, () => moveColumn(editor, tablePos, table, col, col - 1), {
+      disabled: col === 0,
+    }),
+  )
+  panel.appendChild(
+    menuItem('Move right', 'move-right', ICON_ARROW_RIGHT, () => moveColumn(editor, tablePos, table, col, col + 1), {
+      disabled: col === (table.firstChild?.childCount ?? 0) - 1,
+    }),
+  )
+  panel.appendChild(menuItem('Duplicate', 'duplicate', ICON_COPY, () => duplicateColumn(editor, tablePos, table, col)))
+  panel.appendChild(document.createElement('hr'))
+  panel.appendChild(
     menuItem(`Align: ${alignLabel(align)}`, 'align', ICON_ALIGN[align ?? 'left'], () => {
       setColumnAlign(editor, tablePos, table, col, nextAlign(align))
     }),
+  )
+  panel.appendChild(
+    menuItem('Sort ascending', 'sort-asc', ICON_SORT_ASC, () => sortByColumn(editor, tablePos, table, col, 'asc')),
+  )
+  panel.appendChild(
+    menuItem('Sort descending', 'sort-desc', ICON_SORT_DESC, () => sortByColumn(editor, tablePos, table, col, 'desc')),
   )
   panel.appendChild(document.createElement('hr'))
   panel.appendChild(
@@ -240,16 +292,27 @@ function buildColumnMenu(
       () => {
         runAtCell(editor, cellPos(tablePos, table, 0, col), (c) => c.deleteColumn())
       },
-      true,
+      { danger: true },
     ),
   )
   details.appendChild(panel)
+
+  attachGripDrag({
+    grip: summary,
+    axis: 'col',
+    index: col,
+    wrapper,
+    controls,
+    minGap: 0,
+    onDrop: (target) => moveColumn(editor, tablePos, table, col, target),
+  })
 
   const owner = `col-${col}`
   details.addEventListener('toggle', () => {
     if (details.open) {
       closeOtherMenus(controls, details)
       showColumnHighlight(wrapper, controls, col)
+      placeMenuPanel(details, 'col')
     } else {
       clearHighlightIfOwner(controls, owner)
     }
@@ -288,6 +351,19 @@ function buildRowMenu(
       runAtCell(editor, cellPos(tablePos, table, row, 0), (c) => c.addRowAfter())
     }),
   )
+  if (row > 0) {
+    panel.appendChild(
+      menuItem('Move up', 'move-up', ICON_ARROW_UP, () => moveRow(editor, tablePos, table, row, row - 1), {
+        disabled: row === 1,
+      }),
+    )
+    panel.appendChild(
+      menuItem('Move down', 'move-down', ICON_ARROW_DOWN, () => moveRow(editor, tablePos, table, row, row + 1), {
+        disabled: row === table.childCount - 1,
+      }),
+    )
+    panel.appendChild(menuItem('Duplicate', 'duplicate', ICON_COPY, () => duplicateRow(editor, tablePos, table, row)))
+  }
   panel.appendChild(document.createElement('hr'))
   panel.appendChild(
     menuItem(
@@ -297,16 +373,29 @@ function buildRowMenu(
       () => {
         runAtCell(editor, cellPos(tablePos, table, row, 0), (c) => c.deleteRow())
       },
-      true,
+      { danger: true },
     ),
   )
   details.appendChild(panel)
+
+  if (row > 0) {
+    attachGripDrag({
+      grip: summary,
+      axis: 'row',
+      index: row,
+      wrapper,
+      controls,
+      minGap: 1,
+      onDrop: (target) => moveRow(editor, tablePos, table, row, target),
+    })
+  }
 
   const owner = `row-${row}`
   details.addEventListener('toggle', () => {
     if (details.open) {
       closeOtherMenus(controls, details)
       showRowHighlight(wrapper, controls, row)
+      placeMenuPanel(details, 'row')
     } else {
       clearHighlightIfOwner(controls, owner)
     }

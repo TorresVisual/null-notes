@@ -1557,18 +1557,33 @@ code {
    drag handle here would only ever be a session-local illusion of control. */
 .note-editor .tableWrapper { position: relative; overflow-x: auto; margin: 0.8em 0; padding: 22px 18px 18px 22px; }
 .note-editor table {
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 0;
   width: 100%;
   margin: 0;
   font-size: 0.93em;
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
 }
+/* Soft grid: faint inner lines only, the outer edge is the table's own
+   rounded border. Corner cells carry the radius because overflow: hidden
+   doesn't clip a display: table box reliably. */
 .note-editor th,
 .note-editor td {
   font-variant-numeric: tabular-nums;
-  border: 1px solid var(--border-strong);
+  border-right: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
   padding: 8px 12px;
   text-align: left;
 }
+.note-editor th:last-child,
+.note-editor td:last-child { border-right: none; }
+.note-editor tr:last-child > th,
+.note-editor tr:last-child > td { border-bottom: none; }
+.note-editor tr:first-child > :first-child { border-top-left-radius: 7px; }
+.note-editor tr:first-child > :last-child { border-top-right-radius: 7px; }
+.note-editor tr:last-child > :first-child { border-bottom-left-radius: 7px; }
+.note-editor tr:last-child > :last-child { border-bottom-right-radius: 7px; }
 /* A cell holds a single prose paragraph, so the paragraph-spacing rule
    (`.note-editor p { margin-bottom: 0.6em }`) has no sibling to create space
    against — it just sits below the text, and vertical-align: middle (the
@@ -1576,10 +1591,8 @@ code {
    text itself, visibly pushing the text off-center. */
 .note-editor td p,
 .note-editor th p { margin-bottom: 0; }
-/* Accent-tinted so the header never collides with the zebra shade on the
-   first body row, which otherwise renders as one solid block. */
-.note-editor th { background: var(--accent-bg); font-weight: 600; border-bottom: 2px solid var(--border-strong); }
-.note-editor tr:nth-child(even) td { background: var(--bg-hover); }
+.note-editor th { background: var(--bg-sunken); font-weight: 600; border-bottom-color: var(--border-strong); }
+.note-editor tr:hover > td { background: var(--bg-hover); }
 
 /* Tints the column/row a grip's menu currently targets, so the user can
    confirm what they're about to insert/delete before committing. A JS-drawn
@@ -1640,8 +1653,10 @@ code {
    other axis is a fixed flex rule so it never needs recomputing. */
 .note-editor .table-col-menu,
 .note-editor .table-row-menu { position: absolute; display: flex; z-index: 3; pointer-events: auto; }
-.note-editor .table-col-menu { top: 0; height: 22px; align-items: center; transform: translateX(-50%); }
-.note-editor .table-row-menu { left: 0; width: 22px; align-items: center; justify-content: center; transform: translateY(-50%); }
+/* Centred with margins, not transform: a transformed ancestor would become
+   the containing block for the fixed-position menu panel (placeMenuPanel). */
+.note-editor .table-col-menu { top: 0; height: 22px; align-items: center; margin-left: -13px; }
+.note-editor .table-row-menu { left: 0; width: 22px; align-items: center; justify-content: center; margin-top: -9px; }
 
 .note-editor .table-grip {
   list-style: none;
@@ -1664,9 +1679,21 @@ code {
    below) — same visual language as every other menu in the app — with just
    the position overridden to anchor off the grip instead of the cursor. */
 .note-editor .table-menu-panel { position: absolute; z-index: 30; min-width: 160px; }
-.note-editor .table-col-menu .table-menu-panel { top: 20px; left: 50%; transform: translateX(-50%); }
-.note-editor .table-row-menu .table-menu-panel { top: 0; left: 24px; }
+.note-editor .table-col-menu .table-menu-panel { transform: translateX(-50%); }
 .note-editor .table-menu-panel svg { width: 13px; height: 13px; flex: none; }
+.note-editor .table-menu-panel button:disabled { color: var(--text-disabled); cursor: default; background: none; }
+
+/* Drag-to-reorder: the grip is the handle, the line marks the drop gap. */
+.note-editor .table-controls { user-select: none; }
+.note-editor .table-controls.dragging { opacity: 1; cursor: grabbing; }
+.note-editor .table-controls.dragging .table-grip { cursor: grabbing; }
+.note-editor .table-drop-line {
+  position: absolute;
+  pointer-events: none;
+  background: var(--accent);
+  border-radius: 1px;
+  z-index: 5;
+}
 
 /* Syntax-highlighted code blocks (lowlight) */
 .note-editor pre {
