@@ -92,3 +92,57 @@ describe('NoteLink typing', () => {
     expect(typing('![alt](pic.png)').getHTML()).not.toContain('<a ')
   })
 })
+
+describe('NoteLink suggestions', () => {
+  it('offers notes after [text]( and writes a relative link on selection', async () => {
+    const user = userEvent.setup()
+    useNotesStore.setState({
+      notes: [
+        { path: `${WS}\\A.md`, title: 'A', workspace: WS },
+        { path: LINK_PATH, title: 'Link', workspace: WS },
+        { path: `${WS}\\sub\\Other.md`, title: 'Other', workspace: WS },
+      ] as never,
+    })
+    let current: Editor | null = null
+    function Mounted() {
+      const instance = useEditor({ extensions: extensionsFor(`${WS}\\A.md`), content: '<p></p>' })
+      current = instance
+      return <EditorContent editor={instance} />
+    }
+    const { container } = render(<Mounted />)
+    await waitFor(() => expect(current).not.toBeNull())
+
+    ;(current as Editor | null)?.commands.focus('end')
+    // userEvent.type treats "[" as a special key; "[[" types a literal "[".
+    await user.type(container.querySelector('.tiptap') as HTMLElement, '[[See Results](Li')
+
+    const item = await waitFor(() => {
+      const els = document.querySelectorAll('.slash-menu-item')
+      if (els.length !== 1) throw new Error(`expected one suggestion, got ${els.length}`)
+      return els[0] as Element
+    })
+    expect(item.textContent).toBe('Link')
+
+    await user.click(item)
+    await waitFor(() => expect(markdownOf(current as unknown as Editor)).toBe('[See Results](Link.md)'))
+  })
+})
+
+describe('PlainText brackets', () => {
+  const saved = (text: string) => {
+    const instance = new Editor({
+      extensions: extensionsFor(`${WS}\\A.md`),
+      content: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text }] }] },
+    })
+    return markdownOf(instance)
+  }
+
+  it('saves a lone bracket pair without backslashes', () => {
+    expect(saved('[ results ]')).toBe('[ results ]')
+  })
+
+  it('keeps the escape where bare brackets would re-parse as a link or checkbox', () => {
+    expect(saved('[x](y)')).toBe('\\[x\\](y)')
+    expect(saved('[ ] todo')).toBe('\\[ \\] todo')
+  })
+})

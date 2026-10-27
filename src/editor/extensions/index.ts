@@ -1,4 +1,5 @@
 import StarterKit from '@tiptap/starter-kit'
+import { PlainText } from './PlainText'
 import { Code } from '@tiptap/extension-code'
 import { markInputRule, Extension, InputRule } from '@tiptap/core'
 import type { ResolvedPos } from '@tiptap/pm/model'
@@ -160,12 +161,14 @@ export const coreExtensions = [
   // the name twice and the app's own config is the one that loses.
   StarterKit.configure({
     code: false,
+    text: false,
     codeBlock: false,
     link: false,
     underline: false,
     horizontalRule: false,
     dropcursor: { color: 'var(--accent)', width: 2 },
   }),
+  PlainText,
   Divider,
   NodeRange.configure({ key: 'Shift' }),
   CodeWithRegexpRule.configure({ HTMLAttributes: NO_SPELLCHECK }),

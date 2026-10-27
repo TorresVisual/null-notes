@@ -1,16 +1,37 @@
 import { InputRule } from '@tiptap/core'
+import type { Node as ProseMirrorNode } from '@tiptap/pm/model'
 import { Plugin, PluginKey } from '@tiptap/pm/state'
+import Suggestion from '@tiptap/suggestion'
 import { Link } from '@tiptap/extension-link'
 import type { LinkOptions } from '@tiptap/extension-link'
 import { openUrl } from '@tauri-apps/plugin-opener'
-import { isBareNoteName, isExternalHref, isSafeExternalHref, resolveNoteLink } from '../../lib/noteLinks'
+import {
+  isBareNoteName,
+  isExternalHref,
+  isSafeExternalHref,
+  relativeNoteLink,
+  resolveNoteLink,
+} from '../../lib/noteLinks'
 import { useNotesStore } from '../../store/notes'
 import { useWorkspaceStore } from '../../store/workspace'
+import { noteMenuRender } from './WikiLink'
+import type { WikiLinkItem } from './WikiLink'
 
 // Typing `[text](target)` makes a link, as in any Markdown editor.
 const MARKDOWN_LINK = /(?<!!)\[([^\]\n]+)\]\(([^)\n]+)\)$/
 // Typing `Name.md ` links only when that note exists next to this one.
 const NOTE_NAME_THEN_SPACE = /(?:^|\s)([^\s[\]()<>]+\.md) $/i
+
+interface NoteLinkItem extends WikiLinkItem {
+  path: string
+}
+
+// The `[text` a `](` is closing, so the menu only opens inside link syntax.
+const OPEN_LABEL = /\[([^\]\n]+)$/
+
+function labelBefore(doc: ProseMirrorNode, pos: number): string {
+  return doc.textBetween(doc.resolve(pos).start(), pos, '\n', '￼')
+}
 
 export const NoteLink = Link.extend({
   addOptions() {
@@ -76,6 +97,43 @@ export const NoteLink = Link.extend({
 
     return [
       ...(this.parent?.() ?? []),
+      Suggestion<NoteLinkItem>({
+        editor: this.editor,
+        pluginKey: new PluginKey('noteLinkSuggestion'),
+        char: '](',
+        allowSpaces: true,
+        allowedPrefixes: null,
+        allow: ({ state, range }) => OPEN_LABEL.test(labelBefore(state.doc, range.from)),
+        items: ({ query }) => {
+          const q = query.toLowerCase()
+          return useNotesStore
+            .getState()
+            .notes.filter((n) => n.path !== notePath() && n.title.toLowerCase().includes(q))
+            .slice(0, 10)
+            .map((n) => ({ title: n.title, isNew: false, path: n.path }))
+        },
+        command: ({ editor, range, props }) => {
+          const label = OPEN_LABEL.exec(labelBefore(editor.state.doc, range.from))
+          if (!label) return
+          editor
+            .chain()
+            .focus()
+            .insertContentAt(
+              { from: range.from - label[0].length, to: range.to },
+              {
+                type: 'text',
+                text: label[1],
+                marks: [{ type: 'link', attrs: { href: relativeNoteLink(notePath(), props.path) } }],
+              },
+            )
+            .command(({ tr }) => {
+              tr.setStoredMarks([])
+              return true
+            })
+            .run()
+        },
+        render: noteMenuRender,
+      }),
       new Plugin({
         key: new PluginKey('noteLinkClick'),
         view: (view) => {

@@ -4,6 +4,7 @@ import { Node } from '@tiptap/core'
 import { ReactNodeViewRenderer, ReactRenderer, NodeViewWrapper } from '@tiptap/react'
 import type { ReactNodeViewProps } from '@tiptap/react'
 import Suggestion from '@tiptap/suggestion'
+import type { SuggestionOptions } from '@tiptap/suggestion'
 import { PluginKey } from '@tiptap/pm/state'
 import { useNotesStore } from '../../store/notes'
 import { useWorkspaceStore } from '../../store/workspace'
@@ -81,7 +82,7 @@ function WikiLinkView({ node }: ReactNodeViewProps) {
 // command list, plus a trailing "create note" entry for titles that don't
 // exist yet, since a wiki-link is allowed to point at a note that isn't
 // written yet.
-interface WikiLinkItem {
+export interface WikiLinkItem {
   title: string
   isNew: boolean
 }
@@ -161,6 +162,40 @@ const WikiLinkMenu = forwardRef<WikiLinkMenuHandle, WikiLinkMenuProps>(function 
   )
 })
 
+export function noteMenuRender(): ReturnType<NonNullable<SuggestionOptions['render']>> {
+  let renderer: ReactRenderer<WikiLinkMenuHandle, WikiLinkMenuProps>
+
+  return {
+    onStart(props) {
+      renderer = new ReactRenderer(WikiLinkMenu, {
+        props: {
+          items: props.items as WikiLinkItem[],
+          onSelect: (item: WikiLinkItem) => props.command(item),
+          clientRect: props.clientRect,
+        },
+        editor: props.editor,
+      })
+    },
+    onUpdate(props) {
+      renderer.updateProps({
+        items: props.items as WikiLinkItem[],
+        onSelect: (item: WikiLinkItem) => props.command(item),
+        clientRect: props.clientRect,
+      })
+    },
+    onKeyDown({ event }) {
+      if (event.key === 'Escape') {
+        renderer.destroy()
+        return true
+      }
+      return renderer.ref?.onKeyDown(event) ?? false
+    },
+    onExit() {
+      renderer.destroy()
+    },
+  }
+}
+
 export const WikiLink = Node.create({
   name: 'wikiLink',
   group: 'inline',
@@ -180,39 +215,7 @@ export const WikiLink = Node.create({
           const { title } = props as WikiLinkItem
           editor.chain().focus().deleteRange(range).insertContent({ type: 'wikiLink', attrs: { title } }).run()
         },
-        render() {
-          let renderer: ReactRenderer<WikiLinkMenuHandle, WikiLinkMenuProps>
-
-          return {
-            onStart(props) {
-              renderer = new ReactRenderer(WikiLinkMenu, {
-                props: {
-                  items: props.items as WikiLinkItem[],
-                  onSelect: (item: WikiLinkItem) => props.command(item),
-                  clientRect: props.clientRect,
-                },
-                editor: props.editor,
-              })
-            },
-            onUpdate(props) {
-              renderer.updateProps({
-                items: props.items as WikiLinkItem[],
-                onSelect: (item: WikiLinkItem) => props.command(item),
-                clientRect: props.clientRect,
-              })
-            },
-            onKeyDown({ event }) {
-              if (event.key === 'Escape') {
-                renderer.destroy()
-                return true
-              }
-              return renderer.ref?.onKeyDown(event) ?? false
-            },
-            onExit() {
-              renderer.destroy()
-            },
-          }
-        },
+        render: noteMenuRender,
       }),
     ]
   },

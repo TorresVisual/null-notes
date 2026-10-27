@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { isBareNoteName, isExternalHref, isSafeExternalHref, resolveNoteLink } from './noteLinks'
+import { isBareNoteName, isExternalHref, isSafeExternalHref, relativeNoteLink, resolveNoteLink } from './noteLinks'
 
 const ws = 'C:\\ws'
 const notes = ['C:\\ws\\Link.md', 'C:\\ws\\sub\\Lecture 7.md', 'C:\\ws\\sub\\Other.md']
@@ -46,5 +46,20 @@ describe('resolveNoteLink', () => {
 
   it('returns null for a missing note', () => {
     expect(resolveNoteLink('Nope.md', 'C:\\ws\\A.md', ws, notes)).toBeNull()
+  })
+})
+
+describe('relativeNoteLink', () => {
+  it('writes the shortest path from one note to another', () => {
+    expect(relativeNoteLink('C:\\ws\\A.md', 'C:\\ws\\Link.md')).toBe('Link.md')
+    expect(relativeNoteLink('C:\\ws\\A.md', 'C:\\ws\\sub\\Other.md')).toBe('sub/Other.md')
+    expect(relativeNoteLink('C:\\ws\\sub\\A.md', 'C:\\ws\\Link.md')).toBe('../Link.md')
+    expect(relativeNoteLink('C:\\ws\\a\\A.md', 'C:\\ws\\b\\B.md')).toBe('../b/B.md')
+  })
+
+  it('round-trips through resolveNoteLink', () => {
+    const from = 'C:\\ws\\sub\\A.md'
+    const href = relativeNoteLink(from, 'C:\\ws\\Link.md')
+    expect(resolveNoteLink(href, from, ws, notes)).toBe('C:\\ws\\Link.md')
   })
 })

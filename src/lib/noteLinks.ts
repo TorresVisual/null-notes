@@ -64,3 +64,18 @@ export function resolveNoteLink(
   }
   return null
 }
+
+/** The destination to write in `from`'s Markdown to reach `to`: `Link.md`, `sub/Other.md`, `../Up.md`. */
+export function relativeNoteLink(from: string, to: string): string {
+  const fromDir = normalize(from).split('/').slice(0, -1)
+  const toParts = normalize(to).split('/')
+  let shared = 0
+  while (
+    shared < fromDir.length &&
+    shared < toParts.length - 1 &&
+    fromDir[shared]?.toLowerCase() === toParts[shared]?.toLowerCase()
+  ) {
+    shared++
+  }
+  return [...fromDir.slice(shared).map(() => '..'), ...toParts.slice(shared)].join('/')
+}
