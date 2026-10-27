@@ -57,6 +57,8 @@ describe('withPrintMount', () => {
 describe('markPageBreaks', () => {
   function build(html: string): HTMLElement {
     const root = document.createElement('div')
+    // Test-only helper; callers always pass this file's own hardcoded fixture strings.
+    // eslint-disable-next-line no-unsanitized/property
     root.innerHTML = html
     return root
   }
