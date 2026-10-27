@@ -4,6 +4,18 @@ export function isExternalHref(href: string): boolean {
   return SCHEME.test(href)
 }
 
+const SAFE_SCHEMES = new Set(['http:', 'https:', 'mailto:'])
+
+// A note's content is untrusted (synced, imported, pasted), so only these
+// schemes may reach the OS opener — never `file:`, `javascript:` or custom handlers.
+export function isSafeExternalHref(href: string): boolean {
+  try {
+    return SAFE_SCHEMES.has(new URL(href).protocol.toLowerCase())
+  } catch {
+    return false
+  }
+}
+
 // `.md` is Moldova's TLD, so linkify reads a bare `Link.md` as a domain.
 export function isBareNoteName(text: string): boolean {
   return !SCHEME.test(text) && /\.md$/i.test(text.split(/[?#]/)[0] ?? '')

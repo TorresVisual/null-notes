@@ -2,7 +2,7 @@ import { Plugin, PluginKey } from '@tiptap/pm/state'
 import { Link } from '@tiptap/extension-link'
 import type { LinkOptions } from '@tiptap/extension-link'
 import { openUrl } from '@tauri-apps/plugin-opener'
-import { isBareNoteName, isExternalHref, resolveNoteLink } from '../../lib/noteLinks'
+import { isBareNoteName, isExternalHref, isSafeExternalHref, resolveNoteLink } from '../../lib/noteLinks'
 import { useNotesStore } from '../../store/notes'
 import { useWorkspaceStore } from '../../store/workspace'
 
@@ -30,7 +30,7 @@ export const NoteLink = Link.extend({
             event.preventDefault()
 
             if (isExternalHref(href)) {
-              void openUrl(href)
+              if (isSafeExternalHref(href)) void openUrl(href)
               return
             }
 

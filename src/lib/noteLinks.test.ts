@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { isBareNoteName, isExternalHref, resolveNoteLink } from './noteLinks'
+import { isBareNoteName, isExternalHref, isSafeExternalHref, resolveNoteLink } from './noteLinks'
 
 const ws = 'C:\\ws'
 const notes = ['C:\\ws\\Link.md', 'C:\\ws\\sub\\Lecture 7.md', 'C:\\ws\\sub\\Other.md']
@@ -18,6 +18,16 @@ describe('isExternalHref', () => {
     expect(isExternalHref('https://a.b')).toBe(true)
     expect(isExternalHref('mailto:a@b.c')).toBe(true)
     expect(isExternalHref('Link.md')).toBe(false)
+  })
+})
+
+describe('isSafeExternalHref', () => {
+  it('allows only http, https and mailto', () => {
+    expect(isSafeExternalHref('https://example.com')).toBe(true)
+    expect(isSafeExternalHref('mailto:a@b.c')).toBe(true)
+    expect(isSafeExternalHref('file:///C:/Windows/System32/calc.exe')).toBe(false)
+    expect(isSafeExternalHref('javascript:alert(1)')).toBe(false)
+    expect(isSafeExternalHref('ms-msdt:/id')).toBe(false)
   })
 })
 
