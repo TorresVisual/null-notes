@@ -8,8 +8,14 @@ export function updateCargoToml(content, version) {
   return content.replace(/^version = ".*"$/m, `version = "${version}"`)
 }
 
+export function assertRetaggable(release, tag) {
+  if (release && !release.isDraft) {
+    throw new Error(`${tag} is already published — bump the version instead of retagging.`)
+  }
+}
+
 // --- CLI entry point (below the Task 1 exports) ---
-import { execSync } from 'node:child_process'
+import { execSync, execFileSync } from 'node:child_process'
 import { readFileSync, writeFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 
@@ -17,10 +23,36 @@ function run(cmd) {
   execSync(cmd, { stdio: 'inherit' })
 }
 
+function findRelease(tag) {
+  try {
+    const out = execFileSync('gh', ['release', 'view', tag, '--json', 'isDraft'], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    })
+    return JSON.parse(out)
+  } catch (e) {
+    if (String(e.stderr).includes('release not found')) return null
+    throw e
+  }
+}
+
+function retag() {
+  const { version } = JSON.parse(readFileSync('package.json', 'utf8'))
+  const tag = `v${version}`
+  const release = findRelease(tag)
+  assertRetaggable(release, tag)
+  if (release) run(`gh release delete ${tag} --yes`)
+  run(`git tag -f -a ${tag} -m "${tag}"`)
+  run('git push origin main')
+  run(`git push --force origin ${tag}`)
+  console.log(`Retagged ${tag} at HEAD`)
+}
+
 function main() {
   const bump = process.argv[2]
+  if (bump === 'retag') return retag()
   if (!['patch', 'minor', 'major'].includes(bump)) {
-    console.error('Usage: npm run release -- patch|minor|major')
+    console.error('Usage: npm run release -- patch|minor|major|retag')
     process.exit(1)
   }
 

@@ -1,9 +1,9 @@
 $ErrorActionPreference = "Stop"
 
-$bump = Read-Host "Release bump (patch/minor/major) [patch]"
+$bump = Read-Host "Release bump (patch/minor/major/retag) [patch]"
 if (-not $bump) { $bump = "patch" }
 
-if ($bump -notin @("patch", "minor", "major")) {
+if ($bump -notin @("patch", "minor", "major", "retag")) {
     Write-Error "Invalid bump type: $bump"
     exit 1
 }

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { updateTauriConf, updateCargoToml } from './release.mjs'
+import { updateTauriConf, updateCargoToml, assertRetaggable } from './release.mjs'
 
 describe('updateTauriConf', () => {
   it('replaces the version field and preserves formatting', () => {
@@ -25,5 +25,16 @@ describe('updateCargoToml', () => {
     const output = updateCargoToml(input, '0.2.0')
     expect(output).toContain('\nversion = "0.2.0"\n')
     expect(output).toContain('serde = { version = "1.0", features = ["derive"] }')
+  })
+})
+
+describe('assertRetaggable', () => {
+  it('allows a missing release or a leftover draft', () => {
+    expect(() => assertRetaggable(null, 'v1.0.5')).not.toThrow()
+    expect(() => assertRetaggable({ isDraft: true }, 'v1.0.5')).not.toThrow()
+  })
+
+  it('refuses a published release', () => {
+    expect(() => assertRetaggable({ isDraft: false }, 'v1.0.5')).toThrow(/already published/)
   })
 })

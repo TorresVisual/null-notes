@@ -18,6 +18,27 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Refuse to build with the updater placeholder key
+        shell: bash
+        run: |
+          if grep -q REPLACE_WITH src-tauri/tauri.conf.json; then
+            echo "plugins.updater.pubkey in tauri.conf.json is still a placeholder" >&2
+            exit 1
+          fi
+
+      - name: Release notes from commits
+        id: notes
+        shell: bash
+        run: |
+          prev=$(git describe --tags --abbrev=0 --match 'v*' "${GITHUB_REF_NAME}^" 2>/dev/null || true)
+          {
+            echo 'body<<NOTES_EOF'
+            git log --no-merges --format='- %s' ${prev:+$prev..}"${GITHUB_REF_NAME}" | grep -v '^- chore: release' || true
+            echo 'NOTES_EOF'
+          } >> "$GITHUB_OUTPUT"
 
       - name: Generate CI signing cert
         run: ./scripts/windows/dev-cert.ps1
@@ -50,6 +71,11 @@ jobs:
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           tagName: ${{ github.ref_name }}
           releaseName: 'null-notes ${{ github.ref_name }}'
+          releaseBody: ${{ steps.notes.outputs.body }}
+          releaseDraft: true
+          args: --config src-tauri/tauri.release.conf.json
