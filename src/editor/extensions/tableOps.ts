@@ -55,6 +55,17 @@ export function insertRowAboveHeader(editor: Editor, tablePos: number, table: PM
   replaceTable(editor, tablePos, table, [header, body, ...childrenOf(table).slice(1)])
 }
 
+// Deleting the header promotes the row below it. Returns false for a one-row
+// table, which has no row to promote and is left to the stock deleteRow.
+export function deleteHeaderRow(editor: Editor, tablePos: number, table: PMNode): boolean {
+  const { tableHeader } = table.type.schema.nodes
+  const [, next, ...rest] = childrenOf(table)
+  if (!tableHeader || !next) return false
+  const promoted = next.copy(Fragment.from(childrenOf(next).map((cell) => tableHeader.create(cell.attrs, cell.content, cell.marks))))
+  replaceTable(editor, tablePos, table, [promoted, ...rest])
+  return true
+}
+
 export function duplicateRow(editor: Editor, tablePos: number, table: PMNode, row: number): void {
   if (row < 1 || row >= table.childCount) return
   const rows = childrenOf(table)

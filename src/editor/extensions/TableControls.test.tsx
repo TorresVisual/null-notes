@@ -395,6 +395,19 @@ describe('inserting above the header', () => {
   })
 })
 
+describe('deleting the header row', () => {
+  it('promotes the row below to the header', () => {
+    const e = mount(TABLE_HTML)
+    openMenu('.table-row-menu[data-row-index="0"]', e)
+    click('.table-row-menu[data-row-index="0"] [data-action="delete"]', e)
+    const table = findTable(e)
+    expect(table.childCount).toBe(2)
+    expect(table.child(0).child(0).type.name).toBe('tableHeader')
+    expect(rowTexts(table.child(0))).toEqual(['1', '2', '3'])
+    expect(table.child(1).child(0).type.name).toBe('tableCell')
+  })
+})
+
 describe('Tab inside a table', () => {
   function pressTab(e: Editor, shiftKey = false): void {
     const event = new KeyboardEvent('keydown', { key: 'Tab', shiftKey, bubbles: true })
