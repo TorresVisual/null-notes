@@ -180,6 +180,18 @@ function InlineMathView({ node, editor, getPos, updateAttributes, deleteNode, se
   )
 }
 
+// A bare `|` ends the cell in a GFM table row, and `\|` can't stand in for it:
+// the parser below reads raw source, so the backslash would survive into
+// KaTeX, where `\|` means a double bar. `\vert` / `\Vert` render the same
+// glyphs and need no unescaping on read; a letter right after one needs a
+// space or it would extend the command name.
+function escapeTablePipes(latex: string): string {
+  return latex.replace(/(\\*)\|([A-Za-z]?)/g, (_match, slashes: string, next: string) => {
+    const escaped = slashes.length % 2 === 1 ? `${slashes.slice(0, -1)}\\Vert` : `${slashes}\\vert`
+    return next ? `${escaped} ${next}` : escaped
+  })
+}
+
 export const InlineMath = Node.create({
   name: 'inlineMath',
   group: 'inline',
@@ -247,8 +259,8 @@ export const InlineMath = Node.create({
     return {
       markdown: {
         serialize(state: Record<string, unknown>, node: { attrs: InlineMathAttrs }) {
-          const s = state as { write: (str: string) => void }
-          s.write(`$${node.attrs.latex}$`)
+          const s = state as { write: (str: string) => void; inTable?: boolean }
+          s.write(`$${s.inTable ? escapeTablePipes(node.attrs.latex) : node.attrs.latex}$`)
         },
         parse: {
           // An *inline*-ruler rule, not a core-ruler post-process: markdown-it's

@@ -62,3 +62,28 @@ describe('table cells holding only an atom node', () => {
     expect(getMarkdown(e)).toContain('| $x^2$ | plain |')
   })
 })
+
+describe('pipes inside table math', () => {
+  const HTML =
+    '<table><tr><th>A</th><th>B</th></tr>' +
+    '<tr><td><span data-type="inline-math" data-latex="|x| + \\| y \\|"></span></td><td>2</td></tr></table>'
+
+  it('writes | as \\vert and \\| as \\Vert so the cell is not split', () => {
+    const out = getMarkdown(mount(HTML))
+    expect(out).toContain('| $\\vert x\\vert + \\Vert y \\Vert$ | 2 |')
+  })
+
+  it('reloads with the same number of cells in every row', () => {
+    const reloaded = mount(getMarkdown(mount(HTML)))
+    const widths: number[] = []
+    reloaded.state.doc.descendants((node) => {
+      if (node.type.name === 'tableRow') widths.push(node.childCount)
+      return true
+    })
+    expect(widths).toEqual([2, 2])
+  })
+
+  it('does not rewrite math outside a table', () => {
+    expect(getMarkdown(mount('$|x|$'))).toBe('$|x|$')
+  })
+})
