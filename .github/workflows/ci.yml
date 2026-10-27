@@ -69,4 +69,7 @@ jobs:
         # tauri -> plist, no fix available until that pin moves.
         # RUSTSEC-2023-0071 (rsa Marvin Attack): advisory itself has no fixed
         # upgrade available yet.
-        run: cargo audit --ignore RUSTSEC-2026-0194 --ignore RUSTSEC-2026-0195 --ignore RUSTSEC-2023-0071
+        # RUSTSEC-2026-0367/0368/0369 (zip 4.6.1): Unix SUID/symlink/permission
+        # handling in extract(); the updater only uses zip on Windows, and it is
+        # pinned by tauri-plugin-updater 2.x (fix needs zip >=9, no 2.x release).
+        run: cargo audit --ignore RUSTSEC-2026-0194 --ignore RUSTSEC-2026-0195 --ignore RUSTSEC-2023-0071 --ignore RUSTSEC-2026-0367 --ignore RUSTSEC-2026-0368 --ignore RUSTSEC-2026-0369
