@@ -94,21 +94,15 @@ const ICON_SORT_ASC =
   '<path d="m3 8 4-4 4 4"/><path d="M7 4v16"/><path d="M11 12h4"/><path d="M11 16h7"/><path d="M11 20h10"/>'
 const ICON_SORT_DESC =
   '<path d="m3 16 4 4 4-4"/><path d="M7 20V4"/><path d="M11 4h10"/><path d="M11 8h7"/><path d="M11 12h4"/>'
-const ICON_DOTS_HORIZONTAL =
-  '<circle cx="6" cy="12" r="1.6" fill="currentColor"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/><circle cx="18" cy="12" r="1.6" fill="currentColor"/>'
-const ICON_DOTS_VERTICAL =
-  '<circle cx="12" cy="6" r="1.6" fill="currentColor"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/><circle cx="12" cy="18" r="1.6" fill="currentColor"/>'
 
-function svgIcon(inner: string, stroked: boolean): SVGSVGElement {
+function svgIcon(inner: string): SVGSVGElement {
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
   svg.setAttribute('viewBox', '0 0 24 24')
-  if (stroked) {
-    svg.setAttribute('fill', 'none')
-    svg.setAttribute('stroke', 'currentColor')
-    svg.setAttribute('stroke-width', '2.5')
-    svg.setAttribute('stroke-linecap', 'round')
-    svg.setAttribute('stroke-linejoin', 'round')
-  }
+  svg.setAttribute('fill', 'none')
+  svg.setAttribute('stroke', 'currentColor')
+  svg.setAttribute('stroke-width', '2.5')
+  svg.setAttribute('stroke-linecap', 'round')
+  svg.setAttribute('stroke-linejoin', 'round')
   // `inner` is always one of this file's own hardcoded ICON_* constants,
   // never note-derived text.
   // eslint-disable-next-line no-unsanitized/property
@@ -122,7 +116,7 @@ function iconButton(className: string, label: string, iconInner: string, onActiv
   el.className = className
   el.setAttribute('aria-label', label)
   el.title = label
-  el.appendChild(svgIcon(iconInner, true))
+  el.appendChild(svgIcon(iconInner))
   // mousedown + preventDefault (not click) so the browser never moves focus
   // or the DOM selection out of the table before the handler runs.
   el.addEventListener('mousedown', (event) => {
@@ -144,7 +138,7 @@ function menuItem(
   el.disabled = disabled
   el.dataset.action = action
   if (danger) el.className = 'danger'
-  el.appendChild(svgIcon(iconInner, true))
+  el.appendChild(svgIcon(iconInner))
   el.appendChild(document.createTextNode(label))
   el.addEventListener('mousedown', (event) => {
     event.preventDefault()
@@ -155,17 +149,25 @@ function menuItem(
 
 // The table wrapper scrolls horizontally, which clips anything hanging below
 // a short table — and these menus are taller than a two-row table. Fixed
-// positioning lets the panel escape that clip; it is anchored to the grip's
-// screen rect when it opens and kept inside the viewport.
+// positioning lets the panel escape that clip. A transformed ancestor would
+// make "fixed" mean "relative to that ancestor", so the panel is first parked
+// at the viewport origin and the offset it actually lands at is subtracted.
 function placeMenuPanel(details: HTMLDetailsElement, axis: 'col' | 'row'): void {
   const grip = details.querySelector('summary')
   const panel = details.querySelector('.table-menu-panel')
   if (!grip || !(panel instanceof HTMLElement)) return
-  const r = grip.getBoundingClientRect()
+  panel.style.transform = 'none'
   panel.style.position = 'fixed'
-  panel.style.left = `${axis === 'col' ? r.left + r.width / 2 : r.right + 2}px`
+  panel.style.left = '0px'
+  panel.style.top = '0px'
+  const origin = panel.getBoundingClientRect()
+  const r = grip.getBoundingClientRect()
+  const left = axis === 'col' ? r.left + r.width / 2 - origin.width / 2 : r.right + 2
   const top = axis === 'col' ? r.bottom + 2 : r.top
-  panel.style.top = `${Math.max(8, Math.min(top, window.innerHeight - panel.offsetHeight - 8))}px`
+  const maxLeft = window.innerWidth - origin.width - 8
+  const maxTop = window.innerHeight - origin.height - 8
+  panel.style.left = `${Math.max(8, Math.min(left, maxLeft)) - origin.left}px`
+  panel.style.top = `${Math.max(8, Math.min(top, maxTop)) - origin.top}px`
 }
 
 // Only one grip menu open at a time, Notion-style — opening one closes any
@@ -245,7 +247,6 @@ function buildColumnMenu(
   const summary = document.createElement('summary')
   summary.className = 'table-grip'
   summary.setAttribute('aria-label', `Column ${col + 1} options`)
-  summary.appendChild(svgIcon(ICON_DOTS_HORIZONTAL, false))
   details.appendChild(summary)
 
   const panel = document.createElement('div')
@@ -336,7 +337,6 @@ function buildRowMenu(
   const summary = document.createElement('summary')
   summary.className = 'table-grip'
   summary.setAttribute('aria-label', `Row ${row + 1} options`)
-  summary.appendChild(svgIcon(ICON_DOTS_VERTICAL, false))
   details.appendChild(summary)
 
   const panel = document.createElement('div')
@@ -404,6 +404,15 @@ function buildRowMenu(
   return details
 }
 
+function setHoveredGrips(controls: HTMLElement, col: number, row: number): void {
+  controls.querySelectorAll<HTMLElement>('.table-col-menu').forEach((el) => {
+    el.classList.toggle('hovered', Number(el.dataset.colIndex) === col)
+  })
+  controls.querySelectorAll<HTMLElement>('.table-row-menu').forEach((el) => {
+    el.classList.toggle('hovered', Number(el.dataset.rowIndex) === row)
+  })
+}
+
 function positionGrips(wrapper: HTMLElement, controls: HTMLElement): void {
   const wrapperRect = wrapper.getBoundingClientRect()
   const firstRow = wrapper.querySelector(':scope > table > tbody > tr:first-child')
@@ -435,12 +444,6 @@ function buildControls(editor: Editor, wrapper: HTMLElement, tablePos: number, t
   const controls = document.createElement('div')
   controls.className = 'table-controls'
   controls.contentEditable = 'false'
-
-  controls.appendChild(
-    iconButton('table-controls-corner', 'Delete table', ICON_TRASH, () => {
-      runAtCell(editor, cellPos(tablePos, table, 0, 0), (c) => c.deleteTable())
-    }),
-  )
 
   for (let col = 0; col < cols; col++) {
     controls.appendChild(buildColumnMenu(editor, wrapper, controls, tablePos, table, col))
@@ -509,6 +512,31 @@ export const TableControls = Extension.create({
           }
           document.addEventListener('mousedown', onOutsideClick, true)
 
+          // A grip shows only for the row/column under the pointer. Moving
+          // from a cell onto its grip (which sits in the wrapper's padding)
+          // keeps the current state; leaving the table clears it.
+          const onOver = (event: MouseEvent) => {
+            const target = event.target
+            if (!(target instanceof Element)) return
+            const controls = target.closest('.tableWrapper')?.querySelector(':scope > .table-controls')
+            if (!(controls instanceof HTMLElement)) return
+            const cell = target.closest('td, th')
+            if (cell instanceof HTMLTableCellElement && cell.parentElement instanceof HTMLTableRowElement) {
+              setHoveredGrips(controls, cell.cellIndex, cell.parentElement.rowIndex)
+            } else if (!target.closest('.table-controls')) {
+              setHoveredGrips(controls, -1, -1)
+            }
+          }
+          const onLeave = (event: MouseEvent) => {
+            const target = event.target
+            if (!(target instanceof Element) || !target.classList.contains('tableWrapper')) return
+            if (event.relatedTarget instanceof Node && target.contains(event.relatedTarget)) return
+            const controls = target.querySelector(':scope > .table-controls')
+            if (controls instanceof HTMLElement) setHoveredGrips(controls, -1, -1)
+          }
+          editorView.dom.addEventListener('mouseover', onOver)
+          editorView.dom.addEventListener('mouseout', onLeave)
+
           return {
             update(view, prevState) {
               if (!view.state.doc.eq(prevState.doc)) {
@@ -518,6 +546,8 @@ export const TableControls = Extension.create({
             destroy() {
               window.removeEventListener('resize', onResize)
               document.removeEventListener('mousedown', onOutsideClick, true)
+              editorView.dom.removeEventListener('mouseover', onOver)
+              editorView.dom.removeEventListener('mouseout', onLeave)
             },
           }
         },

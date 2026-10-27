@@ -151,15 +151,20 @@ describe('table grip menus', () => {
     expect(rowTexts(table.child(3))).toEqual(['', '', ''])
   })
 
-  it('deletes the whole table via the corner control', () => {
+  it('shows only the grips for the hovered cell', () => {
     const e = mount(TABLE_HTML)
-    click('.table-controls-corner', e)
-    let found = false
-    e.state.doc.descendants((node) => {
-      if (node.type.name === 'table') found = true
-      return true
-    })
-    expect(found).toBe(false)
+    const cell = e.view.dom.querySelectorAll('tbody tr')[2]?.children[1]
+    if (!cell) throw new Error('no cell')
+    fireEvent.mouseOver(cell)
+    const hoveredCols = Array.from(e.view.dom.querySelectorAll('.table-col-menu.hovered')).map((el) => (el as HTMLElement).dataset['colIndex'])
+    const hoveredRows = Array.from(e.view.dom.querySelectorAll('.table-row-menu.hovered')).map((el) => (el as HTMLElement).dataset['rowIndex'])
+    expect(hoveredCols).toEqual(['1'])
+    expect(hoveredRows).toEqual(['2'])
+  })
+
+  it('has no delete-table control', () => {
+    const e = mount(TABLE_HTML)
+    expect(e.view.dom.querySelector('.table-controls-corner')).toBeNull()
   })
 
   it('rebuilds menus to match the new column count after a delete', () => {

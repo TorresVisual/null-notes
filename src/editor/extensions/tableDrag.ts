@@ -52,11 +52,11 @@ export function attachGripDrag({ grip, axis, index, wrapper, controls, minGap, o
     const mids = rects.map((r) => (axis === 'col' ? r.left + r.width / 2 : r.top + r.height / 2))
     let dragging = false
     let gap = -1
-    grip.setPointerCapture(event.pointerId)
 
     const onMove = (move: PointerEvent) => {
       const pointer = axis === 'col' ? move.clientX : move.clientY
       if (!dragging && Math.abs(pointer - start) < MOVE_THRESHOLD_PX) return
+      if (!dragging) grip.setPointerCapture(event.pointerId)
       dragging = true
       controls.classList.add('dragging')
       gap = gapIndex(mids, pointer, minGap)

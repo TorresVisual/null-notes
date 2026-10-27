@@ -1607,22 +1607,16 @@ code {
 }
 
 /* Grip/menu/append overlay. Lives in the padding strip reserved around the
-   table (see .tableWrapper), never on top of its content. `:has([open])`
-   keeps it visible while a menu is open even if the pointer has drifted off
-   the wrapper — losing the hover state mid-menu would otherwise fade the
-   whole overlay out from under an open dropdown. */
+   table (see .tableWrapper), never on top of its content. The overlay itself
+   is always laid out; each grip fades in only for the row/column under the
+   pointer (`.hovered`, set by TableControls) or while its menu is open, and
+   the append strips fade in with the table's own hover. */
 .note-editor .table-controls {
   position: absolute;
   inset: 0;
   pointer-events: none;
-  opacity: 0;
-  transition: opacity var(--duration-fast) var(--ease-standard);
 }
-.note-editor .tableWrapper:hover .table-controls,
-.note-editor .table-controls:focus-within,
-.note-editor .table-controls:has([open]) { opacity: 1; }
 
-.note-editor .table-controls-corner,
 .note-editor .table-append-col,
 .note-editor .table-append-row {
   position: absolute;
@@ -1635,14 +1629,17 @@ code {
   background: transparent;
   color: var(--text-tertiary);
   cursor: pointer;
+  opacity: 0;
+  transition: opacity var(--duration-fast) var(--ease-standard);
 }
-.note-editor .table-controls-corner:hover { background: rgba(224, 80, 80, 0.15); color: var(--danger); }
+.note-editor .tableWrapper:hover .table-append-col,
+.note-editor .tableWrapper:hover .table-append-row,
+.note-editor .table-append-col:focus-visible,
+.note-editor .table-append-row:focus-visible { opacity: 1; }
 .note-editor .table-append-col:hover,
 .note-editor .table-append-row:hover { background: var(--bg-hover); color: var(--accent); }
-.note-editor .table-controls-corner svg,
 .note-editor .table-append-col svg,
 .note-editor .table-append-row svg { width: 11px; height: 11px; }
-.note-editor .table-controls-corner { top: 0; left: 0; width: 18px; height: 18px; z-index: 4; }
 /* Single persistent append point per axis, Notion-style — a thin strip on
    the table's outer edge rather than a control glued to the last column/row. */
 .note-editor .table-append-col { top: 22px; right: 0; bottom: 0; width: 16px; }
@@ -1650,30 +1647,45 @@ code {
 
 /* One grip per column/row, centered over its cell. JS (positionGrips) sets
    only the offset along the cell's own axis each render; centering along the
-   other axis is a fixed flex rule so it never needs recomputing. */
+   other axis is a fixed flex rule so it never needs recomputing. The summary
+   is a generous click target; the visible handle is just the slim bar drawn
+   by ::after. Centred with margins, not transform: a transformed ancestor
+   would become the containing block for the fixed-position menu panel
+   (placeMenuPanel). */
 .note-editor .table-col-menu,
 .note-editor .table-row-menu { position: absolute; display: flex; z-index: 3; pointer-events: auto; }
-/* Centred with margins, not transform: a transformed ancestor would become
-   the containing block for the fixed-position menu panel (placeMenuPanel). */
-.note-editor .table-col-menu { top: 0; height: 22px; align-items: center; margin-left: -13px; }
-.note-editor .table-row-menu { left: 0; width: 22px; align-items: center; justify-content: center; margin-top: -9px; }
+.note-editor .table-col-menu { top: 0; height: 22px; align-items: center; margin-left: -16px; }
+.note-editor .table-row-menu { left: 0; width: 22px; align-items: center; justify-content: center; margin-top: -16px; }
 
 .note-editor .table-grip {
   list-style: none;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 26px;
-  height: 18px;
   border-radius: 4px;
-  color: var(--text-tertiary);
+  color: var(--text-secondary);
   cursor: pointer;
+  opacity: 0;
+  transition: opacity var(--duration-fast) var(--ease-standard);
 }
+.note-editor .table-col-menu > .table-grip { width: 32px; height: 20px; }
+.note-editor .table-row-menu > .table-grip { width: 20px; height: 32px; }
 .note-editor .table-grip::-webkit-details-marker { display: none; }
-.note-editor .table-grip:hover { background: var(--bg-hover); color: var(--text-secondary); }
+.note-editor .table-grip::after {
+  content: '';
+  border-radius: 2px;
+  background: currentColor;
+}
+.note-editor .table-col-menu > .table-grip::after { width: 22px; height: 4px; }
+.note-editor .table-row-menu > .table-grip::after { width: 4px; height: 22px; }
+.note-editor .table-col-menu.hovered > .table-grip,
+.note-editor .table-row-menu.hovered > .table-grip,
+.note-editor .table-col-menu[open] > .table-grip,
+.note-editor .table-row-menu[open] > .table-grip,
+.note-editor .table-grip:focus-visible { opacity: 1; }
+.note-editor .table-grip:hover { background: var(--bg-hover); color: var(--text-primary); opacity: 1; }
 .note-editor .table-col-menu[open] > .table-grip,
 .note-editor .table-row-menu[open] > .table-grip { background: var(--accent-bg); color: var(--accent); }
-.note-editor .table-grip svg { width: 13px; height: 13px; }
 
 /* Dropdown content reuses .context-menu's look (see "Folder context menu"
    below) — same visual language as every other menu in the app — with just
@@ -1685,7 +1697,8 @@ code {
 
 /* Drag-to-reorder: the grip is the handle, the line marks the drop gap. */
 .note-editor .table-controls { user-select: none; }
-.note-editor .table-controls.dragging { opacity: 1; cursor: grabbing; }
+.note-editor .table-controls.dragging { cursor: grabbing; }
+.note-editor .table-controls.dragging .table-grip { opacity: 1; }
 .note-editor .table-controls.dragging .table-grip { cursor: grabbing; }
 .note-editor .table-drop-line {
   position: absolute;
