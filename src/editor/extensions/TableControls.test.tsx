@@ -174,27 +174,36 @@ describe('table grip menus', () => {
     expect(e.view.dom.querySelectorAll('.table-col-menu').length).toBe(2)
   })
 
-  it("cycles a column's alignment through center, right, then back to default, applied to every cell in the column", () => {
+  it('sets the chosen alignment on every cell in the column, and left clears it', () => {
     const e = mount(TABLE_HTML)
-    const selector = '.table-col-menu[data-col-index="1"] [data-action="align"]'
-
-    openMenu('.table-col-menu[data-col-index="1"]', e)
-    click(selector, e)
+    const pick = (action: string) => {
+      openMenu('.table-col-menu[data-col-index="1"]', e)
+      click(`.table-col-menu[data-col-index="1"] [data-action="${action}"]`, e)
+    }
+    pick('align-center')
     expect(columnAligns(findTable(e), 1)).toEqual(['center', 'center', 'center'])
-
-    openMenu('.table-col-menu[data-col-index="1"]', e)
-    click(selector, e)
+    pick('align-right')
     expect(columnAligns(findTable(e), 1)).toEqual(['right', 'right', 'right'])
-
-    openMenu('.table-col-menu[data-col-index="1"]', e)
-    click(selector, e)
+    pick('align-left')
     expect(columnAligns(findTable(e), 1)).toEqual([null, null, null])
+  })
+
+  it('marks the current alignment as active in the menu', () => {
+    const e = mount(TABLE_HTML)
+    const active = () =>
+      Array.from(e.view.dom.querySelectorAll('.table-col-menu[data-col-index="1"] button.active')).map((b) =>
+        (b as HTMLElement).dataset['action'],
+      )
+    expect(active()).toEqual(['align-left'])
+    openMenu('.table-col-menu[data-col-index="1"]', e)
+    click('.table-col-menu[data-col-index="1"] [data-action="align-right"]', e)
+    expect(active()).toEqual(['align-right'])
   })
 
   it('leaves other columns unaligned when only one column is cycled', () => {
     const e = mount(TABLE_HTML)
     openMenu('.table-col-menu[data-col-index="1"]', e)
-    click('.table-col-menu[data-col-index="1"] [data-action="align"]', e)
+    click('.table-col-menu[data-col-index="1"] [data-action="align-center"]', e)
     expect(columnAligns(findTable(e), 0)).toEqual([null, null, null])
     expect(columnAligns(findTable(e), 2)).toEqual([null, null, null])
   })
@@ -278,7 +287,7 @@ describe('table row operations', () => {
 describe('table column operations', () => {
   it('moves a column right and keeps its alignment with it', () => {
     const e = mount(TABLE_HTML)
-    colMenuAction(0, 'align', e)
+    colMenuAction(0, 'align-center', e)
     colMenuAction(0, 'move-right', e)
     const table = findTable(e)
     expect(rowTexts(table.firstChild!)).toEqual(['B', 'A', 'C'])
@@ -288,7 +297,7 @@ describe('table column operations', () => {
 
   it('duplicates a column directly after the original, content and alignment included', () => {
     const e = mount(TABLE_HTML)
-    colMenuAction(1, 'align', e)
+    colMenuAction(1, 'align-center', e)
     colMenuAction(1, 'duplicate', e)
     const table = findTable(e)
     expect(rowTexts(table.firstChild!)).toEqual(['A', 'B', 'B', 'C'])
@@ -358,5 +367,18 @@ describe('pasting tables', () => {
     expect(rowTexts(table.child(0))).toEqual(['Name', 'Score'])
     expect(table.child(0).child(0).type.name).toBe('tableHeader')
     expect(bodyTexts(table)).toEqual([['Ada', '9']])
+  })
+})
+
+describe('block handle', () => {
+  it('can select the whole table as a node, which its menu needs', () => {
+    const e = mount(TABLE_HTML)
+    let tablePos = -1
+    e.state.doc.descendants((node, pos) => {
+      if (node.type.name === 'table') tablePos = pos
+      return tablePos < 0
+    })
+    e.commands.setNodeSelection(tablePos)
+    expect(e.state.selection.constructor.name).toBe('NodeSelection')
   })
 })

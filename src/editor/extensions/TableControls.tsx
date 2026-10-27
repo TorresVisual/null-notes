@@ -42,21 +42,6 @@ function runAtCell(editor: Editor, pos: number, run: (chain: Chain) => Chain): v
 
 type Align = 'left' | 'center' | 'right' | null
 
-// Skips the redundant fourth state — an explicit 'left' renders identically
-// to the unset default, so a null <-> 'left' <-> 'center' <-> 'right' cycle
-// would show two visually identical steps.
-function nextAlign(current: Align): Align {
-  if (current === null) return 'center'
-  if (current === 'center') return 'right'
-  return null
-}
-
-function alignLabel(align: Align): string {
-  if (align === 'center') return 'Center'
-  if (align === 'right') return 'Right'
-  return 'Left'
-}
-
 // A CellSelection spanning the top and bottom cell of a column covers every
 // cell between them, so setCellAttribute (which applies to a whole
 // CellSelection via forEachCell) lands on the entire column in one dispatch.
@@ -273,11 +258,20 @@ function buildColumnMenu(
   )
   panel.appendChild(menuItem('Duplicate', 'duplicate', ICON_COPY, () => duplicateColumn(editor, tablePos, table, col)))
   panel.appendChild(document.createElement('hr'))
-  panel.appendChild(
-    menuItem(`Align: ${alignLabel(align)}`, 'align', ICON_ALIGN[align ?? 'left'], () => {
-      setColumnAlign(editor, tablePos, table, col, nextAlign(align))
-    }),
-  )
+  // An explicit left is stored as no alignment: it renders identically and
+  // keeps the saved delimiter row a plain `---`.
+  for (const choice of ['left', 'center', 'right'] as const) {
+    const item = menuItem(
+      `Align ${choice}`,
+      `align-${choice}`,
+      ICON_ALIGN[choice],
+      () => setColumnAlign(editor, tablePos, table, col, choice === 'left' ? null : choice),
+    )
+    const active = (align ?? 'left') === choice
+    item.classList.toggle('active', active)
+    item.setAttribute('aria-pressed', String(active))
+    panel.appendChild(item)
+  }
   panel.appendChild(
     menuItem('Sort ascending', 'sort-asc', ICON_SORT_ASC, () => sortByColumn(editor, tablePos, table, col, 'asc')),
   )

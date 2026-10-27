@@ -1645,7 +1645,8 @@ code {
 .note-editor .table-append-col { top: 22px; right: 0; bottom: 0; width: 16px; }
 .note-editor .table-append-row { left: 22px; right: 0; bottom: 0; height: 16px; }
 
-/* One grip per column/row, centered over its cell. JS (positionGrips) sets
+/* One grip per column/row, centered over its cell and sitting on the
+   table's own outer line (the wrapper's 22px padding puts that line at 22px). JS (positionGrips) sets
    only the offset along the cell's own axis each render; centering along the
    other axis is a fixed flex rule so it never needs recomputing. The summary
    is a generous click target; the visible handle is just the slim bar drawn
@@ -1654,8 +1655,8 @@ code {
    (placeMenuPanel). */
 .note-editor .table-col-menu,
 .note-editor .table-row-menu { position: absolute; display: flex; z-index: 3; pointer-events: auto; }
-.note-editor .table-col-menu { top: 0; height: 22px; align-items: center; margin-left: -16px; }
-.note-editor .table-row-menu { left: 0; width: 22px; align-items: center; justify-content: center; margin-top: -16px; }
+.note-editor .table-col-menu { top: 16px; height: 12px; align-items: center; margin-left: -16px; }
+.note-editor .table-row-menu { left: 16px; width: 12px; align-items: center; justify-content: center; margin-top: -16px; }
 
 .note-editor .table-grip {
   list-style: none;
@@ -1668,8 +1669,8 @@ code {
   opacity: 0;
   transition: opacity var(--duration-fast) var(--ease-standard);
 }
-.note-editor .table-col-menu > .table-grip { width: 32px; height: 20px; }
-.note-editor .table-row-menu > .table-grip { width: 20px; height: 32px; }
+.note-editor .table-col-menu > .table-grip { width: 32px; height: 12px; }
+.note-editor .table-row-menu > .table-grip { width: 12px; height: 32px; }
 .note-editor .table-grip::-webkit-details-marker { display: none; }
 .note-editor .table-grip::after {
   content: '';
@@ -1693,6 +1694,7 @@ code {
 .note-editor .table-menu-panel { position: absolute; z-index: 30; min-width: 160px; }
 .note-editor .table-col-menu .table-menu-panel { transform: translateX(-50%); }
 .note-editor .table-menu-panel svg { width: 13px; height: 13px; flex: none; }
+.note-editor .table-menu-panel button.active { color: var(--accent); }
 .note-editor .table-menu-panel button:disabled { color: var(--text-disabled); cursor: default; background: none; }
 
 /* Drag-to-reorder: the grip is the handle, the line marks the drop gap. */

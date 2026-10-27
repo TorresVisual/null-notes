@@ -170,7 +170,7 @@ export const coreExtensions = [
   NodeRange.configure({ key: 'Shift' }),
   CodeWithRegexpRule.configure({ HTMLAttributes: NO_SPELLCHECK }),
   CodeBlockEditor.configure({ lowlight, HTMLAttributes: NO_SPELLCHECK }),
-  TableMarkdown.configure({ resizable: false }),
+  TableMarkdown.configure({ resizable: false, allowTableNodeSelection: true }),
   TableRow,
   TableHeader,
   TableCell,
