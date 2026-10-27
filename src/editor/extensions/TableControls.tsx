@@ -5,7 +5,7 @@ import type { EditorView } from '@tiptap/pm/view'
 import type { Node as PMNode } from '@tiptap/pm/model'
 import { TableMap } from '@tiptap/pm/tables'
 import { attachGripDrag } from './tableDrag'
-import { duplicateColumn, duplicateRow, moveColumn, moveRow, sortByColumn } from './tableOps'
+import { duplicateColumn, duplicateRow, insertRowAboveHeader, moveColumn, moveRow, sortByColumn } from './tableOps'
 
 interface TableInfo {
   pos: number
@@ -337,7 +337,8 @@ function buildRowMenu(
   panel.className = 'context-menu table-menu-panel'
   panel.appendChild(
     menuItem('Insert above', 'insert-above', ICON_PLUS, () => {
-      runAtCell(editor, cellPos(tablePos, table, row, 0), (c) => c.addRowBefore())
+      if (row === 0) insertRowAboveHeader(editor, tablePos, table)
+      else runAtCell(editor, cellPos(tablePos, table, row, 0), (c) => c.addRowBefore())
     }),
   )
   panel.appendChild(

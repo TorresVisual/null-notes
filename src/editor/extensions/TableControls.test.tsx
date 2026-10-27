@@ -2,7 +2,9 @@ import { describe, it, expect, afterEach } from 'vitest'
 import { fireEvent } from '@testing-library/react'
 import { Editor } from '@tiptap/core'
 import type { Node as PMNode } from '@tiptap/pm/model'
+import { TableMap } from '@tiptap/pm/tables'
 import { coreExtensions } from './index'
+import { handleEditorKeyDown } from './CodeBlockEditor'
 
 let editor: Editor | null = null
 
@@ -367,6 +369,83 @@ describe('pasting tables', () => {
     expect(rowTexts(table.child(0))).toEqual(['Name', 'Score'])
     expect(table.child(0).child(0).type.name).toBe('tableHeader')
     expect(bodyTexts(table)).toEqual([['Ada', '9']])
+  })
+})
+
+describe('inserting above the header', () => {
+  it('makes the new row the header and demotes the old one to a body row', () => {
+    const e = mount(TABLE_HTML)
+    openMenu('.table-row-menu[data-row-index="0"]', e)
+    click('.table-row-menu[data-row-index="0"] [data-action="insert-above"]', e)
+    const table = findTable(e)
+    expect(table.childCount).toBe(4)
+    expect(table.child(0).child(0).type.name).toBe('tableHeader')
+    expect(rowTexts(table.child(0))).toEqual(['', '', ''])
+    expect(table.child(1).child(0).type.name).toBe('tableCell')
+    expect(rowTexts(table.child(1))).toEqual(['A', 'B', 'C'])
+  })
+
+  it('keeps each column alignment on the new header', () => {
+    const e = mount('| A | B |\n| :---: | ---: |\n| 1 | 2 |')
+    openMenu('.table-row-menu[data-row-index="0"]', e)
+    click('.table-row-menu[data-row-index="0"] [data-action="insert-above"]', e)
+    const table = findTable(e)
+    expect(table.child(0).child(0).attrs['align']).toBe('center')
+    expect(table.child(0).child(1).attrs['align']).toBe('right')
+  })
+})
+
+describe('Tab inside a table', () => {
+  function pressTab(e: Editor, shiftKey = false): void {
+    const event = new KeyboardEvent('keydown', { key: 'Tab', shiftKey, bubbles: true })
+    e.view.someProp('handleKeyDown', (f) => (f as (v: Editor['view'], ev: KeyboardEvent) => boolean | void)(e.view, event))
+  }
+
+  function mountWithEditorProps(content: string): Editor {
+    editor = new Editor({
+      element: document.createElement('div'),
+      extensions: coreExtensions,
+      content,
+      editorProps: { handleKeyDown: handleEditorKeyDown },
+    })
+    return editor
+  }
+
+  function caretInCell(e: Editor, row: number, col: number): void {
+    let tablePos = -1
+    e.state.doc.descendants((node, pos) => {
+      if (node.type.name === 'table') tablePos = pos
+      return tablePos < 0
+    })
+    e.commands.setTextSelection(tablePos + 1 + TableMap.get(findTable(e)).positionAt(row, col, findTable(e)) + 2)
+  }
+
+  function caretCell(e: Editor): string {
+    return e.state.selection.$from.parent.textContent
+  }
+
+  it('moves to the next cell, wrapping to the next row, and back with Shift+Tab', () => {
+    const e = mountWithEditorProps(TABLE_HTML)
+    caretInCell(e, 0, 2)
+    expect(caretCell(e)).toBe('C')
+    pressTab(e)
+    expect(caretCell(e)).toBe('1')
+    pressTab(e, true)
+    expect(caretCell(e)).toBe('C')
+  })
+
+  it('adds a row when Tab is pressed in the last cell', () => {
+    const e = mountWithEditorProps(TABLE_HTML)
+    caretInCell(e, 2, 2)
+    pressTab(e)
+    expect(findTable(e).childCount).toBe(4)
+  })
+
+  it('never inserts spaces into a cell', () => {
+    const e = mountWithEditorProps(TABLE_HTML)
+    caretInCell(e, 0, 0)
+    pressTab(e)
+    expect(rowTexts(findTable(e).child(0))).toEqual(['A', 'B', 'C'])
   })
 })
 

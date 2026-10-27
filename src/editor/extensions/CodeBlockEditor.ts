@@ -174,9 +174,21 @@ function findListItemType(view: EditorView): NodeType | null {
   for (let depth = $from.depth; depth > 0; depth -= 1) {
     const type = $from.node(depth).type
     if (type.name === 'listItem' || type.name === 'taskItem') return type
+    if (type.name === 'tableCell' || type.name === 'tableHeader') return null
   }
 
   return null
+}
+
+function isInTableCell(view: EditorView): boolean {
+  const { $from } = view.state.selection
+
+  for (let depth = $from.depth; depth > 0; depth -= 1) {
+    const name = $from.node(depth).type.name
+    if (name === 'tableCell' || name === 'tableHeader') return true
+  }
+
+  return false
 }
 
 export function handleEditorKeyDown(view: EditorView, event: KeyboardEvent): boolean {
@@ -208,8 +220,11 @@ export function handleEditorKeyDown(view: EditorView, event: KeyboardEvent): boo
 
   if (event.key !== 'Tab') return false
 
-  event.preventDefault()
   const itemType = findListItemType(view)
+  // Tab in a cell belongs to the table's own keymap (next cell, new row at the end).
+  if (!itemType && isInTableCell(view)) return false
+
+  event.preventDefault()
   if (itemType) {
     const command = event.shiftKey ? liftListItem(itemType) : sinkListItem(itemType)
     return command(view.state, view.dispatch)

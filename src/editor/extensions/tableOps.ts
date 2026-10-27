@@ -39,6 +39,22 @@ export function moveRow(editor: Editor, tablePos: number, table: PMNode, from: n
   replaceTable(editor, tablePos, table, moved(childrenOf(table), from, to))
 }
 
+// The first row is the GFM header, so a row inserted above it becomes the new
+// header and the old one drops to a body row (prosemirror-tables would add a
+// plain row above a still-header row instead).
+export function insertRowAboveHeader(editor: Editor, tablePos: number, table: PMNode): void {
+  const { tableHeader, tableCell } = table.type.schema.nodes
+  const oldHeader = table.firstChild
+  if (!tableHeader || !tableCell || !oldHeader) return
+  const header = oldHeader.copy(
+    Fragment.from(childrenOf(oldHeader).map((cell) => tableHeader.createAndFill({ ...cell.attrs, colspan: 1, rowspan: 1 }) as PMNode)),
+  )
+  const body = oldHeader.copy(
+    Fragment.from(childrenOf(oldHeader).map((cell) => tableCell.create(cell.attrs, cell.content, cell.marks))),
+  )
+  replaceTable(editor, tablePos, table, [header, body, ...childrenOf(table).slice(1)])
+}
+
 export function duplicateRow(editor: Editor, tablePos: number, table: PMNode, row: number): void {
   if (row < 1 || row >= table.childCount) return
   const rows = childrenOf(table)
