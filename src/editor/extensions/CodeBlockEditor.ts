@@ -5,6 +5,7 @@ import { liftListItem, sinkListItem } from '@tiptap/pm/schema-list'
 import { joinTextblockBackward } from '@tiptap/pm/commands'
 import type { Node as ProseMirrorNode, NodeType } from '@tiptap/pm/model'
 import type { EditorView } from '@tiptap/pm/view'
+import { applyMarkdownLink } from '../../lib/markdownLink'
 import { useSettingsStore } from '../../store/settings'
 
 // P11-3: what one Tab keypress inserts, and what one Shift+Tab removes.
@@ -258,6 +259,14 @@ export function handleEditorTextInput(view: EditorView, from: number, to: number
   }
 
   if (currentCharacter === text && CLOSING_CHARACTERS.has(text)) {
+    const linkType = view.state.schema.marks.link
+    if (text === ')' && linkType) {
+      const linking = view.state.tr
+      if (applyMarkdownLink(linking, linkType, from, 1)) {
+        view.dispatch(linking)
+        return true
+      }
+    }
     const transaction = view.state.tr.setSelection(TextSelection.create(view.state.doc, from + text.length))
     view.dispatch(transaction)
     return true

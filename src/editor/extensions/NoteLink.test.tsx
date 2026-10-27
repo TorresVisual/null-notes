@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event'
 import { useEditor, EditorContent } from '@tiptap/react'
 import { Editor } from '@tiptap/core'
 import { coreExtensions, extensionsFor } from './index'
+import { handleEditorTextInput } from './CodeBlockEditor'
 import { useNotesStore } from '../../store/notes'
 import { useWorkspaceStore } from '../../store/workspace'
 
@@ -60,7 +61,13 @@ describe('NoteLink typing', () => {
   const NOTE = `${WS}\\A.md`
 
   function typing(text: string, content = '<p></p>') {
-    const instance = new Editor({ extensions: extensionsFor(NOTE), content })
+    // The app's own editorProps: they auto-close brackets and step over a typed
+    // closer, which is what real typing goes through before any input rule.
+    const instance = new Editor({
+      extensions: extensionsFor(NOTE),
+      content,
+      editorProps: { handleTextInput: handleEditorTextInput },
+    })
     typeInto(instance, text)
     return instance
   }
@@ -105,7 +112,11 @@ describe('NoteLink suggestions', () => {
     })
     let current: Editor | null = null
     function Mounted() {
-      const instance = useEditor({ extensions: extensionsFor(`${WS}\\A.md`), content: '<p></p>' })
+      const instance = useEditor({
+        extensions: extensionsFor(`${WS}\\A.md`),
+        content: '<p></p>',
+        editorProps: { handleTextInput: handleEditorTextInput },
+      })
       current = instance
       return <EditorContent editor={instance} />
     }

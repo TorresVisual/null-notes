@@ -4,6 +4,7 @@ import { Plugin, PluginKey } from '@tiptap/pm/state'
 import Suggestion from '@tiptap/suggestion'
 import { Link } from '@tiptap/extension-link'
 import type { LinkOptions } from '@tiptap/extension-link'
+import { applyMarkdownLink } from '../../lib/markdownLink'
 import { openUrl } from '@tauri-apps/plugin-opener'
 import {
   isBareNoteName,
@@ -31,6 +32,10 @@ const OPEN_LABEL = /\[([^\]\n]+)$/
 
 function labelBefore(doc: ProseMirrorNode, pos: number): string {
   return doc.textBetween(doc.resolve(pos).start(), pos, '\n', '￼')
+}
+
+function nextChar(doc: ProseMirrorNode, pos: number): string {
+  return doc.textBetween(pos, Math.min(pos + 1, doc.content.size), '\n', '￼')
 }
 
 export const NoteLink = Link.extend({
@@ -68,12 +73,7 @@ export const NoteLink = Link.extend({
     return [
       new InputRule({
         find: MARKDOWN_LINK,
-        handler: ({ state, range, match }) => {
-          const [, text = '', href = ''] = match
-          state.tr
-            .replaceWith(range.from, range.to, state.schema.text(text, [type.create({ href: href.trim() })]))
-            .setStoredMarks([])
-        },
+        handler: ({ state, range }) => (applyMarkdownLink(state.tr, type, range.to, 0) ? undefined : null),
       }),
       new InputRule({
         find: NOTE_NAME_THEN_SPACE,
@@ -119,7 +119,7 @@ export const NoteLink = Link.extend({
             .chain()
             .focus()
             .insertContentAt(
-              { from: range.from - label[0].length, to: range.to },
+              { from: range.from - label[0].length, to: range.to + (nextChar(editor.state.doc, range.to) === ')' ? 1 : 0) },
               {
                 type: 'text',
                 text: label[1],
