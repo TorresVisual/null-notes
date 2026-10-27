@@ -5063,6 +5063,11 @@ input[type='checkbox']:focus-visible {
    than a print preview. Unscoped from `@media print` (unlike the palette
    swap below) because this has to look right before the user ever prints. */
 :is(.print-preview-pages, #print-root) {
+  /* The preview sits inside a `text-sm` dialog and the print mount sits
+     directly in `body`; without pinning these, the cloned note inherits two
+     different font sizes and paginates into two different page counts. */
+  font: var(--text-body);
+  color: var(--text-primary);
   --bg-base: #ffffff;
   --bg-raised: #ffffff;
   --bg-sunken: #f5f5f5;
@@ -5117,17 +5122,66 @@ input[type='checkbox']:focus-visible {
    `@media print`, where the real print job — which only ever prints
    already-paginated `.pagedjs_page` boxes — would apply them far too late
    to move a break. */
-:is(.print-preview-pages, #print-root) h1, :is(.print-preview-pages, #print-root) h2, :is(.print-preview-pages, #print-root) h3,
-:is(.print-preview-pages, #print-root) h4, :is(.print-preview-pages, #print-root) h5, :is(.print-preview-pages, #print-root) h6 {
-  break-after: avoid;
-}
-:is(.print-preview-pages, #print-root) pre, :is(.print-preview-pages, #print-root) .pdf-page-block,
-:is(.print-preview-pages, #print-root) .ink-block-wrapper, :is(.print-preview-pages, #print-root) table,
-:is(.print-preview-pages, #print-root) .note-image, :is(.print-preview-pages, #print-root) .callout,
-:is(.print-preview-pages, #print-root) .details-wrapper, :is(.print-preview-pages, #print-root) .block-math,
-:is(.print-preview-pages, #print-root) .mermaid-block, :is(.print-preview-pages, #print-root) .diagram-block-preview {
+/* Short code blocks only: a long block has to be allowed to split, or the
+   page before it is left mostly empty (see markPageBreaks). Keep-with-next
+   for headings and code-block captions is applied as data attributes there,
+   because Paged.js does not read `break-after` from this stylesheet. */
+:is(.print-preview-pages, #print-root) pre[data-keep-together],
+:is(.print-preview-pages, #print-root) .pdf-page-block,
+:is(.print-preview-pages, #print-root) .ink-block-wrapper,
+:is(.print-preview-pages, #print-root) table,
+:is(.print-preview-pages, #print-root) .note-image,
+:is(.print-preview-pages, #print-root) .callout,
+:is(.print-preview-pages, #print-root) .details-wrapper,
+:is(.print-preview-pages, #print-root) .block-math,
+:is(.print-preview-pages, #print-root) .mermaid-block,
+:is(.print-preview-pages, #print-root) .diagram-block-preview {
   break-inside: avoid;
 }
+
+/* Tables: the editor's wrapper scrolls sideways and reserves room for the row
+   and column grips, neither of which exists on paper. Fixed layout plus
+   anywhere-wrapping makes long inline code shrink the column instead of
+   widening the table past the page. */
+:is(.print-preview-pages, #print-root) .tableWrapper { overflow: visible; padding: 0; }
+:is(.print-preview-pages, #print-root) .table-controls,
+:is(.print-preview-pages, #print-root) .table-append-col,
+:is(.print-preview-pages, #print-root) .table-append-row,
+:is(.print-preview-pages, #print-root) .table-drop-line { display: none !important; }
+:is(.print-preview-pages, #print-root) table { table-layout: fixed; font-size: 0.85em; }
+:is(.print-preview-pages, #print-root) th,
+:is(.print-preview-pages, #print-root) td { overflow-wrap: anywhere; padding: 6px 8px; }
+:is(.print-preview-pages, #print-root) td code,
+:is(.print-preview-pages, #print-root) th code { white-space: normal; overflow-wrap: anywhere; }
+
+/* Code: smaller type so typical lines (and ASCII diagrams) fit without
+   wrapping, and the on-screen scrollbar/clipping gives way to wrapping for
+   the rest. The syntax palette is the dark-theme one by default — pale pastels
+   that vanish on the light print background — so it is swapped for a
+   light-theme set here. These beat the per-theme `[data-code-theme]` rules
+   because `#print-root`/`:is()` carries id-level specificity. */
+:is(.print-preview-pages, #print-root) .note-editor pre {
+  font-size: 11px;
+  white-space: pre-wrap;
+  overflow: visible;
+  overflow-wrap: anywhere;
+}
+:is(.print-preview-pages, #print-root) .hljs-keyword,
+:is(.print-preview-pages, #print-root) .hljs-selector-tag,
+:is(.print-preview-pages, #print-root) .hljs-built_in { color: #7b3fb5; }
+:is(.print-preview-pages, #print-root) .hljs-string,
+:is(.print-preview-pages, #print-root) .hljs-attr { color: #0f6b2c; }
+:is(.print-preview-pages, #print-root) .hljs-number,
+:is(.print-preview-pages, #print-root) .hljs-literal { color: #a04a00; }
+:is(.print-preview-pages, #print-root) .hljs-comment { color: #57606a; font-style: italic; }
+:is(.print-preview-pages, #print-root) .hljs-function,
+:is(.print-preview-pages, #print-root) .hljs-title { color: #0550ae; }
+:is(.print-preview-pages, #print-root) .hljs-type,
+:is(.print-preview-pages, #print-root) .hljs-class { color: #8a5a00; }
+:is(.print-preview-pages, #print-root) .hljs-variable,
+:is(.print-preview-pages, #print-root) .hljs-name { color: #b3261e; }
+:is(.print-preview-pages, #print-root) .hljs-meta,
+:is(.print-preview-pages, #print-root) .hljs-operator { color: #1b6a82; }
 
 /* A collapsed section is a screen-only affordance — a printed note must show
    every section's content regardless of its current open/closed state. */

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { withPrintMount } from './printMount'
+import { markPageBreaks, withPrintMount } from './printMount'
 
 const previewMock = vi.hoisted(() => vi.fn())
 
@@ -51,5 +51,43 @@ describe('withPrintMount', () => {
 
     expect(run).not.toHaveBeenCalled()
     expect(document.getElementById('print-root')).toBeNull()
+  })
+})
+
+describe('markPageBreaks', () => {
+  function build(html: string): HTMLElement {
+    const root = document.createElement('div')
+    root.innerHTML = html
+    return root
+  }
+
+  it('keeps a heading and a code-block caption with the node after them', () => {
+    const root = build('<h2>Title</h2><p>intro</p><p>Caption.java</p><pre>a</pre>')
+    markPageBreaks(root)
+
+    const at = (i: number) => root.children.item(i)
+    expect(at(0)?.getAttribute('data-break-after')).toBe('avoid')
+    expect(at(1)?.getAttribute('data-previous-break-after')).toBe('avoid')
+    expect(at(1)?.hasAttribute('data-break-after')).toBe(false)
+    expect(at(2)?.getAttribute('data-break-after')).toBe('avoid')
+    expect(at(3)?.getAttribute('data-previous-break-after')).toBe('avoid')
+  })
+
+  it('makes whitespace-only text in code blocks non-whitespace so Paged.js keeps it', () => {
+    const root = build('<pre><span>private</span> <span>double</span>\n    <span>x</span> y</pre>')
+    markPageBreaks(root)
+
+    const texts = Array.from(root.querySelector('pre')?.childNodes ?? []).map((n) => n.textContent)
+    expect(texts).toEqual(['private', ' ​', 'double', '\n    ​', 'x', ' y'])
+  })
+
+  it('keeps short code blocks together and lets long ones split', () => {
+    const short = '<pre>' + 'x\n'.repeat(7) + 'x</pre>'
+    const long = '<pre>' + 'x\n'.repeat(8) + 'x</pre>'
+    const root = build(short + long)
+    markPageBreaks(root)
+
+    expect(root.children.item(0)?.hasAttribute('data-keep-together')).toBe(true)
+    expect(root.children.item(1)?.hasAttribute('data-keep-together')).toBe(false)
   })
 })

@@ -12,6 +12,14 @@ export function teardown(previewer: Previewer): void {
   previewer.polisher.destroy()
 }
 
+/** Paged.js lays a note out by measuring it, and measuring only works while
+ *  the mount is rendered. Parked at a large negative `left` it pushes a blank
+ *  first page and then lays the first page out twice (25 pages for a note the
+ *  preview paginates into 20); parked at the origin, `visibility: hidden`
+ *  keeps layout but paints nothing. The width is the A4 sheet so wrapping
+ *  matches what is printed. */
+const MEASURING_STYLE = 'position: absolute; left: 0; top: 0; width: 210mm; visibility: hidden; z-index: -1;'
+
 /**
  * Paginates `content` into a bare `#print-root` on `document.body`, hides
  * everything else with `body.printing`, runs `run` (the actual print job),
@@ -19,8 +27,8 @@ export function teardown(previewer: Previewer): void {
  * dialog means the job sees nothing but the page stack — no fixed
  * positioning, centring transforms or clipped scroll pane to undo.
  *
- * The mount sits off-screen while Paged.js measures it (`display: none`
- * would measure nothing) and is switched into normal flow before `run`.
+ * The mount is measured in place (`display: none` would measure nothing) and
+ * switched into normal flow before `run`.
  */
 export async function withPrintMount<T>(
   content: HTMLElement,
@@ -29,7 +37,7 @@ export async function withPrintMount<T>(
 ): Promise<T> {
   const mount = document.createElement('div')
   mount.id = 'print-root'
-  mount.style.cssText = 'position: absolute; left: -100000px; top: 0;'
+  mount.style.cssText = MEASURING_STYLE
   document.body.appendChild(mount)
   const previewer = new Previewer()
   try {
@@ -42,4 +50,42 @@ export async function withPrintMount<T>(
     teardown(previewer)
     mount.remove()
   }
+}
+
+/** Code blocks up to this many lines stay on one page; longer ones split so a
+ *  page is never left mostly empty waiting for a big block to fit. */
+const KEEP_TOGETHER_MAX_LINES = 8
+
+/**
+ * Paged.js only honours `break-after: avoid` through `data-break-after` /
+ * `data-previous-break-after` attributes (it builds them itself from the
+ * stylesheets it is handed, which never include the app's own CSS), so
+ * "keep with next" is applied to the clone directly: headings and any
+ * paragraph that introduces a code block stay on the page of what follows.
+ * Short code blocks are tagged for `break-inside: avoid` in `index.css`.
+ */
+export function markPageBreaks(root: HTMLElement): void {
+  const keepWithNext = (el: Element) => {
+    const next = el.nextElementSibling
+    if (!next) return
+    el.setAttribute('data-break-after', 'avoid')
+    next.setAttribute('data-previous-break-after', 'avoid')
+  }
+  root.querySelectorAll('h1, h2, h3, h4, h5, h6').forEach(keepWithNext)
+  root.querySelectorAll('p').forEach((p) => {
+    if (p.nextElementSibling?.tagName === 'PRE') keepWithNext(p)
+  })
+  root.querySelectorAll('pre').forEach((pre) => {
+    // Paged.js drops whitespace-only text nodes from the continuation of a
+    // block it splits across pages — the spaces between highlighted tokens,
+    // indentation and the newlines of blank lines — so the second half of a
+    // long block comes out run together. A zero-width space makes each such
+    // node "non-empty" without changing how it looks.
+    const texts = document.createTreeWalker(pre, NodeFilter.SHOW_TEXT)
+    for (let node = texts.nextNode(); node; node = texts.nextNode()) {
+      if (!node.nodeValue?.trim()) node.nodeValue += '​'
+    }
+    const lines = (pre.textContent?.match(/\n/g)?.length ?? 0) + 1
+    if (lines <= KEEP_TOGETHER_MAX_LINES) pre.setAttribute('data-keep-together', '')
+  })
 }

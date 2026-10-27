@@ -34,10 +34,14 @@ export function ExportPdfDialog({ noteTitle, contentRef, onClose }: ExportPdfDia
 
   async function chooseAndExport() {
     if (isExporting || isRendering) return
-    const path = await save({
-      defaultPath: `${noteTitle}.pdf`,
-      filters: [{ name: 'PDF', extensions: ['pdf'] }],
-    })
+    // The native save dialog is out of reach of the e2e driver, so
+    // e2e/specs/print-export-pdf.e2e.ts supplies the destination here.
+    const path =
+      (window as unknown as { __e2eSavePath?: string }).__e2eSavePath ??
+      (await save({
+        defaultPath: `${noteTitle}.pdf`,
+        filters: [{ name: 'PDF', extensions: ['pdf'] }],
+      }))
     if (!path) return
     setIsExporting(true)
     try {

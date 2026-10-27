@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import type { RefObject } from 'react'
 import { Previewer } from 'pagedjs'
 import { buildPageCss, formatPrintDate } from '../lib/printPreviewCss'
-import { teardown, withPrintMount } from '../lib/printMount'
+import { markPageBreaks, teardown, withPrintMount } from '../lib/printMount'
 
 /** Paged.js keeps a placeholder copy of the top-level node's own tag/class
  *  around while it splits content across pages. Left as `.editor-pane`,
@@ -14,6 +14,7 @@ import { teardown, withPrintMount } from '../lib/printMount'
 function cloneForPagination(el: HTMLElement): HTMLElement {
   const clone = el.cloneNode(true) as HTMLElement
   clone.removeAttribute('class')
+  markPageBreaks(clone)
   return clone
 }
 
