@@ -99,7 +99,7 @@ pub fn build_command(
 /// binary installed.
 pub fn is_on_path(candidate: &str) -> bool {
     let probe = if cfg!(windows) { "where" } else { "which" };
-    std::process::Command::new(probe)
+    super::git::no_window_command(probe)
         .arg(candidate)
         .output()
         .map(|out| out.status.success())

@@ -4,11 +4,12 @@
 //! confirmation) instead of containment.
 
 use super::editor_launch::{is_on_path, tokenize};
+use super::git::no_window_command;
 use base64::Engine;
 use serde::Serialize;
 use std::collections::HashMap;
 use std::io::{Read, Write};
-use std::process::{Child, ChildStdin, Command, Stdio};
+use std::process::{Child, ChildStdin, Stdio};
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 use tauri::{AppHandle, Emitter, Manager, State};
@@ -210,7 +211,7 @@ pub async fn run_code(
             return Ok(());
         }
         let (compiler, compile_args) = cpp_compile_argv(&cpp_compiler_command, "main.cpp");
-        let compile_output = match Command::new(&compiler)
+        let compile_output = match no_window_command(&compiler)
             .args(&compile_args)
             .current_dir(&dir_path)
             .output()
@@ -258,7 +259,7 @@ pub async fn run_code(
         return Ok(());
     };
 
-    let mut child = match Command::new(&program)
+    let mut child = match no_window_command(&program)
         .args(&args)
         .current_dir(&dir_path)
         .stdin(Stdio::piped())
