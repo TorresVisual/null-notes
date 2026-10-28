@@ -74,4 +74,3 @@ e2e/.artifacts/
 # impeccable-ignore-end
 .*.tmp
 .env
-.claude/
