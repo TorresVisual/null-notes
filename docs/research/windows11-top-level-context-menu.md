@@ -513,6 +513,8 @@ All of these are corroborated by implementer reports (not vendor marketing copy)
 
 ## 7. Runbook: registering shell integration on a second machine
 
+> Superseded for the common case: releases are signed with one pinned cert and the installer trusts it (`scripts/windows/trust-cert.ps1`, see `docs/installing.md`). This runbook is the manual fallback, including the elevated stores of §6.13.
+
 For a machine that isn't the one where `identity-package/null-notes-identity.msix` was originally built and signed (e.g. a second dev PC, since there is still no public signing pipeline — see §5's "no signing pipeline exists today" and the feasibility summary below):
 
 1. **Generate (or reuse) a dev cert and signed package.**

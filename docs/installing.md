@@ -24,6 +24,15 @@ One-time setup: create the public repo `TorresVisual/null-notes-releases` with a
 
 ## Note: Explorer right-click integration
 
-Releases are signed with a self-signed dev certificate (there's no public code-signing pipeline yet — see `docs/research/windows11-top-level-context-menu.md` §5). That certificate isn't trusted on a fresh machine, so the "Open in null-notes" Explorer context-menu entry won't register — this fails silently and doesn't affect the rest of the app.
+The identity package behind the "Open in null-notes" entry is signed with one self-signed cert (`CN=null-notes-dev`) that is **pinned**: its private key lives in the `NULL_NOTES_SIGNING_PFX_BASE64` secret and its public half is committed as `scripts/windows/null-notes-dev.cer`. Release CI refuses to run without the secret, or if its thumbprint differs from the committed `.cer`, so a release can never ship under a cert machines don't already trust.
 
-To get that feature working on a given machine, see the runbook in `docs/research/windows11-top-level-context-menu.md` §7.
+- **Install / update:** the NSIS installer runs `trust-cert.ps1 -Action Install` (current user, no admin). **Uninstall** removes the trust again. The MSI target has no hook; run the script from the install folder by hand.
+- **If registration still fails**, the app starts normally without the context-menu entry and logs the PowerShell error under `shell-integration` in the in-app error log. Some machines also need the extra stores and `AllowAllTrustedApps` described in `docs/research/windows11-top-level-context-menu.md` §6.13 / §7.
+
+**Rotating the cert** (the current one expires 2027-09-13): delete `scripts/windows/.dev-cert/` and the old `CN=null-notes-dev` cert from `Cert:\CurrentUser\My`, run `scripts/windows/dev-cert.ps1` (new certs are valid 10 years), copy `.dev-cert/null-notes-dev.cer` over `scripts/windows/null-notes-dev.cer`, and re-set the secret:
+
+```powershell
+[Convert]::ToBase64String([IO.File]::ReadAllBytes("scripts\windows\.dev-cert\null-notes-dev.pfx")) | gh secret set NULL_NOTES_SIGNING_PFX_BASE64
+```
+
+The first time (or after rotating), run that same `gh secret set` command.

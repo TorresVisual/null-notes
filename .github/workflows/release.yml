@@ -40,8 +40,12 @@ jobs:
             echo 'NOTES_EOF'
           } >> "$GITHUB_OUTPUT"
 
-      - name: Generate CI signing cert
-        run: ./scripts/windows/dev-cert.ps1
+      - name: Restore pinned signing cert
+        env:
+          NULL_NOTES_SIGNING_PFX_BASE64: ${{ secrets.NULL_NOTES_SIGNING_PFX_BASE64 }}
+        run: |
+          if (-not $env:NULL_NOTES_SIGNING_PFX_BASE64) { throw "Secret NULL_NOTES_SIGNING_PFX_BASE64 is not set - see docs/installing.md" }
+          ./scripts/windows/dev-cert.ps1
 
       - name: Package identity .msix
         run: ./scripts/windows/package-identity.ps1

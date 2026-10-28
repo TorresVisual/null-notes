@@ -133,7 +133,9 @@ pub fn run() {
                     let msix = exe_dir.join("null-notes-identity.msix");
                     if msix.exists() && !commands::identity::has_current_package_identity(&msix) {
                         let args: Vec<String> = std::env::args().skip(1).collect();
-                        commands::identity::register_and_relaunch(&msix, &exe_dir, &args);
+                        commands::identity::register_and_relaunch(
+                            &msix, &exe_dir, &args, &data_dir,
+                        );
                     }
                 }
                 let recents =

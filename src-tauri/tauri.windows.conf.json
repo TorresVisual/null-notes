@@ -3,6 +3,8 @@
   "bundle": {
     "resources": {
       "../identity-package/null-notes-identity.msix": "",
+      "../scripts/windows/trust-cert.ps1": "",
+      "../scripts/windows/null-notes-dev.cer": "",
       "vendor/pdfium.dll": "",
       "context-menu-handler/target/release/null_notes_context_menu.dll": "shell-integration/null_notes_context_menu.dll"
     }
