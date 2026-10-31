@@ -22,7 +22,7 @@ pub struct TrashEntry {
     pub trashed_at: i64,
 }
 
-fn trash_root(app: &AppHandle) -> Result<PathBuf, String> {
+pub(super) fn trash_root(app: &AppHandle) -> Result<PathBuf, String> {
     app.path()
         .app_data_dir()
         .map(|dir| dir.join("trash"))
@@ -198,7 +198,7 @@ async fn blocking<T: Send + 'static>(
     tokio::task::spawn_blocking(job).await?
 }
 
-async fn trash_note_at(
+pub(super) async fn trash_note_at(
     root: &Path,
     workspace: &str,
     path: &str,
@@ -225,7 +225,12 @@ async fn trash_folder_at(
     Ok(entry)
 }
 
-async fn restore_at(root: &Path, workspace: &str, id: &str, db: &DbPool) -> anyhow::Result<String> {
+pub(super) async fn restore_at(
+    root: &Path,
+    workspace: &str,
+    id: &str,
+    db: &DbPool,
+) -> anyhow::Result<String> {
     let (root, workspace_owned, id) = (root.to_path_buf(), workspace.to_string(), id.to_string());
     let (entry, restored) = blocking(move || restore_files(&root, &workspace_owned, &id)).await?;
     let restored_str = restored.to_string_lossy().into_owned();

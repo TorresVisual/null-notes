@@ -54,6 +54,7 @@ import {
   copyNotePath,
   deleteNote,
   duplicateNote,
+  mergeNotes,
   moveNoteViaPicker,
   openNoteExternally,
   renameNote,
@@ -153,6 +154,7 @@ export function Layout() {
   const editorPaneRef = useRef<HTMLDivElement>(null)
   const [terminalMounted, setTerminalMounted] = useState(false)
   const [terminalOpen, setTerminalOpen] = useState(false)
+  const [mergeSource, setMergeSource] = useState<string | null>(null)
   const [pendingFlashcardInsert, setPendingFlashcardInsert] = useState<
     { editor: Editor; range: Range } | null
   >(null)
@@ -238,6 +240,31 @@ export function Layout() {
   // keydown listener further down is what actually makes every accelerator
   // shown on a menu item work — the menu's own dispatch only reliably fires
   // from a mouse click.
+  const requestMerge = useCallback(
+    (path: string) => {
+      setMergeSource(path)
+      openOverlay('mergeTarget')
+    },
+    [openOverlay],
+  )
+
+  // A pending debounced save landing after the merge would write the
+  // trashed source back to disk.
+  const flushThenMerge = useCallback(
+    async (source: string, dest: string) => {
+      await flush()
+      await flushSecondary()
+      await mergeNotes(source, dest)
+    },
+    [flush, flushSecondary],
+  )
+
+  useEffect(() => {
+    const handler = (e: Event) => requestMerge((e as CustomEvent<string>).detail)
+    window.addEventListener('note:merge-request', handler)
+    return () => window.removeEventListener('note:merge-request', handler)
+  }, [requestMerge])
+
   const runCommand = useCallback(
     async (id: string) => {
       if (id.startsWith('open-recent:')) {
@@ -376,6 +403,12 @@ export function Layout() {
         case 'note-duplicate':
           if (activeTab) await duplicateNote(activeTab)
           break
+        case 'note-merge':
+          if (activeTab) requestMerge(activeTab)
+          break
+        case 'extract-selection':
+          window.dispatchEvent(new Event('command:extract-selection'))
+          break
         case 'note-move':
           if (activeTab) await moveNoteViaPicker(activeTab)
           break
@@ -430,6 +463,7 @@ export function Layout() {
       closeWorkspace,
       openOverlay,
       syncNow,
+      requestMerge,
     ],
   )
 
@@ -565,6 +599,14 @@ export function Layout() {
     <>
       {activeOverlay === 'search' && <SearchModal onClose={closeOverlay} />}
       {activeOverlay === 'switcher' && <QuickSwitcher onClose={closeOverlay} />}
+      {activeOverlay === 'mergeTarget' && mergeSource && (
+        <QuickSwitcher
+          onClose={closeOverlay}
+          title="Merge into note"
+          exclude={mergeSource}
+          onPick={(dest) => void flushThenMerge(mergeSource, dest)}
+        />
+      )}
       {activeOverlay === 'palette' && (
         <CommandPalette
           hasWorkspace={!!workspacePath}

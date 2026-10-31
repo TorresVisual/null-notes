@@ -6,6 +6,9 @@ import { CommandDialog, Command, CommandInput, CommandList, CommandEmpty, Comman
 
 interface QuickSwitcherProps {
   onClose: () => void
+  onPick?: (path: string) => void
+  title?: string
+  exclude?: string | null
 }
 
 // Ranks a title match by where the query hits: a prefix match beats a
@@ -26,15 +29,19 @@ export function matchNotes(notes: NoteMetadata[], query: string): NoteMetadata[]
     .map((m) => m.note)
 }
 
-export function QuickSwitcher({ onClose }: QuickSwitcherProps) {
+export function QuickSwitcher({ onClose, onPick, title = 'Jump to note', exclude = null }: QuickSwitcherProps) {
   const [query, setQuery] = useState('')
   const notes = useNotesStore((s) => s.notes)
   const openTab = useWorkspaceStore((s) => s.openTab)
 
-  const results = useMemo(() => matchNotes(notes, query), [notes, query])
+  const results = useMemo(
+    () => matchNotes(exclude ? notes.filter((n) => n.path !== exclude) : notes, query),
+    [notes, query, exclude],
+  )
 
   function open(path: string) {
-    openTab(path)
+    if (onPick) onPick(path)
+    else openTab(path)
     onClose()
   }
 
@@ -43,13 +50,13 @@ export function QuickSwitcher({ onClose }: QuickSwitcherProps) {
       open
       onOpenChange={(next) => !next && onClose()}
       className="search-modal"
-      title="Jump to note"
-      description="Jump to a note by title"
+      title={title}
+      description="Pick a note by title"
     >
       <Command shouldFilter={false}>
         <CommandInput
           className="search-modal-input"
-          placeholder="Jump to note…"
+          placeholder={`${title}…`}
           value={query}
           onValueChange={setQuery}
         />

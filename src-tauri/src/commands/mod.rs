@@ -2,6 +2,7 @@ pub mod assets;
 pub mod bookmarks;
 pub mod code_format;
 pub mod code_run;
+pub mod compose;
 pub mod crossref;
 pub mod diagrams;
 pub mod editor_launch;

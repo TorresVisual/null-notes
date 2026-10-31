@@ -126,6 +126,17 @@ export interface TrashEntry {
   trashedAt: number
 }
 
+export interface MergeSnapshot {
+  path: string
+  before: string
+  after: string
+}
+
+export interface MergeOutcome {
+  trash: TrashEntry
+  snapshots: MergeSnapshot[]
+}
+
 export interface GithubRepo {
   nameWithOwner: string
   url: string

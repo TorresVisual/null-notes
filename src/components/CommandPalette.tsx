@@ -15,6 +15,7 @@ const NEEDS_NOTE = new Set([
   'toggle-view',
   'insert-ink',
   'split-tasks',
+  'extract-selection',
   'export-pdf',
   'print',
   'toggle-outline',

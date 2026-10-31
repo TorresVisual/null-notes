@@ -10,6 +10,8 @@ import { takePendingHighlight } from '../lib/pendingHighlight'
 import { highlightHeading, highlightSearchMatch } from './extensions/SearchJumpHighlight'
 import { handleEditorKeyDown, handleEditorTextInput } from './extensions/CodeBlockEditor'
 import { splitIntoTasks, report, markdownOf } from './splitIntoTasks'
+import { extractSelection } from './extractSelection'
+import { useWorkspaceStore } from '../store/workspace'
 import { linkMention, LINK_MENTION_EVENT } from './linkMention'
 import { EditorStatusBar } from './EditorStatusBar'
 import { BlockHandle } from './extensions/BlockHandle'
@@ -209,6 +211,16 @@ export function NoteEditor({
     window.addEventListener('command:split-tasks', handler)
     return () => window.removeEventListener('command:split-tasks', handler)
   }, [editor, onChange])
+
+  useEffect(() => {
+    const handler = () => {
+      const workspace = useWorkspaceStore.getState().path
+      if (!editor || !editor.isFocused || !workspace) return
+      extractSelection(editor, notePath, workspace).catch(report)
+    }
+    window.addEventListener('command:extract-selection', handler)
+    return () => window.removeEventListener('command:extract-selection', handler)
+  }, [editor, notePath])
 
   // The outgoing-links panel's "link this mention" action. The note path in
   // the event keeps a second pane showing a different note from reacting.

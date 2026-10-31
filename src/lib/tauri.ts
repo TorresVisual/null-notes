@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core'
-import type { NoteMetadata, WorkspaceState, WorkspaceTree, SearchPage, SearchSort, AppSettings, GraphLink, GraphTag, RepoMode, CommitOutcome, PushOutcome, PullOutcome, RebaseOutcome, RepoInitOutcome, TemplateMetadata, CrossRefTarget, OpenTask, DueCard, Grade, NoteHistoryEntry, GithubRepo, BacklinkEntry, PrinterInfo, McGradeResult, CardSummary, ErrorLogEntry, TrashEntry, CodeLinkStatus, CodeLinkTarget } from '../types'
+import type { NoteMetadata, WorkspaceState, WorkspaceTree, SearchPage, SearchSort, AppSettings, GraphLink, GraphTag, RepoMode, CommitOutcome, PushOutcome, PullOutcome, RebaseOutcome, RepoInitOutcome, TemplateMetadata, CrossRefTarget, OpenTask, DueCard, Grade, NoteHistoryEntry, GithubRepo, BacklinkEntry, PrinterInfo, McGradeResult, CardSummary, ErrorLogEntry, TrashEntry, MergeOutcome, MergeSnapshot, CodeLinkStatus, CodeLinkTarget } from '../types'
 import type { PdfPage, PdfMarkdownImport } from '../pdf/types'
 import { useWorkspaceStore } from '../store/workspace'
 import { sidecarDir } from './pathPrefix'
@@ -77,6 +77,12 @@ export const api = {
       invoke<TrashEntry>('delete_folder', { workspace, path }),
     moveNote: (path: string, destFolder: string, workspace: string) =>
       invoke<string>('move_note', { path, destFolder, workspace }),
+    extract: (workspace: string, sourcePath: string, title: string, markdown: string) =>
+      invoke<NoteMetadata>('extract_to_note', { workspace, sourcePath, title, markdown }),
+    merge: (workspace: string, sourcePath: string, destPath: string) =>
+      invoke<MergeOutcome>('merge_note', { workspace, sourcePath, destPath }),
+    undoMerge: (workspace: string, trashId: string, snapshots: MergeSnapshot[]) =>
+      invoke<string>('undo_merge', { workspace, trashId, snapshots }),
     duplicate: (path: string, workspace: string) =>
       invoke<NoteMetadata>('duplicate_note', { path, workspace }),
     reveal: (workspace: string, path: string) =>

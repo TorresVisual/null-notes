@@ -1404,7 +1404,11 @@ async fn grade_mc_card_at(
 // `extract_links` trims whitespace inside the brackets, so the rewrite must
 // tolerate both rather than only matching an exact `[[Old]]`. A `#heading`
 // and/or `|label` suffix is carried over untouched.
-fn rewrite_links(content: &str, old_title: &str, new_title: &str) -> anyhow::Result<String> {
+pub(super) fn rewrite_links(
+    content: &str,
+    old_title: &str,
+    new_title: &str,
+) -> anyhow::Result<String> {
     let pattern = format!(
         r"(?i)\[\[\s*{}\s*((?:[#|][^\]\n]*)?)\]\]",
         regex::escape(old_title)
@@ -1421,7 +1425,7 @@ fn rewrite_links(content: &str, old_title: &str, new_title: &str) -> anyhow::Res
 // foo.png"); NoteImage's Markdown syntax stores it `encodeURI`-escaped, the
 // fenced ink/pdf/diagram blocks store it raw. Rewriting the directory prefix
 // in both forms keeps embeds resolvable after the sidecar dirs are renamed.
-fn rewrite_sidecar_links(content: &str, old_stem: &str, new_stem: &str) -> String {
+pub(super) fn rewrite_sidecar_links(content: &str, old_stem: &str, new_stem: &str) -> String {
     let mut out = content.to_string();
     for suffix in [".ink", ".pdf", ".assets", ".diagrams"] {
         out = out.replace(
@@ -1440,7 +1444,7 @@ fn rewrite_sidecar_links(content: &str, old_stem: &str, new_stem: &str) -> Strin
 // exactly the characters `note_filename` can produce: alphanumerics, spaces
 // and dashes. Spaces become `%20`; non-ASCII letters are percent-encoded by
 // UTF-8 byte, same as JS's encodeURI.
-fn encode_uri_stem(stem: &str) -> String {
+pub(super) fn encode_uri_stem(stem: &str) -> String {
     let mut out = String::new();
     for c in stem.chars() {
         if c.is_ascii_alphanumeric() || c == '-' {
@@ -1995,7 +1999,7 @@ pub async fn graph_tags(workspace: String, db: State<'_, DbPool>) -> Result<Vec<
         .collect())
 }
 
-fn note_filename(title: &str) -> String {
+pub(super) fn note_filename(title: &str) -> String {
     let safe_name: String = title
         .chars()
         .map(|c| {

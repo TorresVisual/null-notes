@@ -17,7 +17,7 @@ function workspaceOf(path: string): string | null {
 
 // A bare move/rename shows up to git as a removal at the old path plus an
 // addition at the new one, and the sidecars travel with the note.
-function queueGitPaths(...paths: string[]) {
+export function queueGitPaths(...paths: string[]) {
   const { addGitPendingPath } = useWorkspaceStore.getState()
   for (const path of paths) {
     for (const suffix of SIDECAR_SUFFIXES) addGitPendingPath(sidecarDir(path, suffix))
@@ -74,6 +74,38 @@ export async function deleteNote(path: string): Promise<void> {
   // pending list and `git rm` never runs.
   queueGitPaths(path)
   offerUndoDelete(workspace, trashed)
+}
+
+export async function mergeNotes(source: string, dest: string): Promise<void> {
+  const workspace = workspaceOf(source)
+  if (!workspace) return
+  let outcome
+  try {
+    outcome = await api.notes.merge(workspace, source, dest)
+  } catch (err) {
+    reportError(err)
+    return
+  }
+  const { setFolderError, closeTab, openTab } = useWorkspaceStore.getState()
+  setFolderError(null)
+  useNotesStore.getState().removeNote(source)
+  closeTab(source)
+  openTab(dest)
+  queueGitPaths(source, ...outcome.snapshots.map((s) => s.path))
+  await refreshTree()
+  const title = useNotesStore.getState().notes.find((n) => n.path === dest)?.title ?? 'note'
+  showToast(`Merged "${outcome.trash.name}" into "${title}"`, {
+    label: 'Undo',
+    onClick: () => {
+      api.notes
+        .undoMerge(workspace, outcome.trash.id, outcome.snapshots)
+        .then(async (restored) => {
+          queueGitPaths(restored, ...outcome.snapshots.map((s) => s.path))
+          await refreshTree()
+        })
+        .catch(reportError)
+    },
+  })
 }
 
 export async function duplicateNote(path: string): Promise<void> {

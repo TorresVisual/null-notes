@@ -1,4 +1,4 @@
-import { Copy, ExternalLink, FolderInput, FolderOpen, Link, Pencil, Trash2 } from 'lucide-react'
+import { Copy, ExternalLink, FolderInput, Merge, FolderOpen, Link, Pencil, Trash2 } from 'lucide-react'
 import {
   copyNotePath,
   deleteNote,
@@ -24,6 +24,9 @@ export function NoteContextMenuItems({ path }: NoteContextMenuItemsProps) {
       </ContextMenuItem>
       <ContextMenuItem onSelect={() => void moveNoteViaPicker(path)}>
         <FolderInput size={14} /> Move to…
+      </ContextMenuItem>
+      <ContextMenuItem onSelect={() => window.dispatchEvent(new CustomEvent('note:merge-request', { detail: path }))}>
+        <Merge size={14} /> Merge into…
       </ContextMenuItem>
       <ContextMenuSeparator />
       <ContextMenuItem onSelect={() => void revealNote(path)}>
