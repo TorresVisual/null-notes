@@ -33,6 +33,9 @@ import { useWorkspaceStore } from '../store/workspace'
 import { useNotesStore } from '../store/notes'
 import { useSettingsStore } from '../store/settings'
 import { useNote } from '../hooks/useNote'
+import { useCreateCanvas } from '../hooks/useCreateCanvas'
+import { CanvasPane } from './CanvasPane'
+import { isCanvasPath } from '../lib/canvasPath'
 import { useWorkspace, refreshTags, refreshRecents } from '../hooks/useWorkspace'
 import { useExternalChanges } from '../hooks/useExternalChanges'
 import { useBookmarksStore } from '../store/bookmarks'
@@ -85,6 +88,7 @@ const GIT_FLUSH_ON_CLOSE_TIMEOUT_MS = 5000
 
 export function Layout() {
   const activeTab = useWorkspaceStore((s) => s.activeTab)
+  const canvasTab = activeTab !== null && isCanvasPath(activeTab)
   const setActiveTab = useWorkspaceStore((s) => s.setActiveTab)
   const openTabs = useWorkspaceStore((s) => s.openTabs)
   const togglePinTab = useWorkspaceStore((s) => s.togglePinTab)
@@ -110,7 +114,7 @@ export function Layout() {
     conflict,
     keepMine,
     reloadTheirs,
-  } = useNote(activeTab)
+  } = useNote(canvasTab ? null : activeTab)
   const windowTitle = useWindowTitle(workspacePath, activeTab)
   const { saveSession, openWorkspace, openWorkspaceAt, closeWorkspace } = useWorkspace()
   const { updateGit } = useGitConfig()
@@ -128,6 +132,7 @@ export function Layout() {
   const createNote = useCreateNote()
   const createFolder = useCreateFolder()
   const createCanvasNote = useCreateCanvasNote()
+  const createAgentCanvas = useCreateCanvas()
   const [primaryViewMode, setPrimaryViewMode] = useState<ViewMode>('wysiwyg')
   const [secondaryViewMode, setSecondaryViewMode] = useState<ViewMode>('wysiwyg')
   const secondaryTab = useWorkspaceStore((s) => s.secondaryTab)
@@ -291,6 +296,11 @@ export function Layout() {
         case 'new-canvas': {
           const title = await promptText('Canvas note title:')
           if (title) await createCanvasNote(title)
+          break
+        }
+        case 'new-agent-canvas': {
+          if (!workspacePath) break
+          await createAgentCanvas(useWorkspaceStore.getState().selectedFolder ?? workspacePath)
           break
         }
         case 'new-from-template':
@@ -462,6 +472,7 @@ export function Layout() {
       createNote,
       createFolder,
       createCanvasNote,
+      createAgentCanvas,
       openWorkspace,
       openWorkspaceAt,
       closeWorkspace,
@@ -733,7 +744,9 @@ export function Layout() {
     </>
   )
 
-  const primaryEditorPane = (
+  const primaryEditorPane = canvasTab && activeTab ? (
+    <CanvasPane path={activeTab} />
+  ) : (
     <EditorPane
       ref={editorPaneRef}
       scrollRef={scrollRef}
@@ -851,10 +864,10 @@ export function Layout() {
           {splitDropZoneActive && <div className="split-drop-zone" />}
           <div className="pane-wrapper" style={secondaryTab ? { flex: `0 0 ${splitRatio * 100}%` } : undefined}>
             {primaryEditorPane}
-            {!isLoading && activeTab && primaryViewMode === 'wysiwyg' && outlineOpen && (
+            {!canvasTab && !isLoading && activeTab && primaryViewMode === 'wysiwyg' && outlineOpen && (
               <OutlinePanel content={content} containerRef={editorPaneRef} />
             )}
-            {!isLoading && activeTab && primaryViewMode === 'wysiwyg' && outgoingLinksOpen && (
+            {!canvasTab && !isLoading && activeTab && primaryViewMode === 'wysiwyg' && outgoingLinksOpen && (
               <OutgoingLinksPanel content={content} notePath={activeTab} />
             )}
           </div>

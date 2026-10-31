@@ -27,7 +27,7 @@ const entry = {
 
 beforeEach(() => {
   useWorkspaceStore.setState({ path: '/ws', gitPendingPaths: [] })
-  vi.mocked(api.notes.scan).mockResolvedValue({ notes: [], folders: [] })
+  vi.mocked(api.notes.scan).mockResolvedValue({ notes: [], folders: [], canvases: [] })
 })
 
 afterEach(() => {

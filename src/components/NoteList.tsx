@@ -9,6 +9,7 @@ import type { NoteMetadata } from '../types'
 export function NoteList() {
   const notes = useNotesStore((s) => s.notes)
   const folders = useNotesStore((s) => s.folders)
+  const canvases = useNotesStore((s) => s.canvases)
   const workspacePath = useWorkspaceStore((s) => s.path)
   const tagFilter = useWorkspaceStore((s) => s.tagFilter)
   const openTab = useWorkspaceStore((s) => s.openTab)
@@ -37,7 +38,7 @@ export function NoteList() {
     }
   }, [tagFilter, workspacePath, setFolderError])
 
-  const tree = workspacePath ? buildFolderTree(workspacePath, folders, notes) : []
+  const tree = workspacePath ? buildFolderTree(workspacePath, folders, notes, canvases) : []
 
   return (
     <>

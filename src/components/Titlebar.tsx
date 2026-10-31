@@ -39,7 +39,7 @@ function commandEntry(id: string): MenuEntry {
 // accelerators come from the keymap registry, not from here.
 export function buildFileMenu(recentWorkspaces: string[]): MenuItemSpec[] {
   return [
-    ...entries(['new-note', 'new-folder', 'new-canvas', 'new-from-template', '-', 'open-workspace', 'close-workspace']),
+    ...entries(['new-note', 'new-folder', 'new-canvas', 'new-agent-canvas', 'new-from-template', '-', 'open-workspace', 'close-workspace']),
     ...recentWorkspaces.map((path) => ({ id: `open-recent:${path}`, label: folderName(path) })),
     ...entries([
       '-',

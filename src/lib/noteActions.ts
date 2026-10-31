@@ -69,6 +69,8 @@ export async function deleteNote(path: string): Promise<void> {
   const { setFolderError, closeTab } = useWorkspaceStore.getState()
   setFolderError(null)
   useNotesStore.getState().removeNote(path)
+  const { canvases, setCanvases } = useNotesStore.getState()
+  setCanvases(canvases.filter((p) => p !== path))
   closeTab(path)
   // Otherwise the deletion never enters the auto-commit's pathspec-scoped
   // pending list and `git rm` never runs.

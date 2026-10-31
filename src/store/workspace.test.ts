@@ -99,6 +99,12 @@ describe('useWorkspaceStore', () => {
     })
   })
 
+  it('refuses to open a canvas in the secondary pane', () => {
+    useWorkspaceStore.getState().setSecondaryTab('/ws/map.canvas')
+    expect(useWorkspaceStore.getState().secondaryTab).toBeNull()
+    expect(useWorkspaceStore.getState().openTabs).not.toContain('/ws/map.canvas')
+  })
+
   it('closing the only tab sets activeTab to null', () => {
     useWorkspaceStore.getState().openTab('/ws/a.md')
     useWorkspaceStore.getState().closeTab('/ws/a.md')

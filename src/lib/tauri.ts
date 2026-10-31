@@ -7,6 +7,10 @@ import { isMobile } from './platform'
 import { getStoredGitToken } from './gitCredentials'
 
 export const api = {
+  canvas: {
+    create: (workspace: string, folder: string, name: string) =>
+      invoke<string>('create_canvas', { workspace, folder, name }),
+  },
   notes: {
     list: (workspace: string) =>
       invoke<NoteMetadata[]>('list_notes', { workspace }),

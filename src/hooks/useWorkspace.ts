@@ -13,6 +13,7 @@ export async function refreshTree(): Promise<void> {
   const tree = await api.notes.scan(path)
   useNotesStore.getState().setNotes(tree.notes)
   useNotesStore.getState().setFolders(tree.folders)
+  useNotesStore.getState().setCanvases(tree.canvases)
 }
 
 export async function refreshTags(): Promise<void> {
@@ -28,7 +29,7 @@ export async function refreshRecents(): Promise<void> {
 
 export function useWorkspace() {
   const { setPath, openTab, setExpandedFolders, resetForNewWorkspace } = useWorkspaceStore()
-  const { setNotes, setFolders } = useNotesStore()
+  const { setNotes, setFolders, setCanvases } = useNotesStore()
   const { checkForUpdates } = useGitAutoPull()
   const { flushGitCommit } = useGitAutoCommit()
 
@@ -68,8 +69,9 @@ export function useWorkspace() {
     clearNavigationHistory()
     setNotes([])
     setFolders([])
+    setCanvases([])
     setPath(null)
-  }, [saveSession, flushGitCommit, resetForNewWorkspace, setNotes, setFolders, setPath])
+  }, [saveSession, flushGitCommit, resetForNewWorkspace, setNotes, setFolders, setCanvases, setPath])
 
   // Read the folder before touching any state: a recent workspace can be gone
   // by the time it's clicked, and a failed scan must leave the current one open.
@@ -112,6 +114,7 @@ export function useWorkspace() {
       await api.workspace.watch(selected)
       setNotes(tree.notes)
       setFolders(tree.folders)
+      setCanvases(tree.canvases)
       setExpandedFolders(session.expandedFolders)
       setRecentSearches(session.recentSearches)
       setGit(session.git)
@@ -163,6 +166,7 @@ export function useWorkspace() {
       setPath,
       setNotes,
       setFolders,
+      setCanvases,
       setExpandedFolders,
       openTab,
       resetForNewWorkspace,

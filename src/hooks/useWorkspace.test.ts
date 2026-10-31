@@ -18,7 +18,7 @@ const notes = vi.mocked(api.notes)
 const workspace = vi.mocked(api.workspace)
 const git = vi.mocked(api.git)
 
-const emptyTree: WorkspaceTree = { notes: [], folders: [] }
+const emptyTree: WorkspaceTree = { notes: [], folders: [], canvases: [] }
 const emptySession: WorkspaceState = {
   openTabs: [],
   activeTab: null,

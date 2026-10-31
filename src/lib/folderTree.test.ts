@@ -39,6 +39,28 @@ describe('buildFolderTree', () => {
     expect(tree.map((e) => e.name)).toEqual(['Zeta', 'Alpha', 'Beta'])
   })
 
+  it('places a canvas under its folder, named without the extension, after the notes', () => {
+    const tree = buildFolderTree(
+      '/ws',
+      ['/ws/\Notes'],
+      [note('Alpha', '/ws/\Notes/Alpha.md')],
+      ['/ws/\Notes/\map.canvas', '/ws/root.canvas'],
+    )
+    const notes = tree[0]
+    expect(notes?.type === 'folder' && notes.children.map((c) => [c.type, c.name])).toEqual([
+      ['note', 'Alpha'],
+      ['canvas', 'map'],
+    ])
+    expect(tree[1]).toEqual({ type: 'canvas', name: 'root', path: '/ws/root.canvas' })
+  })
+
+  it('names a canvas on a Windows path without the folder prefix', () => {
+    const path = String.raw`D:\ws\Notes\map.canvas`
+    const tree = buildFolderTree(String.raw`D:\ws`, [String.raw`D:\ws\Notes`], [], [path])
+    const notes = tree[0]
+    expect(notes?.type === 'folder' && notes.children).toEqual([{ type: 'canvas', name: 'map', path }])
+  })
+
   it('handles nested subfolders', () => {
     const n = note('Deep', '/ws/A/B/Deep.md')
     const tree = buildFolderTree('/ws', ['/ws/A', '/ws/A/B'], [n])

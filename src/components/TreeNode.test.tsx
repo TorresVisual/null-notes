@@ -78,7 +78,7 @@ beforeEach(() => {
   })
   useNotesStore.setState({ notes: [noteEntry.note], folders: [], tags: [] })
   useToastStore.setState({ toasts: [] })
-  notesApi.scan.mockResolvedValue({ notes: [], folders: [] })
+  notesApi.scan.mockResolvedValue({ notes: [], folders: [], canvases: [] })
 })
 
 afterEach(() => {

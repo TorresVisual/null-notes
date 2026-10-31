@@ -9,6 +9,13 @@ export interface NoteMetadata {
 export interface WorkspaceTree {
   notes: NoteMetadata[]
   folders: string[]
+  canvases: string[]
+}
+
+export interface CanvasViewport {
+  x: number
+  y: number
+  zoom: number
 }
 
 export interface BacklinkEntry {
@@ -65,6 +72,7 @@ export interface WorkspaceState {
   sidebarCollapsed?: boolean
   tagsCollapsed?: boolean
   pinnedTabs?: string[]
+  canvasViewports?: Record<string, CanvasViewport>
   expandedFolders: string[]
   recentSearches: string[]
   git: GitWorkspaceConfig

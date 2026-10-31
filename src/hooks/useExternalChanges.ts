@@ -20,6 +20,11 @@ export function useExternalChanges() {
   }, [])
 
   useEffect(() => {
+    const unlisten = listen('canvas-changed', () => void refreshTree())
+    return () => void unlisten.then((off) => off())
+  }, [])
+
+  useEffect(() => {
     const unlisten = listen<string[]>('workspace-changed', async (event) => {
       const workspace = useWorkspaceStore.getState().path
       if (!workspace) return

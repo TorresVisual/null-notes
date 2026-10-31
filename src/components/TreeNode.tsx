@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ChevronRight, Pencil, Trash2 } from 'lucide-react'
+import { ChevronRight, Pencil, Plus, Trash2 } from 'lucide-react'
 import { confirm } from '@tauri-apps/plugin-dialog'
 import { offerUndoDelete } from '../hooks/useTrash'
 import { useWorkspaceStore } from '../store/workspace'
@@ -8,6 +8,7 @@ import { promptText } from '../store/promptDialog'
 import { api } from '../lib/tauri'
 import { deleteNote, moveNoteInto, renameNote } from '../lib/noteActions'
 import { refreshTree } from '../hooks/useWorkspace'
+import { useCreateCanvas } from '../hooks/useCreateCanvas'
 import { folderName, isSingleSegmentName, isUnderPath } from '../lib/pathPrefix'
 import type { TreeEntry } from '../lib/folderTree'
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from './ui/context-menu'
@@ -40,6 +41,44 @@ export function TreeNode({ entry }: TreeNodeProps) {
   const setFolderError = useWorkspaceStore((s) => s.setFolderError)
   const openTab = useWorkspaceStore((s) => s.openTab)
   const notes = useNotesStore((s) => s.notes)
+  const createCanvas = useCreateCanvas()
+
+  if (entry.type === 'canvas') {
+    const isActive = activeTab === entry.path
+    return (
+      <li>
+        <ContextMenu>
+          <ContextMenuTrigger asChild>
+            <div
+              className={`tree-row tree-note${isActive ? ' active' : ''}`}
+              tabIndex={0}
+              aria-current={isActive || undefined}
+              onClick={() => openTab(entry.path)}
+              onKeyDown={(e) => activateOnKey(e, () => openTab(entry.path))}
+            >
+              <span className="tree-label" title={entry.name}>{entry.name}</span>
+              <button
+                className="tree-delete"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  void deleteNote(entry.path)
+                }}
+                aria-label={`Delete ${entry.name}`}
+                title={`Delete ${entry.name}`}
+              >
+                <Trash2 size={12} />
+              </button>
+            </div>
+          </ContextMenuTrigger>
+          <ContextMenuContent className="context-menu">
+            <ContextMenuItem variant="destructive" onSelect={() => void deleteNote(entry.path)}>
+              <Trash2 size={14} /> Delete
+            </ContextMenuItem>
+          </ContextMenuContent>
+        </ContextMenu>
+      </li>
+    )
+  }
 
   if (entry.type === 'note') {
     const isActive = activeTab === entry.path
@@ -197,6 +236,9 @@ export function TreeNode({ entry }: TreeNodeProps) {
         </ContextMenuTrigger>
         <ContextMenuContent className="context-menu">
           <BookmarkMenuItem bookmark={{ kind: 'folder', path: entry.path }} />
+          <ContextMenuItem onSelect={() => void createCanvas(entry.path)}>
+            <Plus size={14} /> New canvas
+          </ContextMenuItem>
           <ContextMenuItem onSelect={() => void handleRenameFolder()}>
             <Pencil size={14} /> Rename
           </ContextMenuItem>

@@ -19,8 +19,8 @@ describe('useCreateFolder', () => {
       expandedFolders: [],
       folderError: null,
     })
-    useNotesStore.setState({ notes: [], folders: [] })
-    notes.scan.mockResolvedValue({ notes: [], folders: [] })
+    useNotesStore.setState({ notes: [], folders: [], canvases: [] })
+    notes.scan.mockResolvedValue({ notes: [], folders: [], canvases: [] })
   })
 
   afterEach(() => {

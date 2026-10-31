@@ -48,7 +48,7 @@ const metadata = (path: string): NoteMetadata => ({
   updatedAt: Date.now(),
 })
 
-const tree = (): WorkspaceTree => ({ notes: [...files.keys()].map(metadata), folders: [] })
+const tree = (): WorkspaceTree => ({ notes: [...files.keys()].map(metadata), folders: [], canvases: [] })
 
 export const commands: Record<string, Command> = {
   initial_workspace: () => WORKSPACE,

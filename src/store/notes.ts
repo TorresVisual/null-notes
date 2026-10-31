@@ -10,15 +10,17 @@ import { folderName } from '../lib/pathPrefix'
 // title is the one the user actually typed. Anywhere else that shows a
 // note's name needs the same lookup, or it can show a mangled version of it.
 export function noteTitle(notes: NoteMetadata[], path: string): string {
-  return notes.find((n) => n.path === path)?.title ?? folderName(path).replace(/\.md$/, '')
+  return notes.find((n) => n.path === path)?.title ?? folderName(path).replace(/\.(md|canvas)$/, '')
 }
 
 interface NotesStore {
   notes: NoteMetadata[]
   folders: string[]
+  canvases: string[]
   tags: string[]
   setNotes: (notes: NoteMetadata[]) => void
   setFolders: (folders: string[]) => void
+  setCanvases: (canvases: string[]) => void
   setTags: (tags: string[]) => void
   addNote: (note: NoteMetadata) => void
   removeNote: (path: string) => void
@@ -27,9 +29,11 @@ interface NotesStore {
 export const useNotesStore = create<NotesStore>((set, get) => ({
   notes: [],
   folders: [],
+  canvases: [],
   tags: [],
   setNotes: (notes) => set({ notes }),
   setFolders: (folders) => set({ folders }),
+  setCanvases: (canvases) => set({ canvases }),
   setTags: (tags) => set({ tags }),
   addNote: (note) => set({ notes: [note, ...get().notes] }),
   removeNote: (path) => {

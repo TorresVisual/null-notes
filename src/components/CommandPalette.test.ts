@@ -20,6 +20,11 @@ describe('availableActions', () => {
     expect(ids({ hasWorkspace: true, hasNote: true, repoMode: false })).toContain('note-duplicate')
   })
 
+  it('offers New Agent Canvas whenever a workspace is open', () => {
+    expect(ids({ hasWorkspace: true, hasNote: false, repoMode: false })).toContain('new-agent-canvas')
+    expect(ids({ hasWorkspace: false, hasNote: false, repoMode: false })).not.toContain('new-agent-canvas')
+  })
+
   it('shows Sync Now only in a git repo, and never lists the palette itself', () => {
     expect(ids({ hasWorkspace: true, hasNote: true, repoMode: false })).not.toContain('sync-now')
     const withRepo = ids({ hasWorkspace: true, hasNote: true, repoMode: true })

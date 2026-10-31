@@ -30,6 +30,7 @@ export const COMMANDS: CommandDef[] = [
   def('new-note', 'New Note', 'Create', 'Ctrl+N'),
   def('new-folder', 'New Folder', 'Create', 'Ctrl+Shift+N'),
   def('new-canvas', 'New Canvas Note', 'Create'),
+  def('new-agent-canvas', 'New Agent Canvas', 'Create'),
   def('new-from-template', 'New from Template…', 'Create', 'Ctrl+Shift+T'),
   def('open-workspace', 'Open Workspace…', 'Navigate', 'Ctrl+O'),
   def('close-workspace', 'Close Workspace', 'Other'),
