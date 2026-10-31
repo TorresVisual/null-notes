@@ -201,4 +201,23 @@ describe('LinkSource', () => {
     expect(instance.state.doc.child(0).textContent).toBe('Text')
     expect(instance.getHTML()).toContain('href="Link.md"')
   })
+
+  it('lets Enter break the line while the ](…) menu is open with no matches', async () => {
+    function Source() {
+      const instance = useEditor({ extensions: extensionsFor(NOTE), content: '<p><a href="Link.md">Text</a>d</p>' })
+      return <EditorContent editor={instance} />
+    }
+    const { container } = render(<Source />)
+    const pm = await waitFor(() => {
+      const el = container.querySelector<HTMLElement>('.ProseMirror')
+      if (!el) throw new Error('editor not mounted')
+      return el
+    })
+    const editor = (pm as unknown as { editor: Editor }).editor
+    pm.focus()
+    editor.commands.setTextSelection(16)
+    await waitFor(() => expect(editor.getText()).toContain('[Text](Link.md)d'))
+    await userEvent.keyboard('{Enter}')
+    expect(editor.state.doc.childCount).toBe(2)
+  })
 })

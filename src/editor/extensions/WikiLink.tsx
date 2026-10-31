@@ -144,6 +144,9 @@ const WikiLinkMenu = forwardRef<WikiLinkMenuHandle, WikiLinkMenuProps>(function 
 
   useImperativeHandle(ref, () => ({
     onKeyDown(e) {
+      // No list is showing, so there is nothing to navigate or pick; keys
+      // belong to the editor (Enter must still break the line).
+      if (!items.length) return false
       if (e.key === 'ArrowUp') {
         setSelected((s) => Math.max(0, s - 1))
         return true
