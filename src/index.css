@@ -2144,6 +2144,32 @@ pre:has(code.language-expect)::before, pre:has(code.language-expected)::before {
 .inline-math.note-find-match, .block-math.note-find-match { outline: 2px solid var(--accent-bg); border-radius: 3px; }
 .inline-math.note-find-match-active, .block-math.note-find-match-active { outline-color: var(--accent); }
 
+/* Heading/list folding (Folding.ts) — hidden content stays in the DOM. */
+.fold-hidden { display: none; }
+.fold-able { position: relative; }
+.fold-toggle {
+  position: absolute;
+  top: 0.15em;
+  left: -1.3em;
+  width: 1em;
+  text-align: center;
+  font-size: 0.8em;
+  line-height: 1.6;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  user-select: none;
+  opacity: 0;
+  transform: rotate(90deg);
+  transition: opacity var(--duration-base) var(--ease-standard), transform var(--duration-base) var(--ease-standard);
+}
+li .fold-toggle { left: -2.4em; top: 0.25em; }
+/* A task item's content sits in a wrapper div, so the toggle is a grandchild there. */
+.fold-able:hover > .fold-toggle,
+.fold-able:hover > div > .fold-toggle { opacity: 1; }
+.fold-toggle:hover { color: var(--accent); }
+.fold-collapsed > .fold-toggle,
+.fold-collapsed > div > .fold-toggle { opacity: 0.7; transform: none; }
+
 /* Focus mode (Ctrl+Shift+F) — every top-level block but the active one. */
 .focus-mode-dim { opacity: 0.35; transition: opacity 0.15s ease; }
 .code-block-copy.copied, .code-block-format.copied { color: var(--accent); border-color: var(--accent); }

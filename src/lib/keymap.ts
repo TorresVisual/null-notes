@@ -64,6 +64,8 @@ export const COMMANDS: CommandDef[] = [
   def('prev-tab', 'Previous Tab', 'Navigate', 'Ctrl+Shift+Tab'),
   def('nav-back', 'Go Back', 'Navigate', 'Alt+ArrowLeft'),
   def('nav-forward', 'Go Forward', 'Navigate', 'Alt+ArrowRight'),
+  def('fold-all', 'Fold All Headings and Lists', 'View'),
+  def('unfold-all', 'Unfold All Headings and Lists', 'View'),
   def('toggle-focus-mode', 'Toggle Focus Mode', 'View', 'Ctrl+Shift+F'),
   def('sync-now', 'Sync Now', 'Other'),
   def('note-bookmark', 'Toggle Note Bookmark', 'Note'),

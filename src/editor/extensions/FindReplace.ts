@@ -4,6 +4,7 @@ import { Decoration, DecorationSet } from '@tiptap/pm/view'
 import type { EditorState, Transaction } from '@tiptap/pm/state'
 import type { Node as ProseMirrorNode } from '@tiptap/pm/model'
 import type { EditorView } from '@tiptap/pm/view'
+import { revealPos } from './Folding'
 
 /**
  * Note-wide find/replace (`Ctrl+F`), a sibling of `CodeBlockSearch.ts`'s
@@ -288,7 +289,15 @@ export const FindReplace = Extension.create({
           },
         },
         view(view: EditorView) {
-          const dispatchMeta = (meta: FindReplaceMeta) => view.dispatch(view.state.tr.setMeta(findReplaceKey, meta))
+          const dispatchMeta = (meta: FindReplaceMeta) => {
+            view.dispatch(view.state.tr.setMeta(findReplaceKey, meta))
+            if (meta.type !== 'query' && meta.type !== 'nav' && meta.type !== 'toggleOption') return
+            const value = findReplaceKey.getState(view.state)
+            if (!value) return
+            const matches = findDocMatches(view.state.doc, value.query, value)
+            const active = matches[wrapIndex(value.activeIndex, matches.length)]
+            if (active) revealPos(view, active.from)
+          }
 
           const bar = findBar()
           const paneEl = view.dom.closest<HTMLElement>('.editor-pane')

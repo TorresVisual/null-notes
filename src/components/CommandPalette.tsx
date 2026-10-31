@@ -20,6 +20,8 @@ const NEEDS_NOTE = new Set([
   'print',
   'toggle-outline',
   'toggle-outgoing-links',
+  'fold-all',
+  'unfold-all',
   'close-tab',
   'toggle-pin-tab',
   'next-tab',

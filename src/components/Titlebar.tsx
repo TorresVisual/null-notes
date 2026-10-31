@@ -69,6 +69,8 @@ export const VIEW_MENU: MenuItemSpec[] = entries([
   'toggle-terminal',
   'toggle-outline',
   'toggle-outgoing-links',
+  'fold-all',
+  'unfold-all',
   'toggle-sidebar',
   'task-view',
   'review',

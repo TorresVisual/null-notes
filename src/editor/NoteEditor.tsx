@@ -222,6 +222,18 @@ export function NoteEditor({
     return () => window.removeEventListener('command:extract-selection', handler)
   }, [editor, notePath])
 
+  useEffect(() => {
+    if (!editor) return
+    const foldAll = () => editor.isFocused && editor.commands.foldAll()
+    const unfoldAll = () => editor.isFocused && editor.commands.unfoldAll()
+    window.addEventListener('command:fold-all', foldAll)
+    window.addEventListener('command:unfold-all', unfoldAll)
+    return () => {
+      window.removeEventListener('command:fold-all', foldAll)
+      window.removeEventListener('command:unfold-all', unfoldAll)
+    }
+  }, [editor])
+
   // The outgoing-links panel's "link this mention" action. The note path in
   // the event keeps a second pane showing a different note from reacting.
   useEffect(() => {

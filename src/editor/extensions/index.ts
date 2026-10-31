@@ -33,6 +33,7 @@ import { CodeBlockRun } from './CodeBlockRun'
 import { FindReplace } from './FindReplace'
 import { SearchJumpHighlight } from './SearchJumpHighlight'
 import { FocusMode } from './FocusMode'
+import { Folding } from './Folding'
 import { CrossRef } from './CrossRef'
 import { Tag } from './Tag'
 import { NoteContext } from './NoteContext'
@@ -210,6 +211,7 @@ export const coreExtensions = [
   FindReplace,
   SearchJumpHighlight,
   FocusMode,
+  Folding,
   CrossRef,
   NoteContext,
   SlashCommands,

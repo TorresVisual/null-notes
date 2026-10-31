@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import type { RefObject } from 'react'
 import { parseHeadings } from '../lib/outlineHeadings'
 import { useWorkspaceStore } from '../store/workspace'
+import { REVEAL_FOLD_EVENT } from '../editor/extensions/Folding'
 import { BookmarkMenuItem } from './BookmarkMenuItem'
 import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from './ui/context-menu'
 
@@ -65,7 +66,9 @@ export function OutlinePanel({ content, containerRef }: OutlinePanelProps) {
 
   function jump(index: number) {
     const els = containerRef.current?.querySelectorAll<HTMLElement>(HEADING_SELECTOR)
-    els?.[index]?.scrollIntoView({ block: 'start', behavior: 'smooth' })
+    const el = els?.[index]
+    el?.dispatchEvent(new Event(REVEAL_FOLD_EVENT, { bubbles: true }))
+    el?.scrollIntoView({ block: 'start', behavior: 'smooth' })
   }
 
   return (

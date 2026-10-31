@@ -430,6 +430,10 @@ export function Layout() {
         case 'note-copy-relative-path':
           if (activeTab) await copyNotePath(activeTab, 'relative')
           break
+        case 'fold-all':
+        case 'unfold-all':
+          window.dispatchEvent(new Event(`command:${id}`))
+          break
         case 'toggle-focus-mode':
           toggleFocusMode()
           break

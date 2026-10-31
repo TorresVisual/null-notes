@@ -3,6 +3,7 @@ import { Plugin, PluginKey } from '@tiptap/pm/state'
 import { Decoration, DecorationSet } from '@tiptap/pm/view'
 import type { Editor } from '@tiptap/core'
 import { findDocMatches } from './FindReplace'
+import { revealPos } from './Folding'
 
 /**
  * Backs the flash-highlight a Ctrl+K search result jump lands on
@@ -56,24 +57,30 @@ export function highlightSearchMatch(editor: Editor, text: string): void {
     wholeWord: false,
     useRegex: false,
   })[0]
-  if (match) flashRange(editor, match.from, match.to)
+  if (match) {
+    revealPos(editor.view, match.from)
+    flashRange(editor, match.from, match.to)
+  }
 }
 
 /** Scrolls to and briefly highlights the first heading whose text equals
  *  `heading` (case-insensitive). No such heading leaves the note at the top. */
 export function highlightHeading(editor: Editor, heading: string): void {
   const wanted = heading.toLowerCase()
-  const found: { from: number; to: number }[] = []
+  const found: { from: number; to: number; heading: number }[] = []
   editor.state.doc.descendants((node, pos) => {
     if (found.length) return false
     if (node.type.name !== 'heading') return true
     if (node.textContent.trim().toLowerCase() === wanted) {
-      found.push({ from: pos + 1, to: pos + node.nodeSize - 1 })
+      found.push({ from: pos + 1, to: pos + node.nodeSize - 1, heading: pos })
     }
     return false
   })
   const hit = found[0]
-  if (hit) flashRange(editor, hit.from, hit.to)
+  if (hit) {
+    revealPos(editor.view, hit.heading)
+    flashRange(editor, hit.from, hit.to)
+  }
 }
 
 function flashRange(editor: Editor, from: number, to: number): void {

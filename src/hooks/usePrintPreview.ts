@@ -14,6 +14,8 @@ import { markPageBreaks, teardown, withPrintMount } from '../lib/printMount'
 function cloneForPagination(el: HTMLElement): HTMLElement {
   const clone = el.cloneNode(true) as HTMLElement
   clone.removeAttribute('class')
+  clone.querySelectorAll('.fold-hidden, .fold-able').forEach((el) => el.classList.remove('fold-hidden', 'fold-able', 'fold-collapsed'))
+  clone.querySelectorAll('.fold-toggle').forEach((el) => el.remove())
   markPageBreaks(clone)
   return clone
 }
