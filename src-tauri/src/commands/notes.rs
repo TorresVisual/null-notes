@@ -851,9 +851,10 @@ pub(crate) fn is_excluded_dir(name: &str) -> bool {
 pub(super) async fn scan_dir_recursive(
     root: &std::path::Path,
     workspace: &str,
-) -> anyhow::Result<(Vec<NoteMetadata>, Vec<String>)> {
+) -> anyhow::Result<(Vec<NoteMetadata>, Vec<String>, Vec<String>)> {
     let mut notes = Vec::new();
     let mut folders = Vec::new();
+    let mut canvases = Vec::new();
     let mut stack = vec![root.to_path_buf()];
     let mut shown = std::collections::HashSet::new();
 
@@ -878,7 +879,13 @@ pub(super) async fn scan_dir_recursive(
                 continue;
             }
 
-            if path.extension().and_then(|e| e.to_str()) != Some("md") {
+            let extension = path.extension().and_then(|e| e.to_str());
+            if extension == Some("canvas") {
+                shown.insert(dir.clone());
+                canvases.push(path.to_string_lossy().into_owned());
+                continue;
+            }
+            if extension != Some("md") {
                 continue;
             }
             shown.insert(dir.clone());
@@ -913,7 +920,7 @@ pub(super) async fn scan_dir_recursive(
     // every intermediate segment from the deeper path.
     folders.retain(|f| shown.contains(std::path::Path::new(f)));
 
-    Ok((notes, folders))
+    Ok((notes, folders, canvases))
 }
 
 #[tauri::command]
@@ -921,9 +928,10 @@ pub async fn scan_workspace(
     workspace: String,
     db: State<'_, DbPool>,
 ) -> Result<WorkspaceTree, String> {
-    let (notes, folders) = scan_dir_recursive(std::path::Path::new(&workspace), &workspace)
-        .await
-        .map_err(|e| e.to_string())?;
+    let (notes, folders, canvases) =
+        scan_dir_recursive(std::path::Path::new(&workspace), &workspace)
+            .await
+            .map_err(|e| e.to_string())?;
 
     for meta in &notes {
         db::notes::index_note(&db, meta)
@@ -938,6 +946,7 @@ pub async fn scan_workspace(
     Ok(WorkspaceTree {
         notes: indexed,
         folders,
+        canvases,
     })
 }
 
@@ -1999,7 +2008,7 @@ pub async fn graph_tags(workspace: String, db: State<'_, DbPool>) -> Result<Vec<
         .collect())
 }
 
-pub(super) fn note_filename(title: &str) -> String {
+pub(super) fn safe_stem(title: &str) -> String {
     let safe_name: String = title
         .chars()
         .map(|c| {
@@ -2010,7 +2019,42 @@ pub(super) fn note_filename(title: &str) -> String {
             }
         })
         .collect();
-    format!("{}.md", safe_name.trim())
+    safe_name.trim().to_string()
+}
+
+pub(super) fn note_filename(title: &str) -> String {
+    format!("{}.md", safe_stem(title))
+}
+
+const EMPTY_CANVAS: &str = "{
+  \"nodes\": [],
+  \"edges\": [],
+  \"lastPass\": 0
+}
+";
+
+#[tauri::command]
+pub async fn create_canvas(
+    workspace: String,
+    folder: String,
+    name: String,
+) -> Result<String, String> {
+    require_within_workspace(&workspace, &folder)?;
+    let stem = safe_stem(&name);
+    if stem.is_empty() {
+        return Err("a canvas needs a name".to_string());
+    }
+    let path = Path::new(&folder).join(format!("{stem}.canvas"));
+    if tokio::fs::try_exists(&path)
+        .await
+        .map_err(|e| e.to_string())?
+    {
+        return Err(format!("a canvas named \"{stem}\" already exists here"));
+    }
+    write_atomic(&path, EMPTY_CANVAS)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(path.to_string_lossy().into_owned())
 }
 
 // Filenames are derived from titles, so two different notes can want the same
@@ -3496,7 +3540,7 @@ mod tests {
         std::fs::write(root.join("root-note.md"), "# Root").unwrap();
 
         let ws = root.to_string_lossy().into_owned();
-        let (notes, folders) = scan_dir_recursive(root, &ws).await.unwrap();
+        let (notes, folders, _) = scan_dir_recursive(root, &ws).await.unwrap();
 
         assert_eq!(notes.len(), 2);
         assert_eq!(folders.len(), 1);
@@ -3510,7 +3554,7 @@ mod tests {
         std::fs::write(root.join("lecture-1-notes.md"), "# Lecture 1 Notes\nbody").unwrap();
 
         let ws = root.to_string_lossy().into_owned();
-        let (notes, _) = scan_dir_recursive(root, &ws).await.unwrap();
+        let (notes, _, _) = scan_dir_recursive(root, &ws).await.unwrap();
 
         assert_eq!(notes.len(), 1);
         assert_eq!(notes[0].title, "Lecture 1 Notes");
@@ -3526,7 +3570,7 @@ mod tests {
         std::fs::write(root.join("Note.md"), "# Note").unwrap();
 
         let ws = root.to_string_lossy().into_owned();
-        let (notes, folders) = scan_dir_recursive(root, &ws).await.unwrap();
+        let (notes, folders, _) = scan_dir_recursive(root, &ws).await.unwrap();
 
         assert_eq!(notes.len(), 1);
         assert!(folders.is_empty());
@@ -3539,7 +3583,7 @@ mod tests {
         let ws = root.to_string_lossy().into_owned();
         create_folder_at(&ws, "Empty").await.unwrap();
 
-        let (notes, folders) = scan_dir_recursive(root, &ws).await.unwrap();
+        let (notes, folders, _) = scan_dir_recursive(root, &ws).await.unwrap();
 
         assert!(notes.is_empty());
         assert_eq!(folders.len(), 1);
@@ -3555,11 +3599,87 @@ mod tests {
         std::fs::write(root.join("Mine/sub/n.md"), "# n").unwrap();
 
         let ws = root.to_string_lossy().into_owned();
-        let (_, folders) = scan_dir_recursive(root, &ws).await.unwrap();
+        let (_, folders, _) = scan_dir_recursive(root, &ws).await.unwrap();
 
         assert_eq!(folders.len(), 1);
         assert!(folders[0].ends_with("sub"));
         assert!(root.join("Foreign/deep/data.txt").exists());
+    }
+
+    #[tokio::test]
+    async fn test_scan_dir_recursive_collects_canvases_and_keeps_their_folders() {
+        let tmp = tempdir().unwrap();
+        let root = tmp.path();
+        for dir in ["Notes", "Only", "Note.ink", ".git"] {
+            std::fs::create_dir_all(root.join(dir)).unwrap();
+        }
+        for file in [
+            "Notes/map.canvas",
+            "Only/board.canvas",
+            "Note.ink/hidden.canvas",
+            ".git/hidden.canvas",
+        ] {
+            std::fs::write(root.join(file), "{}").unwrap();
+        }
+
+        let ws = root.to_string_lossy().into_owned();
+        let (notes, folders, mut canvases) = scan_dir_recursive(root, &ws).await.unwrap();
+
+        canvases.sort();
+        assert!(notes.is_empty());
+        assert_eq!(folders.len(), 2);
+        assert_eq!(canvases.len(), 2);
+        assert!(canvases[0].ends_with("map.canvas"));
+        assert!(canvases[1].ends_with("board.canvas"));
+    }
+
+    #[tokio::test]
+    async fn test_create_canvas_writes_an_empty_canvas_and_refuses_a_second_one() {
+        let tmp = tempdir().unwrap();
+        let ws = tmp.path().to_string_lossy().into_owned();
+
+        let path = create_canvas(ws.clone(), ws.clone(), "My Map".into())
+            .await
+            .unwrap();
+
+        assert!(path.ends_with("My Map.canvas"));
+        let json: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
+        assert_eq!(json["nodes"], serde_json::json!([]));
+        assert_eq!(json["edges"], serde_json::json!([]));
+        assert_eq!(json["lastPass"], 0);
+        assert!(create_canvas(ws.clone(), ws, "My Map".into())
+            .await
+            .is_err());
+    }
+
+    #[tokio::test]
+    async fn test_create_canvas_refuses_a_folder_outside_the_workspace() {
+        let tmp = tempdir().unwrap();
+        let other = tempdir().unwrap();
+
+        let result = create_canvas(
+            tmp.path().to_string_lossy().into_owned(),
+            other.path().to_string_lossy().into_owned(),
+            "Map".into(),
+        )
+        .await;
+
+        assert!(result.is_err());
+        assert!(!other.path().join("Map.canvas").exists());
+    }
+
+    #[tokio::test]
+    async fn test_create_canvas_sanitises_the_name_and_refuses_an_empty_one() {
+        let tmp = tempdir().unwrap();
+        let ws = tmp.path().to_string_lossy().into_owned();
+
+        let path = create_canvas(ws.clone(), ws.clone(), "a/b:c".into())
+            .await
+            .unwrap();
+
+        assert!(path.ends_with("a-b-c.canvas"));
+        assert!(create_canvas(ws.clone(), ws, "  ".into()).await.is_err());
     }
 }
 

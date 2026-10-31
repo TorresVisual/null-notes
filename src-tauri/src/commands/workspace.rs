@@ -158,6 +158,7 @@ pub async fn save_workspace(path: String, state: WorkspaceState) -> Result<(), S
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::models::CanvasViewport;
     use tempfile::tempdir;
 
     #[tokio::test]
@@ -376,6 +377,38 @@ mod tests {
         .unwrap();
         let legacy = load_workspace_from_dir(&path).await.unwrap();
         assert!(legacy.pinned_tabs.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_canvas_viewports_roundtrip_and_default_empty() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().to_string_lossy().into_owned();
+        let original = WorkspaceState {
+            canvas_viewports: [(
+                "/ws/map.canvas".to_string(),
+                CanvasViewport {
+                    x: 10.0,
+                    y: -4.5,
+                    zoom: 0.75,
+                },
+            )]
+            .into(),
+            ..Default::default()
+        };
+
+        save_workspace_to_dir(&path, &original).await.unwrap();
+        let loaded = load_workspace_from_dir(&path).await.unwrap();
+        let viewport = &loaded.canvas_viewports["/ws/map.canvas"];
+        assert_eq!((viewport.x, viewport.y, viewport.zoom), (10.0, -4.5, 0.75));
+
+        tokio::fs::write(
+            dir.path().join(".workspace.json"),
+            r#"{"openTabs":[],"activeTab":null}"#,
+        )
+        .await
+        .unwrap();
+        let legacy = load_workspace_from_dir(&path).await.unwrap();
+        assert!(legacy.canvas_viewports.is_empty());
     }
 
     // idle_minutes/skip_hooks/auto_push are P5-2/P5-3 fields, added after

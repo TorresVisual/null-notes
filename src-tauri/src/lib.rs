@@ -197,6 +197,7 @@ pub fn run() {
             commands::bookmarks::read_bookmarks,
             commands::bookmarks::write_bookmarks,
             commands::notes::create_note,
+            commands::notes::create_canvas,
             commands::notes::rename_note,
             commands::notes::rename_tag,
             commands::trash::delete_note,

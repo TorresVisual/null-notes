@@ -113,7 +113,8 @@ fn trash_files(
 
     let moved = (|| -> std::io::Result<()> {
         move_path(src, &payload.join(file_name))?;
-        if !is_folder {
+        // A canvas shares its stem with a same-named note, whose sidecars aren't its own.
+        if !is_folder && !is_canvas(src) {
             for suffix in SIDECAR_SUFFIXES {
                 let sidecar = PathBuf::from(super::sidecar_dir_for(path, suffix));
                 if let Some(sidecar_name) = sidecar.file_name().filter(|_| sidecar.exists()) {
@@ -132,9 +133,16 @@ fn trash_files(
     Ok(entry)
 }
 
+fn is_canvas(path: &Path) -> bool {
+    path.extension().is_some_and(|e| e == "canvas")
+}
+
 fn is_free(parent: &Path, entry: &TrashEntry, candidate: &str) -> bool {
     if entry.is_folder {
         return !parent.join(candidate).exists();
+    }
+    if is_canvas(Path::new(&entry.original_path)) {
+        return !parent.join(format!("{candidate}.canvas")).exists();
     }
     !parent.join(format!("{candidate}.md")).exists()
         && SIDECAR_SUFFIXES
@@ -171,7 +179,7 @@ fn restore_files(root: &Path, workspace: &str, id: &str) -> anyhow::Result<(Tras
         let suffix = item_name.strip_prefix(&stem).unwrap_or_default();
         let target = parent.join(format!("{candidate}{suffix}"));
         move_path(&item.path(), &target)?;
-        if suffix.is_empty() || suffix == ".md" {
+        if suffix.is_empty() || suffix == ".md" || suffix == ".canvas" {
             restored_root = target;
         }
     }
@@ -235,12 +243,12 @@ pub(super) async fn restore_at(
     let (entry, restored) = blocking(move || restore_files(&root, &workspace_owned, &id)).await?;
     let restored_str = restored.to_string_lossy().into_owned();
     if entry.is_folder {
-        let (notes, _) = scan_dir_recursive(&restored, workspace).await?;
+        let (notes, _, _) = scan_dir_recursive(&restored, workspace).await?;
         for note in notes {
             let content = tokio::fs::read_to_string(&note.path).await?;
             index_note_at(&note.path, workspace, &content, db).await?;
         }
-    } else {
+    } else if !is_canvas(&restored) {
         let content = tokio::fs::read_to_string(&restored).await?;
         index_note_at(&restored_str, workspace, &content, db).await?;
     }
@@ -490,6 +498,60 @@ mod tests {
             .unwrap();
 
         assert_note_with_sidecars(&folder, "note");
+    }
+
+    #[tokio::test]
+    async fn test_trash_then_restore_canvas_keeps_the_index_and_a_sibling_notes_sidecars() {
+        let ws = tempdir().unwrap();
+        let trash = tempdir().unwrap();
+        write_note_with_sidecars(ws.path(), "map");
+        let canvas = ws.path().join("map.canvas");
+        std::fs::write(&canvas, "{}").unwrap();
+        let pool = make_pool().await;
+        let workspace = ws.path().to_string_lossy().into_owned();
+
+        let entry = trash_note_at(trash.path(), &workspace, &canvas.to_string_lossy(), &pool)
+            .await
+            .unwrap();
+
+        assert!(!canvas.exists());
+        assert_note_with_sidecars(ws.path(), "map");
+
+        let restored = restore_at(trash.path(), &workspace, &entry.id, &pool)
+            .await
+            .unwrap();
+
+        assert_eq!(restored, canvas.to_string_lossy());
+        assert!(canvas.exists());
+        assert!(db::notes::list_by_workspace(&pool, &workspace)
+            .await
+            .unwrap()
+            .is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_restore_canvas_on_collision_never_overwrites() {
+        let ws = tempdir().unwrap();
+        let trash = tempdir().unwrap();
+        let canvas = ws.path().join("map.canvas");
+        std::fs::write(&canvas, "old").unwrap();
+        let pool = make_pool().await;
+        let workspace = ws.path().to_string_lossy().into_owned();
+        let entry = trash_note_at(trash.path(), &workspace, &canvas.to_string_lossy(), &pool)
+            .await
+            .unwrap();
+        std::fs::write(&canvas, "new").unwrap();
+
+        let restored = restore_at(trash.path(), &workspace, &entry.id, &pool)
+            .await
+            .unwrap();
+
+        assert_eq!(
+            restored,
+            ws.path().join("map (restored).canvas").to_string_lossy()
+        );
+        assert_eq!(std::fs::read_to_string(&canvas).unwrap(), "new");
+        assert_eq!(std::fs::read_to_string(&restored).unwrap(), "old");
     }
 
     #[test]

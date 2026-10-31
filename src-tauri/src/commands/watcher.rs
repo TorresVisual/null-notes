@@ -12,14 +12,22 @@ pub struct WatcherState(pub Mutex<Option<RecommendedWatcher>>);
 // atomic write lands as create+rename. Collapse a burst into one refresh.
 const DEBOUNCE: Duration = Duration::from_millis(300);
 
-fn is_note_path(path: &Path) -> bool {
-    if path.extension().and_then(|e| e.to_str()) != Some("md") {
+fn has_visible_ext(path: &Path, ext: &str) -> bool {
+    if path.extension().and_then(|e| e.to_str()) != Some(ext) {
         return false;
     }
     !path.components().any(|c| {
         let name = c.as_os_str().to_string_lossy();
         name.starts_with('.') || name.ends_with(".ink")
     })
+}
+
+fn is_note_path(path: &Path) -> bool {
+    has_visible_ext(path, "md")
+}
+
+fn is_canvas_path(path: &Path) -> bool {
+    has_visible_ext(path, "canvas")
 }
 
 fn is_bookmarks_path(path: &Path) -> bool {
@@ -30,7 +38,7 @@ fn note_paths(event: &Event) -> Vec<PathBuf> {
     event
         .paths
         .iter()
-        .filter(|p| is_note_path(p) || is_bookmarks_path(p))
+        .filter(|p| is_note_path(p) || is_canvas_path(p) || is_bookmarks_path(p))
         .cloned()
         .collect()
 }
@@ -63,10 +71,21 @@ pub fn watch_workspace(
             while let Ok(more) = rx.recv_timeout(DEBOUNCE) {
                 batch.extend(more);
             }
-            let (bookmarks, notes): (Vec<PathBuf>, Vec<PathBuf>) =
+            let (bookmarks, rest): (Vec<PathBuf>, Vec<PathBuf>) =
                 batch.into_iter().partition(|p| is_bookmarks_path(p));
             if !bookmarks.is_empty() {
                 let _ = app.emit("bookmarks-changed", ());
+            }
+            // Canvases stay off `workspace-changed`: that path re-indexes from
+            // disk, and a .canvas is JSON, not a note.
+            let (canvases, notes): (Vec<PathBuf>, Vec<PathBuf>) =
+                rest.into_iter().partition(|p| is_canvas_path(p));
+            if !canvases.is_empty() {
+                let paths: Vec<String> = canvases
+                    .into_iter()
+                    .map(|p| p.to_string_lossy().into_owned())
+                    .collect();
+                let _ = app.emit("canvas-changed", paths);
             }
             if !notes.is_empty() {
                 let paths: Vec<String> = notes
@@ -109,6 +128,15 @@ mod tests {
     #[test]
     fn test_is_note_path_rejects_our_own_temp_writes() {
         assert!(!is_note_path(Path::new("/ws/.note.md.abc123.tmp")));
+    }
+
+    #[test]
+    fn test_is_canvas_path_accepts_canvases_but_not_temp_writes_or_dot_directories() {
+        assert!(is_canvas_path(Path::new("/ws/a.canvas")));
+        assert!(!is_canvas_path(Path::new("/ws/.a.canvas.abc.tmp")));
+        assert!(!is_canvas_path(Path::new("/ws/.git/a.canvas")));
+        assert!(!is_canvas_path(Path::new("/ws/a.md")));
+        assert!(!is_note_path(Path::new("/ws/a.canvas")));
     }
 
     #[test]

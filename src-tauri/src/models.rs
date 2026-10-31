@@ -1,5 +1,6 @@
 use crate::sm2;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -156,6 +157,17 @@ pub struct WorkspaceState {
     // ordered pinned-first. Absent in a file an older build wrote.
     #[serde(default)]
     pub pinned_tabs: Vec<String>,
+    // Last pan/zoom per canvas, keyed by path. Lives here, not in the `.canvas`,
+    // so a view change never dirties a file an agent may be writing.
+    #[serde(default)]
+    pub canvas_viewports: HashMap<String, CanvasViewport>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct CanvasViewport {
+    pub x: f64,
+    pub y: f64,
+    pub zoom: f64,
 }
 
 /// Whether *this machine* should auto-commit in this workspace, and whether
@@ -241,6 +253,8 @@ pub enum RepoMode {
 pub struct WorkspaceTree {
     pub notes: Vec<NoteMetadata>,
     pub folders: Vec<String>,
+    #[serde(default)]
+    pub canvases: Vec<String>,
 }
 
 // The connections graph's raw edges — link/tag resolution into an actual
