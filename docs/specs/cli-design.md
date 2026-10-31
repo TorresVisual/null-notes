@@ -63,7 +63,7 @@ Chosen by the user: approach 2.
 
 ### Output and exit codes
 
-- Default output is JSON on stdout; diagnostics on stderr. `--format text` for humans (minimal in v1: one line per item).
+- JSON on stdout only; diagnostics on stderr. No human-readable format in v1 — the TUI is the human surface.
 - Exit codes: `0` ok, `1` command failed (error JSON on stdout), `2` usage error, `3` workspace not resolved, `4` app unreachable after launch timeout, `5` write refused (dirty buffer — see below).
 
 ### Command surface (v1)
@@ -75,17 +75,30 @@ Verb-noun, mapped 1:1 to existing commands: `note list|read|create|append|rename
 - CLI writes call the same `save_note`/`create_note`/`rename_note` the app uses, so `write_atomic` and the no-DB-work-on-save split hold. The CLI calls `reindex_note` after a write itself (it is not a keystroke path).
 - The watcher already treats a file changed on disk as external: clean buffer reloads, dirty buffer prompts. The CLI never forces. If the app reports the target note has an unsaved buffer, the write fails with exit `5` and does not touch disk. (How the server learns about dirty buffers — it lives in the frontend — is the one real open mechanism; see below.)
 
+## Settled in review
+
+- Dirty-buffer writes are refused (exit 5), never forwarded to the conflict prompt.
+- Trust boundary is the same user; the allowlist is the real control. Trash-delete is in v1; permanent delete, empty-trash and git push/pull/clone are not. `git status`/`commit` are in.
+- First request per workspace per server session runs an incremental scan so search/backlinks are not stale; the plan measures its cost on a real workspace.
+- Cross-workspace requests work (commands take `workspace`); the CLI triggers that workspace's scan/reindex. The app's watcher keeps covering only the workspace its window has open.
+- Notes are addressed by workspace-relative, forward-slash path in input and output. Title lookup lives in `search` only.
+- Content commands accept `--content -` (stdin) as well as inline; agent docs recommend stdin.
+- Installer places `nullnotes.exe` beside `null-notes.exe` and adds that folder to the user PATH; the CLI finds the app exe beside itself, falling back to `target/` in dev.
+- Every request carries an integer protocol version; mismatch returns a clear "update the CLI/app" error.
+- CLI-started or CLI-targeted workspaces never enter `recent-workspaces.json` or the jump list.
+- The server holds a per-path lock around each write command.
+- Settings toggle "Allow CLI access", default on; when off the pipe server does not start and the CLI exits with a message saying so.
+- At startup the app may re-launch itself under its MSIX identity (`register_and_relaunch`). The CLI waits for the pipe, never on the child process, and `--headless` must survive that relaunch.
+
 ## Decisions made by me (the user can override)
 
 - Binary built as a second `[[bin]]` in `src-tauri`, not a new crate.
 - Pipe name/token scheme, 15 s launch timeout, 10 min idle quit.
-- JSON default output; text format minimal.
 - Exit code numbering.
-- Write-safety refusal at exit `5`.
 
 ## Left to the builder
 
-- **Dirty-buffer detection for writes.** The backend does not know about frontend buffers. Options: the frontend reports dirty paths to the backend (small new command + state), or the server asks the webview. Start with the first; if it proves heavy, ship v1 writes as "refuse if the app window is shown, allow if hidden" and file the rest.
+- **Dirty-buffer detection.** The backend does not know about frontend buffers: the frontend reports its dirty paths to the backend (small new command + state). A hidden, never-shown instance has no buffers, so writes always proceed there.
 - Exact flag grammar (use `clap`, already idiomatic for Rust CLIs; it is not yet a dependency).
 - Windows-only gating of the pipe/launch code (`cfg(windows)`), keeping mobile and web builds compiling.
 - Tests: pipe server unit tests with an in-process client; one e2e spec via `e2e-verify` covering cold-start launch and a search round-trip.
