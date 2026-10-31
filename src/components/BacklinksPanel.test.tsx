@@ -126,6 +126,6 @@ describe('BacklinksPanel', () => {
     await user.click(await screen.findByRole('button', { name: 'Sorting' }))
 
     expect(useWorkspaceStore.getState().activeTab).toBe('/ws/sorting.md')
-    expect(takePendingHighlight('/ws/sorting.md')).toBe('Big O Notation')
+    expect(takePendingHighlight('/ws/sorting.md')).toEqual({ text: 'Big O Notation', heading: false })
   })
 })

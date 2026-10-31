@@ -7,7 +7,7 @@ import { confirm, message } from '@tauri-apps/plugin-dialog'
 import { extensionsFor } from './extensions'
 import { rememberPosition, recallPosition } from '../lib/notePositions'
 import { takePendingHighlight } from '../lib/pendingHighlight'
-import { highlightSearchMatch } from './extensions/SearchJumpHighlight'
+import { highlightHeading, highlightSearchMatch } from './extensions/SearchJumpHighlight'
 import { handleEditorKeyDown, handleEditorTextInput } from './extensions/CodeBlockEditor'
 import { splitIntoTasks, report, markdownOf } from './splitIntoTasks'
 import { EditorStatusBar } from './EditorStatusBar'
@@ -40,6 +40,13 @@ function buildEditorProps(spellcheck: boolean, language: string) {
     handleTextInput: handleEditorTextInput,
     ...caretScrollProps(isMobile()),
   }
+}
+
+function jumpToPending(editor: Editor, notePath: string) {
+  const pending = takePendingHighlight(notePath)
+  if (!pending) return
+  if (pending.heading) highlightHeading(editor, pending.text)
+  else highlightSearchMatch(editor, pending.text)
 }
 
 export function NoteEditor({
@@ -168,16 +175,12 @@ export function NoteEditor({
   // nor content, so this effect's deps would never re-fire for it.
   useEffect(() => {
     if (!editor) return
-    const text = takePendingHighlight(notePath)
-    if (text) highlightSearchMatch(editor, text)
+    jumpToPending(editor, notePath)
   }, [editor, notePath, content])
 
   useEffect(() => {
     if (!editor) return
-    const onSearchJump = () => {
-      const text = takePendingHighlight(notePath)
-      if (text) highlightSearchMatch(editor, text)
-    }
+    const onSearchJump = () => jumpToPending(editor, notePath)
     window.addEventListener('search:jump', onSearchJump)
     return () => window.removeEventListener('search:jump', onSearchJump)
   }, [editor, notePath])

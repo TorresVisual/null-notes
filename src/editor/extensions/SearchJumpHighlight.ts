@@ -56,11 +56,28 @@ export function highlightSearchMatch(editor: Editor, text: string): void {
     wholeWord: false,
     useRegex: false,
   })[0]
-  if (!match) return
+  if (match) flashRange(editor, match.from, match.to)
+}
 
-  editor.view.dispatch(
-    editor.state.tr.setMeta(searchJumpKey, { from: match.from, to: match.to }).scrollIntoView(),
-  )
+/** Scrolls to and briefly highlights the first heading whose text equals
+ *  `heading` (case-insensitive). No such heading leaves the note at the top. */
+export function highlightHeading(editor: Editor, heading: string): void {
+  const wanted = heading.toLowerCase()
+  const found: { from: number; to: number }[] = []
+  editor.state.doc.descendants((node, pos) => {
+    if (found.length) return false
+    if (node.type.name !== 'heading') return true
+    if (node.textContent.trim().toLowerCase() === wanted) {
+      found.push({ from: pos + 1, to: pos + node.nodeSize - 1 })
+    }
+    return false
+  })
+  const hit = found[0]
+  if (hit) flashRange(editor, hit.from, hit.to)
+}
+
+function flashRange(editor: Editor, from: number, to: number): void {
+  editor.view.dispatch(editor.state.tr.setMeta(searchJumpKey, { from, to }).scrollIntoView())
   setTimeout(() => {
     if (editor.isDestroyed) return
     editor.view.dispatch(editor.state.tr.setMeta(searchJumpKey, null))

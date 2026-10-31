@@ -12,14 +12,17 @@ import { useCreateNote } from '../../hooks/useCreateNote'
 import { excerptForPreview } from '../../lib/notePreview'
 import { api } from '../../lib/tauri'
 import { encodeAttr } from '../../lib/htmlAttr'
+import { setPendingHighlight } from '../../lib/pendingHighlight'
+import { parseHeadings } from '../../lib/outlineHeadings'
+import { formatWikiLink, parseWikiLink, wikiLinkText } from '../../lib/wikiLinkSyntax'
+import type { WikiLinkParts } from '../../lib/wikiLinkSyntax'
 import { Tooltip, TooltipContent, TooltipTrigger } from '../../components/ui/tooltip'
 
-interface WikiLinkAttrs {
-  title: string
-}
+type WikiLinkAttrs = WikiLinkParts
 
 function WikiLinkView({ node }: ReactNodeViewProps) {
-  const { title } = node.attrs as unknown as WikiLinkAttrs
+  const attrs = node.attrs as unknown as WikiLinkAttrs
+  const { title, heading } = attrs
   const notes = useNotesStore((s) => s.notes)
   const openTab = useWorkspaceStore((s) => s.openTab)
   const createNote = useCreateNote()
@@ -35,6 +38,10 @@ function WikiLinkView({ node }: ReactNodeViewProps) {
   function handleClick() {
     if (target) {
       openTab(target.path)
+      if (heading) {
+        setPendingHighlight(target.path, heading, true)
+        window.dispatchEvent(new Event('search:jump'))
+      }
       return
     }
     void createNote(title)
@@ -48,7 +55,7 @@ function WikiLinkView({ node }: ReactNodeViewProps) {
       title={target ? undefined : `Create note "${title}"`}
       spellCheck={false}
     >
-      {title}
+      {wikiLinkText(attrs)}
     </NodeViewWrapper>
   )
 
@@ -84,18 +91,36 @@ function WikiLinkView({ node }: ReactNodeViewProps) {
 // written yet.
 export interface WikiLinkItem {
   title: string
+  heading?: string
+  label?: string
   isNew: boolean
 }
 
-function wikiLinkItems({ query }: { query: string }): WikiLinkItem[] {
-  const q = query.toLowerCase()
+// After `#` the menu switches from note titles to that note's headings; the
+// `|label` typed so far rides along onto whichever item is picked.
+async function wikiLinkItems({ query }: { query: string }): Promise<WikiLinkItem[]> {
+  const typed = parseWikiLink(query)
+  const q = typed.title.toLowerCase()
   const notes = useNotesStore.getState().notes
+  const exactNote = notes.find((n) => n.title.toLowerCase() === q)
+
+  if (query.slice(0, query.indexOf('|') < 0 ? undefined : query.indexOf('|')).includes('#')) {
+    if (!exactNote) return []
+    const headings = parseHeadings(await api.notes.open(exactNote.workspace, exactNote.path))
+    const wanted = typed.heading.toLowerCase()
+    return headings
+      .filter((h) => h.text.toLowerCase().includes(wanted))
+      .slice(0, 10)
+      .map((h) => ({ title: exactNote.title, heading: h.text, label: typed.label, isNew: false }))
+  }
+
   const matches = notes
     .filter((n) => n.title.toLowerCase().includes(q))
     .slice(0, 10)
-    .map((n) => ({ title: n.title, isNew: false }))
-  const exact = notes.some((n) => n.title.toLowerCase() === q)
-  if (query && !exact) matches.push({ title: query, isNew: true })
+    .map((n) => ({ title: n.title, heading: '', label: typed.label, isNew: false }))
+  if (typed.title && !exactNote) {
+    matches.push({ title: typed.title, heading: '', label: typed.label, isNew: true })
+  }
   return matches
 }
 
@@ -146,7 +171,7 @@ const WikiLinkMenu = forwardRef<WikiLinkMenuHandle, WikiLinkMenuProps>(function 
     >
       {items.map((item, i) => (
         <button
-          key={item.title}
+          key={`${item.title}#${item.heading}`}
           className={`slash-menu-item${i === selected ? ' selected' : ''}`}
           onMouseEnter={() => setSelected(i)}
           onMouseDown={(e) => {
@@ -154,7 +179,7 @@ const WikiLinkMenu = forwardRef<WikiLinkMenuHandle, WikiLinkMenuProps>(function 
             onSelect(item)
           }}
         >
-          <span className="slash-item-title">{item.isNew ? `Create note "${item.title}"` : item.title}</span>
+          <span className="slash-item-title">{item.isNew ? `Create note "${item.title}"` : item.heading ? `${item.title} › ${item.heading}` : item.title}</span>
         </button>
       ))}
     </div>,
@@ -212,8 +237,13 @@ export const WikiLink = Node.create({
         startOfLine: false,
         items: wikiLinkItems,
         command({ editor, range, props }) {
-          const { title } = props as WikiLinkItem
-          editor.chain().focus().deleteRange(range).insertContent({ type: 'wikiLink', attrs: { title } }).run()
+          const { title, heading = '', label = '' } = props as WikiLinkItem
+          editor
+            .chain()
+            .focus()
+            .deleteRange(range)
+            .insertContent({ type: 'wikiLink', attrs: { title, heading, label } })
+            .run()
         },
         render: noteMenuRender,
       }),
@@ -223,6 +253,8 @@ export const WikiLink = Node.create({
   addAttributes() {
     return {
       title: { default: '' },
+      heading: { default: '', renderHTML: (a) => ({ 'data-heading': a.heading }) },
+      label: { default: '', renderHTML: (a) => ({ 'data-label': a.label }) },
     }
   },
 
@@ -232,6 +264,8 @@ export const WikiLink = Node.create({
         tag: 'span[data-type="wiki-link"]',
         getAttrs: (el) => ({
           title: (el as HTMLElement).getAttribute('data-title') ?? '',
+          heading: (el as HTMLElement).getAttribute('data-heading') ?? '',
+          label: (el as HTMLElement).getAttribute('data-label') ?? '',
         }),
       },
     ]
@@ -249,7 +283,7 @@ export const WikiLink = Node.create({
     return {
       markdown: {
         serialize(state: Record<string, unknown>, node: { attrs: WikiLinkAttrs }) {
-          ;(state as { write: (s: string) => void }).write(`[[${node.attrs.title}]]`)
+          ;(state as { write: (s: string) => void }).write(`[[${formatWikiLink(node.attrs)}]]`)
         },
         parse: {
           setup(markdownit: {
@@ -280,9 +314,12 @@ export const WikiLink = Node.create({
                     if (i % 2 === 0) {
                       if (part) newChildren.push({ type: 'text', content: part })
                     } else {
+                      const { title, heading, label } = parseWikiLink(part)
                       newChildren.push({
                         type: 'html_inline',
-                        content: `<span data-type="wiki-link" data-title="${encodeAttr(part)}"></span>`,
+                        content:
+                          `<span data-type="wiki-link" data-title="${encodeAttr(title)}"` +
+                          ` data-heading="${encodeAttr(heading)}" data-label="${encodeAttr(label)}"></span>`,
                       })
                     }
                   }

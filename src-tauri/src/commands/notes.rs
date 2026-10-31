@@ -140,7 +140,15 @@ pub fn extract_links(content: &str) -> Vec<String> {
     let mut links = Vec::new();
     for cap in re.captures_iter(split_frontmatter(content).1) {
         if let Some(m) = cap.get(1) {
-            let title = m.as_str().trim().to_string();
+            // `[[Note#Heading|shown text]]` — only the part before the first
+            // `#` or `|` names the note.
+            let body = m.as_str();
+            let title = body
+                .split(['#', '|'])
+                .next()
+                .unwrap_or(body)
+                .trim()
+                .to_string();
             if !title.is_empty() && seen.insert(title.to_lowercase()) {
                 links.push(title);
             }
@@ -266,7 +274,10 @@ fn finalize_snippet_line(line: &str) -> String {
 /// character-offset-based, snippet: the whole surrounding sentence reads
 /// more usefully than a fixed window of characters centered on the link.
 pub fn extract_backlink_snippet(content: &str, title: &str) -> Option<String> {
-    let pattern = format!(r"(?i)\[\[\s*{}\s*\]\]", regex::escape(title));
+    let pattern = format!(
+        r"(?i)\[\[\s*{}\s*(?:[#|][^\]\n]*)?\]\]",
+        regex::escape(title)
+    );
     let re = Regex::new(&pattern).ok()?;
     let line = content.lines().find(|line| re.is_match(line))?;
     Some(finalize_snippet_line(line))
@@ -1391,12 +1402,18 @@ async fn grade_mc_card_at(
 
 // Wiki-links resolve by title case-insensitively (`backlinks_for`), and
 // `extract_links` trims whitespace inside the brackets, so the rewrite must
-// tolerate both rather than only matching an exact `[[Old]]`.
+// tolerate both rather than only matching an exact `[[Old]]`. A `#heading`
+// and/or `|label` suffix is carried over untouched.
 fn rewrite_links(content: &str, old_title: &str, new_title: &str) -> anyhow::Result<String> {
-    let pattern = format!(r"(?i)\[\[\s*{}\s*\]\]", regex::escape(old_title));
+    let pattern = format!(
+        r"(?i)\[\[\s*{}\s*((?:[#|][^\]\n]*)?)\]\]",
+        regex::escape(old_title)
+    );
     let re = Regex::new(&pattern)?;
     Ok(re
-        .replace_all(content, |_: &regex::Captures| format!("[[{new_title}]]"))
+        .replace_all(content, |caps: &regex::Captures| {
+            format!("[[{new_title}{}]]", &caps[1])
+        })
         .into_owned())
 }
 
@@ -2670,6 +2687,31 @@ mod tests {
     fn test_extract_links_deduplicates_case_insensitively() {
         let links = extract_links("[[Big O Notation]] again: [[big o notation]]");
         assert_eq!(links, vec!["Big O Notation"]);
+    }
+
+    #[test]
+    fn test_extract_links_strips_heading_and_label() {
+        let links = extract_links(
+            "[[Recurrences#Master theorem|the theorem]] [[Sorting|sorts]] [[Graphs#BFS]]",
+        );
+        assert_eq!(links, vec!["Recurrences", "Sorting", "Graphs"]);
+    }
+
+    #[test]
+    fn test_extract_links_dedupes_across_forms() {
+        let links = extract_links("[[Sorting]] [[sorting#Quick|q]]");
+        assert_eq!(links, vec!["Sorting"]);
+    }
+
+    #[test]
+    fn test_rewrite_links_keeps_heading_and_label() {
+        let out = rewrite_links(
+            "[[Old]] [[old#Part|shown]] [[ Old |x]] [[Older]]",
+            "Old",
+            "New",
+        )
+        .unwrap();
+        assert_eq!(out, "[[New]] [[New#Part|shown]] [[New|x]] [[Older]]");
     }
 
     #[test]

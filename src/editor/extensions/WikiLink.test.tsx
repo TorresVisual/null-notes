@@ -7,6 +7,8 @@ import { useEffect } from 'react'
 import { coreExtensions } from './index'
 import { useNotesStore } from '../../store/notes'
 import { TooltipProvider } from '../../components/ui/tooltip'
+import { takePendingHighlight } from '../../lib/pendingHighlight'
+import { highlightHeading } from './SearchJumpHighlight'
 
 vi.mock('../../lib/tauri', () => ({
   api: { notes: { open: vi.fn() } },
@@ -135,3 +137,67 @@ describe('WikiLink [[ autocomplete', () => {
     expect(items.some((el) => el.textContent === 'Create note "Brand New Note"')).toBe(true)
   })
 })
+
+describe('WikiLink display text and heading anchors', () => {
+  it.each([
+    ['[[Big O Notation|the bound]]', 'the bound'],
+    ['[[Big O Notation#Proofs]]', 'Big O Notation › Proofs'],
+    ['[[Big O Notation#Proofs|the proof]]', 'the proof'],
+  ])('renders %s and round-trips it unchanged', async (markdown, shown) => {
+    const { container } = mount(`See ${markdown} here`)
+    await waitFor(() => expect(getWikiLink(container)).toBeInTheDocument())
+
+    expect(getWikiLink(container).textContent).toBe(shown)
+    expect(markdownOf()).toBe(`See ${markdown} here`)
+  })
+
+  it('clicking a heading link opens the note and queues the heading jump', async () => {
+    const user = userEvent.setup()
+    openNote.mockResolvedValue('# Big O Notation')
+    const { container } = mount('[[Big O Notation#Proofs]]')
+    await waitFor(() => expect(getWikiLink(container)).toBeInTheDocument())
+
+    await user.click(getWikiLink(container))
+
+    expect(takePendingHighlight('/ws/big-o.md')).toEqual({ text: 'Proofs', heading: true })
+  })
+
+  it("offers the target note's headings after # and keeps the typed label", async () => {
+    const user = userEvent.setup()
+    openNote.mockResolvedValue(['# Big O Notation', '## Intro', '## Proofs'].join('\n'))
+    const { container } = mount('<p></p>')
+    await waitFor(() => expect(editor).not.toBeNull())
+
+    editor?.commands.focus('end')
+    await user.type(container.querySelector('.tiptap') as HTMLElement, '[[[[Big O Notation#Pr|why')
+
+    const item = await waitFor(() => {
+      const el = document.querySelector('.slash-menu-item')
+      if (!el) throw new Error('menu not rendered')
+      return el
+    })
+    expect(item.textContent).toBe('Big O Notation › Proofs')
+
+    await user.click(item)
+
+    await waitFor(() => expect(markdownOf()).toBe('[[Big O Notation#Proofs|why]]'))
+  })
+})
+
+describe('highlightHeading', () => {
+  it('flags the heading matching case-insensitively, and nothing when absent', async () => {
+    const { container } = mount('# Big O\n\n## Proofs\n\nproofs are fun')
+    await waitFor(() => expect(editor).not.toBeNull())
+    const target = () => container.querySelector('.search-jump-target')?.textContent
+
+    highlightHeading(editor as Editor, 'missing')
+    expect(target()).toBeUndefined()
+
+    highlightHeading(editor as Editor, 'PROOFS')
+    await waitFor(() => expect(target()).toBe('Proofs'))
+  })
+})
+
+function markdownOf(): string | undefined {
+  return (editor?.storage as unknown as { markdown: { getMarkdown(): string } } | undefined)?.markdown.getMarkdown()
+}
