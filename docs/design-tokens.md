@@ -147,6 +147,18 @@ Eight states, each with a token or a documented convention:
 
 ---
 
+## Categorical hues (agent canvas)
+
+The app is otherwise one accent plus semantic colours, so the agent canvas, which needs eight distinguishable pass colours, adds five hues and builds everything else from existing tokens. Agent colours are assigned by the app per pass number, never read from the file.
+
+| Token | Value |
+|---|---|
+| `--cat-blue` / `--cat-purple` / `--cat-teal` / `--cat-orange` / `--cat-pink` | `#58a6ff` / `#bc8cff` / `#39c5cf` / `#f0883e` / `#f778ba` |
+| `--pass-1` ... `--pass-8` | blue, `--accent`, `--warning`, purple, teal, orange, pink, `--text-secondary` (cycles after 8) |
+| `--canvas-color-1` ... `--canvas-color-6` | JSON Canvas presets: `--danger`, orange, `--warning`, `--accent`, teal, purple |
+
+---
+
 ## Motion (P9.5-4)
 
 One easing curve, two durations. `--ease-standard: ease` — a plain curve on purpose, not a custom cubic-bezier; `--duration-fast: 120ms` for a state-change swap (hover/press/toggle), `--duration-base: 180ms` for a surface entering (menu/modal) or a larger movement (chevron rotate) — the value `.details-chevron` already used before this pass, kept rather than replaced. Every transition/animation in the app derives from these two numbers and this one curve; `prefers-reduced-motion: reduce` collapses both to near-zero globally.

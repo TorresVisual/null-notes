@@ -34,7 +34,6 @@ import { useNotesStore } from '../store/notes'
 import { useSettingsStore } from '../store/settings'
 import { useNote } from '../hooks/useNote'
 import { useCreateCanvas } from '../hooks/useCreateCanvas'
-import { CanvasPane } from './CanvasPane'
 import { isCanvasPath } from '../lib/canvasPath'
 import { useWorkspace, refreshTags, refreshRecents } from '../hooks/useWorkspace'
 import { useExternalChanges } from '../hooks/useExternalChanges'
@@ -80,6 +79,7 @@ import { isMobile, isWeb } from '../lib/platform'
 // them and only load when their overlay/pane is first opened.
 const ExportPdfDialog = lazy(() => import('./ExportPdfDialog').then((m) => ({ default: m.ExportPdfDialog })))
 const PrintDialog = lazy(() => import('./PrintDialog').then((m) => ({ default: m.PrintDialog })))
+const CanvasPane = lazy(() => import('./CanvasPane').then((m) => ({ default: m.CanvasPane })))
 const TerminalPane = lazy(() => import('./TerminalPane').then((m) => ({ default: m.TerminalPane })))
 
 type ViewMode = 'wysiwyg' | 'raw'
@@ -745,7 +745,9 @@ export function Layout() {
   )
 
   const primaryEditorPane = canvasTab && activeTab ? (
-    <CanvasPane key={activeTab} path={activeTab} />
+    <Suspense fallback={null}>
+      <CanvasPane key={activeTab} path={activeTab} />
+    </Suspense>
   ) : (
     <EditorPane
       ref={editorPaneRef}

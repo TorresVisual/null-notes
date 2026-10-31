@@ -39,6 +39,27 @@
   /* Ink */
   --ink-grid: rgba(88, 130, 200, 0.20);
 
+  /* Categorical hues (agent canvas): the only non-semantic colours in the app. */
+  --cat-blue: #58a6ff;
+  --cat-purple: #bc8cff;
+  --cat-teal: #39c5cf;
+  --cat-orange: #f0883e;
+  --cat-pink: #f778ba;
+  --pass-1: var(--cat-blue);
+  --pass-2: var(--accent);
+  --pass-3: var(--warning);
+  --pass-4: var(--cat-purple);
+  --pass-5: var(--cat-teal);
+  --pass-6: var(--cat-orange);
+  --pass-7: var(--cat-pink);
+  --pass-8: var(--text-secondary);
+  --canvas-color-1: var(--danger);
+  --canvas-color-2: var(--cat-orange);
+  --canvas-color-3: var(--warning);
+  --canvas-color-4: var(--accent);
+  --canvas-color-5: var(--cat-teal);
+  --canvas-color-6: var(--cat-purple);
+
   /* Spacing */
   --space-xs: 4px;
   --space-sm: 8px;
@@ -6163,3 +6184,135 @@ input[type='checkbox']:focus-visible {
 
 .update-install { color: var(--accent); border-color: var(--accent); }
 .update-install:disabled, .update-actions .settings-reset:disabled { opacity: 0.5; cursor: default; }
+
+/* Agent canvas — the React Flow surface for `.canvas` files. Card chrome
+   reads --card-accent (set per card from its pass or its own colour). */
+.canvas-pane {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-base);
+}
+
+.canvas-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  flex-shrink: 0;
+  padding: var(--space-xs) var(--space-sm);
+  background: var(--bg-raised);
+  border-bottom: 1px solid var(--border);
+}
+
+.canvas-toolbar .toolbar-button:disabled { opacity: var(--disabled-opacity); cursor: default; }
+.canvas-toolbar-sep { width: 1px; height: 16px; margin: 0 var(--space-xs); background: var(--border-strong); }
+.canvas-status { margin-left: auto; font: var(--text-metadata); color: var(--text-tertiary); }
+
+.canvas-flow { flex: 1; min-height: 0; position: relative; }
+
+.canvas-flow .react-flow.dark {
+  --xy-background-color-default: var(--bg-base);
+  --xy-background-pattern-dots-color-default: var(--border-strong);
+  --xy-edge-stroke-default: var(--text-tertiary);
+  --xy-edge-stroke-selected-default: var(--accent);
+  --xy-connectionline-stroke-default: var(--accent);
+  --xy-edge-label-color-default: var(--text-primary);
+  --xy-edge-label-background-color-default: var(--bg-raised);
+  --xy-handle-background-color-default: var(--accent);
+  --xy-handle-border-color-default: var(--bg-base);
+  --xy-selection-background-color-default: var(--accent-bg);
+  --xy-selection-border-default: 1px dotted var(--accent);
+  --xy-resize-background-color-default: var(--accent);
+  --xy-controls-button-background-color-default: var(--bg-raised);
+  --xy-controls-button-background-color-hover-default: var(--bg-hover);
+  --xy-controls-button-color-default: var(--text-secondary);
+  --xy-controls-button-color-hover-default: var(--text-primary);
+  --xy-controls-button-border-color-default: var(--border);
+  --xy-attribution-background-color-default: transparent;
+}
+
+.canvas-card {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  padding: var(--space-sm) var(--space-md);
+  background: var(--bg-raised);
+  border: 1px solid var(--card-accent, var(--border-strong));
+  border-radius: 6px;
+  color: var(--text-primary);
+  font: var(--text-body);
+  font-size: 13px;
+  overflow: hidden;
+}
+
+.react-flow__node.selected .canvas-card { box-shadow: 0 0 0 1px var(--accent); }
+.canvas-card.is-agent { background: color-mix(in srgb, var(--card-accent) 10%, var(--bg-raised)); }
+.canvas-card.is-inert { opacity: 0.6; }
+.canvas-card .react-flow__handle { opacity: 0; transition: opacity var(--duration-fast) var(--ease-standard); }
+.canvas-card:hover .react-flow__handle, .react-flow__node.selected .react-flow__handle { opacity: 1; }
+
+.canvas-card--group {
+  padding: 0;
+  background: color-mix(in srgb, var(--card-accent, var(--border-strong)) 6%, transparent);
+  border-style: dashed;
+  border-width: 2px;
+  overflow: visible;
+}
+
+.canvas-card--group.is-agent { background: color-mix(in srgb, var(--card-accent) 6%, transparent); }
+
+.canvas-group-label {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  padding: var(--space-xs) var(--space-md);
+  font: var(--text-metadata);
+  color: var(--card-accent, var(--text-secondary));
+}
+
+.canvas-group-delete {
+  display: inline-flex;
+  padding: 2px;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  color: var(--text-tertiary);
+  cursor: pointer;
+}
+
+.canvas-group-delete:hover { background: var(--bg-hover); color: var(--danger); }
+
+.canvas-text { white-space: pre-wrap; overflow-wrap: anywhere; }
+
+.canvas-text-edit {
+  width: 100%;
+  height: 100%;
+  resize: none;
+  padding: 0;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: inherit;
+  font: inherit;
+}
+
+.canvas-file { display: flex; flex-direction: column; gap: 2px; }
+.canvas-file-title { font-weight: 600; overflow-wrap: anywhere; }
+.canvas-file-line { font: var(--text-code); color: var(--text-tertiary); }
+.canvas-link-tag { font: var(--text-metadata); color: var(--text-tertiary); text-transform: uppercase; margin-bottom: var(--space-xs); }
+
+.canvas-edited {
+  position: absolute;
+  top: var(--space-xs);
+  right: var(--space-xs);
+  display: inline-flex;
+  color: var(--text-tertiary);
+}
+
