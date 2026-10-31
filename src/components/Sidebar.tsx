@@ -1,4 +1,5 @@
 import { useWorkspaceStore } from '../store/workspace'
+import { BookmarkList } from './BookmarkList'
 import { NoteList } from './NoteList'
 import { TagList } from './TagList'
 import { SidebarHeader } from './SidebarHeader'
@@ -44,6 +45,7 @@ export function Sidebar({
       <SidebarRail {...railProps} />
       <div className="sidebar-panel" inert={collapsed}>
         <SidebarHeader onSearchOpen={onSearchOpen} onTemplateOpen={onTemplateOpen} />
+        <BookmarkList onSearchOpen={onSearchOpen} />
         <NoteList />
         <TagList />
       </div>

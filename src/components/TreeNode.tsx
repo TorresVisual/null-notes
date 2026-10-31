@@ -12,6 +12,7 @@ import { folderName, isSingleSegmentName, isUnderPath } from '../lib/pathPrefix'
 import type { TreeEntry } from '../lib/folderTree'
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from './ui/context-menu'
 import { NoteContextMenuItems } from './NoteContextMenuItems'
+import { BookmarkMenuItem } from './BookmarkMenuItem'
 
 // Ignores keys that bubble up from the row's own rename/delete buttons.
 function activateOnKey(e: React.KeyboardEvent, activate: () => void) {
@@ -195,6 +196,7 @@ export function TreeNode({ entry }: TreeNodeProps) {
           </div>
         </ContextMenuTrigger>
         <ContextMenuContent className="context-menu">
+          <BookmarkMenuItem bookmark={{ kind: 'folder', path: entry.path }} />
           <ContextMenuItem onSelect={() => void handleRenameFolder()}>
             <Pencil size={14} /> Rename
           </ContextMenuItem>

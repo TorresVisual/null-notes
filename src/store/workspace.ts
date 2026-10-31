@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { isUnderPath, replacePathPrefix } from '../lib/pathPrefix'
+import { useBookmarksStore } from './bookmarks'
 import type { GitWorkspaceConfig, RepoMode, GitCommitStatus, SearchSort } from '../types'
 
 // Matches P1-2's recent-workspaces cap — a "recent list" this long is
@@ -263,6 +264,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   setSelectedFolder: (path) => set({ selectedFolder: path }),
 
   replaceOpenPath: (oldPrefix, newPrefix) => {
+    useBookmarksStore.getState().rewritePrefix(oldPrefix, newPrefix)
     const { openTabs, pinnedTabs, activeTab, secondaryTab, expandedFolders, selectedFolder } = get()
     set({
       openTabs: openTabs.map((p) => replacePathPrefix(p, oldPrefix, newPrefix)),

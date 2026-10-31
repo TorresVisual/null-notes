@@ -82,7 +82,7 @@ Data integrity rules. Breaking one of these silently loses or corrupts a note.
 
 Where a file lives decides whether it syncs. That is the whole contract between storage and sync, so it's a decision to make deliberately, not a side effect of picking a path.
 
-- **Inside the workspace folder** — travels with the notes: `.md` files, `NoteName.ink/`, `NoteName.pdf/`, `NoteName.diagrams/` and `NoteName.assets/` sidecars, and `.workspace.json` (UI state, gitignored).
+- **Inside the workspace folder** — travels with the notes: `.md` files, `NoteName.ink/`, `NoteName.pdf/`, `NoteName.diagrams/` and `NoteName.assets/` sidecars, `.bookmarks` (sidebar bookmarks, one JSON entry per line so it merges), and `.workspace.json` (UI state, gitignored).
 - **In the OS app-data dir** — stays on this machine: `index.db`, `settings.json`, `recent-workspaces.json`.
 
 `index.db` is outside because a binary SQLite file cannot be merged across machines, and it's safe to exclude only because it's rebuildable — those two facts hold each other up. Ink, PDF and image sidecars are inside because a note whose drawings or figures didn't travel with it is a broken note.

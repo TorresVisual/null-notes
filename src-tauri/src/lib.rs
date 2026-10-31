@@ -194,6 +194,8 @@ pub fn run() {
             commands::notes::reindex_note,
             commands::notes::reindex_from_disk,
             commands::watcher::watch_workspace,
+            commands::bookmarks::read_bookmarks,
+            commands::bookmarks::write_bookmarks,
             commands::notes::create_note,
             commands::notes::rename_note,
             commands::notes::rename_tag,

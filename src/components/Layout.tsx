@@ -34,6 +34,7 @@ import { useSettingsStore } from '../store/settings'
 import { useNote } from '../hooks/useNote'
 import { useWorkspace, refreshTags, refreshRecents } from '../hooks/useWorkspace'
 import { useExternalChanges } from '../hooks/useExternalChanges'
+import { useBookmarksStore } from '../store/bookmarks'
 import { useCreateNote } from '../hooks/useCreateNote'
 import { useCreateFolder } from '../hooks/useCreateFolder'
 import { useCreateCanvasNote } from '../hooks/useCreateCanvasNote'
@@ -363,6 +364,9 @@ export function Layout() {
           break
         case 'reopen-closed-tab':
           reopenClosedTab()
+          break
+        case 'note-bookmark':
+          if (activeTab) useBookmarksStore.getState().toggle({ kind: 'note', path: activeTab })
           break
         case 'note-duplicate':
           if (activeTab) await duplicateNote(activeTab)

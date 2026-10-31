@@ -952,7 +952,7 @@ pub async fn open_note(workspace: String, path: String) -> Result<String, String
 // A note is only ever replaced wholesale, so a partially written file is
 // always corruption. Write a sibling temp file, fsync it, then rename over
 // the target — the reader sees either the whole old note or the whole new one.
-async fn write_atomic(path: &Path, content: &str) -> anyhow::Result<()> {
+pub(super) async fn write_atomic(path: &Path, content: &str) -> anyhow::Result<()> {
     let dir = path
         .parent()
         .ok_or_else(|| anyhow::anyhow!("note path has no parent directory: {}", path.display()))?;

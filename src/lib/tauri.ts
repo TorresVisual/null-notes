@@ -123,6 +123,11 @@ export const api = {
     exitApp: () => invoke<void>('exit_app'),
     isReleaseBuild: () => invoke<boolean>('is_release_build'),
   },
+  bookmarks: {
+    read: (workspace: string) => invoke<string>('read_bookmarks', { workspace }),
+    write: (workspace: string, content: string) =>
+      invoke<void>('write_bookmarks', { workspace, content }),
+  },
   workspace: {
     watch: (workspace: string) =>
       invoke<void>('watch_workspace', { workspace }),

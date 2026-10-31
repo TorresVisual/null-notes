@@ -1,4 +1,5 @@
 pub mod assets;
+pub mod bookmarks;
 pub mod code_format;
 pub mod code_run;
 pub mod crossref;

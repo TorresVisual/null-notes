@@ -5,6 +5,9 @@ import { useWorkspaceStore } from '../store/workspace'
 import { useWorkspace } from '../hooks/useWorkspace'
 import { firstPositiveTerm, parseSearchQuery } from '../lib/searchQuery'
 import { setPendingHighlight } from '../lib/pendingHighlight'
+import { takePendingSearch } from '../lib/pendingSearch'
+import { sameBookmark } from '../lib/bookmarks'
+import { useBookmarksStore } from '../store/bookmarks'
 import {
   CommandDialog,
   Command,
@@ -20,7 +23,7 @@ interface SearchModalProps {
 }
 
 export function SearchModal({ onClose }: SearchModalProps) {
-  const [query, setQuery] = useState('')
+  const [query, setQuery] = useState(takePendingSearch)
   const [results, setResults] = useState<SearchResult[]>([])
   const [total, setTotal] = useState(0)
   const [allWorkspaces, setAllWorkspaces] = useState(false)
@@ -31,6 +34,9 @@ export function SearchModal({ onClose }: SearchModalProps) {
   const sort = useWorkspaceStore((s) => s.searchSort)
   const setSort = useWorkspaceStore((s) => s.setSearchSort)
   const { openWorkspaceAt } = useWorkspace()
+  const savedSearch = useBookmarksStore((s) =>
+    s.items.some((b) => sameBookmark(b, { kind: 'search', query: query.trim() })),
+  )
 
   useEffect(() => {
     if (!workspacePath) return
@@ -112,6 +118,18 @@ export function SearchModal({ onClose }: SearchModalProps) {
             onChange={(e) => setAllWorkspaces(e.target.checked)}
           />
           Search all workspaces
+          {query.trim() !== '' && (
+            <button
+              type="button"
+              className="search-save"
+              onClick={(e) => {
+                e.preventDefault()
+                useBookmarksStore.getState().toggle({ kind: 'search', query: query.trim() })
+              }}
+            >
+              {savedSearch ? 'Remove saved search' : 'Save this search'}
+            </button>
+          )}
         </label>
         {results.length > 0 && (
           <div className="search-meta">

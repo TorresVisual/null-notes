@@ -64,6 +64,7 @@ export const COMMANDS: CommandDef[] = [
   def('nav-forward', 'Go Forward', 'Navigate', 'Alt+ArrowRight'),
   def('toggle-focus-mode', 'Toggle Focus Mode', 'View', 'Ctrl+Shift+F'),
   def('sync-now', 'Sync Now', 'Other'),
+  def('note-bookmark', 'Toggle Note Bookmark', 'Note'),
   def('note-duplicate', 'Duplicate Note', 'Note'),
   def('note-move', 'Move Note to…', 'Note'),
   def('note-rename', 'Rename Note', 'Note'),

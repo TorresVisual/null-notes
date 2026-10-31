@@ -8,6 +8,7 @@ import {
   renameNote,
   revealNote,
 } from '../lib/noteActions'
+import { BookmarkMenuItem } from './BookmarkMenuItem'
 import { ContextMenuItem, ContextMenuSeparator } from './ui/context-menu'
 
 interface NoteContextMenuItemsProps {
@@ -17,6 +18,7 @@ interface NoteContextMenuItemsProps {
 export function NoteContextMenuItems({ path }: NoteContextMenuItemsProps) {
   return (
     <>
+      <BookmarkMenuItem bookmark={{ kind: 'note', path }} />
       <ContextMenuItem onSelect={() => void duplicateNote(path)}>
         <Copy size={14} /> Duplicate
       </ContextMenuItem>

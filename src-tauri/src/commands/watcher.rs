@@ -22,11 +22,15 @@ fn is_note_path(path: &Path) -> bool {
     })
 }
 
+fn is_bookmarks_path(path: &Path) -> bool {
+    path.file_name().and_then(|n| n.to_str()) == Some(super::bookmarks::BOOKMARKS_FILE)
+}
+
 fn note_paths(event: &Event) -> Vec<PathBuf> {
     event
         .paths
         .iter()
-        .filter(|p| is_note_path(p))
+        .filter(|p| is_note_path(p) || is_bookmarks_path(p))
         .cloned()
         .collect()
 }
@@ -59,11 +63,18 @@ pub fn watch_workspace(
             while let Ok(more) = rx.recv_timeout(DEBOUNCE) {
                 batch.extend(more);
             }
-            let paths: Vec<String> = batch
-                .into_iter()
-                .map(|p| p.to_string_lossy().into_owned())
-                .collect();
-            let _ = app.emit("workspace-changed", paths);
+            let (bookmarks, notes): (Vec<PathBuf>, Vec<PathBuf>) =
+                batch.into_iter().partition(|p| is_bookmarks_path(p));
+            if !bookmarks.is_empty() {
+                let _ = app.emit("bookmarks-changed", ());
+            }
+            if !notes.is_empty() {
+                let paths: Vec<String> = notes
+                    .into_iter()
+                    .map(|p| p.to_string_lossy().into_owned())
+                    .collect();
+                let _ = app.emit("workspace-changed", paths);
+            }
         }
     });
 
@@ -86,6 +97,13 @@ mod tests {
     fn test_is_note_path_rejects_non_markdown() {
         assert!(!is_note_path(Path::new("/ws/index.db")));
         assert!(!is_note_path(Path::new("/ws/sketch.svg")));
+    }
+
+    #[test]
+    fn test_is_bookmarks_path_matches_only_the_bookmarks_file() {
+        assert!(is_bookmarks_path(Path::new("/ws/.bookmarks")));
+        assert!(!is_bookmarks_path(Path::new("/ws/.bookmarks.abc.tmp")));
+        assert!(!is_bookmarks_path(Path::new("/ws/notes.md")));
     }
 
     #[test]

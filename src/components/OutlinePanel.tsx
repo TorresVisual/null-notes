@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { RefObject } from 'react'
 import { parseHeadings } from '../lib/outlineHeadings'
+import { useWorkspaceStore } from '../store/workspace'
+import { BookmarkMenuItem } from './BookmarkMenuItem'
+import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from './ui/context-menu'
 
 interface OutlinePanelProps {
   // The active note's markdown — the list itself is derived from this, not
@@ -26,6 +29,10 @@ export function OutlinePanel({ content, containerRef }: OutlinePanelProps) {
   const headings = useMemo(() => parseHeadings(content), [content])
   const [activeIndex, setActiveIndex] = useState<number | null>(null)
   const [expanded, setExpanded] = useState(false)
+  const notePath = useWorkspaceStore((s) => s.activeTab)
+  // The menu is portaled, so reaching it counts as leaving the panel — keep
+  // the flyout (the menu's trigger) mounted until the menu closes.
+  const [menuOpen, setMenuOpen] = useState(false)
 
   // Tracks the section the *cursor* sits in, not what's scrolled into view —
   // reading (scrolling without touching the cursor) leaves the last-edited
@@ -65,7 +72,7 @@ export function OutlinePanel({ content, containerRef }: OutlinePanelProps) {
     <div
       className="outline-panel"
       onMouseEnter={() => setExpanded(true)}
-      onMouseLeave={() => setExpanded(false)}
+      onMouseLeave={() => !menuOpen && setExpanded(false)}
     >
       <div className="outline-ticks" aria-hidden={expanded}>
         {headings.length === 0 ? (
@@ -89,13 +96,30 @@ export function OutlinePanel({ content, containerRef }: OutlinePanelProps) {
             <ul className="outline-list">
               {headings.map((h, i) => (
                 <li key={i}>
-                  <button
-                    className={`outline-item${i === activeIndex ? ' active' : ''}`}
-                    style={{ paddingLeft: 8 + (h.level - 1) * 12 }}
-                    onClick={() => jump(i)}
+                  <ContextMenu
+                    onOpenChange={(open) => {
+                      setMenuOpen(open)
+                      if (!open) setExpanded(false)
+                    }}
                   >
-                    {h.text || '(untitled heading)'}
-                  </button>
+                    <ContextMenuTrigger asChild>
+                      <button
+                        className={`outline-item${i === activeIndex ? ' active' : ''}`}
+                        style={{ paddingLeft: 8 + (h.level - 1) * 12 }}
+                        onClick={() => jump(i)}
+                      >
+                        {h.text || '(untitled heading)'}
+                      </button>
+                    </ContextMenuTrigger>
+                    {notePath && h.text && (
+                      <ContextMenuContent className="context-menu">
+                        <BookmarkMenuItem
+                          bookmark={{ kind: 'heading', path: notePath, heading: h.text }}
+                          label="Bookmark heading"
+                        />
+                      </ContextMenuContent>
+                    )}
+                  </ContextMenu>
                 </li>
               ))}
             </ul>
