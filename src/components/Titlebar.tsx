@@ -11,12 +11,12 @@ import {
 } from './ui/dropdown-menu'
 import { folderName } from '../lib/pathPrefix'
 
-export export interface MenuEntry {
+export interface MenuEntry {
   id: string
   label: string
   accel?: string
 }
-export export type MenuItemSpec = MenuEntry | { separator: true }
+export type MenuItemSpec = MenuEntry | { separator: true }
 
 // Mirrors the native menu structure the Rust side used to build (build_menu,
 // src-tauri/src/lib.rs, removed when decorations went custom) — same ids, so
@@ -24,7 +24,7 @@ export export type MenuItemSpec = MenuEntry | { separator: true }
 // clipboard shortcuts work natively without a menu entry. Exit routes
 // through the same window.close() the titlebar's close button uses, so it
 // still hits the flush-before-close path rather than bypassing it.
-export export function buildFileMenu(recentWorkspaces: string[]): MenuItemSpec[] {
+export function buildFileMenu(recentWorkspaces: string[]): MenuItemSpec[] {
   return [
     { id: 'new-note', label: 'New Note', accel: 'Ctrl+N' },
     { id: 'new-folder', label: 'New Folder', accel: 'Ctrl+Shift+N' },
@@ -48,7 +48,7 @@ export export function buildFileMenu(recentWorkspaces: string[]): MenuItemSpec[]
   ]
 }
 
-export export const VIEW_MENU: MenuItemSpec[] = [
+export const VIEW_MENU: MenuItemSpec[] = [
   { id: 'home', label: 'Home', accel: 'Ctrl+H' },
   { separator: true },
   { id: 'search', label: 'Search', accel: 'Ctrl+K' },
