@@ -592,6 +592,16 @@ button, [role="button"], .tree-row, .tab, .search-result, .slash-menu-item,
 }
 
 .sidebar .rail-btn:hover:not(:disabled) { color: var(--text-primary); }
+
+.sidebar .rail-badge {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+}
 .sidebar .rail-btn.is-active { color: var(--accent); }
 
 .sidebar .rail-btn.is-active::before {

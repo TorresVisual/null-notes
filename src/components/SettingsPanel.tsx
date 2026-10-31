@@ -6,6 +6,7 @@ import { useWorkspaceStore } from '../store/workspace'
 import { useGitConfig } from '../hooks/useGitConfig'
 import { api } from '../lib/tauri'
 import { Dialog, DialogContent, DialogTitle } from './ui/dialog'
+import { AboutSettings } from './AboutSettings'
 import { ErrorLogDialog } from './ErrorLogDialog'
 import { KeymapSettings } from './KeymapSettings'
 
@@ -472,6 +473,8 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
               )}
             </div>
           ) : null}
+
+          <AboutSettings />
 
           {error && <p className="settings-error">{error}</p>}
         </div>

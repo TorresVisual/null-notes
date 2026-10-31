@@ -1,9 +1,10 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest'
-import { render, screen, cleanup } from '@testing-library/react'
+import { render, screen, cleanup, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { check } from '@tauri-apps/plugin-updater'
 import { UpdateDialog } from './UpdateDialog'
 import { api } from '../lib/tauri'
+import { useUpdateStore } from '../store/update'
 
 vi.mock('@tauri-apps/plugin-updater', () => ({ check: vi.fn() }))
 vi.mock('../lib/tauri', () => ({ api: { window: { isReleaseBuild: vi.fn() } } }))
@@ -14,6 +15,7 @@ const downloadAndInstall = vi.fn()
 const update = { version: '1.1.0', body: '- fix a thing', downloadAndInstall } as unknown as Awaited<ReturnType<typeof check>>
 
 beforeEach(() => {
+  useUpdateStore.setState({ update: null, dialogOpen: false, checking: false })
   isReleaseBuild.mockResolvedValue(true)
   checkMock.mockResolvedValue(update)
 })
@@ -51,5 +53,14 @@ describe('UpdateDialog', () => {
     render(<UpdateDialog />)
     await userEvent.click(await screen.findByRole('button', { name: 'Later' }))
     expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('keeps the update after Later so it can be reopened', async () => {
+    render(<UpdateDialog />)
+    await userEvent.click(await screen.findByRole('button', { name: 'Later' }))
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(useUpdateStore.getState().update).toBe(update)
+    act(() => useUpdateStore.getState().openDialog())
+    expect(await screen.findByText(/v1\.1\.0/)).toBeInTheDocument()
   })
 })

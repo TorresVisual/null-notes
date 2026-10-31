@@ -1,13 +1,17 @@
 import { useState } from 'react'
 import { useUpdateCheck } from '../hooks/useUpdateCheck'
+import { useUpdateStore } from '../store/update'
 import { Dialog, DialogContent, DialogTitle } from './ui/dialog'
 
 export function UpdateDialog() {
-  const { update, dismiss } = useUpdateCheck()
+  useUpdateCheck()
+  const update = useUpdateStore((s) => s.update)
+  const dialogOpen = useUpdateStore((s) => s.dialogOpen)
+  const dismiss = useUpdateStore((s) => s.closeDialog)
   const [installing, setInstalling] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  if (!update) return null
+  if (!update || !dialogOpen) return null
 
   async function install() {
     setInstalling(true)

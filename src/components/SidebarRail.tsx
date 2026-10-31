@@ -11,6 +11,7 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { useWorkspaceStore } from '../store/workspace'
+import { useUpdateStore } from '../store/update'
 import { isWeb } from '../lib/platform'
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip'
 
@@ -21,6 +22,7 @@ interface RailItem {
   onClick: () => void
   disabled?: boolean
   pressed?: boolean
+  badge?: boolean
 }
 
 interface SidebarRailProps {
@@ -45,6 +47,7 @@ function RailButton({ item }: { item: RailItem }) {
           aria-pressed={item.pressed}
         >
           <item.icon size={16} />
+          {item.badge && <span className="rail-badge" aria-hidden />}
         </button>
       </TooltipTrigger>
       <TooltipContent side="right">
@@ -69,6 +72,7 @@ export function SidebarRail({
   const sidebarCollapsed = useWorkspaceStore((s) => s.sidebarCollapsed)
   const toggleSidebar = useWorkspaceStore((s) => s.toggleSidebar)
   const noWorkspace = !workspacePath
+  const updateAvailable = useUpdateStore((s) => s.update !== null)
 
   const home: RailItem = {
     label: 'Home',
@@ -78,7 +82,13 @@ export function SidebarRail({
     disabled: noWorkspace,
   }
   const search: RailItem = { label: 'Search', icon: Search, shortcut: 'Ctrl K', onClick: onSearchOpen }
-  const settings: RailItem = { label: 'Settings', icon: Settings, shortcut: 'Ctrl ,', onClick: onSettingsOpen }
+  const settings: RailItem = {
+    label: updateAvailable ? 'Settings — update available' : 'Settings',
+    icon: Settings,
+    shortcut: 'Ctrl ,',
+    onClick: onSettingsOpen,
+    badge: updateAvailable,
+  }
   const features: RailItem[] = [
     { label: 'Tasks', icon: ListChecks, shortcut: 'Ctrl Shift K', onClick: onTaskOpen, disabled: noWorkspace },
     { label: 'Graph view', icon: Network, shortcut: 'Ctrl G', onClick: onGraphOpen, disabled: noWorkspace },
