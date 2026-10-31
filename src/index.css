@@ -2437,12 +2437,33 @@ pre:has(code.language-expect)::before, pre:has(code.language-expected)::before {
 
 .callout-body > *:last-child { margin-bottom: 0; }
 
+.callout-foldable .callout-header { cursor: pointer; }
+.callout-chevron {
+  margin-left: auto;
+  transition: transform var(--duration-base) var(--ease-standard);
+}
+.callout-foldable.open .callout-chevron { transform: rotate(90deg); }
+/* Content stays in the DOM (like .details-body) so a closed callout still
+   exports/prints; only screen display hides it. */
+.callout-foldable:not(.open) .callout-body { display: none; }
+.callout-foldable:not(.open) .callout-header { margin-bottom: 0; }
+
 .callout-note  { --callout-color: #4a9eff; --callout-bg: #0d1f33; }
 .callout-info  { --callout-color: #4a9eff; --callout-bg: #0d1f33; }
 .callout-tip   { --callout-color: #2dd4bf; --callout-bg: #0d2420; }
 .callout-warning   { --callout-color: #f0a030; --callout-bg: #271c0a; }
 .callout-danger    { --callout-color: #e05050; --callout-bg: #270d0d; }
 .callout-important { --callout-color: #9b59b6; --callout-bg: #1a0d27; }
+
+/* Obsidian's remaining types; aliases resolve to these in Callout.tsx. Unknown
+   types get no rule and fall through to the neutral accent/hover default. */
+.callout-abstract { --callout-color: #22b8cf; --callout-bg: #0d2228; }
+.callout-todo     { --callout-color: #5b8def; --callout-bg: #101a33; }
+.callout-success  { --callout-color: #3fb950; --callout-bg: #0f2415; }
+.callout-question { --callout-color: #d4b83a; --callout-bg: #262308; }
+.callout-failure  { --callout-color: #ef6b73; --callout-bg: #2a1014; }
+.callout-bug      { --callout-color: #f0663f; --callout-bg: #2a140d; }
+.callout-quote    { --callout-color: #9ca3af; --callout-bg: #1a1c20; }
 
 /* Proof/theorem-family blocks (P6-1) — same mechanism, an academic palette */
 .callout-theorem    { --callout-color: #8b7cf6; --callout-bg: #191531; }
@@ -5350,6 +5371,8 @@ input[type='checkbox']:focus-visible {
    every section's content regardless of its current open/closed state. */
 :is(.print-preview-pages, #print-root) .details-body { display: block !important; }
 :is(.print-preview-pages, #print-root) .details-chevron { display: none; }
+:is(.print-preview-pages, #print-root) .callout-body { display: block !important; }
+:is(.print-preview-pages, #print-root) .callout-chevron { display: none; }
 
 /* Export to PDF and Print paginate the note into `#print-root` (see
    lib/printMount.ts) and hide everything else with `body.printing`, so the
@@ -5388,6 +5411,13 @@ input[type='checkbox']:focus-visible {
   .callout-proof { --callout-color: #4b5563; --callout-bg: #f0f1f3; }
   .callout-example { --callout-color: #15803d; --callout-bg: #e9f7ee; }
   .callout-algorithm { --callout-color: #a8296b; --callout-bg: #fbeaf2; }
+  .callout-abstract { --callout-color: #0e7490; --callout-bg: #e5f6fa; }
+  .callout-todo { --callout-color: #2f5fc4; --callout-bg: #eaf0fb; }
+  .callout-success { --callout-color: #15803d; --callout-bg: #e9f7ee; }
+  .callout-question { --callout-color: #8a6e00; --callout-bg: #faf4d9; }
+  .callout-failure { --callout-color: #b3261e; --callout-bg: #fbeaea; }
+  .callout-bug { --callout-color: #b4491f; --callout-bg: #fbece5; }
+  .callout-quote { --callout-color: #4b5563; --callout-bg: #f0f1f3; }
 
   * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 

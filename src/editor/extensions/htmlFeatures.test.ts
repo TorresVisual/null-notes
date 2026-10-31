@@ -189,6 +189,58 @@ describe('Callout proof/theorem blocks (P6-1)', () => {
   })
 })
 
+describe('Callout fold markers and Obsidian types (#154)', () => {
+  function firstCallout(e: Editor) {
+    let attrs: Record<string, unknown> = {}
+    e.state.doc.descendants((node) => {
+      if (node.type.name === 'callout' && !Object.keys(attrs).length) attrs = node.attrs
+      return true
+    })
+    return attrs
+  }
+
+  it.each([
+    ['-', '> [!note]- Title\n> Body.'],
+    ['+', '> [!faq]+ Title\n> Body.'],
+  ])('reads %s as a fold marker, not part of the title, and writes it back unchanged', (marker, md) => {
+    const e = mount(md)
+    expect(firstCallout(e)).toMatchObject({ foldable: marker, title: 'Title' })
+    expect(getMarkdown(e)).toContain(md.split('\n')[0])
+  })
+
+  it('round-trips a fold marker on an untitled callout', () => {
+    const e = mount('> [!tip]-\n> Body.')
+    expect(firstCallout(e)).toMatchObject({ foldable: '-', title: '' })
+    expect(getMarkdown(e)).toContain('> [!tip]-\n')
+  })
+
+  it('leaves non-foldable callouts without a marker', () => {
+    const e = mount('> [!NOTE] Title\n> Body.')
+    expect(firstCallout(e)).toMatchObject({ foldable: null })
+    expect(getMarkdown(e)).toContain('[!NOTE] Title')
+  })
+
+  it.each(['abstract', 'todo', 'success', 'question', 'failure', 'bug', 'quote', 'tldr', 'cite', 'FAQ'])(
+    'recognises [!%s] as a callout and keeps its type string',
+    (type) => {
+      const e = mount(`> [!${type}] Title\n> Body.`)
+      expect(firstCallout(e)).toMatchObject({ calloutType: type.toLowerCase(), rawType: type })
+      expect(getMarkdown(e)).toContain(`[!${type}] Title`)
+    },
+  )
+
+  it('round-trips an unknown type unchanged', () => {
+    const e = mount('> [!MyCustom-Kind]- Title\n> Body.')
+    expect(firstCallout(e)).toMatchObject({ calloutType: 'mycustom-kind' })
+    expect(getMarkdown(e)).toContain('> [!MyCustom-Kind]- Title')
+  })
+
+  it('still treats a plain blockquote as a blockquote', () => {
+    const e = mount('> just a quote')
+    expect(firstCallout(e)).toEqual({})
+  })
+})
+
 describe('Algorithm blocks (P6-2)', () => {
   it('round-trips as a plain, portable Markdown blockquote with bold slot labels', () => {
     // One blank-line-separated paragraph per slot — what /Algorithm Block
