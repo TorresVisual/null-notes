@@ -54,13 +54,34 @@ fn truncate_title(s: &str) -> String {
     }
 }
 
+/// Splits a leading `---` ... `---` YAML block off a note, verbatim (delimiter
+/// lines and their line endings included), so `frontmatter + body == content`.
+/// Kept in sync by hand with `src/lib/frontmatter.ts`.
+pub fn split_frontmatter(content: &str) -> (&str, &str) {
+    let mut lines = content.split_inclusive('\n');
+    let Some(first) = lines.next() else {
+        return ("", content);
+    };
+    if first.trim_end() != "---" {
+        return ("", content);
+    }
+    let mut end = first.len();
+    for line in lines {
+        end += line.len();
+        if line.trim_end() == "---" {
+            return content.split_at(end);
+        }
+    }
+    ("", content)
+}
+
 // Notes often open with a blockquote tagline or a horizontal rule before
 // their actual heading, so the title can't just be "the first line" — it
 // has to be the first ATX heading found anywhere in the document, falling
 // back to the first non-heading line only when no heading exists at all.
 pub fn title_from_content(content: &str) -> String {
     let mut fallback: Option<&str> = None;
-    for line in content.lines() {
+    for line in split_frontmatter(content).1.lines() {
         let trimmed = line.trim();
         if trimmed.is_empty() {
             continue;
@@ -92,7 +113,7 @@ fn strip_code(content: &str) -> String {
 }
 
 pub fn extract_tags(content: &str) -> Vec<String> {
-    let stripped = strip_code(content);
+    let stripped = strip_code(split_frontmatter(content).1);
     let re = match Regex::new(r"(?:^|\s)#([A-Za-z][\w-]*)") {
         Ok(re) => re,
         Err(_) => return Vec::new(),
@@ -117,7 +138,7 @@ pub fn extract_links(content: &str) -> Vec<String> {
     };
     let mut seen = HashSet::new();
     let mut links = Vec::new();
-    for cap in re.captures_iter(content) {
+    for cap in re.captures_iter(split_frontmatter(content).1) {
         if let Some(m) = cap.get(1) {
             let title = m.as_str().trim().to_string();
             if !title.is_empty() && seen.insert(title.to_lowercase()) {
@@ -1023,7 +1044,7 @@ pub(super) async fn index_note_at(
     db::notes::index_note(db, &meta).await?;
     let pdf_text = pdf_search_text_for(path).await;
     let diagram_text = diagram_search_text_for(content).await;
-    let mut fts_body = content.to_string();
+    let mut fts_body = split_frontmatter(content).1.to_string();
     for extra in [&pdf_text, &diagram_text] {
         if !extra.is_empty() {
             fts_body.push_str("\n\n");
@@ -1086,6 +1107,7 @@ pub async fn reindex_from_disk(
 // from, preserving its `#` depth. A note with no heading at all (the
 // fallback-first-line case) gets one prepended, matching `create_note`'s shape.
 fn rewrite_title(content: &str, new_title: &str) -> String {
+    let (frontmatter, content) = split_frontmatter(content);
     let mut replaced = false;
     let mut lines: Vec<String> = Vec::new();
     for line in content.lines() {
@@ -1108,7 +1130,7 @@ fn rewrite_title(content: &str, new_title: &str) -> String {
     if !replaced {
         rewritten = format!("# {new_title}\n\n{rewritten}");
     }
-    rewritten
+    format!("{frontmatter}{rewritten}")
 }
 
 // Flips the checkbox on the line at `position` (the same 0-indexed line
@@ -2462,6 +2484,77 @@ mod tests {
         // is a stretch, but "Distributed Systems" abbreviated is not.
         assert!(!is_excluded_dir("distributed"));
         assert!(!is_excluded_dir("building-compilers"));
+    }
+
+    const FRONTMATTER: &str = "---\ntitle: Foo\ntags: [a, b]\naliases:\n  - Bar\n---\n";
+
+    #[test]
+    fn test_split_frontmatter_separates_the_block_verbatim() {
+        let content = format!("{FRONTMATTER}# Real Title\n");
+        assert_eq!(split_frontmatter(&content), (FRONTMATTER, "# Real Title\n"));
+    }
+
+    #[test]
+    fn test_split_frontmatter_empty_block() {
+        assert_eq!(split_frontmatter("---\n---\nbody"), ("---\n---\n", "body"));
+    }
+
+    #[test]
+    fn test_split_frontmatter_ignores_dashes_inside_a_value() {
+        let content = "---\nnote: a --- b\n---\nbody";
+        assert_eq!(
+            split_frontmatter(content),
+            ("---\nnote: a --- b\n---\n", "body")
+        );
+    }
+
+    #[test]
+    fn test_split_frontmatter_none_without_a_leading_block() {
+        assert_eq!(
+            split_frontmatter("# Title\n---\nx\n---\n"),
+            ("", "# Title\n---\nx\n---\n")
+        );
+        assert_eq!(
+            split_frontmatter("---\nnever closed\n"),
+            ("", "---\nnever closed\n")
+        );
+        assert_eq!(split_frontmatter(""), ("", ""));
+    }
+
+    #[test]
+    fn test_split_frontmatter_keeps_crlf_endings() {
+        let content = "---\r\ntitle: Foo\r\n---\r\nbody";
+        assert_eq!(
+            split_frontmatter(content),
+            ("---\r\ntitle: Foo\r\n---\r\n", "body")
+        );
+    }
+
+    #[test]
+    fn test_split_frontmatter_block_may_end_the_file() {
+        assert_eq!(split_frontmatter("---\na: 1\n---"), ("---\na: 1\n---", ""));
+    }
+
+    #[test]
+    fn test_frontmatter_is_ignored_by_title_tags_and_links() {
+        let content = "---\ntitle: Foo\ntags: [a]\n# comment\nrelated: \"[[Hidden]] #hidden\"\n---\n# Real Title\nBody #real [[Shown]]\n";
+        assert_eq!(title_from_content(content), "Real Title");
+        assert_eq!(extract_tags(content), vec!["real"]);
+        assert_eq!(extract_links(content), vec!["Shown"]);
+    }
+
+    #[test]
+    fn test_rewrite_title_leaves_frontmatter_alone() {
+        let content = format!("{FRONTMATTER}# Old\nbody\n");
+        assert_eq!(
+            rewrite_title(&content, "New"),
+            format!("{FRONTMATTER}# New\nbody\n")
+        );
+        let no_heading = format!("{FRONTMATTER}just text");
+        assert_eq!(
+            rewrite_title(&no_heading, "New"),
+            format!("{FRONTMATTER}# New\n\njust text")
+        );
     }
 
     #[test]

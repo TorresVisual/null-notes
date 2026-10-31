@@ -13,6 +13,7 @@ import { HomeView } from './HomeView'
 import { useWorkspaceStore } from '../store/workspace'
 import { useNotesStore } from '../store/notes'
 import { useSettingsStore } from '../store/settings'
+import { joinFrontmatter, splitFrontmatter } from '../lib/frontmatter'
 import type { SaveState } from '../hooks/useNote'
 
 export interface EditorPaneProps {
@@ -78,6 +79,9 @@ export const EditorPane = forwardRef<HTMLDivElement, EditorPaneProps>(function E
   const repoMode = useWorkspaceStore((s) => s.repoMode)
   const notes = useNotesStore((s) => s.notes)
   const currentNote = notes.find((n) => n.path === notePath)
+  // The WYSIWYG editor only ever sees the body; the YAML block is re-attached
+  // on every change so it reaches disk untouched. Raw view edits the whole file.
+  const { frontmatter, body } = splitFrontmatter(content)
 
   return (
     <div className="editor-scroll" ref={scrollRef}>
@@ -104,11 +108,11 @@ export const EditorPane = forwardRef<HTMLDivElement, EditorPaneProps>(function E
         {isLoading && <LoadingStatus />}
         {!isLoading && notePath && viewMode === 'wysiwyg' && (
           <NoteEditor
-            content={content}
+            content={body}
             notePath={notePath}
             spellcheck={settings.spellcheck}
             spellcheckLanguage={settings.spellcheckLanguage}
-            onChange={onSave}
+            onChange={(markdown) => onSave(joinFrontmatter(frontmatter, markdown))}
             onFlashcardCommand={onFlashcardCommand}
             onDiagramCommand={onDiagramCommand}
           />
