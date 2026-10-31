@@ -12,6 +12,29 @@ export interface WorkspaceTree {
   canvases: string[]
 }
 
+export interface BaseRow {
+  path: string
+  title: string
+  properties: Record<string, unknown>
+  parseError: string | null
+  ctime: number
+  mtime: number
+  size: number
+  tags: string[]
+  links: string[]
+  backlinks: string[]
+}
+
+export type PropertyEdit =
+  | { type: 'set'; key: string; value: unknown }
+  | { type: 'remove'; key: string }
+  | { type: 'rename'; from: string; to: string }
+
+export interface PropertiesResult {
+  properties: Record<string, unknown>
+  error: string | null
+}
+
 export interface CanvasViewport {
   x: number
   y: number
@@ -182,6 +205,8 @@ export interface AppSettings {
   codeRunTimeoutSecs: number
   /** Command id → key combo, only where it differs from the default; `""` means cleared. */
   keymap: Record<string, string>
+  /** Raster tile URL template for a base's map layout; `{z}`, `{x}`, `{y}` placeholders. */
+  mapTileUrl: string
 }
 
 export interface ErrorLogEntry {

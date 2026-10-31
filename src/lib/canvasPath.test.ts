@@ -1,5 +1,14 @@
 import { describe, it, expect } from 'vitest'
-import { isCanvasPath, workspaceFilePath } from './canvasPath'
+import { isBasePath, isCanvasPath, workspaceFilePath } from './canvasPath'
+
+describe('isBasePath', () => {
+  it('matches only a trailing .base', () => {
+    expect(isBasePath('a/x.base')).toBe(true)
+    expect(isBasePath(String.raw`C:\ws\x.base`)).toBe(true)
+    expect(isBasePath('a/x.basement')).toBe(false)
+    expect(isBasePath('a/x.canvas')).toBe(false)
+  })
+})
 
 describe('isCanvasPath', () => {
   it('matches only a trailing .canvas', () => {

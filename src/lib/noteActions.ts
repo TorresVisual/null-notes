@@ -1,6 +1,7 @@
 import { open } from '@tauri-apps/plugin-dialog'
 import { api } from './tauri'
 import { writeToClipboard } from './clipboard'
+import { isBasePath } from './canvasPath'
 import { folderName, isUnderPath, sidecarDir } from './pathPrefix'
 import { refreshTree } from '../hooks/useWorkspace'
 import { offerUndoDelete } from '../hooks/useTrash'
@@ -58,9 +59,9 @@ export async function renameNote(path: string): Promise<void> {
 
 export async function renameCanvas(path: string): Promise<void> {
   const workspace = workspaceOf(path)
-  const current = folderName(path).replace(/\.canvas$/, '')
+  const current = folderName(path).replace(/\.(canvas|base)$/, '')
   if (!workspace) return
-  const newName = await promptText('New canvas name:', current)
+  const newName = await promptText(isBasePath(path) ? 'New base name:' : 'New canvas name:', current)
   if (!newName || newName === current) return
   try {
     const renamedPath = await api.canvas.rename(workspace, path, newName)

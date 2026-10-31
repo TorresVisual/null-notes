@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { isCanvasPath } from '../lib/canvasPath'
+import { isBasePath, isCanvasPath } from '../lib/canvasPath'
 import { isUnderPath, replacePathPrefix } from '../lib/pathPrefix'
 import { useBookmarksStore } from './bookmarks'
 import type { CanvasViewport, GitWorkspaceConfig, RepoMode, GitCommitStatus, SearchSort } from '../types'
@@ -206,7 +206,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   setActiveTab: (notePath) => set({ activeTab: notePath }),
 
   setSecondaryTab: (notePath) => {
-    if (notePath !== null && isCanvasPath(notePath)) return
+    if (notePath !== null && (isCanvasPath(notePath) || isBasePath(notePath))) return
     if (notePath === null) {
       set({ secondaryTab: null })
       return

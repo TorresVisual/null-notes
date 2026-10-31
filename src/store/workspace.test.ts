@@ -106,6 +106,12 @@ describe('useWorkspaceStore', () => {
     expect(useWorkspaceStore.getState().openTabs).not.toContain('/ws/map.canvas')
   })
 
+  it('refuses to open a base in the secondary pane', () => {
+    useWorkspaceStore.getState().setSecondaryTab('/ws/Tasks.base')
+    expect(useWorkspaceStore.getState().secondaryTab).toBeNull()
+    expect(useWorkspaceStore.getState().openTabs).not.toContain('/ws/Tasks.base')
+  })
+
   describe('canvas viewports', () => {
     const view = { x: 10, y: -20, zoom: 0.5 }
 

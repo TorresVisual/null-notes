@@ -62,7 +62,7 @@ function toTreeEntries(folder: MutableFolder): TreeEntry[] {
     .map((n) => ({ type: 'note', name: n.title, path: n.path, note: n }))
 
   const canvasEntries: CanvasTreeNode[] = folder.canvases
-    .map((path) => ({ type: 'canvas' as const, name: folderName(path).replace(/\.canvas$/, ''), path }))
+    .map((path) => ({ type: 'canvas' as const, name: folderName(path).replace(/\.(canvas|base)$/, ''), path }))
     .sort((a, b) => a.name.localeCompare(b.name))
 
   return [...folderEntries, ...noteEntries, ...canvasEntries]

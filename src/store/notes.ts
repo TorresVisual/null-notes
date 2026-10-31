@@ -10,7 +10,7 @@ import { folderName } from '../lib/pathPrefix'
 // title is the one the user actually typed. Anywhere else that shows a
 // note's name needs the same lookup, or it can show a mangled version of it.
 export function noteTitle(notes: NoteMetadata[], path: string): string {
-  return notes.find((n) => n.path === path)?.title ?? folderName(path).replace(/\.(md|canvas)$/, '')
+  return notes.find((n) => n.path === path)?.title ?? folderName(path).replace(/\.(md|canvas|base)$/, '')
 }
 
 interface NotesStore {

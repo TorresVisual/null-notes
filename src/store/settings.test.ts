@@ -24,6 +24,7 @@ describe('useSettingsStore', () => {
       pythonCommand: 'python3.11',
       cppCompilerCommand: 'clang++',
       keymap: {},
+      mapTileUrl: 'https://tiles.example/{z}/{x}/{y}.png',
       codeRunTimeoutSecs: 30,
     })
     expect(useSettingsStore.getState().settings).toEqual({
@@ -41,6 +42,7 @@ describe('useSettingsStore', () => {
       pythonCommand: 'python3.11',
       cppCompilerCommand: 'clang++',
       keymap: {},
+      mapTileUrl: 'https://tiles.example/{z}/{x}/{y}.png',
       codeRunTimeoutSecs: 30,
     })
   })

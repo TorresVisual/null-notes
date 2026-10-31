@@ -17,6 +17,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   cppCompilerCommand: 'g++',
   codeRunTimeoutSecs: 10,
   keymap: {},
+  mapTileUrl: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
 }
 
 interface SettingsStore {

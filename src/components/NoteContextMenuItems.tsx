@@ -9,7 +9,7 @@ import {
   renameNote,
   revealNote,
 } from '../lib/noteActions'
-import { isCanvasPath } from '../lib/canvasPath'
+import { isBasePath, isCanvasPath } from '../lib/canvasPath'
 import { BookmarkMenuItem } from './BookmarkMenuItem'
 import { ContextMenuItem, ContextMenuSeparator } from './ui/context-menu'
 
@@ -18,8 +18,8 @@ interface NoteContextMenuItemsProps {
 }
 
 export function NoteContextMenuItems({ path }: NoteContextMenuItemsProps) {
-  // Duplicate, move and merge rewrite Markdown and move a note's sidecars, which a canvas has none of.
-  if (isCanvasPath(path)) {
+  // Duplicate, move and merge rewrite Markdown and move a note's sidecars, which a canvas or base has none of.
+  if (isCanvasPath(path) || isBasePath(path)) {
     return (
       <>
         <ContextMenuItem onSelect={() => void copyNotePath(path, 'absolute')}>

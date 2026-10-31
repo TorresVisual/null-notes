@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core'
-import type { NoteMetadata, WorkspaceState, WorkspaceTree, SearchPage, SearchSort, AppSettings, GraphLink, GraphTag, RepoMode, CommitOutcome, PushOutcome, PullOutcome, RebaseOutcome, RepoInitOutcome, TemplateMetadata, CrossRefTarget, OpenTask, DueCard, Grade, NoteHistoryEntry, GithubRepo, BacklinkEntry, PrinterInfo, McGradeResult, CardSummary, ErrorLogEntry, TrashEntry, MergeOutcome, MergeSnapshot, CodeLinkStatus, CodeLinkTarget } from '../types'
+import type { BaseRow, PropertiesResult, PropertyEdit, NoteMetadata, WorkspaceState, WorkspaceTree, SearchPage, SearchSort, AppSettings, GraphLink, GraphTag, RepoMode, CommitOutcome, PushOutcome, PullOutcome, RebaseOutcome, RepoInitOutcome, TemplateMetadata, CrossRefTarget, OpenTask, DueCard, Grade, NoteHistoryEntry, GithubRepo, BacklinkEntry, PrinterInfo, McGradeResult, CardSummary, ErrorLogEntry, TrashEntry, MergeOutcome, MergeSnapshot, CodeLinkStatus, CodeLinkTarget } from '../types'
 import type { PdfPage, PdfMarkdownImport } from '../pdf/types'
 import { useWorkspaceStore } from '../store/workspace'
 import { sidecarDir } from './pathPrefix'
@@ -7,6 +7,36 @@ import { isMobile } from './platform'
 import { getStoredGitToken } from './gitCredentials'
 
 export const api = {
+  base: {
+    create: (workspace: string, folder: string, name: string) =>
+      invoke<string>('create_base', { workspace, folder, name }),
+  },
+  properties: {
+    listRows: (workspace: string) => invoke<BaseRow[]>('list_base_rows', { workspace }),
+    parse: (content: string) => invoke<PropertiesResult>('parse_note_properties', { content }),
+    edit: (content: string, edit: PropertyEdit) =>
+      invoke<string>('edit_content_property', { content, edit }),
+    writeProperty: (
+      workspace: string,
+      path: string,
+      key: string,
+      expected: unknown,
+      value: unknown,
+    ) =>
+      invoke<void>('write_note_property', {
+        workspace,
+        path,
+        key,
+        expected: expected ?? null,
+        value: value ?? null,
+      }),
+    createNote: (
+      workspace: string,
+      folder: string,
+      title: string,
+      properties: Record<string, unknown>,
+    ) => invoke<NoteMetadata>('create_note_with_properties', { workspace, folder, title, properties }),
+  },
   canvas: {
     create: (workspace: string, folder: string, name: string) =>
       invoke<string>('create_canvas', { workspace, folder, name }),

@@ -61,6 +61,11 @@ describe('buildFolderTree', () => {
     expect(notes?.type === 'folder' && notes.children).toEqual([{ type: 'canvas', name: 'map', path }])
   })
 
+  it('shows a base without its extension, beside canvases', () => {
+    const tree = buildFolderTree('/ws', [], [], ['/ws/Tasks.base'])
+    expect(tree).toEqual([{ type: 'canvas', name: 'Tasks', path: '/ws/Tasks.base' }])
+  })
+
   it('handles nested subfolders', () => {
     const n = note('Deep', '/ws/A/B/Deep.md')
     const tree = buildFolderTree('/ws', ['/ws/A', '/ws/A/B'], [n])

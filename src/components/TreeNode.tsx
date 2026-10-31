@@ -8,6 +8,7 @@ import { promptText } from '../store/promptDialog'
 import { api } from '../lib/tauri'
 import { deleteNote, moveNoteInto, renameCanvas, renameNote } from '../lib/noteActions'
 import { refreshTree } from '../hooks/useWorkspace'
+import { useCreateBase } from '../hooks/useCreateBase'
 import { useCreateCanvas } from '../hooks/useCreateCanvas'
 import { folderName, isSingleSegmentName, isUnderPath } from '../lib/pathPrefix'
 import type { TreeEntry } from '../lib/folderTree'
@@ -42,6 +43,7 @@ export function TreeNode({ entry }: TreeNodeProps) {
   const openTab = useWorkspaceStore((s) => s.openTab)
   const notes = useNotesStore((s) => s.notes)
   const createCanvas = useCreateCanvas()
+  const createBase = useCreateBase()
 
   if (entry.type === 'canvas') {
     const isActive = activeTab === entry.path
@@ -241,6 +243,9 @@ export function TreeNode({ entry }: TreeNodeProps) {
           <BookmarkMenuItem bookmark={{ kind: 'folder', path: entry.path }} />
           <ContextMenuItem onSelect={() => void createCanvas(entry.path)}>
             <Plus size={14} /> New canvas
+          </ContextMenuItem>
+          <ContextMenuItem onSelect={() => void createBase(entry.path)}>
+            <Plus size={14} /> New base
           </ContextMenuItem>
           <ContextMenuItem onSelect={() => void handleRenameFolder()}>
             <Pencil size={14} /> Rename

@@ -20,6 +20,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   cppCompilerCommand: '',
   codeRunTimeoutSecs: 10,
   keymap: {},
+  mapTileUrl: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
 }
 
 const EMPTY_STATE: WorkspaceState = {
