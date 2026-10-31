@@ -48,6 +48,15 @@ import { useGitConfig } from '../hooks/useGitConfig'
 import { useGitAutoCommit } from '../hooks/useGitAutoCommit'
 import { useGitAutoPull } from '../hooks/useGitAutoPull'
 import { promptText } from '../store/promptDialog'
+import {
+  copyNotePath,
+  deleteNote,
+  duplicateNote,
+  moveNoteViaPicker,
+  openNoteExternally,
+  renameNote,
+  revealNote,
+} from '../lib/noteActions'
 import { api } from '../lib/tauri'
 import { diagramApi } from '../lib/diagram'
 import { insertDiagram } from '../editor/toolbar/insertDiagram'
@@ -346,6 +355,30 @@ export function Layout() {
           break
         case 'reopen-closed-tab':
           reopenClosedTab()
+          break
+        case 'note-duplicate':
+          if (activeTab) await duplicateNote(activeTab)
+          break
+        case 'note-move':
+          if (activeTab) await moveNoteViaPicker(activeTab)
+          break
+        case 'note-rename':
+          if (activeTab) await renameNote(activeTab)
+          break
+        case 'note-delete':
+          if (activeTab) await deleteNote(activeTab)
+          break
+        case 'note-reveal':
+          if (activeTab) await revealNote(activeTab)
+          break
+        case 'note-open-external':
+          if (activeTab) await openNoteExternally(activeTab)
+          break
+        case 'note-copy-path':
+          if (activeTab) await copyNotePath(activeTab, 'absolute')
+          break
+        case 'note-copy-relative-path':
+          if (activeTab) await copyNotePath(activeTab, 'relative')
           break
         case 'toggle-focus-mode':
           toggleFocusMode()

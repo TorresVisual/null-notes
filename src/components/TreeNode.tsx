@@ -6,10 +6,12 @@ import { useWorkspaceStore } from '../store/workspace'
 import { useNotesStore } from '../store/notes'
 import { promptText } from '../store/promptDialog'
 import { api } from '../lib/tauri'
+import { deleteNote, moveNoteInto, renameNote } from '../lib/noteActions'
 import { refreshTree } from '../hooks/useWorkspace'
-import { folderName, isSingleSegmentName, isUnderPath, sidecarDir } from '../lib/pathPrefix'
+import { folderName, isSingleSegmentName, isUnderPath } from '../lib/pathPrefix'
 import type { TreeEntry } from '../lib/folderTree'
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from './ui/context-menu'
+import { NoteContextMenuItems } from './NoteContextMenuItems'
 
 // Ignores keys that bubble up from the row's own rename/delete buttons.
 function activateOnKey(e: React.KeyboardEvent, activate: () => void) {
@@ -36,90 +38,52 @@ export function TreeNode({ entry }: TreeNodeProps) {
   const closeTabsUnder = useWorkspaceStore((s) => s.closeTabsUnder)
   const setFolderError = useWorkspaceStore((s) => s.setFolderError)
   const openTab = useWorkspaceStore((s) => s.openTab)
-  const closeTab = useWorkspaceStore((s) => s.closeTab)
   const notes = useNotesStore((s) => s.notes)
-  const removeNote = useNotesStore((s) => s.removeNote)
 
   if (entry.type === 'note') {
     const isActive = activeTab === entry.path
-    const workspace = entry.note.workspace
-
-    async function handleRename(e: React.MouseEvent) {
-      e.stopPropagation()
-      const newTitle = await promptText('New title:', entry.name)
-      if (!newTitle || newTitle === entry.name) return
-      try {
-        const renamed = await api.notes.rename(entry.path, newTitle, workspace)
-        setFolderError(null)
-        // rename_note moves the file (and its sidecars) to match the new
-        // title, the same way a drag-and-drop move does — so open tabs and
-        // .workspace.json must be repointed at the new path, not just told
-        // a rename happened.
-        if (renamed.path !== entry.path) {
-          replaceOpenPath(entry.path, renamed.path)
-          for (const suffix of ['ink', 'pdf', 'diagrams', 'assets']) {
-            useWorkspaceStore.getState().addGitPendingPath(sidecarDir(entry.path, suffix))
-            useWorkspaceStore.getState().addGitPendingPath(sidecarDir(renamed.path, suffix))
-          }
-        }
-        useWorkspaceStore.getState().addGitPendingPath(entry.path)
-        useWorkspaceStore.getState().addGitPendingPath(renamed.path)
-        await refreshTree()
-      } catch (err) {
-        setFolderError(err instanceof Error ? err.message : String(err))
-      }
-    }
-
-    async function handleDelete(e: React.MouseEvent) {
-      e.stopPropagation()
-      let trashed
-      try {
-        trashed = await api.notes.delete(workspace, entry.path)
-      } catch (err) {
-        setFolderError(err instanceof Error ? err.message : String(err))
-        return
-      }
-      setFolderError(null)
-      removeNote(entry.path)
-      closeTab(entry.path)
-      // Otherwise the deletion never enters the auto-commit's pathspec-scoped
-      // pending list — the files are gone on disk, but `git rm` never runs,
-      // so they silently never reach the repo (or GitHub) at all. delete_note
-      // removes every sidecar, so every sidecar needs to be queued too.
-      for (const suffix of ['ink', 'pdf', 'diagrams', 'assets']) {
-        useWorkspaceStore.getState().addGitPendingPath(sidecarDir(entry.path, suffix))
-      }
-      useWorkspaceStore.getState().addGitPendingPath(entry.path)
-      offerUndoDelete(workspace, trashed)
-    }
-
     return (
-      <li
-        className={`tree-row tree-note${isActive ? ' active' : ''}`}
-        draggable
-        tabIndex={0}
-        aria-current={isActive || undefined}
-        onDragStart={(e) => e.dataTransfer.setData('text/note-path', entry.path)}
-        onClick={() => openTab(entry.path)}
-        onKeyDown={(e) => activateOnKey(e, () => openTab(entry.path))}
-      >
-        <span className="tree-label" title={entry.name}>{entry.name}</span>
-        <button
-          className="tree-rename"
-          onClick={(e) => void handleRename(e)}
-          aria-label={`Rename ${entry.name}`}
-          title={`Rename ${entry.name}`}
-        >
-          <Pencil size={12} />
-        </button>
-        <button
-          className="tree-delete"
-          onClick={(e) => void handleDelete(e)}
-          aria-label={`Delete ${entry.name}`}
-          title={`Delete ${entry.name}`}
-        >
-          <Trash2 size={12} />
-        </button>
+      <li>
+        <ContextMenu>
+          <ContextMenuTrigger asChild>
+            <div
+              className={`tree-row tree-note${isActive ? ' active' : ''}`}
+              draggable
+              tabIndex={0}
+              aria-current={isActive || undefined}
+              onDragStart={(e) => e.dataTransfer.setData('text/note-path', entry.path)}
+              onClick={() => openTab(entry.path)}
+              onKeyDown={(e) => activateOnKey(e, () => openTab(entry.path))}
+            >
+              <span className="tree-label" title={entry.name}>{entry.name}</span>
+              <button
+                className="tree-rename"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  void renameNote(entry.path)
+                }}
+                aria-label={`Rename ${entry.name}`}
+                title={`Rename ${entry.name}`}
+              >
+                <Pencil size={12} />
+              </button>
+              <button
+                className="tree-delete"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  void deleteNote(entry.path)
+                }}
+                aria-label={`Delete ${entry.name}`}
+                title={`Delete ${entry.name}`}
+              >
+                <Trash2 size={12} />
+              </button>
+            </div>
+          </ContextMenuTrigger>
+          <ContextMenuContent className="context-menu">
+            <NoteContextMenuItems path={entry.path} />
+          </ContextMenuContent>
+        </ContextMenu>
       </li>
     )
   }
@@ -141,18 +105,8 @@ export function TreeNode({ entry }: TreeNodeProps) {
     const draggedFolderPath = e.dataTransfer.getData('text/folder-path')
     try {
       if (notePath) {
-        const newPath = await api.notes.moveNote(notePath, entry.path)
-        replaceOpenPath(notePath, newPath)
-        // Old path/dirs so git registers the removal, new ones so it
-        // registers the addition — a bare fs::rename shows up as both to git
-        // status. move_note_at moves every sidecar (ink/pdf/diagrams/assets)
-        // alongside the note itself, so all of them need to be queued too.
-        for (const suffix of ['ink', 'pdf', 'diagrams', 'assets']) {
-          useWorkspaceStore.getState().addGitPendingPath(sidecarDir(notePath, suffix))
-          useWorkspaceStore.getState().addGitPendingPath(sidecarDir(newPath, suffix))
-        }
-        useWorkspaceStore.getState().addGitPendingPath(notePath)
-        useWorkspaceStore.getState().addGitPendingPath(newPath)
+        if (!workspacePath) return
+        await moveNoteInto(notePath, entry.path, workspacePath)
       } else if (draggedFolderPath && !isUnderPath(entry.path, draggedFolderPath)) {
         const separator = entry.path.includes('\\') ? '\\' : '/'
         const newPath = `${entry.path}${separator}${folderName(draggedFolderPath)}`

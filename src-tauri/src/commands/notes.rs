@@ -2396,11 +2396,120 @@ pub async fn rename_folder(
 pub async fn move_note(
     path: String,
     dest_folder: String,
+    workspace: String,
     db: State<'_, DbPool>,
 ) -> Result<String, String> {
+    require_within_workspace(&workspace, &path)?;
+    require_within_workspace(&workspace, &dest_folder)?;
     move_note_at(&path, &dest_folder, &db)
         .await
         .map_err(|e| e.to_string())
+}
+
+// "Name copy", then "Name copy 2", … — the first title whose filename is free
+// in `folder`. The suffix also keeps the copy's title distinct from the
+// original's, so wiki-links to the original don't become ambiguous.
+async fn free_copy_title(folder: &Path, title: &str) -> anyhow::Result<String> {
+    let mut n = 1;
+    loop {
+        let candidate = if n == 1 {
+            format!("{title} copy")
+        } else {
+            format!("{title} copy {n}")
+        };
+        if !tokio::fs::try_exists(folder.join(note_filename(&candidate))).await? {
+            return Ok(candidate);
+        }
+        n += 1;
+    }
+}
+
+// Sidecars are copied before the note is written: the note appearing is the
+// commit point, and a note whose ink or images are missing is broken, whereas
+// an orphaned sidecar from a failed duplicate is harmless.
+async fn duplicate_note_at(
+    path: &str,
+    workspace: &str,
+    db: &DbPool,
+) -> anyhow::Result<NoteMetadata> {
+    let content = tokio::fs::read_to_string(path).await?;
+    let folder = Path::new(path)
+        .parent()
+        .ok_or_else(|| anyhow::anyhow!("note path has no parent folder: {path}"))?;
+    let new_title = free_copy_title(folder, &title_from_content(&content)).await?;
+    let new_path = folder.join(note_filename(&new_title));
+    let new_path_str = new_path.to_string_lossy().into_owned();
+
+    for suffix in ["ink", "pdf", "diagrams", "assets"] {
+        let old_dir = super::sidecar_dir_for(path, suffix);
+        if tokio::fs::metadata(&old_dir).await.is_ok() {
+            let new_dir = super::sidecar_dir_for(&new_path_str, suffix);
+            tokio::task::spawn_blocking(move || {
+                super::trash::copy_recursive(Path::new(&old_dir), Path::new(&new_dir))
+            })
+            .await??;
+        }
+    }
+
+    let stem_of = |p: &str| {
+        Path::new(p)
+            .file_stem()
+            .unwrap_or_default()
+            .to_string_lossy()
+            .into_owned()
+    };
+    let new_content = rewrite_sidecar_links(
+        &rewrite_title(&content, &new_title),
+        &stem_of(path),
+        &stem_of(&new_path_str),
+    );
+    write_atomic(&new_path, &new_content).await?;
+    index_note_at(&new_path_str, workspace, &new_content, db).await?;
+
+    Ok(NoteMetadata {
+        id: Uuid::new_v4().to_string(),
+        title: new_title,
+        path: new_path_str,
+        workspace: workspace.to_string(),
+        updated_at: now_ms(),
+    })
+}
+
+#[tauri::command]
+pub async fn duplicate_note(
+    path: String,
+    workspace: String,
+    db: State<'_, DbPool>,
+) -> Result<NoteMetadata, String> {
+    require_within_workspace(&workspace, &path)?;
+    duplicate_note_at(&path, &workspace, &db)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+// Hands a path to the OS, so it is held to the same standard as the editor
+// launcher: absolute and inside the workspace as written, an existing file,
+// and `.md` only — a workspace can arrive by Git or Syncthing, so "inside the
+// workspace" alone must never be enough to launch an arbitrary file.
+fn require_note_file(workspace: &str, path: &str) -> Result<(), String> {
+    require_within_workspace(workspace, path)?;
+    let p = Path::new(path);
+    if p.extension().and_then(|e| e.to_str()) != Some("md") || !p.is_file() {
+        return Err(format!("not a note: {path}"));
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub fn reveal_note(workspace: String, path: String) -> Result<(), String> {
+    require_note_file(&workspace, &path)?;
+    tauri_plugin_opener::reveal_item_in_dir(&path).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn open_note_externally(workspace: String, path: String) -> Result<(), String> {
+    require_note_file(&workspace, &path)?;
+    tauri_plugin_opener::open_path(&path, None::<&str>).map_err(|e| e.to_string())
 }
 
 #[cfg(test)]
@@ -4819,6 +4928,92 @@ mod folder_tests {
             .await
             .unwrap();
         assert_eq!(notes[0].path, new_path);
+    }
+
+    #[tokio::test]
+    async fn test_duplicate_note_at_copies_sidecars_and_rewrites_their_links() {
+        let tmp = tempdir().unwrap();
+        let root = tmp.path();
+        let ws = root.to_string_lossy().into_owned();
+        std::fs::write(
+            root.join("Lecture.md"),
+            "# Lecture
+
+![fig](Lecture.assets/a%20b.png)
+
+```ink
+Lecture.ink/1.svg
+```
+",
+        )
+        .unwrap();
+        for suffix in ["ink", "pdf", "diagrams", "assets"] {
+            let dir = root.join(format!("Lecture.{suffix}"));
+            std::fs::create_dir_all(&dir).unwrap();
+            std::fs::write(dir.join("child"), "content").unwrap();
+        }
+
+        let pool = make_pool().await;
+        let path = root.join("Lecture.md").to_string_lossy().into_owned();
+        let copy = duplicate_note_at(&path, &ws, &pool).await.unwrap();
+
+        assert_eq!(copy.title, "Lecture copy");
+        assert!(copy.path.ends_with("Lecture copy.md"));
+        let body = std::fs::read_to_string(&copy.path).unwrap();
+        assert!(body.starts_with(
+            "# Lecture copy
+"
+        ));
+        assert!(body.contains("Lecture%20copy.assets/") || body.contains("Lecture copy.assets/"));
+        assert!(!body.contains("Lecture.assets/") && !body.contains("Lecture.ink/"));
+        for suffix in ["ink", "pdf", "diagrams", "assets"] {
+            assert!(root
+                .join(format!("Lecture copy.{suffix}"))
+                .join("child")
+                .exists());
+            assert!(
+                root.join(format!("Lecture.{suffix}"))
+                    .join("child")
+                    .exists(),
+                "the original's sidecars must stay put"
+            );
+        }
+        assert_eq!(
+            std::fs::read_to_string(root.join("Lecture.md"))
+                .unwrap()
+                .lines()
+                .next(),
+            Some("# Lecture")
+        );
+        let indexed = db::notes::list_by_workspace(&pool, &ws).await.unwrap();
+        assert!(indexed.iter().any(|n| n.path == copy.path));
+    }
+
+    #[tokio::test]
+    async fn test_free_copy_title_takes_the_next_free_name() {
+        let tmp = tempdir().unwrap();
+        std::fs::write(tmp.path().join("Note copy.md"), "# Note copy").unwrap();
+        std::fs::write(tmp.path().join("Note copy 2.md"), "# Note copy 2").unwrap();
+
+        assert_eq!(
+            free_copy_title(tmp.path(), "Note").await.unwrap(),
+            "Note copy 3"
+        );
+    }
+
+    #[test]
+    fn require_note_file_refuses_anything_but_an_existing_md_inside_the_workspace() {
+        let tmp = tempdir().unwrap();
+        let ws = tmp.path().to_string_lossy().into_owned();
+        let note = tmp.path().join("a.md");
+        let exe = tmp.path().join("run.exe");
+        std::fs::write(&note, "# a").unwrap();
+        std::fs::write(&exe, "").unwrap();
+
+        assert!(require_note_file(&ws, &note.to_string_lossy()).is_ok());
+        assert!(require_note_file(&ws, &exe.to_string_lossy()).is_err());
+        assert!(require_note_file(&ws, &tmp.path().join("gone.md").to_string_lossy()).is_err());
+        assert!(require_note_file("/elsewhere", &note.to_string_lossy()).is_err());
     }
 
     #[tokio::test]

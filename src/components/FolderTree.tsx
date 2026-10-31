@@ -2,8 +2,9 @@ import { useState } from 'react'
 import { TreeNode } from './TreeNode'
 import { useWorkspaceStore } from '../store/workspace'
 import { refreshTree } from '../hooks/useWorkspace'
-import { folderName, isUnderPath, sidecarDir } from '../lib/pathPrefix'
+import { folderName, isUnderPath } from '../lib/pathPrefix'
 import { api } from '../lib/tauri'
+import { moveNoteInto } from '../lib/noteActions'
 import type { TreeEntry } from '../lib/folderTree'
 
 interface FolderTreeProps {
@@ -33,14 +34,7 @@ export function FolderTree({ entries }: FolderTreeProps) {
     const draggedFolderPath = e.dataTransfer.getData('text/folder-path')
     try {
       if (notePath) {
-        const newPath = await api.notes.moveNote(notePath, workspacePath)
-        replaceOpenPath(notePath, newPath)
-        for (const suffix of ['ink', 'pdf', 'diagrams', 'assets']) {
-          useWorkspaceStore.getState().addGitPendingPath(sidecarDir(notePath, suffix))
-          useWorkspaceStore.getState().addGitPendingPath(sidecarDir(newPath, suffix))
-        }
-        useWorkspaceStore.getState().addGitPendingPath(notePath)
-        useWorkspaceStore.getState().addGitPendingPath(newPath)
+        await moveNoteInto(notePath, workspacePath, workspacePath)
       } else if (draggedFolderPath && !isUnderPath(workspacePath, draggedFolderPath)) {
         const separator = workspacePath.includes('\\') ? '\\' : '/'
         const newPath = `${workspacePath}${separator}${folderName(draggedFolderPath)}`

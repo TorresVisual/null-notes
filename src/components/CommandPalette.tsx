@@ -27,6 +27,14 @@ const EXTRA_ACTIONS: MenuEntry[] = [
   { id: 'prev-tab', label: 'Previous Tab', accel: 'Ctrl+Shift+Tab' },
   { id: 'toggle-focus-mode', label: 'Toggle Focus Mode', accel: 'Ctrl+Shift+F' },
   { id: 'sync-now', label: 'Sync Now' },
+  { id: 'note-duplicate', label: 'Duplicate Note' },
+  { id: 'note-move', label: 'Move Note to…' },
+  { id: 'note-rename', label: 'Rename Note' },
+  { id: 'note-delete', label: 'Delete Note' },
+  { id: 'note-reveal', label: 'Show Note in File Explorer' },
+  { id: 'note-open-external', label: 'Open Note in Default App' },
+  { id: 'note-copy-path', label: 'Copy Note Path' },
+  { id: 'note-copy-relative-path', label: 'Copy Note Relative Path' },
 ]
 
 const NO_WORKSPACE_NEEDED = new Set(['open-workspace', 'settings', 'shortcuts-help', 'exit'])
@@ -50,7 +58,7 @@ export function availableActions({ hasWorkspace, hasNote, repoMode, tabPinned }:
         'id' in item &&
         item.id !== 'command-palette' &&
         (hasWorkspace || NO_WORKSPACE_NEEDED.has(item.id)) &&
-        (hasNote || !(NEEDS_NOTE.has(item.id) || item.id.startsWith('goto-tab:'))) &&
+        (hasNote || !(NEEDS_NOTE.has(item.id) || item.id.startsWith('goto-tab:') || item.id.startsWith('note-'))) &&
         (repoMode || item.id !== 'sync-now'),
     )
     .map((item) => (item.id === 'toggle-pin-tab' && tabPinned ? { ...item, label: 'Unpin Tab' } : item))

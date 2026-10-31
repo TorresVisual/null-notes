@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { confirm } from '@tauri-apps/plugin-dialog'
+import { confirm, open } from '@tauri-apps/plugin-dialog'
 import { TreeNode } from './TreeNode'
 import { useWorkspaceStore } from '../store/workspace'
 import { useNotesStore } from '../store/notes'
@@ -18,6 +18,7 @@ vi.mock('../lib/tauri', () => ({
       scan: vi.fn(),
       renameFolder: vi.fn(),
       moveNote: vi.fn(),
+      duplicate: vi.fn(),
       deleteFolder: vi.fn(),
     },
     trash: {
@@ -29,6 +30,7 @@ vi.mock('../lib/tauri', () => ({
 vi.mock('@tauri-apps/plugin-dialog', () => ({
   confirm: vi.fn(),
   message: vi.fn(),
+  open: vi.fn(),
 }))
 
 const notesApi = vi.mocked(api.notes)
@@ -45,7 +47,7 @@ function trashEntry(overrides: Partial<TrashEntry>): TrashEntry {
     ...overrides,
   }
 }
-const dialog = vi.mocked({ confirm })
+const dialog = vi.mocked({ confirm, open })
 
 const noteEntry: NoteTreeNode = {
   type: 'note',
@@ -135,6 +137,52 @@ describe('TreeNode delete (note)', () => {
   })
 })
 
+describe('TreeNode note context menu', () => {
+  function openMenu() {
+    render(<TreeNode entry={noteEntry} />)
+    fireEvent.contextMenu(screen.getByText('Lecture 7').closest('.tree-note')!)
+  }
+
+  it('offers the file-management actions alongside Rename and Delete', async () => {
+    openMenu()
+
+    for (const name of ['Duplicate', 'Move to…', 'Show in File Explorer', 'Open in default app', 'Copy path', 'Copy relative path', 'Rename', 'Delete']) {
+      expect(await screen.findByRole('menuitem', { name })).toBeTruthy()
+    }
+  })
+
+  it('duplicates the note, queues the copy for auto-commit and opens it', async () => {
+    notesApi.duplicate.mockResolvedValue({ ...noteEntry.note, title: 'Lecture 7 copy', path: '/ws/Lecture 7 copy.md' })
+    openMenu()
+
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Duplicate' }))
+
+    expect(notesApi.duplicate).toHaveBeenCalledWith('/ws/Lecture 7.md', '/ws')
+    await waitFor(() => expect(useWorkspaceStore.getState().activeTab).toBe('/ws/Lecture 7 copy.md'))
+    expect(useWorkspaceStore.getState().gitPendingPaths).toContain('/ws/Lecture 7 copy.md')
+  })
+
+  it('moves the note into the folder picked in the dialog', async () => {
+    dialog.open.mockResolvedValue('/ws/Target')
+    notesApi.moveNote.mockResolvedValue('/ws/Target/Lecture 7.md')
+    openMenu()
+
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Move to…' }))
+
+    await waitFor(() => expect(notesApi.moveNote).toHaveBeenCalledWith('/ws/Lecture 7.md', '/ws/Target', '/ws'))
+  })
+
+  it('refuses a picked folder outside the workspace', async () => {
+    dialog.open.mockResolvedValue('/elsewhere')
+    openMenu()
+
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Move to…' }))
+
+    await waitFor(() => expect(useWorkspaceStore.getState().folderError).toMatch(/inside the workspace/))
+    expect(notesApi.moveNote).not.toHaveBeenCalled()
+  })
+})
+
 describe('TreeNode delete (folder, via right-click context menu)', () => {
   // The bug this guards against: deleting a whole course folder removed the
   // files locally but never queued the subtree for auto-commit, so the
@@ -212,7 +260,7 @@ describe('TreeNode drop (folder)', () => {
     dropWithPaths(row, { 'text/note-path': '/ws/a.md' })
 
     await waitFor(() => {
-      expect(notesApi.moveNote).toHaveBeenCalledWith('/ws/a.md', '/ws/Target')
+      expect(notesApi.moveNote).toHaveBeenCalledWith('/ws/a.md', '/ws/Target', '/ws')
     })
     expect(notesApi.renameFolder).not.toHaveBeenCalled()
   })

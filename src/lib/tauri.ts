@@ -75,8 +75,14 @@ export const api = {
       invoke<void>('rename_folder', { oldPath, newPath }),
     deleteFolder: (workspace: string, path: string) =>
       invoke<TrashEntry>('delete_folder', { workspace, path }),
-    moveNote: (path: string, destFolder: string) =>
-      invoke<string>('move_note', { path, destFolder }),
+    moveNote: (path: string, destFolder: string, workspace: string) =>
+      invoke<string>('move_note', { path, destFolder, workspace }),
+    duplicate: (path: string, workspace: string) =>
+      invoke<NoteMetadata>('duplicate_note', { path, workspace }),
+    reveal: (workspace: string, path: string) =>
+      invoke<void>('reveal_note', { workspace, path }),
+    openExternally: (workspace: string, path: string) =>
+      invoke<void>('open_note_externally', { workspace, path }),
     graphLinks: (workspace: string) =>
       invoke<GraphLink[]>('graph_links', { workspace }),
     graphTags: (workspace: string) =>

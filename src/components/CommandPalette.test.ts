@@ -16,6 +16,8 @@ describe('availableActions', () => {
   it('hides note-bound actions until a note is open', () => {
     expect(ids({ hasWorkspace: true, hasNote: false, repoMode: false })).not.toContain('export-pdf')
     expect(ids({ hasWorkspace: true, hasNote: true, repoMode: false })).toContain('export-pdf')
+    expect(ids({ hasWorkspace: true, hasNote: false, repoMode: false })).not.toContain('note-duplicate')
+    expect(ids({ hasWorkspace: true, hasNote: true, repoMode: false })).toContain('note-duplicate')
   })
 
   it('shows Sync Now only in a git repo, and never lists the palette itself', () => {

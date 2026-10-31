@@ -54,7 +54,7 @@ describe('FolderTree root drop target', () => {
     })
 
     await waitFor(() => {
-      expect(notesApi.moveNote).toHaveBeenCalledWith('/ws/Sub/a.md', '/ws')
+      expect(notesApi.moveNote).toHaveBeenCalledWith('/ws/Sub/a.md', '/ws', '/ws')
     })
     // #18: a root-drop move wasn't queuing its paths into the auto-commit
     // batch, so the move landed on disk but never got auto-committed.

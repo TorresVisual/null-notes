@@ -3,7 +3,8 @@ import { ChevronLeft, ChevronRight, Pin, RefreshCw, X } from 'lucide-react'
 import { useWorkspaceStore } from '../store/workspace'
 import { useNotesStore, noteTitle } from '../store/notes'
 import { requestCloseTab } from '../lib/requestCloseTab'
-import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from './ui/context-menu'
+import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuTrigger } from './ui/context-menu'
+import { NoteContextMenuItems } from './NoteContextMenuItems'
 import { SaveStatus } from './SaveStatus'
 import { GitCommitStatus } from './GitCommitStatus'
 import { goBack, goForward, useNavigationHistoryStore } from '../lib/navigationHistory'
@@ -94,6 +95,8 @@ export function TabBar({
                 {isPinned ? 'Unpin tab' : 'Pin tab'}
               </ContextMenuItem>
               <ContextMenuItem onSelect={() => void requestCloseTab(path)}>Close tab</ContextMenuItem>
+              <ContextMenuSeparator />
+              <NoteContextMenuItems path={path} />
             </ContextMenuContent>
             </ContextMenu>
           )

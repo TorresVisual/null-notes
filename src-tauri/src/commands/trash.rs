@@ -51,7 +51,7 @@ fn remove_any(path: &Path) -> std::io::Result<()> {
     }
 }
 
-fn copy_recursive(src: &Path, dst: &Path) -> std::io::Result<()> {
+pub(super) fn copy_recursive(src: &Path, dst: &Path) -> std::io::Result<()> {
     if src.is_dir() {
         std::fs::create_dir_all(dst)?;
         for child in std::fs::read_dir(src)? {
