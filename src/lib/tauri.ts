@@ -10,6 +10,8 @@ export const api = {
   canvas: {
     create: (workspace: string, folder: string, name: string) =>
       invoke<string>('create_canvas', { workspace, folder, name }),
+    rename: (workspace: string, path: string, newName: string) =>
+      invoke<string>('rename_canvas', { workspace, path, newName }),
   },
   notes: {
     list: (workspace: string) =>

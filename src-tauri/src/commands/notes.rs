@@ -2057,6 +2057,37 @@ pub async fn create_canvas(
     Ok(path.to_string_lossy().into_owned())
 }
 
+#[tauri::command]
+pub async fn rename_canvas(
+    workspace: String,
+    path: String,
+    new_name: String,
+) -> Result<String, String> {
+    require_within_workspace(&workspace, &path)?;
+    let old = Path::new(&path);
+    if old.extension().and_then(|e| e.to_str()) != Some("canvas") {
+        return Err(format!("not a canvas: {path}"));
+    }
+    let stem = safe_stem(&new_name);
+    if stem.is_empty() {
+        return Err("a canvas needs a name".to_string());
+    }
+    let parent = old
+        .parent()
+        .ok_or_else(|| format!("path has no parent directory: {path}"))?;
+    let new = parent.join(format!("{stem}.canvas"));
+    if tokio::fs::try_exists(&new)
+        .await
+        .map_err(|e| e.to_string())?
+    {
+        return Err(format!("a canvas named \"{stem}\" already exists here"));
+    }
+    tokio::fs::rename(old, &new)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(new.to_string_lossy().into_owned())
+}
+
 // Filenames are derived from titles, so two different notes can want the same
 // one. Creating over an existing file would silently destroy it, so refuse and
 // let the caller report the collision.
@@ -3680,6 +3711,83 @@ mod tests {
 
         assert!(path.ends_with("a-b-c.canvas"));
         assert!(create_canvas(ws.clone(), ws, "  ".into()).await.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_rename_canvas_moves_the_file_and_returns_the_new_path() {
+        let tmp = tempdir().unwrap();
+        let ws = tmp.path().to_string_lossy().into_owned();
+        let old = create_canvas(ws.clone(), ws.clone(), "Old".into())
+            .await
+            .unwrap();
+
+        let new = rename_canvas(ws.clone(), old.clone(), "New name".into())
+            .await
+            .unwrap();
+
+        assert!(new.ends_with("New name.canvas"));
+        assert!(!Path::new(&old).exists());
+        assert!(Path::new(&new).exists());
+    }
+
+    #[tokio::test]
+    async fn test_rename_canvas_refuses_an_existing_target() {
+        let tmp = tempdir().unwrap();
+        let ws = tmp.path().to_string_lossy().into_owned();
+        let a = create_canvas(ws.clone(), ws.clone(), "A".into())
+            .await
+            .unwrap();
+        create_canvas(ws.clone(), ws.clone(), "B".into())
+            .await
+            .unwrap();
+
+        assert!(rename_canvas(ws, a.clone(), "B".into()).await.is_err());
+        assert!(Path::new(&a).exists());
+    }
+
+    #[tokio::test]
+    async fn test_rename_canvas_refuses_a_path_that_is_not_a_canvas() {
+        let tmp = tempdir().unwrap();
+        let ws = tmp.path().to_string_lossy().into_owned();
+        let note = tmp.path().join("note.md");
+        std::fs::write(&note, "# note").unwrap();
+
+        let result = rename_canvas(ws, note.to_string_lossy().into_owned(), "x".into()).await;
+
+        assert!(result.is_err());
+        assert!(note.exists());
+    }
+
+    #[tokio::test]
+    async fn test_rename_canvas_refuses_a_path_outside_the_workspace() {
+        let tmp = tempdir().unwrap();
+        let other = tempdir().unwrap();
+        let outside = other.path().join("x.canvas");
+        std::fs::write(&outside, "{}").unwrap();
+
+        let result = rename_canvas(
+            tmp.path().to_string_lossy().into_owned(),
+            outside.to_string_lossy().into_owned(),
+            "y".into(),
+        )
+        .await;
+
+        assert!(result.is_err());
+        assert!(outside.exists());
+    }
+
+    #[tokio::test]
+    async fn test_rename_canvas_sanitises_a_name_with_path_characters() {
+        let tmp = tempdir().unwrap();
+        let ws = tmp.path().to_string_lossy().into_owned();
+        let old = create_canvas(ws.clone(), ws.clone(), "Old".into())
+            .await
+            .unwrap();
+
+        let new = rename_canvas(ws, old, "a/b:c".into()).await.unwrap();
+
+        assert!(new.ends_with("a-b-c.canvas"));
+        assert_eq!(Path::new(&new).parent().unwrap(), tmp.path());
     }
 }
 

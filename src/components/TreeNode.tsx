@@ -6,7 +6,7 @@ import { useWorkspaceStore } from '../store/workspace'
 import { useNotesStore } from '../store/notes'
 import { promptText } from '../store/promptDialog'
 import { api } from '../lib/tauri'
-import { deleteNote, moveNoteInto, renameNote } from '../lib/noteActions'
+import { deleteNote, moveNoteInto, renameCanvas, renameNote } from '../lib/noteActions'
 import { refreshTree } from '../hooks/useWorkspace'
 import { useCreateCanvas } from '../hooks/useCreateCanvas'
 import { folderName, isSingleSegmentName, isUnderPath } from '../lib/pathPrefix'
@@ -71,6 +71,9 @@ export function TreeNode({ entry }: TreeNodeProps) {
             </div>
           </ContextMenuTrigger>
           <ContextMenuContent className="context-menu">
+            <ContextMenuItem onSelect={() => void renameCanvas(entry.path)}>
+              <Pencil size={14} /> Rename
+            </ContextMenuItem>
             <ContextMenuItem variant="destructive" onSelect={() => void deleteNote(entry.path)}>
               <Trash2 size={14} /> Delete
             </ContextMenuItem>

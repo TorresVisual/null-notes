@@ -1,7 +1,7 @@
 import { open } from '@tauri-apps/plugin-dialog'
 import { api } from './tauri'
 import { writeToClipboard } from './clipboard'
-import { isUnderPath, sidecarDir } from './pathPrefix'
+import { folderName, isUnderPath, sidecarDir } from './pathPrefix'
 import { refreshTree } from '../hooks/useWorkspace'
 import { offerUndoDelete } from '../hooks/useTrash'
 import { promptText } from '../store/promptDialog'
@@ -50,6 +50,24 @@ export async function renameNote(path: string): Promise<void> {
     // rename happened.
     if (renamed.path !== path) useWorkspaceStore.getState().replaceOpenPath(path, renamed.path)
     queueGitPaths(path, renamed.path)
+    await refreshTree()
+  } catch (err) {
+    reportError(err)
+  }
+}
+
+export async function renameCanvas(path: string): Promise<void> {
+  const workspace = workspaceOf(path)
+  const current = folderName(path).replace(/\.canvas$/, '')
+  if (!workspace) return
+  const newName = await promptText('New canvas name:', current)
+  if (!newName || newName === current) return
+  try {
+    const renamedPath = await api.canvas.rename(workspace, path, newName)
+    useWorkspaceStore.getState().setFolderError(null)
+    useWorkspaceStore.getState().replaceOpenPath(path, renamedPath)
+    useWorkspaceStore.getState().addGitPendingPath(path)
+    useWorkspaceStore.getState().addGitPendingPath(renamedPath)
     await refreshTree()
   } catch (err) {
     reportError(err)
