@@ -2698,6 +2698,24 @@ mod tests {
     }
 
     #[test]
+    fn test_extract_links_counts_embeds() {
+        let links = extract_links("![[Sorting]] and ![[Graphs#BFS]]");
+        assert_eq!(links, vec!["Sorting", "Graphs"]);
+    }
+
+    #[test]
+    fn test_rewrite_links_keeps_embed_bang() {
+        let out = rewrite_links("![[Old]] ![[old#Part]]", "Old", "New").unwrap();
+        assert_eq!(out, "![[New]] ![[New#Part]]");
+    }
+
+    #[test]
+    fn test_extract_backlink_snippet_finds_embed_line() {
+        let snippet = extract_backlink_snippet("intro\n![[Sorting]]\n", "Sorting");
+        assert_eq!(snippet, Some("![[Sorting]]".to_string()));
+    }
+
+    #[test]
     fn test_extract_links_dedupes_across_forms() {
         let links = extract_links("[[Sorting]] [[sorting#Quick|q]]");
         assert_eq!(links, vec!["Sorting"]);
