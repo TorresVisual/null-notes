@@ -745,7 +745,7 @@ export function Layout() {
   )
 
   const primaryEditorPane = canvasTab && activeTab ? (
-    <CanvasPane path={activeTab} />
+    <CanvasPane key={activeTab} path={activeTab} />
   ) : (
     <EditorPane
       ref={editorPaneRef}
