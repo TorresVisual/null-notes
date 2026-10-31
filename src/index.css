@@ -2260,6 +2260,7 @@ li .fold-toggle { left: -2.4em; }
 
 /* Links */
 .note-editor a { color: var(--accent); text-decoration: underline; }
+.note-editor .link-source { color: var(--accent); }
 .note-editor a:hover { color: var(--accent-hover); }
 
 /* View source/preview toggle button */

@@ -157,3 +157,39 @@ describe('PlainText brackets', () => {
     expect(saved('[ ] todo')).toBe('\\[ \\] todo')
   })
 })
+
+describe('LinkSource', () => {
+  const NOTE = `${WS}\A.md`
+
+  function focused(content: string) {
+    const instance = new Editor({ extensions: extensionsFor(NOTE), content })
+    instance.view.dom.dispatchEvent(new Event('focus'))
+    return instance
+  }
+
+  it('shows the Markdown source while the caret is on the line, and saves it unchanged', () => {
+    const instance = focused('<p>go <a href="Link.md">Link</a> now</p><p>other</p>')
+    instance.commands.setTextSelection(2)
+    expect(instance.getText()).toContain('go [Link](Link.md) now')
+    expect(instance.getHTML()).not.toContain('<a ')
+    expect(markdownOf(instance)).toBe('go [Link](Link.md) now\n\nother')
+  })
+
+  it('turns an edited destination back into a link when the caret leaves the line', () => {
+    const instance = focused('<p>go <a href="Link.md">Link</a> now</p><p>other</p>')
+    instance.commands.setTextSelection(2)
+    const text = instance.state.doc.textContent
+    const at = 1 + text.indexOf('Link.md)') + 'Link'.length
+    instance.view.dispatch(instance.state.tr.insertText('2', at))
+    instance.commands.setTextSelection(instance.state.doc.content.size - 2)
+    expect(instance.getHTML()).toContain('href="Link2.md"')
+  })
+
+  it('collapses on blur', () => {
+    const instance = focused('<p><a href="Link.md">Link</a></p>')
+    instance.commands.setTextSelection(1)
+    expect(instance.getHTML()).not.toContain('<a ')
+    instance.view.dom.dispatchEvent(new Event('blur'))
+    expect(instance.getHTML()).toContain('href="Link.md"')
+  })
+})

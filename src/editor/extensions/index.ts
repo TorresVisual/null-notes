@@ -11,6 +11,7 @@ import { TableHeader } from '@tiptap/extension-table-header'
 import { TaskList } from '@tiptap/extension-task-list'
 import { TaskItem } from '@tiptap/extension-task-item'
 import { NoteLink } from './NoteLink'
+import { LinkSource } from './LinkSource'
 import { createLowlight, common } from 'lowlight'
 import { pseudocodeLanguage } from './pseudocodeLanguage'
 import { InkBlock } from './InkBlock'
@@ -183,6 +184,7 @@ export const coreExtensions = [
   TaskListTight,
   TaskItemInLists.configure({ nested: true }),
   NoteLink.configure({ openOnClick: false, autolink: true }),
+  LinkSource,
   Markdown.configure({
     html: true,
     transformPastedText: true,

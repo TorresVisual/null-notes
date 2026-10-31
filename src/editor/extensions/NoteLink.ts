@@ -136,6 +136,17 @@ export const NoteLink = Link.extend({
       }),
       new Plugin({
         key: new PluginKey('noteLinkClick'),
+        props: {
+          // Keeps the caret off the link, so the line stays collapsed and the
+          // click that follows opens it.
+          handleDOMEvents: {
+            mousedown: (_view, event) => {
+              if (event.button !== 0 || !(event.target as HTMLElement | null)?.closest?.('a[href]')) return false
+              event.preventDefault()
+              return true
+            },
+          },
+        },
         view: (view) => {
           const onClick = (event: MouseEvent) => {
             const anchor = (event.target as HTMLElement | null)?.closest?.('a[href]')
