@@ -68,6 +68,22 @@ If the file changed between read and write (mtime/hash mismatch), re-read and re
 - **Opening:** `.canvas` files appear in the sidebar tree and open in a tab like notes.
 - Frontend follows project conventions: canvas state in a hook, pure JSON Canvas parse/serialize in `src/lib/`, dialogs reuse `index.css` classes (grep for classNames before calling done), canvas chrome is plain CSS or Tailwind per the app-shell/editor split.
 
+## Scope decisions
+
+- **v1 editing is light:** drag, resize, add/edit text cards, add file cards, draw labelled edges, delete. No align/distribute, no sidebar drag-and-drop.
+- **Desktop only.** `.canvas` files are visible on mobile but not openable until touch interaction gets its own pass.
+- **Malformed file:** the canvas shows an error banner with the parse error and stays read-only. The app never overwrites a file it could not parse.
+- **`lastPass` merge conflicts** across machines are resolved by hand like any JSON conflict; no reconciliation logic.
+- **Out of search, backlinks and the graph view in v1.** `reindex_note` is note-only; a note that a card points to does not show that card as a backlink.
+- **Deleting a `.canvas`** goes through the same recoverable trash as notes.
+- **Group membership is geometric** (JSON Canvas semantics): worked out from rectangles on load; dragging a group moves the cards inside it.
+- **Deleting a pass** removes the group and everything tagged with that `pass` (cards, edges). Cards you added by hand inside its rectangle stay in place.
+- **Pass colours** come from a fixed palette of 8 drawn from the design tokens, cycling after pass 8; the group label always shows the number.
+- **New pass arriving externally:** the view pans to it, it pulses once, and a "Pass N added" toast appears. No "unseen" state is stored in the file.
+- **Viewport (pan/zoom)** is remembered per canvas in `.workspace.json`, never in the `.canvas` file.
+- **Pass legend:** a small overlay with a visibility toggle per pass and a "show only latest" button. No rename or reorder.
+- **ROADMAP §1** closed-question row is reworded, not deleted: "Won't build as a freeform surface inside notes; agent-canvas file added 2026-10-31 as a narrow exception (see agent-canvas-design.md)."
+
 ## Approaches considered
 
 | | Approach | Outcome |
