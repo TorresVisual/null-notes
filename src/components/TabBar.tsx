@@ -3,6 +3,7 @@ import { ChevronLeft, ChevronRight, Pin, RefreshCw, X } from 'lucide-react'
 import { useWorkspaceStore } from '../store/workspace'
 import { useNotesStore, noteTitle } from '../store/notes'
 import { requestCloseTab } from '../lib/requestCloseTab'
+import { noteFolderSegments } from '../lib/pathPrefix'
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuTrigger } from './ui/context-menu'
 import { NoteContextMenuItems } from './NoteContextMenuItems'
 import { SaveStatus } from './SaveStatus'
@@ -38,6 +39,7 @@ export function TabBar({
 }: TabBarProps) {
   const { openTabs, pinnedTabs, activeTab, setActiveTab, togglePinTab, flashTabPath, setFlashTabPath, reorderTabs } =
     useWorkspaceStore()
+  const workspacePath = useWorkspaceStore((s) => s.path)
   const repoMode = useWorkspaceStore((s) => s.repoMode)
   const autoCommit = useWorkspaceStore((s) => s.git.autoCommit)
   const notes = useNotesStore((s) => s.notes)
@@ -45,15 +47,8 @@ export function TabBar({
   const [draggedPath, setDraggedPath] = useState<string | null>(null)
   if (openTabs.length === 0) return null
   return (
+    <>
     <div className="tab-bar" role="tablist">
-      <div className="nav-history">
-        <button onClick={goBack} disabled={!canGoBack} title="Back (Alt+Left)" aria-label="Back">
-          <ChevronLeft size={14} />
-        </button>
-        <button onClick={goForward} disabled={!canGoForward} title="Forward (Alt+Right)" aria-label="Forward">
-          <ChevronRight size={14} />
-        </button>
-      </div>
       <div className="tab-bar-tabs">
         {openTabs.map((path) => {
           const name = noteTitle(notes, path)
@@ -102,6 +97,26 @@ export function TabBar({
           )
         })}
       </div>
+    </div>
+    <div className="nav-bar">
+      <div className="nav-history">
+        <button onClick={goBack} disabled={!canGoBack} title="Back (Alt+Left)" aria-label="Back">
+          <ChevronLeft size={16} />
+        </button>
+        <button onClick={goForward} disabled={!canGoForward} title="Forward (Alt+Right)" aria-label="Forward">
+          <ChevronRight size={16} />
+        </button>
+      </div>
+      {activeTab && (
+        <nav className="breadcrumb" aria-label="Note location">
+          {[...noteFolderSegments(activeTab, workspacePath), noteTitle(notes, activeTab)].map((segment, i, all) => (
+            <span key={i} className={i === all.length - 1 ? 'breadcrumb-current' : undefined}>
+              {i > 0 && <span className="breadcrumb-sep" aria-hidden>/</span>}
+              {segment}
+            </span>
+          ))}
+        </nav>
+      )}
       {activeTab && (
         <div className="tab-bar-status">
           <SaveStatus
@@ -140,5 +155,6 @@ export function TabBar({
         </div>
       )}
     </div>
+    </>
   )
 }

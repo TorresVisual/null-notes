@@ -761,6 +761,19 @@ button, [role="button"], .tree-row, .tab, .search-result, .slash-menu-item,
 .tab-bar {
   display: flex;
   background: var(--bg-raised);
+  flex-shrink: 0;
+}
+
+/* Obsidian-style second row under the tabs: history arrows, the note's
+   folder path, and the save/git status. Shares the editor's background so
+   the active tab reads as attached to it. */
+.nav-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 8px;
+  min-height: 32px;
+  background: var(--bg-base);
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
 }
@@ -771,11 +784,11 @@ button, [role="button"], .tree-row, .tab, .search-result, .slash-menu-item,
 }
 
 .nav-history button {
-  padding: 6px 8px;
+  padding: 4px 6px;
   background: none;
   border: none;
-  border-right: 1px solid var(--border);
-  color: var(--text-tertiary);
+  border-radius: 4px;
+  color: var(--text-secondary);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -783,6 +796,24 @@ button, [role="button"], .tree-row, .tab, .search-result, .slash-menu-item,
 
 .nav-history button:hover:not(:disabled) { color: var(--text-primary); background: var(--bg-hover); }
 .nav-history button:disabled { opacity: 0.4; cursor: default; }
+
+.breadcrumb {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  font-size: 13px;
+  color: var(--text-tertiary);
+}
+
+.breadcrumb-sep { margin: 0 6px; }
+
+.breadcrumb-current {
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 
 /* Scrolls independently so a long tab list can never push save/git status
    off-screen — status always stays visible in .tab-bar-status. */

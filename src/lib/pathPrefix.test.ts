@@ -1,5 +1,18 @@
 import { describe, it, expect } from 'vitest'
-import { folderName, isSingleSegmentName, isUnderPath, replacePathPrefix } from './pathPrefix'
+import { folderName, isSingleSegmentName, isUnderPath, noteFolderSegments, replacePathPrefix } from './pathPrefix'
+
+describe('noteFolderSegments', () => {
+  it('returns the folders between workspace root and note, under either separator', () => {
+    expect(noteFolderSegments('/ws/DSA/Week 1/a.md', '/ws')).toEqual(['DSA', 'Week 1'])
+    expect(noteFolderSegments('C:\\ws\\DSA\\a.md', 'C:\\ws')).toEqual(['DSA'])
+  })
+
+  it('is empty for a root note, a foreign path, or no workspace', () => {
+    expect(noteFolderSegments('/ws/a.md', '/ws')).toEqual([])
+    expect(noteFolderSegments('/other/x/a.md', '/ws')).toEqual([])
+    expect(noteFolderSegments('/ws/x/a.md', null)).toEqual([])
+  })
+})
 
 describe('isSingleSegmentName', () => {
   it('accepts a plain name, including spaces and non-Latin text', () => {

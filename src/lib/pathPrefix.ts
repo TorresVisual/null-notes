@@ -4,6 +4,17 @@ export function folderName(path: string): string {
   return path.split(/[\\/]/).filter(Boolean).pop() ?? path
 }
 
+// The folders between the workspace root and a note, outermost first —
+// empty for a note at the root or one outside the workspace.
+export function noteFolderSegments(notePath: string, workspace: string | null): string[] {
+  if (!workspace || !isUnderPath(notePath, workspace)) return []
+  return notePath
+    .slice(workspace.length)
+    .split(/[\\/]/)
+    .filter(Boolean)
+    .slice(0, -1)
+}
+
 export function isSingleSegmentName(name: string): boolean {
   return name !== '.' && name !== '..' && !/[\\/]/.test(name)
 }
