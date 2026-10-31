@@ -161,6 +161,8 @@ export interface AppSettings {
   cppCompilerCommand: string
   /** Wall-clock seconds before a running code block is killed automatically. */
   codeRunTimeoutSecs: number
+  /** Command id → key combo, only where it differs from the default; `""` means cleared. */
+  keymap: Record<string, string>
 }
 
 export interface ErrorLogEntry {

@@ -10,63 +10,71 @@ import {
   DropdownMenuTrigger,
 } from './ui/dropdown-menu'
 import { folderName } from '../lib/pathPrefix'
+import { commandById, formatCombo } from '../lib/keymap'
+import { useKeymap } from '../hooks/useKeymap'
 
 export interface MenuEntry {
   id: string
   label: string
-  accel?: string
 }
 export type MenuItemSpec = MenuEntry | { separator: true }
+
+const SEPARATOR = { separator: true } as const
+
+function entries(ids: string[]): MenuItemSpec[] {
+  return ids.map((id) => (id === '-' ? SEPARATOR : commandEntry(id)))
+}
+
+function commandEntry(id: string): MenuEntry {
+  const command = commandById(id)
+  return { id, label: command?.label ?? id }
+}
 
 // Mirrors the native menu structure the Rust side used to build (build_menu,
 // src-tauri/src/lib.rs, removed when decorations went custom) — same ids, so
 // Layout.tsx's runCommand needs no changes. Edit (clipboard) was dropped:
 // clipboard shortcuts work natively without a menu entry. Exit routes
 // through the same window.close() the titlebar's close button uses, so it
-// still hits the flush-before-close path rather than bypassing it.
+// still hits the flush-before-close path rather than bypassing it. Labels and
+// accelerators come from the keymap registry, not from here.
 export function buildFileMenu(recentWorkspaces: string[]): MenuItemSpec[] {
   return [
-    { id: 'new-note', label: 'New Note', accel: 'Ctrl+N' },
-    { id: 'new-folder', label: 'New Folder', accel: 'Ctrl+Shift+N' },
-    { id: 'new-canvas', label: 'New Canvas Note' },
-    { id: 'new-from-template', label: 'New from Template…', accel: 'Ctrl+Shift+T' },
-    { separator: true },
-    { id: 'open-workspace', label: 'Open Workspace…', accel: 'Ctrl+O' },
-    { id: 'close-workspace', label: 'Close Workspace' },
+    ...entries(['new-note', 'new-folder', 'new-canvas', 'new-from-template', '-', 'open-workspace', 'close-workspace']),
     ...recentWorkspaces.map((path) => ({ id: `open-recent:${path}`, label: folderName(path) })),
-    { separator: true },
-    { id: 'split-tasks', label: 'Split Into Tasks' },
-    { id: 'generate-formula-sheet', label: 'Generate Formula Sheet…' },
-    { separator: true },
-    { id: 'export-pdf', label: 'Export to PDF…' },
-    { id: 'print', label: 'Print…' },
-    { separator: true },
-    { id: 'trash', label: 'Trash…' },
-    { id: 'settings', label: 'Settings…', accel: 'Ctrl+,' },
-    { separator: true },
-    { id: 'exit', label: 'Exit' },
+    ...entries([
+      '-',
+      'split-tasks',
+      'generate-formula-sheet',
+      '-',
+      'export-pdf',
+      'print',
+      '-',
+      'trash',
+      'settings',
+      '-',
+      'exit',
+    ]),
   ]
 }
 
-export const VIEW_MENU: MenuItemSpec[] = [
-  { id: 'home', label: 'Home', accel: 'Ctrl+H' },
-  { separator: true },
-  { id: 'search', label: 'Search', accel: 'Ctrl+K' },
-  { id: 'quick-switch', label: 'Quick Switcher', accel: 'Ctrl+P' },
-  { id: 'command-palette', label: 'Command Palette', accel: 'Ctrl+Shift+P' },
-  { id: 'command-palette', label: 'Command Palette', accel: 'Ctrl+Shift+P' },
-  { id: 'toggle-view', label: 'Toggle Source/Preview', accel: 'Ctrl+E' },
-  { id: 'insert-ink', label: 'Insert Ink Block', accel: 'Ctrl+Shift+I' },
-  { id: 'graph-view', label: 'Connections Graph', accel: 'Ctrl+G' },
-  { id: 'toggle-terminal', label: 'Toggle Terminal', accel: 'Ctrl+`' },
-  { id: 'toggle-outline', label: 'Toggle Outline', accel: 'Ctrl+Shift+O' },
-  { id: 'toggle-sidebar', label: 'Toggle Sidebar', accel: 'Ctrl+\\' },
-  { id: 'task-view', label: 'Tasks', accel: 'Ctrl+Shift+K' },
-  { id: 'review', label: 'Review', accel: 'Ctrl+Shift+R' },
-  { id: 'deck-view', label: 'Browse All Cards', accel: 'Ctrl+Shift+D' },
-  { separator: true },
-  { id: 'shortcuts-help', label: 'Keyboard Shortcuts' },
-]
+export const VIEW_MENU: MenuItemSpec[] = entries([
+  'home',
+  '-',
+  'search',
+  'quick-switch',
+  'command-palette',
+  'toggle-view',
+  'insert-ink',
+  'graph-view',
+  'toggle-terminal',
+  'toggle-outline',
+  'toggle-sidebar',
+  'task-view',
+  'review',
+  'deck-view',
+  '-',
+  'shortcuts-help',
+])
 
 interface TitlebarProps {
   title: string
@@ -131,6 +139,7 @@ interface TitlebarMenuProps {
 }
 
 function TitlebarMenu({ label, items, onCommand }: TitlebarMenuProps) {
+  const keymap = useKeymap()
   return (
     <DropdownMenu>
       <DropdownMenuTrigger className="titlebar-menu-trigger">{label}</DropdownMenuTrigger>
@@ -141,7 +150,7 @@ function TitlebarMenu({ label, items, onCommand }: TitlebarMenuProps) {
           ) : (
             <DropdownMenuItem key={item.id} onSelect={() => onCommand(item.id)}>
               {item.label}
-              {item.accel && <DropdownMenuShortcut>{item.accel}</DropdownMenuShortcut>}
+              {keymap[item.id] && <DropdownMenuShortcut>{formatCombo(keymap[item.id])}</DropdownMenuShortcut>}
             </DropdownMenuItem>
           ),
         )}

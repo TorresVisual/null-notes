@@ -4193,6 +4193,84 @@ input[type='checkbox']:focus-visible {
   font-family: inherit;
 }
 
+/* Settings → Shortcuts. Rows mirror .settings-row's rhythm; the binding
+   button reuses .shortcuts-row kbd's look so the same combo reads the same
+   in the sheet and here. */
+.keymap-search {
+  width: 100%;
+  max-width: 640px;
+  padding: 5px 8px;
+  background: var(--bg-hover);
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.keymap-search:focus-visible { outline: none; box-shadow: var(--focus-ring); border-color: var(--accent); }
+
+.keymap-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  max-width: 640px;
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.keymap-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
+.keymap-label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.keymap-empty {
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+
+.keymap-binding {
+  min-width: 96px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  background: var(--bg-base);
+  border: 1px solid var(--border-strong);
+  border-radius: 3px;
+  padding: 3px 8px;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.keymap-binding:hover { border-color: var(--text-tertiary); }
+.keymap-binding:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.keymap-binding.is-recording { border-color: var(--accent); background: var(--accent-bg); color: var(--text-primary); }
+
+.keymap-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  color: var(--text-tertiary);
+  cursor: pointer;
+}
+
+.keymap-icon:hover:not(:disabled) { color: var(--text-primary); border-color: var(--border-strong); }
+.keymap-icon:disabled { opacity: var(--disabled-opacity); cursor: default; }
+
 /* Imported PDF pages — reference images, not editable content */
 .pdf-page-block {
   position: relative;

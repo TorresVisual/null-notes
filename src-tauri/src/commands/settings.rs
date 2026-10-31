@@ -117,6 +117,7 @@ mod tests {
             python_command: "python3.11".to_string(),
             cpp_compiler_command: "clang++".to_string(),
             code_run_timeout_secs: 30,
+            keymap: [("search".to_string(), "Ctrl+Shift+S".to_string())].into(),
         };
         save_settings_to_dir(dir.path(), &original).await.unwrap();
         let loaded = load_settings_from_dir(dir.path()).await.unwrap();
@@ -137,6 +138,7 @@ mod tests {
         assert_eq!(loaded.python_command, "python3.11");
         assert_eq!(loaded.cpp_compiler_command, "clang++");
         assert_eq!(loaded.code_run_timeout_secs, 30);
+        assert_eq!(loaded.keymap["search"], "Ctrl+Shift+S");
     }
 
     // Detection fills the editor command only when there is nothing to keep.

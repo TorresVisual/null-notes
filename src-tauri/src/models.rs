@@ -497,6 +497,11 @@ pub struct AppSettings {
     /// automatically — the only resource limit P10-2 applies.
     #[serde(default = "default_code_run_timeout_secs")]
     pub code_run_timeout_secs: u32,
+    /// Command id → key combo, only where it differs from the default; an
+    /// empty string means the user cleared the binding. Machine-local, like
+    /// the rest of settings.json.
+    #[serde(default)]
+    pub keymap: std::collections::HashMap<String, String>,
 }
 
 fn default_code_run_timeout_secs() -> u32 {
@@ -532,6 +537,7 @@ impl Default for AppSettings {
             python_command: String::new(),
             cpp_compiler_command: String::new(),
             code_run_timeout_secs: default_code_run_timeout_secs(),
+            keymap: Default::default(),
         }
     }
 }

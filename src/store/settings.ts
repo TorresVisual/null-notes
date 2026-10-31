@@ -16,6 +16,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   pythonCommand: 'python3',
   cppCompilerCommand: 'g++',
   codeRunTimeoutSecs: 10,
+  keymap: {},
 }
 
 interface SettingsStore {

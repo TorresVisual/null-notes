@@ -23,6 +23,7 @@ describe('useSettingsStore', () => {
       codeFontSizePx: 16,
       pythonCommand: 'python3.11',
       cppCompilerCommand: 'clang++',
+      keymap: {},
       codeRunTimeoutSecs: 30,
     })
     expect(useSettingsStore.getState().settings).toEqual({
@@ -39,6 +40,7 @@ describe('useSettingsStore', () => {
       codeFontSizePx: 16,
       pythonCommand: 'python3.11',
       cppCompilerCommand: 'clang++',
+      keymap: {},
       codeRunTimeoutSecs: 30,
     })
   })

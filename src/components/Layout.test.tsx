@@ -150,6 +150,19 @@ describe('Layout overlay exclusivity', () => {
     expect(screen.getByRole('heading', { name: 'Keyboard Shortcuts' })).toBeInTheDocument()
   })
 
+  it('fires a rebound shortcut and no longer fires the old default', () => {
+    useSettingsStore.setState({ settings: { ...DEFAULT_SETTINGS, keymap: { 'shortcuts-help': 'Ctrl+Alt+J' } } })
+    render(<Layout />)
+
+    act(() => pressKey('?'))
+    expect(screen.queryByRole('heading', { name: 'Keyboard Shortcuts' })).not.toBeInTheDocument()
+
+    act(() => {
+      document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'j', ctrlKey: true, altKey: true, bubbles: true }))
+    })
+    expect(screen.getByRole('heading', { name: 'Keyboard Shortcuts' })).toBeInTheDocument()
+  })
+
   it('Escape closes Settings', () => {
     render(<Layout />)
 

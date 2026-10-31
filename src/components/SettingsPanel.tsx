@@ -7,6 +7,7 @@ import { useGitConfig } from '../hooks/useGitConfig'
 import { api } from '../lib/tauri'
 import { Dialog, DialogContent, DialogTitle } from './ui/dialog'
 import { ErrorLogDialog } from './ErrorLogDialog'
+import { KeymapSettings } from './KeymapSettings'
 
 interface SettingsPanelProps {
   onClose: () => void
@@ -300,6 +301,8 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
               </span>
             </label>
           </div>
+
+          <KeymapSettings overrides={settings.keymap} onChange={(keymap) => void update({ keymap })} />
 
           {(workspacePath && repoMode === null) || repoMode ? (
             <div className="settings-section">

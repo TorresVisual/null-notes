@@ -63,6 +63,8 @@ import { insertDiagram } from '../editor/toolbar/insertDiagram'
 import { report } from '../editor/splitIntoTasks'
 import type { DiagramMetadata } from '../types'
 import { goBack, goForward } from '../lib/navigationHistory'
+import { comboFromEvent, isGlobalCombo } from '../lib/keymap'
+import { useKeymap } from '../hooks/useKeymap'
 import { requestCloseTab } from '../lib/requestCloseTab'
 import { useFocusModeStore } from '../store/focusMode'
 import { canPushHere, pushIfAllowed, withGitLock } from '../lib/git'
@@ -318,6 +320,12 @@ export function Layout() {
           setPrimaryViewMode('wysiwyg')
           openOverlay('print')
           break
+        case 'nav-back':
+          goBack()
+          break
+        case 'nav-forward':
+          goForward()
+          break
         case 'shortcuts-help':
           openOverlay('shortcuts')
           break
@@ -501,85 +509,27 @@ export function Layout() {
     ;(window as unknown as { __e2eRunCommand?: (id: string) => void }).__e2eRunCommand = runCommand
   }, [runCommand])
 
-  // `?` has no natural menu-accelerator form and is safe to double-fire
-  // (opening an already-open overlay is a no-op), so it stays a plain
-  // DOM listener rather than a menu item. Must skip editable targets: typing
-  // a literal `?` into a note or any text field is otherwise indistinguishable
-  // from asking for this overlay.
+  // The one keydown dispatcher: every shortcut — rebindable via Settings —
+  // resolves through the keymap, so the labels in menus, palette and the
+  // shortcut sheet can't drift from what actually fires. Ctrl/Alt/F-key
+  // combos are never legitimate note text, but a bare key like the default
+  // `?` is, so those are skipped when typing into an editable target. Alt+←/→
+  // history navigation rides the same path via nav-back/nav-forward.
+  const keymap = useKeymap()
   useEffect(() => {
+    const commandByCombo = new Map(Object.entries(keymap).filter(([, combo]) => combo).map(([id, combo]) => [combo, id]))
     function onKey(e: KeyboardEvent) {
-      if (e.key !== '?' || e.ctrlKey || e.metaKey) return
-      const target = e.target as HTMLElement | null
-      if (target?.closest('input, textarea, [contenteditable="true"]')) return
-      openOverlay('shortcuts')
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [openOverlay])
-
-  // Alt+Left/Right for link-driven navigation history (wiki-links,
-  // cross-references — see lib/navigationHistory.ts). No native editing
-  // meaning to collide with, so no editable-target guard is needed, unlike
-  // the `?` listener above. The main Ctrl/Meta shortcut map above explicitly
-  // excludes Alt combos, so this can't collide with it either.
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if (!e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return
-      if (e.key === 'ArrowLeft') {
-        e.preventDefault()
-        goBack()
-      } else if (e.key === 'ArrowRight') {
-        e.preventDefault()
-        goForward()
-      }
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [])
-
-  // Every CmdOrCtrl accelerator shown in `build_menu` (src-tauri/src/lib.rs)
-  // needs this to actually fire on Windows — see the comment on `runCommand`.
-  // None of these combinations are ever legitimate to type into a note (they
-  // all require Ctrl), so unlike the `?` listener above there's no editable
-  // target to guard against.
-  useEffect(() => {
-    const KEY_COMMANDS: Record<string, string> = {
-      n: 'new-note',
-      'shift+n': 'new-folder',
-      'shift+t': 'new-from-template',
-      o: 'open-workspace',
-      k: 'search',
-      p: 'quick-switch',
-      'shift+p': 'command-palette',
-      e: 'toggle-view',
-      'shift+i': 'insert-ink',
-      g: 'graph-view',
-      '`': 'toggle-terminal',
-      'shift+o': 'toggle-outline',
-      'shift+k': 'task-view',
-      'shift+r': 'review',
-      'shift+d': 'deck-view',
-      ',': 'settings',
-      h: 'home',
-      w: 'close-tab',
-      'shift+w': 'reopen-closed-tab',
-      'shift+f': 'toggle-focus-mode',
-      '\\': 'toggle-sidebar',
-      Tab: 'next-tab',
-      'shift+Tab': 'prev-tab',
-    }
-    function onKey(e: KeyboardEvent) {
-      if (!(e.ctrlKey || e.metaKey) || e.altKey) return
-      const key = e.key.length === 1 ? e.key.toLowerCase() : e.key
-      const commandId =
-        !e.shiftKey && /^[1-9]$/.test(key) ? `goto-tab:${key}` : KEY_COMMANDS[e.shiftKey ? `shift+${key}` : key]
+      const combo = comboFromEvent(e)
+      const commandId = combo && commandByCombo.get(combo)
       if (!commandId) return
+      const target = e.target as HTMLElement | null
+      if (!isGlobalCombo(combo) && target?.closest('input, textarea, [contenteditable="true"]')) return
       e.preventDefault()
       void runCommand(commandId)
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [runCommand])
+  }, [keymap, runCommand])
 
   useEffect(() => {
     void api.workspace.initialWorkspace().then((path) => {

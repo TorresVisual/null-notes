@@ -19,6 +19,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   pythonCommand: '',
   cppCompilerCommand: '',
   codeRunTimeoutSecs: 10,
+  keymap: {},
 }
 
 const EMPTY_STATE: WorkspaceState = {
