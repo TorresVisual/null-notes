@@ -22,6 +22,10 @@ describe('sectionOf', () => {
     expect(sectionOf('## A\nx', 'missing')).toBeNull()
   })
 
+  it('finds headings in CRLF source', () => {
+    expect(sectionOf('# T\r\n## Part\r\ninside\r\n## Other\r\nout', 'Part')).toBe('## Part\ninside')
+  })
+
   it('ignores #-lines inside fenced code', () => {
     expect(sectionOf('## A\n```\n# not a heading\n```\nbody\n## B', 'A')).toBe(
       '## A\n```\n# not a heading\n```\nbody',

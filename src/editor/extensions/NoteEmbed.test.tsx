@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, waitFor, act } from '@testing-library/react'
+import { render, waitFor, act, fireEvent } from '@testing-library/react'
 import { useEditor, EditorContent } from '@tiptap/react'
 import type { Editor } from '@tiptap/core'
 import { useEffect } from 'react'
@@ -65,7 +65,7 @@ afterEach(() => {
 })
 
 describe('NoteEmbed markdown', () => {
-  it.each(['![[Big O]]', '![[Big O#Proofs]]', 'intro\n\n![[Big O]]\n\noutro'])(
+  it.each(['![[Big O]]', '![[Big O#Proofs]]', '![[Big O#Proofs|the proof]]', '![[Big O|alias]]', 'intro\n\n![[Big O]]\n\noutro'])(
     'renders %j as an embed and round-trips it unchanged',
     async (markdown) => {
       const { container } = mount(markdown)
@@ -158,6 +158,41 @@ describe('NoteEmbedView', () => {
 
     await waitFor(() => expect(container.querySelector('.note-embed-body .tiptap')).toBeInTheDocument())
     expect(container.querySelector('.note-embed-body .tiptap')?.getAttribute('contenteditable')).toBe('false')
+  })
+
+  it('shows the label as the header text', async () => {
+    contents['/ws/b.md'] = '# B\nbody'
+    const { container } = mount('![[B|alias]]')
+
+    await waitFor(() => expect(container.querySelector('.note-embed-header')?.textContent).toBe('alias'))
+  })
+
+  it('finds a heading in a CRLF source note', async () => {
+    contents['/ws/b.md'] = '# B\r\n## Part\r\ninside\r\n## Other\r\noutside'
+    const { container } = mount('![[B#Part]]')
+
+    await waitFor(() => expect(container.querySelector('.note-embed-body')?.textContent).toContain('inside'))
+  })
+
+  it('does not let clicks inside the embed reach the host editor DOM listeners', async () => {
+    contents['/ws/b.md'] = '# B\nhello world'
+    const { container } = mount('![[B]]')
+    await waitFor(() => expect(container.querySelector('.note-embed-body p')).toBeInTheDocument())
+    const hostClick = vi.fn()
+    editor?.view.dom.addEventListener('click', hostClick)
+
+    fireEvent.click(container.querySelector('.note-embed-body p') as HTMLElement)
+
+    expect(hostClick).not.toHaveBeenCalled()
+  })
+
+  it('does not mount code-toolbar controls inside the embed', async () => {
+    contents['/ws/b.md'] = '# B\n\n```python\nprint(1)\n```'
+    const { container } = mount('![[B]]\n\n```python\nprint(2)\n```')
+    await waitFor(() => expect(container.querySelector('.note-embed-body pre')).toBeInTheDocument())
+
+    expect(container.querySelectorAll('.code-block-actions').length).toBeGreaterThan(0)
+    expect(container.querySelector('.note-embed-body .code-block-actions')).toBeNull()
   })
 
   it('follows the source when it changes on disk', async () => {

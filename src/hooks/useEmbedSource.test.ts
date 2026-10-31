@@ -61,6 +61,36 @@ describe('useEmbedSource', () => {
     await waitFor(() => expect(result.current).toBe('v2'))
   })
 
+  it('survives a failed refetch without an unhandled rejection and drops stale content', async () => {
+    openNote.mockResolvedValue('v1')
+    const { result } = renderHook(() => useEmbedSource(target))
+    await waitFor(() => expect(result.current).toBe('v1'))
+
+    openNote.mockRejectedValue(new Error('gone'))
+    await act(async () => {
+      await emitWorkspaceChanged({ payload: ['/ws/b.md'] })
+    })
+
+    await waitFor(() => expect(result.current).toBeNull())
+  })
+
+  it('keeps the newest response when two loads overlap', async () => {
+    let resolveFirst: (v: string) => void = () => {}
+    openNote.mockImplementationOnce(() => new Promise<string>((r) => { resolveFirst = r }))
+    const { result } = renderHook(() => useEmbedSource(target))
+    openNote.mockResolvedValue('new')
+    await act(async () => {
+      await emitWorkspaceChanged({ payload: ['/ws/b.md'] })
+    })
+    await waitFor(() => expect(result.current).toBe('new'))
+
+    await act(async () => {
+      resolveFirst('old')
+    })
+
+    expect(result.current).toBe('new')
+  })
+
   it('stops listening on unmount', async () => {
     openNote.mockResolvedValue('v1')
     const { result, unmount } = renderHook(() => useEmbedSource(target))

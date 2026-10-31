@@ -15,8 +15,8 @@ vi.mock('../../lib/diagram', () => ({
 
 let editor: Editor | null = null
 
-function TestEditor({ content }: { content: string }) {
-  const instance = useEditor({ extensions: coreExtensions, content })
+function TestEditor({ content, editable = true }: { content: string; editable?: boolean }) {
+  const instance = useEditor({ extensions: coreExtensions, content, editable })
   useEffect(() => {
     if (instance) editor = instance
   }, [instance])
@@ -40,5 +40,16 @@ describe('mounting a diagram block in a real React editor', () => {
     await waitFor(() => expect(container.querySelector('.diagram-block-preview')).not.toBeNull())
     // The interactive editor must not mount until the preview is clicked.
     expect(container.querySelector('.diagram-editor-overlay')).toBeNull()
+  })
+})
+
+describe('a diagram block in a read-only editor', () => {
+  it('offers no Edit button', async () => {
+    const fence =
+      '```diagram\n{"jsonSrc":"/ws/N.diagrams/d.excalidraw","svgSrc":"/ws/N.diagrams/d.svg","width":700,"height":500}\n```'
+    const { container } = render(<TestEditor content={fence} editable={false} />)
+
+    await waitFor(() => expect(container.querySelector('.diagram-block-preview')).not.toBeNull())
+    expect(container.querySelector('.diagram-block-edit')).toBeNull()
   })
 })

@@ -13,7 +13,7 @@ export function parseEmbedParagraph(content: string): WikiLinkParts | null {
 // before matching, which would shift every offset this needs to slice on.
 export function sectionOf(markdown: string, heading: string): string | null {
   const wanted = heading.trim().toLowerCase()
-  const lines = markdown.split('\n')
+  const lines = markdown.split(/\r?\n/)
   let inFence = false
   let start = -1
   let level = 0
@@ -42,7 +42,7 @@ export function sectionOf(markdown: string, heading: string): string | null {
 
 export function embedBody(markdown: string, heading: string): string | null {
   if (heading) return sectionOf(markdown, heading)
-  const lines = markdown.split('\n')
+  const lines = markdown.split(/\r?\n/)
   if (lines[0]?.startsWith('# ')) lines.shift()
   return lines.join('\n')
 }

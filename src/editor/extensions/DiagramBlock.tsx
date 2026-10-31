@@ -108,9 +108,11 @@ function DiagramBlockView({ node, editor }: ReactNodeViewProps) {
             {copied ? 'Copied' : 'Copy for card'}
           </button>
         )}
-        <button type="button" className="diagram-block-edit" aria-label="Edit diagram" onClick={() => setEditing(true)}>
-          Edit
-        </button>
+        {editor.isEditable && (
+          <button type="button" className="diagram-block-edit" aria-label="Edit diagram" onClick={() => setEditing(true)}>
+            Edit
+          </button>
+        )}
       </div>
       {editing && (
         <Suspense fallback={null}>

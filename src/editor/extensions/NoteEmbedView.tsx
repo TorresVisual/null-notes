@@ -1,4 +1,4 @@
-import { useContext } from 'react'
+import { useContext, useEffect, useRef } from 'react'
 import type { ReactNode } from 'react'
 import { useEditor, EditorContent, NodeViewWrapper } from '@tiptap/react'
 import type { ReactNodeViewProps } from '@tiptap/react'
@@ -14,7 +14,12 @@ import { EmbedChainContext, MAX_EMBED_DEPTH } from './EmbedChainContext'
 interface EmbedAttrs {
   title: string
   heading: string
+  label: string
 }
+
+// These mutate the document, run code, or act on the active tab, so inside a
+// read-only excerpt they would edit the source or act on the host instead.
+const INTERACTIVE_EXTENSIONS = new Set(['codeBlockRun', 'codeBlockToolbar', 'codeBlockOpenInIde', 'tableControls'])
 
 function Placeholder({ children }: { children: ReactNode }) {
   return (
@@ -25,12 +30,34 @@ function Placeholder({ children }: { children: ReactNode }) {
 }
 
 function EmbedBody({ markdown, path }: { markdown: string; path: string }) {
-  const editor = useEditor({ extensions: extensionsFor(path), content: markdown, editable: false })
-  return <EditorContent className="note-embed-body" editor={editor} />
+  const ref = useRef<HTMLDivElement>(null)
+  const editor = useEditor({
+    extensions: extensionsFor(path).filter((extension) => !INTERACTIVE_EXTENSIONS.has(extension.name)),
+    content: markdown,
+    editable: false,
+  })
+
+  // The nested editor's DOM sits inside the host's, and several plugins attach
+  // native click listeners to `view.dom` that apply a clicked position to their
+  // own document. Native, not React: React's onClick runs after the host's
+  // listeners have already fired.
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const stop = (e: Event) => e.stopPropagation()
+    el.addEventListener('click', stop)
+    return () => el.removeEventListener('click', stop)
+  }, [])
+
+  return (
+    <div className="note-embed-body" ref={ref}>
+      <EditorContent editor={editor} />
+    </div>
+  )
 }
 
 export function NoteEmbedView({ node, editor }: ReactNodeViewProps) {
-  const { title, heading } = node.attrs as unknown as EmbedAttrs
+  const { title, heading, label } = node.attrs as unknown as EmbedAttrs
   const notes = useNotesStore((s) => s.notes)
   const openTab = useWorkspaceStore((s) => s.openTab)
   const chain = [...useContext(EmbedChainContext), editor.storage.noteContext.notePath]
@@ -59,7 +86,7 @@ export function NoteEmbedView({ node, editor }: ReactNodeViewProps) {
   return (
     <NodeViewWrapper className="note-embed" spellCheck={false}>
       <button type="button" className="note-embed-header" contentEditable={false} onClick={openSource}>
-        {wikiLinkText({ title, heading, label: '' })}
+        {wikiLinkText({ title, heading, label })}
       </button>
       <EmbedChainContext.Provider value={chain}>
         <EmbedBody key={body} markdown={body} path={target.path} />

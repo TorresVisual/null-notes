@@ -8,6 +8,7 @@ import { NoteEmbedView } from './NoteEmbedView'
 interface NoteEmbedAttrs {
   title: string
   heading: string
+  label: string
 }
 
 interface BlockState {
@@ -31,6 +32,7 @@ export const NoteEmbed = Node.create({
     return {
       title: { default: '' },
       heading: { default: '' },
+      label: { default: '', renderHTML: (a) => ({ 'data-label': a.label }) },
     }
   },
 
@@ -41,6 +43,7 @@ export const NoteEmbed = Node.create({
         getAttrs: (el) => ({
           title: (el as HTMLElement).getAttribute('data-title') ?? '',
           heading: (el as HTMLElement).getAttribute('data-heading') ?? '',
+          label: (el as HTMLElement).getAttribute('data-label') ?? '',
         }),
       },
     ]
@@ -62,7 +65,7 @@ export const NoteEmbed = Node.create({
           node: { attrs: NoteEmbedAttrs },
         ) {
           const s = state as { write: (str: string) => void; closeBlock: (n: unknown) => void }
-          s.write(`![[${formatWikiLink({ ...node.attrs, label: '' })}]]`)
+          s.write(`![[${formatWikiLink(node.attrs)}]]`)
           s.closeBlock(node)
         },
         parse: {
@@ -97,7 +100,7 @@ export const NoteEmbed = Node.create({
               const token = st.push('html_block', '', 0)
               token.content =
                 `<div data-type="note-embed" data-title="${encodeAttr(parts.title)}"` +
-                ` data-heading="${encodeAttr(parts.heading)}"></div>\n`
+                ` data-heading="${encodeAttr(parts.heading)}" data-label="${encodeAttr(parts.label)}"></div>\n`
               token.map = [startLine, next]
               token.level = st.level
               st.line = next
