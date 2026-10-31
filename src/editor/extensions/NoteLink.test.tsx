@@ -192,4 +192,13 @@ describe('LinkSource', () => {
     instance.view.dom.dispatchEvent(new Event('blur'))
     expect(instance.getHTML()).toContain('href="Link.md"')
   })
+
+  it('breaks the line after the source when Enter is pressed inside it', () => {
+    const instance = focused('<p><a href="Link.md">Text</a></p>')
+    instance.commands.setTextSelection(3)
+    instance.view.dom.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }))
+    expect(instance.state.doc.childCount).toBe(2)
+    expect(instance.state.doc.child(0).textContent).toBe('Text')
+    expect(instance.getHTML()).toContain('href="Link.md"')
+  })
 })

@@ -72,6 +72,10 @@ function collapse(tr: Transaction, blockPos: number): void {
   }
 }
 
+function linkSourceMarkIn(node: ProseMirrorNode): boolean {
+  return node.marks.some((m) => m.type.name === 'linkSource')
+}
+
 function selectedBlock(state: EditorState): number | null {
   const { selection } = state
   if (!(selection instanceof TextSelection)) return null
@@ -112,6 +116,21 @@ export const LinkSource = Mark.create({
           },
         },
         props: {
+          // A line break inside `[label](href)` would cut the source in two and
+          // leave neither half a link, so Enter breaks the line after it instead.
+          handleKeyDown(view, event) {
+            if (event.key !== 'Enter') return false
+            const { selection } = view.state
+            if (!selection.empty) return false
+            const { $from } = selection
+            if (!$from.nodeBefore || !$from.nodeAfter) return false
+            if (!linkSourceMarkIn($from.nodeBefore) || !linkSourceMarkIn($from.nodeAfter)) return false
+            const end = runsOf($from.parent, $from.start() - 1, (c) => (linkSourceMarkIn(c) ? 'source' : null)).find(
+              (run) => run.from <= $from.pos && $from.pos <= run.to,
+            )?.to
+            if (end !== undefined) view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, end)))
+            return false
+          },
           handleDOMEvents: {
             focus: (view) => {
               view.dispatch(view.state.tr.setMeta(key, { focused: true }).setMeta('addToHistory', false))
