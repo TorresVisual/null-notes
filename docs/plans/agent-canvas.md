@@ -208,7 +208,29 @@ Behaviour: legend = one row per pass (colour swatch, `Pass n`, eye toggle) + "Sh
 
 ---
 
-### Task 8: Docs and end-to-end check
+### Task 8: Rename a canvas
+
+**Files:**
+- Modify: `src-tauri/src/commands/notes.rs` (add `rename_canvas` beside `create_canvas`), `src-tauri/src/lib.rs` (register)
+- Modify: `src/lib/tauri.ts` (`api.canvas.rename`), `src/lib/noteActions.ts` (`renameCanvas`), `src/components/TreeNode.tsx` (canvas row context menu: Rename)
+- Modify: `src/store/workspace.ts` (`replaceOpenPath` also re-keys `canvasViewports`)
+- Test: Rust unit tests beside the command; `src/store/workspace.test.ts`
+
+**Interfaces:**
+- Consumes: `create_canvas`'s filename sanitiser (`note_filename`), `canvasViewports` (Task 7), `replaceOpenPath`, `promptText`, `refreshTree`.
+- Produces:
+  - `#[tauri::command] pub async fn rename_canvas(workspace: String, path: String, new_name: String) -> Result<String, String>` — same folder, sanitised `<new_name>.canvas`, `require_within_workspace` on `path`, errors if the target exists or `path` isn't a `.canvas`, plain `tokio::fs::rename` (no content rewrite, so no `write_atomic`); returns the new path.
+  - `renameCanvas(path: string): Promise<void>` in `noteActions.ts`, mirroring `renameNote`: prompt with the current file stem, call the API, `replaceOpenPath(old, new)`, queue both paths for git, `refreshTree()`, `reportError` on failure.
+
+- [ ] **Step 1: Write failing tests**: Rust: rename moves the file and returns the new path; refuses an existing target; refuses a path that isn't `.canvas`; refuses a path outside the workspace; a name with `/` or `:` is sanitised, not treated as a path. TS: `replaceOpenPath('ws/a.canvas','ws/b.canvas')` moves the open tab and the `canvasViewports` entry.
+- [ ] **Step 2: Run** `cargo test --manifest-path src-tauri/Cargo.toml rename_canvas` and `npx vitest run src/store/workspace.test.ts` — Expected: FAIL.
+- [ ] **Step 3: Implement** as above. Other canvases' cards that reference this canvas by path are not rewritten (cards link notes and code, not canvases).
+- [ ] **Step 4: Run** both commands, then `cargo clippy -- -D warnings`, `cargo fmt --check`, `npm run typecheck` — Expected: PASS / clean.
+- [ ] **Step 5: Commit** — `feat(canvas): rename a canvas from the tree`
+
+---
+
+### Task 9: Docs and end-to-end check
 
 **Files:**
 - Modify: `docs/ROADMAP.md` L113 (reword row, do not delete): `Won't build as a freeform surface inside notes; agent-canvas file added 2026-10-31 as a narrow exception (see agent-canvas-design.md).`
@@ -226,5 +248,5 @@ Behaviour: legend = one row per pass (colour swatch, `Pass n`, eye toggle) + "Sh
 ## Self-review notes
 
 - **Spec coverage:** format → T1; agent protocol consumer side (append merge, atomic write) → T2/T5; create/open/tree/tabs → T3/T4; renderer, editing, file-card safety → T6; legend/arrival/viewport → T7; ROADMAP reword + storage-boundary doc → T8; trash/restore → T3 (existing `delete_note` reused); malformed → T5/T6.
-- **Deliberate deviations from the spec text:** no new `open_canvas`/`save_canvas` commands (existing `open_note`/`save_note` are generic and already path-bound); `.canvas` gets its own `canvas-changed` event instead of `workspace-changed`; whitespace-only file is an empty canvas rather than an error.
-- **Not planned (spec silent):** renaming a `.canvas`; the tree shows it by filename sans extension.
+- **Deliberate deviations from the spec text:** (rename is added in Task 8, which the spec did not list); no new `open_canvas`/`save_canvas` commands (existing `open_note`/`save_note` are generic and already path-bound); `.canvas` gets its own `canvas-changed` event instead of `workspace-changed`; whitespace-only file is an empty canvas rather than an error.
+- **Beyond the spec (requested):** renaming a `.canvas` (Task 8); the tree shows canvases by filename sans extension.
