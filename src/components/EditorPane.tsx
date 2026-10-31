@@ -7,6 +7,7 @@ import { RawEditor } from '../editor/RawEditor'
 import { BacklinksPanel } from './BacklinksPanel'
 import { NoteHistoryPanel } from './NoteHistoryPanel'
 import { ConflictBar } from './ConflictBar'
+import { PropertiesBlock } from './PropertiesBlock'
 import { LoadingStatus } from './LoadingStatus'
 import { WorkspacePicker } from './WorkspacePicker'
 import { HomeView } from './HomeView'
@@ -107,15 +108,18 @@ export const EditorPane = forwardRef<HTMLDivElement, EditorPaneProps>(function E
       >
         {isLoading && <LoadingStatus />}
         {!isLoading && notePath && viewMode === 'wysiwyg' && (
-          <NoteEditor
-            content={body}
-            notePath={notePath}
-            spellcheck={settings.spellcheck}
-            spellcheckLanguage={settings.spellcheckLanguage}
-            onChange={(markdown) => onSave(joinFrontmatter(frontmatter, markdown))}
-            onFlashcardCommand={onFlashcardCommand}
-            onDiagramCommand={onDiagramCommand}
-          />
+          <>
+            <PropertiesBlock content={content} onSave={onSave} />
+            <NoteEditor
+              content={body}
+              notePath={notePath}
+              spellcheck={settings.spellcheck}
+              spellcheckLanguage={settings.spellcheckLanguage}
+              onChange={(markdown) => onSave(joinFrontmatter(frontmatter, markdown))}
+              onFlashcardCommand={onFlashcardCommand}
+              onDiagramCommand={onDiagramCommand}
+            />
+          </>
         )}
         {!isLoading && notePath && viewMode === 'raw' && (
           <RawEditor
