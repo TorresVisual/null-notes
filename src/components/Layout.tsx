@@ -9,6 +9,7 @@ import { TooltipProvider } from './ui/tooltip'
 import { EditorPane } from './EditorPane'
 import { SearchModal } from './SearchModal'
 import { QuickSwitcher } from './QuickSwitcher'
+import { CommandPalette } from './CommandPalette'
 import { OutlinePanel } from './OutlinePanel'
 import { SettingsPanel } from './SettingsPanel'
 import { ShortcutsOverlay } from './ShortcutsOverlay'
@@ -267,6 +268,12 @@ export function Layout() {
         case 'quick-switch':
           openOverlay('switcher')
           break
+        case 'command-palette':
+          openOverlay('palette')
+          break
+        case 'sync-now':
+          await syncNow()
+          break
         case 'home':
           if (workspacePath) setActiveTab(null)
           break
@@ -361,6 +368,7 @@ export function Layout() {
       openWorkspaceAt,
       closeWorkspace,
       openOverlay,
+      syncNow,
     ],
   )
 
@@ -498,6 +506,7 @@ export function Layout() {
       o: 'open-workspace',
       k: 'search',
       p: 'quick-switch',
+      'shift+p': 'command-palette',
       e: 'toggle-view',
       'shift+i': 'insert-ink',
       g: 'graph-view',
@@ -552,6 +561,15 @@ export function Layout() {
     <>
       {activeOverlay === 'search' && <SearchModal onClose={closeOverlay} />}
       {activeOverlay === 'switcher' && <QuickSwitcher onClose={closeOverlay} />}
+      {activeOverlay === 'palette' && (
+        <CommandPalette
+          hasWorkspace={!!workspacePath}
+          hasNote={!!activeTab}
+          repoMode={!!repoMode}
+          onRun={(id) => void runCommand(id)}
+          onClose={closeOverlay}
+        />
+      )}
       {activeOverlay === 'settings' && <SettingsPanel onClose={closeOverlay} />}
       {activeOverlay === 'trash' && <TrashDialog onClose={closeOverlay} />}
       {activeOverlay === 'shortcuts' && <ShortcutsOverlay onClose={closeOverlay} />}

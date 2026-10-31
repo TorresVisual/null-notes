@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react'
 export type OverlayKind =
   | 'search'
   | 'switcher'
+  | 'palette'
   | 'settings'
   | 'shortcuts'
   | 'template'

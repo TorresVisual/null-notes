@@ -27,6 +27,7 @@ const SHORTCUT_GROUPS: ShortcutGroup[] = [
       { keys: 'Alt ←', label: 'Back (undo a wiki-link / cross-reference jump)' },
       { keys: 'Alt →', label: 'Forward' },
       { keys: 'Ctrl P', label: 'Jump to a note by title' },
+      { keys: 'Ctrl Shift P', label: 'Command palette' },
       { keys: 'Ctrl H', label: 'Home' },
       { keys: 'Ctrl W', label: 'Close tab' },
       { keys: 'Ctrl Shift W', label: 'Reopen closed tab' },
