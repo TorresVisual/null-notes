@@ -8,6 +8,7 @@ import {
   connectNodes,
   elementColor,
   groupLabel,
+  hiddenForLatestOnly,
   reconnectEdge,
   setEdgeLabel,
   setNodeText,
@@ -81,6 +82,36 @@ describe('toFlow', () => {
       'canvasLink',
       'canvasUnknown',
     ])
+  })
+})
+
+describe('toFlow with hidden passes', () => {
+  const nodes = [
+    node('g1', 0, 0, { type: 'group', pass: 1, author: 'agent' }),
+    node('c1', 10, 10, { pass: 1, author: 'agent' }),
+    node('g2', 500, 0, { type: 'group', pass: 2, author: 'agent' }),
+    node('mine', 520, 20),
+  ]
+  const edges = [edge('agent', 'c1', 'g1', { pass: 1 }), edge('hand', 'mine', 'c1'), edge('keep', 'mine', 'g2')]
+
+  it('hides a pass, its cards and every edge touching them, leaving the rest', () => {
+    const flow = toFlow(canvas(nodes, edges), new Set([1]))
+    expect(flow.nodes.filter((n) => n.hidden).map((n) => n.id)).toEqual(['g1', 'c1'])
+    expect(flow.edges.filter((e) => e.hidden).map((e) => e.id)).toEqual(['agent', 'hand'])
+  })
+
+  it('shows everything by default', () => {
+    const flow = toFlow(canvas(nodes, edges))
+    expect(flow.nodes.some((n) => n.hidden)).toBe(false)
+    expect(flow.edges.some((e) => e.hidden)).toBe(false)
+  })
+})
+
+describe('hiddenForLatestOnly', () => {
+  it('hides every pass but the highest', () => {
+    expect([...hiddenForLatestOnly([1, 2, 3])].sort()).toEqual([1, 2])
+    expect(hiddenForLatestOnly([4]).size).toBe(0)
+    expect(hiddenForLatestOnly([]).size).toBe(0)
   })
 })
 

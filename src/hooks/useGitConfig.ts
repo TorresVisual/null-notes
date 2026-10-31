@@ -27,6 +27,7 @@ export function useGitConfig() {
         sidebarCollapsed,
         tagsCollapsed,
         pinnedTabs,
+        canvasViewports,
         expandedFolders,
         recentSearches,
       } = useWorkspaceStore.getState()
@@ -41,6 +42,7 @@ export function useGitConfig() {
         sidebarCollapsed,
         tagsCollapsed,
         pinnedTabs,
+        canvasViewports,
         expandedFolders,
         recentSearches,
         git: next,

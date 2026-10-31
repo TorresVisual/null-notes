@@ -10,6 +10,7 @@ const reset = () =>
     secondaryTab: null,
     splitRatio: 0.5,
     closedTabs: [],
+    canvasViewports: {},
     expandedFolders: [],
     selectedFolder: null,
     folderError: null,
@@ -103,6 +104,30 @@ describe('useWorkspaceStore', () => {
     useWorkspaceStore.getState().setSecondaryTab('/ws/map.canvas')
     expect(useWorkspaceStore.getState().secondaryTab).toBeNull()
     expect(useWorkspaceStore.getState().openTabs).not.toContain('/ws/map.canvas')
+  })
+
+  describe('canvas viewports', () => {
+    const view = { x: 10, y: -20, zoom: 0.5 }
+
+    it('remembers a viewport per canvas and restores a saved set', () => {
+      useWorkspaceStore.getState().setCanvasViewport('/ws/a.canvas', view)
+      expect(useWorkspaceStore.getState().canvasViewports).toEqual({ '/ws/a.canvas': view })
+      useWorkspaceStore.getState().setCanvasViewports({ '/ws/b.canvas': view })
+      expect(Object.keys(useWorkspaceStore.getState().canvasViewports)).toEqual(['/ws/b.canvas'])
+    })
+
+    it('follows a rename of the canvas or of its folder', () => {
+      useWorkspaceStore.getState().setCanvasViewport('/ws/Notes/a.canvas', view)
+      useWorkspaceStore.getState().replaceOpenPath('/ws/Notes/a.canvas', '/ws/Notes/b.canvas')
+      useWorkspaceStore.getState().replaceOpenPath('/ws/Notes', '/ws/Course')
+      expect(useWorkspaceStore.getState().canvasViewports).toEqual({ '/ws/Course/b.canvas': view })
+    })
+
+    it('is cleared for a new workspace', () => {
+      useWorkspaceStore.getState().setCanvasViewport('/ws/a.canvas', view)
+      useWorkspaceStore.getState().resetForNewWorkspace()
+      expect(useWorkspaceStore.getState().canvasViewports).toEqual({})
+    })
   })
 
   it('closing the only tab sets activeTab to null', () => {

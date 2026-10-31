@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { isCanvasPath } from '../lib/canvasPath'
 import { isUnderPath, replacePathPrefix } from '../lib/pathPrefix'
 import { useBookmarksStore } from './bookmarks'
-import type { GitWorkspaceConfig, RepoMode, GitCommitStatus, SearchSort } from '../types'
+import type { CanvasViewport, GitWorkspaceConfig, RepoMode, GitCommitStatus, SearchSort } from '../types'
 
 // Matches P1-2's recent-workspaces cap — a "recent list" this long is
 // already more than a keyboard-driven picker needs to scroll through.
@@ -80,6 +80,10 @@ interface WorkspaceStore {
   // P6-5: the search box's own recent-queries list, persisted per workspace
   // via WorkspaceState (same checkpoints as openTabs/expandedFolders — no
   // separate save path).
+  // Last pan/zoom per canvas, persisted per workspace like recentSearches.
+  canvasViewports: Record<string, CanvasViewport>
+  setCanvasViewport: (path: string, viewport: CanvasViewport) => void
+  setCanvasViewports: (viewports: Record<string, CanvasViewport>) => void
   recentSearches: string[]
   setRecentSearches: (queries: string[]) => void
   addRecentSearch: (query: string) => void
@@ -139,6 +143,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   path: null,
   openTabs: [],
   pinnedTabs: [],
+  canvasViewports: {},
   activeTab: null,
   secondaryTab: null,
   splitRatio: 0.5,
@@ -262,13 +267,19 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
     if (expandedFolders.includes(folderPath)) return
     set({ expandedFolders: [...expandedFolders, folderPath] })
   },
+  setCanvasViewport: (path, viewport) =>
+    set({ canvasViewports: { ...get().canvasViewports, [path]: viewport } }),
+  setCanvasViewports: (viewports) => set({ canvasViewports: viewports }),
   setExpandedFolders: (paths) => set({ expandedFolders: paths }),
   setSelectedFolder: (path) => set({ selectedFolder: path }),
 
   replaceOpenPath: (oldPrefix, newPrefix) => {
     useBookmarksStore.getState().rewritePrefix(oldPrefix, newPrefix)
-    const { openTabs, pinnedTabs, activeTab, secondaryTab, expandedFolders, selectedFolder } = get()
+    const { openTabs, pinnedTabs, activeTab, secondaryTab, expandedFolders, selectedFolder, canvasViewports } = get()
     set({
+      canvasViewports: Object.fromEntries(
+        Object.entries(canvasViewports).map(([p, v]) => [replacePathPrefix(p, oldPrefix, newPrefix), v]),
+      ),
       openTabs: openTabs.map((p) => replacePathPrefix(p, oldPrefix, newPrefix)),
       pinnedTabs: pinnedTabs.map((p) => replacePathPrefix(p, oldPrefix, newPrefix)),
       activeTab: activeTab ? replacePathPrefix(activeTab, oldPrefix, newPrefix) : activeTab,
@@ -325,6 +336,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
     set({
       openTabs: [],
       pinnedTabs: [],
+      canvasViewports: {},
       activeTab: null,
       secondaryTab: null,
       splitRatio: 0.5,

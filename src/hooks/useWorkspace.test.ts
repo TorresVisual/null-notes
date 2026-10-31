@@ -191,6 +191,16 @@ describe('useWorkspace', () => {
     )
   })
 
+  it('saveSession persists canvas viewports', async () => {
+    const viewports = { '/ws/a.canvas': { x: 1, y: 2, zoom: 0.5 } }
+    useWorkspaceStore.setState({ path: '/ws', canvasViewports: viewports })
+    const { result } = renderHook(() => useWorkspace())
+
+    await result.current.saveSession()
+
+    expect(workspace.save).toHaveBeenCalledWith('/ws', expect.objectContaining({ canvasViewports: viewports }))
+  })
+
   it('closeWorkspace flushes the session, clears state, and falls back to the picker', async () => {
     useWorkspaceStore.setState({
       path: '/ws',

@@ -34,9 +34,9 @@ function keepSelection<T extends { id: string; selected?: boolean }>(fresh: T[],
  * the canvas is only edited when a drag or resize settles, so one gesture is
  * one undo step.
  */
-export function useCanvasFlow(canvas: Canvas, onChange: (next: Canvas) => void) {
-  const [nodes, setNodes] = useState<FlowNode[]>(() => toFlow(canvas).nodes)
-  const [edges, setEdges] = useState<FlowEdge[]>(() => toFlow(canvas).edges)
+export function useCanvasFlow(canvas: Canvas, onChange: (next: Canvas) => void, hidden: ReadonlySet<number>) {
+  const [nodes, setNodes] = useState<FlowNode[]>(() => toFlow(canvas, hidden).nodes)
+  const [edges, setEdges] = useState<FlowEdge[]>(() => toFlow(canvas, hidden).edges)
   const canvasRef = useRef(canvas)
   const nodesRef = useRef(nodes)
   const edgesRef = useRef(edges)
@@ -45,10 +45,10 @@ export function useCanvasFlow(canvas: Canvas, onChange: (next: Canvas) => void) 
   canvasRef.current = canvas
 
   useEffect(() => {
-    const fresh = toFlow(canvas)
+    const fresh = toFlow(canvas, hidden)
     setNodes((prev) => (nodesRef.current = keepSelection(fresh.nodes, prev)))
     setEdges((prev) => (edgesRef.current = keepSelection(fresh.edges, prev)))
-  }, [canvas])
+  }, [canvas, hidden])
 
   // Several changes can land in one tick (delete a card, then its edges); each
   // must build on the previous result, not on the last render's canvas.

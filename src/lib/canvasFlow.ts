@@ -64,7 +64,18 @@ export function groupLabel(node: CanvasNode): string {
   return label ? `Pass ${node.pass} · ${label}` : `Pass ${node.pass}`
 }
 
-export function toFlow(canvas: Canvas): { nodes: FlowNode[]; edges: FlowEdge[] } {
+/** Passes to hide so only the newest one shows. */
+export function hiddenForLatestOnly(passes: readonly number[]): Set<number> {
+  const latest = Math.max(...passes)
+  return new Set(passes.filter((p) => p !== latest))
+}
+
+export function toFlow(
+  canvas: Canvas,
+  hiddenPasses: ReadonlySet<number> = new Set(),
+): { nodes: FlowNode[]; edges: FlowEdge[] } {
+  const isHidden = (pass: number | undefined) => pass !== undefined && hiddenPasses.has(pass)
+  const hiddenIds = new Set(canvas.nodes.filter((n) => isHidden(n.pass)).map((n) => n.id))
   const byId = new Map<string, CanvasNode>()
   const nodes: FlowNode[] = []
   for (const n of canvas.nodes) {
@@ -76,6 +87,7 @@ export function toFlow(canvas: Canvas): { nodes: FlowNode[]; edges: FlowEdge[] }
       position: { x: finite(n.x, 0), y: finite(n.y, 0) },
       width: finite(n.width, FALLBACK_SIZE.width),
       height: finite(n.height, FALLBACK_SIZE.height),
+      hidden: hiddenIds.has(n.id),
       data: { node: n },
     })
   }
@@ -100,6 +112,7 @@ export function toFlow(canvas: Canvas): { nodes: FlowNode[]; edges: FlowEdge[] }
       markerStart: ends.from === 'arrow' ? { type: ARROW, color } : undefined,
       markerEnd: ends.to === 'arrow' ? { type: ARROW, color } : undefined,
       style: color ? { stroke: color } : undefined,
+      hidden: isHidden(e.pass) || hiddenIds.has(e.fromNode) || hiddenIds.has(e.toNode),
       data: { edge: e },
     })
   }

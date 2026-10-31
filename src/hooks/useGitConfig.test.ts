@@ -46,6 +46,7 @@ describe('useGitConfig', () => {
       sidebarCollapsed: false,
       tagsCollapsed: false,
       pinnedTabs: [],
+      canvasViewports: {},
       expandedFolders: [],
       recentSearches: [],
       git: { prompted: true, autoCommit: true, idleMinutes: 10, skipHooks: false, autoPush: true, allowCodeRepoPush: false },

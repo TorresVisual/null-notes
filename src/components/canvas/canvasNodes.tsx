@@ -30,11 +30,12 @@ interface CardProps {
 }
 
 function Card({ node, selected, kind, inert, children }: CardProps) {
-  const { locked } = useContext(CanvasActionsContext)
+  const { locked, pulsePass } = useContext(CanvasActionsContext)
   const accent = elementColor(node)
+  const pulsing = kind === 'group' && node.pass !== undefined && node.pass === pulsePass
   return (
     <div
-      className={`canvas-card canvas-card--${kind}${node.pass !== undefined ? ' is-agent' : ''}${inert ? ' is-inert' : ''}`}
+      className={`canvas-card canvas-card--${kind}${node.pass !== undefined ? ' is-agent' : ''}${inert ? ' is-inert' : ''}${pulsing ? ' canvas-pulse' : ''}`}
       style={accent ? ({ '--card-accent': accent } as CSSProperties) : undefined}
     >
       <NodeResizer isVisible={selected && !locked} minWidth={60} minHeight={30} />

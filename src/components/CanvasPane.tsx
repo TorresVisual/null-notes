@@ -39,6 +39,7 @@ export function CanvasPane({ path }: CanvasPaneProps) {
             readOnly={canvas.readOnly}
             locked={locked}
             saveLabel={SAVE_LABELS[canvas.saveState]}
+            appendedPasses={canvas.appendedPasses}
             canUndo={canvas.canUndo}
             canRedo={canvas.canRedo}
             onChange={canvas.update}

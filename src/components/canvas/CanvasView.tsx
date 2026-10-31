@@ -1,28 +1,34 @@
-import { useCallback, useMemo, useRef, type KeyboardEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import {
   Background,
   ConnectionMode,
   Controls,
   ReactFlow,
+  getNodesBounds,
   useReactFlow,
   type NodeMouseHandler,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import { useCanvasFlow } from '../../hooks/useCanvasFlow'
 import { useCanvasFileStatus } from '../../hooks/useCanvasFileStatus'
+import { useCanvasViewport } from '../../hooks/useCanvasViewport'
 import { api } from '../../lib/tauri'
 import { isSafeWorkspacePath, type Canvas } from '../../lib/jsonCanvas'
 import { workspaceFilePath } from '../../lib/canvasPath'
-import type { FlowEdge, FlowNode } from '../../lib/canvasFlow'
+import { hiddenForLatestOnly, type FlowEdge, type FlowNode } from '../../lib/canvasFlow'
 import { promptText } from '../../store/promptDialog'
 import { showToast } from '../../store/toast'
 import { useWorkspaceStore } from '../../store/workspace'
 import { CanvasActionsContext, type CanvasActions } from './canvasActions'
 import { canvasNodeTypes } from './canvasNodes'
 import { CanvasToolbar } from './CanvasToolbar'
+import { PassLegend } from './PassLegend'
 
 const FIT_PADDING = 0.15
 const FIT_DURATION_MS = 200
+const PULSE_MS = 1500
+const ARRIVAL_FIT_DELAY_MS = 80
+const ARRIVAL_FIT_RETRIES = 5
 const DELETE_KEYS = ['Backspace', 'Delete']
 const MULTI_SELECT_KEYS = ['Shift', 'Meta', 'Control']
 
@@ -32,6 +38,7 @@ interface CanvasViewProps {
   readOnly: boolean
   locked: boolean
   saveLabel: string
+  appendedPasses: number[]
   canUndo: boolean
   canRedo: boolean
   onChange: (next: Canvas) => void
@@ -46,13 +53,20 @@ export function CanvasView(props: CanvasViewProps) {
   const workspace = useWorkspaceStore((s) => s.path)
   const openTab = useWorkspaceStore((s) => s.openTab)
   const frame = useRef<HTMLDivElement>(null)
-  const { fitView, getNodes, screenToFlowPosition } = useReactFlow<FlowNode, FlowEdge>()
-  const flow = useCanvasFlow(canvas, props.onChange)
+  const { fitBounds, fitView, getNodes, screenToFlowPosition } = useReactFlow<FlowNode, FlowEdge>()
+  const [hidden, setHidden] = useState<ReadonlySet<number>>(new Set())
+  const [pulsePass, setPulsePass] = useState<number | null>(null)
+  const flow = useCanvasFlow(canvas, props.onChange, hidden)
+  const viewport = useCanvasViewport(path)
+  const passes = useMemo(
+    () => [...new Set(canvas.nodes.flatMap((n) => (n.pass === undefined ? [] : [n.pass])))].sort((a, b) => a - b),
+    [canvas.nodes],
+  )
   const fileStatus = useCanvasFileStatus(workspace, path, canvas)
 
   const actions = useMemo<CanvasActions>(
-    () => ({ locked, workspace, fileStatus, editText: flow.editText, deletePass: flow.removePass }),
-    [locked, workspace, fileStatus, flow.editText, flow.removePass],
+    () => ({ locked, pulsePass, workspace, fileStatus, editText: flow.editText, deletePass: flow.removePass }),
+    [locked, pulsePass, workspace, fileStatus, flow.editText, flow.removePass],
   )
 
   const centre = useCallback(() => {
@@ -64,10 +78,47 @@ export function CanvasView(props: CanvasViewProps) {
 
   const fitAll = useCallback(() => void fitView({ padding: FIT_PADDING, duration: FIT_DURATION_MS }), [fitView])
 
+  // fitView waits on React Flow's own measuring pass, which never completes for cards
+  // that just arrived; fitBounds applies at once from the sizes we already know.
+  const fitNodes = useCallback(
+    (nodes: FlowNode[]) => void fitBounds(getNodesBounds(nodes), { padding: FIT_PADDING, duration: FIT_DURATION_MS }),
+    [fitBounds],
+  )
+
   const fitSelection = useCallback(() => {
     const selected = getNodes().filter((n) => n.selected)
-    void fitView({ nodes: selected.length > 0 ? selected : undefined, padding: FIT_PADDING, duration: FIT_DURATION_MS })
-  }, [fitView, getNodes])
+    if (selected.length > 0) fitNodes(selected)
+    else fitAll()
+  }, [fitAll, fitNodes, getNodes])
+
+  const jumpToPass = useCallback(
+    (pass: number) => {
+      setHidden((h) => (h.has(pass) ? new Set([...h].filter((p) => p !== pass)) : h))
+      // New or just-unhidden cards reach React Flow's store a render later.
+      const attempt = (left: number) => {
+        const nodes = getNodes().filter((n) => n.data.node.pass === pass)
+        if (nodes.length > 0) fitNodes(nodes)
+        else if (left > 0) setTimeout(() => attempt(left - 1), ARRIVAL_FIT_DELAY_MS)
+      }
+      setTimeout(() => attempt(ARRIVAL_FIT_RETRIES), ARRIVAL_FIT_DELAY_MS)
+    },
+    [fitNodes, getNodes],
+  )
+
+  const togglePass = useCallback(
+    (pass: number) => setHidden((h) => new Set(h.has(pass) ? [...h].filter((p) => p !== pass) : [...h, pass])),
+    [],
+  )
+
+  useEffect(() => {
+    const newest = props.appendedPasses.at(-1)
+    if (newest === undefined) return
+    showToast(`Pass ${newest} added`)
+    setPulsePass(newest)
+    jumpToPass(newest)
+    const clear = setTimeout(() => setPulsePass(null), PULSE_MS)
+    return () => clearTimeout(clear)
+  }, [props.appendedPasses, jumpToPass])
 
   async function addFile() {
     const file = (await promptText('File path in the workspace (e.g. src/net/retry.ts):'))?.trim()
@@ -148,12 +199,21 @@ export function CanvasView(props: CanvasViewProps) {
           multiSelectionKeyCode={MULTI_SELECT_KEYS}
           minZoom={0.1}
           maxZoom={2}
-          fitView
+          defaultViewport={viewport.initial}
+          fitView={!viewport.initial}
+          onMoveEnd={viewport.onMoveEnd}
           colorMode="dark"
         >
           <Background />
           <Controls showInteractive={false} showFitView={false} />
         </ReactFlow>
+        <PassLegend
+          passes={passes}
+          hidden={hidden}
+          onToggle={togglePass}
+          onShowOnlyLatest={() => setHidden(hiddenForLatestOnly(passes))}
+          onJump={jumpToPass}
+        />
       </div>
     </CanvasActionsContext.Provider>
   )

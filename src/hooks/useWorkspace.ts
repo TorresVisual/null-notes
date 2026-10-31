@@ -43,6 +43,7 @@ export function useWorkspace() {
       sidebarCollapsed,
       tagsCollapsed,
       pinnedTabs,
+      canvasViewports,
       expandedFolders,
       recentSearches,
       git,
@@ -56,6 +57,7 @@ export function useWorkspace() {
       sidebarCollapsed,
       tagsCollapsed,
       pinnedTabs,
+      canvasViewports,
       expandedFolders,
       recentSearches,
       git,
@@ -126,6 +128,7 @@ export function useWorkspace() {
         openTab(tab)
       }
       setPinnedTabs(session.pinnedTabs ?? [])
+      useWorkspaceStore.getState().setCanvasViewports(session.canvasViewports ?? {})
       await refreshTags()
       if (remember) {
         setRecentWorkspaces(await api.workspace.remember(selected))

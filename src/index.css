@@ -6316,3 +6316,45 @@ input[type='checkbox']:focus-visible {
   color: var(--text-tertiary);
 }
 
+.canvas-legend {
+  position: absolute;
+  top: var(--space-sm);
+  right: var(--space-sm);
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 140px;
+  padding: var(--space-xs);
+  background: var(--bg-raised);
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  box-shadow: var(--shadow-compact);
+  font-size: 12px;
+}
+
+.canvas-legend-row { display: flex; align-items: center; gap: var(--space-sm); padding: 2px var(--space-xs); border-radius: 4px; }
+.canvas-legend-row:hover { background: var(--bg-hover); }
+.canvas-legend-row.is-hidden .canvas-legend-label { color: var(--text-tertiary); }
+.canvas-legend-swatch { width: 10px; height: 10px; flex-shrink: 0; border-radius: 2px; background: var(--card-accent); }
+
+.canvas-legend-label, .canvas-legend-eye, .canvas-legend-only {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font: inherit;
+}
+
+.canvas-legend-label { flex: 1; padding: 0; text-align: left; }
+.canvas-legend-label:hover, .canvas-legend-eye:hover, .canvas-legend-only:hover { color: var(--text-primary); }
+.canvas-legend-eye { display: inline-flex; padding: 2px; }
+.canvas-legend-only { margin-top: 2px; padding: 3px var(--space-xs); border-top: 1px solid var(--border); text-align: left; }
+
+.canvas-pulse { animation: canvas-pulse 1.2s var(--ease-standard) 1; }
+
+@keyframes canvas-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 transparent; }
+  30% { box-shadow: 0 0 0 6px color-mix(in srgb, var(--card-accent, var(--accent)) 45%, transparent); }
+}
+
