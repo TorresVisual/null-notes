@@ -2192,26 +2192,25 @@ pre:has(code.language-expect)::before, pre:has(code.language-expected)::before {
 .fold-able { position: relative; }
 .fold-toggle {
   position: absolute;
-  top: 0.15em;
-  left: -1.3em;
+  top: 0;
+  left: -1.4em;
   width: 1em;
   text-align: center;
-  font-size: 0.8em;
-  line-height: 1.6;
+  line-height: inherit;
   color: var(--text-tertiary);
   cursor: pointer;
   user-select: none;
   opacity: 0;
-  transform: rotate(90deg);
+  transform: rotate(90deg) scale(0.75);
   transition: opacity var(--duration-base) var(--ease-standard), transform var(--duration-base) var(--ease-standard);
 }
-li .fold-toggle { left: -2.4em; top: 0.25em; }
+li .fold-toggle { left: -2.4em; }
 /* A task item's content sits in a wrapper div, so the toggle is a grandchild there. */
 .fold-able:hover > .fold-toggle,
 .fold-able:hover > div > .fold-toggle { opacity: 1; }
 .fold-toggle:hover { color: var(--accent); }
 .fold-collapsed > .fold-toggle,
-.fold-collapsed > div > .fold-toggle { opacity: 0.7; transform: none; }
+.fold-collapsed > div > .fold-toggle { opacity: 0.7; transform: scale(0.75); }
 
 /* Focus mode (Ctrl+Shift+F) — every top-level block but the active one. */
 .focus-mode-dim { opacity: 0.35; transition: opacity 0.15s ease; }
