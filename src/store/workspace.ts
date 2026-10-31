@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { isUnderPath, replacePathPrefix } from '../lib/pathPrefix'
-import type { GitWorkspaceConfig, RepoMode, GitCommitStatus } from '../types'
+import type { GitWorkspaceConfig, RepoMode, GitCommitStatus, SearchSort } from '../types'
 
 // Matches P1-2's recent-workspaces cap — a "recent list" this long is
 // already more than a keyboard-driven picker needs to scroll through.
@@ -71,6 +71,9 @@ interface WorkspaceStore {
   recentSearches: string[]
   setRecentSearches: (queries: string[]) => void
   addRecentSearch: (query: string) => void
+  // Session-only: the Ctrl+K sort choice outlives the modal, not the app.
+  searchSort: SearchSort
+  setSearchSort: (sort: SearchSort) => void
   resetForNewWorkspace: () => void
   // P5-1: which Git mode the open workspace is in (re-detected on every
   // open, never persisted — it's a fact about the disk, not a preference),
@@ -136,6 +139,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   tagFilter: null,
   recentWorkspaces: [],
   recentSearches: [],
+  searchSort: 'relevance',
   repoMode: null,
   git: DEFAULT_GIT_CONFIG,
   gitPriorAutomation: false,
@@ -254,6 +258,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   setTagFilter: (tag) => set({ tagFilter: tag }),
   setRecentWorkspaces: (paths) => set({ recentWorkspaces: paths }),
   setRecentSearches: (queries) => set({ recentSearches: queries }),
+  setSearchSort: (sort) => set({ searchSort: sort }),
   addRecentSearch: (query) => {
     const trimmed = query.trim()
     if (!trimmed) return

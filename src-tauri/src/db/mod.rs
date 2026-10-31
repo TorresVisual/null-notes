@@ -2,6 +2,7 @@ use anyhow::Result;
 use sqlx::SqlitePool;
 use std::path::Path;
 
+pub mod fts_query;
 pub mod notes;
 pub mod schema;
 

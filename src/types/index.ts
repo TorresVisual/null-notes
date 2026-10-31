@@ -27,8 +27,16 @@ export interface SearchResult {
   path: string
   title: string
   workspace: string
+  updatedAt: number
   snippet: string
 }
+
+export interface SearchPage {
+  results: SearchResult[]
+  total: number
+}
+
+export type SearchSort = 'relevance' | 'modified' | 'name'
 
 export interface GitWorkspaceConfig {
   /** Whether the one-time "enable auto-commit?" prompt has been answered. */

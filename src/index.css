@@ -2570,6 +2570,34 @@ pre:has(code.language-expect)::before, pre:has(code.language-expected)::before {
   cursor: pointer;
 }
 
+.search-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 18px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-tertiary);
+  font-size: 12px;
+}
+
+.search-sort {
+  background: var(--bg-hover);
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 12px;
+}
+
+.search-more {
+  padding: 10px 18px;
+  cursor: pointer;
+  color: var(--accent);
+  font-size: 13px;
+}
+
+.search-more:hover { background: var(--bg-hover); }
+
 .search-results {
   list-style: none;
   max-height: 400px;

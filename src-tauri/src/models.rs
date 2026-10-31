@@ -89,7 +89,31 @@ pub struct SearchResult {
     pub path: String,
     pub title: String,
     pub workspace: String,
+    pub updated_at: i64,
     pub snippet: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SearchPage {
+    pub results: Vec<SearchResult>,
+    pub total: i64,
+}
+
+#[derive(Debug, Clone, Copy, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum SearchSort {
+    #[default]
+    Relevance,
+    Modified,
+    Name,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct SearchPaging {
+    pub sort: SearchSort,
+    pub limit: i64,
+    pub offset: i64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]

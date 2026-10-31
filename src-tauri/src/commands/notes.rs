@@ -2,7 +2,7 @@ use crate::db::{self, DbPool};
 use crate::models::{
     BacklinkEntry, CardKind, CardSummary, CodeLinkEntry, DueCard, ExtractedCallout, ExtractedCard,
     ExtractedFormula, ExtractedTask, GraphLink, GraphTag, McGradeResult, NoteMetadata, OpenTask,
-    SearchResult, WorkspaceTree,
+    SearchPage, SearchPaging, SearchSort, WorkspaceTree,
 };
 use crate::sm2;
 use regex::Regex;
@@ -1671,7 +1671,10 @@ pub async fn create_note(
     Ok(meta)
 }
 
+const SEARCH_PAGE_SIZE: i64 = 20;
+
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 pub async fn search_notes(
     workspace: String,
     query: String,
@@ -1679,41 +1682,53 @@ pub async fn search_notes(
     tag: Option<String>,
     block_type: Option<String>,
     all_workspaces: bool,
+    sort: Option<SearchSort>,
+    offset: Option<i64>,
     db: State<'_, DbPool>,
-) -> Result<Vec<SearchResult>, String> {
-    let trimmed = query.trim();
-    let fts_query = if trimmed.is_empty() {
-        None
-    } else {
-        Some(
-            trimmed
-                .split_whitespace()
-                .map(|w| format!("\"{}\"*", w.replace('"', "")))
-                .collect::<Vec<_>>()
-                .join(" "),
-        )
-    };
+) -> Result<SearchPage, String> {
+    let fts_query = db::fts_query::build_fts_query(&query);
 
     // A bare `folder:` or `tag:` with no free text is a real, useful search
     // ("everything in this folder") — only truly empty input short-circuits.
     if fts_query.is_none() && folder.is_none() && tag.is_none() && block_type.is_none() {
-        return Ok(vec![]);
+        return Ok(SearchPage {
+            results: vec![],
+            total: 0,
+        });
     }
 
-    db::notes::search_notes(
+    let scope = if all_workspaces {
+        None
+    } else {
+        Some(workspace.as_str())
+    };
+    let paging = SearchPaging {
+        sort: sort.unwrap_or_default(),
+        limit: SEARCH_PAGE_SIZE,
+        offset: offset.unwrap_or(0).max(0),
+    };
+    let results = db::notes::search_notes(
         &db,
-        if all_workspaces {
-            None
-        } else {
-            Some(&workspace)
-        },
+        scope,
+        fts_query.as_deref(),
+        folder.as_deref(),
+        tag.as_deref(),
+        block_type.as_deref(),
+        paging,
+    )
+    .await
+    .map_err(|e| e.to_string())?;
+    let total = db::notes::count_search_notes(
+        &db,
+        scope,
         fts_query.as_deref(),
         folder.as_deref(),
         tag.as_deref(),
         block_type.as_deref(),
     )
     .await
-    .map_err(|e| e.to_string())
+    .map_err(|e| e.to_string())?;
+    Ok(SearchPage { results, total })
 }
 
 #[tauri::command]
@@ -3490,10 +3505,21 @@ mod save_tests {
         .await
         .unwrap();
 
-        let hits =
-            db::notes::search_notes(&pool, Some("/ws"), Some("\"shortest\"*"), None, None, None)
-                .await
-                .unwrap();
+        let hits = db::notes::search_notes(
+            &pool,
+            Some("/ws"),
+            Some("\"shortest\"*"),
+            None,
+            None,
+            None,
+            SearchPaging {
+                sort: SearchSort::Relevance,
+                limit: 20,
+                offset: 0,
+            },
+        )
+        .await
+        .unwrap();
         assert_eq!(hits.len(), 1);
         assert_eq!(hits[0].title, "Dijkstra");
 
@@ -3977,10 +4003,21 @@ mod save_tests {
             .await
             .unwrap();
 
-        let results =
-            db::notes::search_notes(&pool, Some(&ws), Some("quicksort"), None, None, None)
-                .await
-                .unwrap();
+        let results = db::notes::search_notes(
+            &pool,
+            Some(&ws),
+            Some("quicksort"),
+            None,
+            None,
+            None,
+            SearchPaging {
+                sort: SearchSort::Relevance,
+                limit: 20,
+                offset: 0,
+            },
+        )
+        .await
+        .unwrap();
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].path, note.to_string_lossy());
     }
@@ -4018,10 +4055,21 @@ mod save_tests {
             .await
             .unwrap();
 
-        let results =
-            db::notes::search_notes(&pool, Some(&ws), Some("automaton"), None, None, None)
-                .await
-                .unwrap();
+        let results = db::notes::search_notes(
+            &pool,
+            Some(&ws),
+            Some("automaton"),
+            None,
+            None,
+            None,
+            SearchPaging {
+                sort: SearchSort::Relevance,
+                limit: 20,
+                offset: 0,
+            },
+        )
+        .await
+        .unwrap();
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].path, note.to_string_lossy());
     }

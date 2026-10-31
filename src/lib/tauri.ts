@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core'
-import type { NoteMetadata, WorkspaceState, WorkspaceTree, SearchResult, AppSettings, GraphLink, GraphTag, RepoMode, CommitOutcome, PushOutcome, PullOutcome, RebaseOutcome, RepoInitOutcome, TemplateMetadata, CrossRefTarget, OpenTask, DueCard, Grade, NoteHistoryEntry, GithubRepo, BacklinkEntry, PrinterInfo, McGradeResult, CardSummary, ErrorLogEntry, TrashEntry, CodeLinkStatus, CodeLinkTarget } from '../types'
+import type { NoteMetadata, WorkspaceState, WorkspaceTree, SearchPage, SearchSort, AppSettings, GraphLink, GraphTag, RepoMode, CommitOutcome, PushOutcome, PullOutcome, RebaseOutcome, RepoInitOutcome, TemplateMetadata, CrossRefTarget, OpenTask, DueCard, Grade, NoteHistoryEntry, GithubRepo, BacklinkEntry, PrinterInfo, McGradeResult, CardSummary, ErrorLogEntry, TrashEntry, CodeLinkStatus, CodeLinkTarget } from '../types'
 import type { PdfPage, PdfMarkdownImport } from '../pdf/types'
 import { useWorkspaceStore } from '../store/workspace'
 import { sidecarDir } from './pathPrefix'
@@ -33,14 +33,18 @@ export const api = {
       tag: string | null,
       blockType: string | null,
       allWorkspaces = false,
+      sort: SearchSort = 'relevance',
+      offset = 0,
     ) =>
-      invoke<SearchResult[]>('search_notes', {
+      invoke<SearchPage>('search_notes', {
         workspace,
         query,
         folder,
         tag,
         blockType,
         allWorkspaces,
+        sort,
+        offset,
       }),
     listTags: (workspace: string) =>
       invoke<string[]>('list_tags', { workspace }),

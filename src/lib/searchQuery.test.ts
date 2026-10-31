@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseSearchQuery } from './searchQuery'
+import { firstPositiveTerm, parseSearchQuery } from './searchQuery'
 
 describe('parseSearchQuery', () => {
   it('parses free text with no keys', () => {
@@ -66,5 +66,40 @@ describe('parseSearchQuery', () => {
       tag: null,
       type: null,
     })
+  })
+})
+
+describe('parseSearchQuery with operators', () => {
+  it('leaves phrase, OR, exclusion and grouping in the free text', () => {
+    expect(parseSearchQuery('folder:CS101 "master theorem" OR (a -b) tag:x')).toEqual({
+      text: '"master theorem" OR (a -b)',
+      folder: 'CS101',
+      tag: 'x',
+      type: null,
+    })
+  })
+})
+
+describe('firstPositiveTerm', () => {
+  it('returns a bare word', () => {
+    expect(firstPositiveTerm('shortest path')).toBe('shortest')
+  })
+
+  it('returns a whole quoted phrase', () => {
+    expect(firstPositiveTerm('"master theorem" OR recurrence')).toBe('master theorem')
+  })
+
+  it('skips exclusions, OR and grouping', () => {
+    expect(firstPositiveTerm('-heap OR (tree)')).toBe('tree')
+    expect(firstPositiveTerm('-"max heap" OR sort')).toBe('sort')
+  })
+
+  it('degrades on unbalanced quotes', () => {
+    expect(firstPositiveTerm('"open phrase')).toBe('open')
+  })
+
+  it('returns undefined when nothing is wanted', () => {
+    expect(firstPositiveTerm('-heap')).toBeUndefined()
+    expect(firstPositiveTerm('')).toBeUndefined()
   })
 })

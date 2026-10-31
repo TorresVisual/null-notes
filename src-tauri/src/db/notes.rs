@@ -1,6 +1,6 @@
 use crate::models::{
     CardKind, CardSummary, CodeLinkEntry, DueCard, ExtractedCard, ExtractedTask, NoteMetadata,
-    OpenTask, SearchResult,
+    OpenTask, SearchPaging, SearchResult, SearchSort,
 };
 use crate::sm2;
 use anyhow::Result;
@@ -179,62 +179,90 @@ pub async fn search_notes(
     folder: Option<&str>,
     tag: Option<&str>,
     block_type: Option<&str>,
+    paging: SearchPaging,
 ) -> Result<Vec<SearchResult>> {
-    let mut sql = String::from(
-        "SELECT notes_fts.path, notes_fts.title, n.workspace, \
+    let (from_where, binds) = search_scope(workspace, fts_query, folder, tag, block_type);
+    let order = match (paging.sort, fts_query.is_some()) {
+        (SearchSort::Relevance, true) => "rank, n.path",
+        (SearchSort::Name, _) => "notes_fts.title COLLATE NOCASE, n.path",
+        _ => "n.updated_at DESC, n.path",
+    };
+    let sql = format!(
+        "SELECT notes_fts.path, notes_fts.title, n.workspace, n.updated_at, \
          snippet(notes_fts, 2, '[[', ']]', '\u{2026}', 20) as snippet \
-         FROM notes_fts JOIN notes n ON n.path = notes_fts.path",
+         {from_where} ORDER BY {order} LIMIT ? OFFSET ?"
     );
-    if tag.is_some() {
+    let mut q = sqlx::query_as::<_, SearchResult>(&sql);
+    for bind in binds {
+        q = q.bind(bind);
+    }
+    Ok(q.bind(paging.limit)
+        .bind(paging.offset)
+        .fetch_all(pool)
+        .await?)
+}
+
+/// Total matches for the same scope `search_notes` pages through.
+pub async fn count_search_notes(
+    pool: &SqlitePool,
+    workspace: Option<&str>,
+    fts_query: Option<&str>,
+    folder: Option<&str>,
+    tag: Option<&str>,
+    block_type: Option<&str>,
+) -> Result<i64> {
+    let (from_where, binds) = search_scope(workspace, fts_query, folder, tag, block_type);
+    let sql = format!("SELECT COUNT(*) {from_where}");
+    let mut q = sqlx::query_scalar::<_, i64>(&sql);
+    for bind in binds {
+        q = q.bind(bind);
+    }
+    Ok(q.fetch_one(pool).await?)
+}
+
+/// The FROM/WHERE shared by the page and count queries, with its binds in
+/// placeholder order (every bind is text).
+fn search_scope(
+    workspace: Option<&str>,
+    fts_query: Option<&str>,
+    folder: Option<&str>,
+    tag: Option<&str>,
+    block_type: Option<&str>,
+) -> (String, Vec<String>) {
+    let mut sql = String::from("FROM notes_fts JOIN notes n ON n.path = notes_fts.path");
+    let mut binds = Vec::new();
+    if let Some(tag) = tag {
         sql.push_str(
             " JOIN note_tags nt ON nt.note_path = notes_fts.path AND nt.tag = ? COLLATE NOCASE",
         );
+        binds.push(tag.to_string());
     }
     let mut conditions = Vec::new();
-    if workspace.is_some() {
+    if let Some(workspace) = workspace {
         conditions.push("n.workspace = ?");
+        binds.push(workspace.to_string());
     }
-    if fts_query.is_some() {
+    if let Some(fts_query) = fts_query {
         conditions.push("notes_fts MATCH ?");
+        binds.push(fts_query.to_string());
     }
-    if folder.is_some() {
+    if let Some(folder) = folder {
         conditions.push("n.path LIKE ? ESCAPE '\\'");
+        binds.push(format!("%{}%", escape_like(folder)));
     }
-    if block_type.is_some() {
+    if let Some(block_type) = block_type {
         conditions.push("notes_fts.body LIKE ? ESCAPE '\\'");
+        binds.push(format!("%[!{}%", escape_like(&block_type.to_uppercase())));
     }
     if !conditions.is_empty() {
         sql.push_str(" WHERE ");
         sql.push_str(&conditions.join(" AND "));
     }
-    sql.push_str(if fts_query.is_some() {
-        " ORDER BY rank LIMIT 20"
-    } else {
-        " ORDER BY n.updated_at DESC LIMIT 20"
-    });
-
-    let mut q = sqlx::query_as::<_, SearchResult>(&sql);
-    if let Some(tag) = tag {
-        q = q.bind(tag.to_string());
-    }
-    if let Some(workspace) = workspace {
-        q = q.bind(workspace.to_string());
-    }
-    if let Some(fts_query) = fts_query {
-        q = q.bind(fts_query.to_string());
-    }
-    if let Some(folder) = folder {
-        q = q.bind(format!("%{}%", escape_like(folder)));
-    }
-    if let Some(block_type) = block_type {
-        q = q.bind(format!("%[!{}%", escape_like(&block_type.to_uppercase())));
-    }
-    let rows = q.fetch_all(pool).await?;
-    Ok(rows)
+    (sql, binds)
 }
 
 /// The note set a P9-2 formula sheet is generated from: the same folder/tag
-/// scoping as `search_notes`, minus the FTS match and the 20-result cap
+/// scoping as `search_notes`, minus the FTS match and the result paging
 /// (a sheet has to include *every* formula in scope, not a search page of
 /// them) and ordered by path rather than recency, so a regenerated sheet
 /// lists formulas in the same source order every time.
@@ -903,14 +931,132 @@ mod tests {
             .unwrap();
     }
 
+    async fn seed_operator_fixture(pool: &SqlitePool) {
+        let notes = [
+            ("1", "Master", "the master theorem solves recurrences", 3000),
+            ("2", "Theorem", "a theorem about the master of none", 2000),
+            ("3", "Heaps", "binary tree and max heap", 1000),
+            ("4", "Trees", "binary tree traversal and recurrence", 4000),
+        ];
+        for (id, title, body, updated_at) in notes {
+            let path = format!("/ws/{id}.md");
+            let meta = NoteMetadata {
+                updated_at,
+                ..note(id, title, &path, "/ws")
+            };
+            index_note(pool, &meta).await.unwrap();
+            index_note_content(pool, &path, title, body).await.unwrap();
+        }
+    }
+
+    async fn match_titles(pool: &SqlitePool, input: &str) -> Vec<String> {
+        let fts = crate::db::fts_query::build_fts_query(input);
+        let paging = SearchPaging {
+            sort: SearchSort::Name,
+            limit: 20,
+            offset: 0,
+        };
+        let hits = search_notes(pool, Some("/ws"), fts.as_deref(), None, None, None, paging)
+            .await
+            .unwrap();
+        hits.into_iter().map(|h| h.title).collect()
+    }
+
+    #[tokio::test]
+    async fn test_search_operators_phrase_or_exclusion_and_grouping() {
+        let pool = make_pool().await;
+        seed_operator_fixture(&pool).await;
+
+        assert_eq!(
+            match_titles(&pool, "\"master theorem\"").await,
+            ["Master"],
+            "a phrase needs its words adjacent and in order"
+        );
+        assert_eq!(match_titles(&pool, "master theorem").await.len(), 2);
+        assert_eq!(
+            match_titles(&pool, "heap OR traversal").await,
+            ["Heaps", "Trees"]
+        );
+        assert_eq!(match_titles(&pool, "binary tree -heap").await, ["Trees"]);
+        assert_eq!(match_titles(&pool, "binary -\"max heap\"").await, ["Trees"]);
+        assert_eq!(
+            match_titles(&pool, "binary (heap OR traversal) -max").await,
+            ["Trees"]
+        );
+        assert_eq!(match_titles(&pool, "\"binary tree").await.len(), 2);
+    }
+
+    #[tokio::test]
+    async fn test_search_notes_pages_counts_and_sorts() {
+        let pool = make_pool().await;
+        seed_operator_fixture(&pool).await;
+        let page = |sort, limit, offset| SearchPaging {
+            sort,
+            limit,
+            offset,
+        };
+        let titles = |hits: Vec<SearchResult>| -> Vec<String> {
+            hits.into_iter().map(|h| h.title).collect()
+        };
+
+        let count = count_search_notes(&pool, Some("/ws"), Some("\"the\"*"), None, None, None)
+            .await
+            .unwrap();
+        assert_eq!(count, 2);
+        assert_eq!(
+            count_search_notes(&pool, Some("/ws"), None, None, None, None)
+                .await
+                .unwrap(),
+            4
+        );
+
+        let by_modified = search_notes(
+            &pool,
+            Some("/ws"),
+            None,
+            None,
+            None,
+            None,
+            page(SearchSort::Modified, 20, 0),
+        )
+        .await
+        .unwrap();
+        assert_eq!(titles(by_modified), ["Trees", "Master", "Theorem", "Heaps"]);
+
+        let by_name_page_two = search_notes(
+            &pool,
+            Some("/ws"),
+            None,
+            None,
+            None,
+            None,
+            page(SearchSort::Name, 2, 2),
+        )
+        .await
+        .unwrap();
+        assert_eq!(titles(by_name_page_two), ["Theorem", "Trees"]);
+    }
+
     #[tokio::test]
     async fn test_search_notes_is_scoped_to_the_given_workspace() {
         let pool = make_pool().await;
         seed_search_fixture(&pool).await;
 
-        let hits = search_notes(&pool, Some("/ws"), Some("\"shortest\"*"), None, None, None)
-            .await
-            .unwrap();
+        let hits = search_notes(
+            &pool,
+            Some("/ws"),
+            Some("\"shortest\"*"),
+            None,
+            None,
+            None,
+            SearchPaging {
+                sort: SearchSort::Relevance,
+                limit: 20,
+                offset: 0,
+            },
+        )
+        .await
+        .unwrap();
 
         assert_eq!(hits.len(), 1);
         assert_eq!(hits[0].path, "/ws/CS101/a.md");
@@ -921,9 +1067,21 @@ mod tests {
         let pool = make_pool().await;
         seed_search_fixture(&pool).await;
 
-        let hits = search_notes(&pool, Some("/ws"), None, Some("CS102"), None, None)
-            .await
-            .unwrap();
+        let hits = search_notes(
+            &pool,
+            Some("/ws"),
+            None,
+            Some("CS102"),
+            None,
+            None,
+            SearchPaging {
+                sort: SearchSort::Relevance,
+                limit: 20,
+                offset: 0,
+            },
+        )
+        .await
+        .unwrap();
 
         assert_eq!(hits.len(), 1);
         assert_eq!(hits[0].path, "/ws/CS102/b.md");
@@ -934,9 +1092,21 @@ mod tests {
         let pool = make_pool().await;
         seed_search_fixture(&pool).await;
 
-        let hits = search_notes(&pool, Some("/ws"), None, None, Some("graphs"), None)
-            .await
-            .unwrap();
+        let hits = search_notes(
+            &pool,
+            Some("/ws"),
+            None,
+            None,
+            Some("graphs"),
+            None,
+            SearchPaging {
+                sort: SearchSort::Relevance,
+                limit: 20,
+                offset: 0,
+            },
+        )
+        .await
+        .unwrap();
 
         assert_eq!(hits.len(), 1);
         assert_eq!(hits[0].path, "/ws/CS101/a.md");
@@ -947,9 +1117,21 @@ mod tests {
         let pool = make_pool().await;
         seed_search_fixture(&pool).await;
 
-        let hits = search_notes(&pool, Some("/ws"), None, None, None, Some("theorem"))
-            .await
-            .unwrap();
+        let hits = search_notes(
+            &pool,
+            Some("/ws"),
+            None,
+            None,
+            None,
+            Some("theorem"),
+            SearchPaging {
+                sort: SearchSort::Relevance,
+                limit: 20,
+                offset: 0,
+            },
+        )
+        .await
+        .unwrap();
 
         assert_eq!(hits.len(), 1);
         assert_eq!(hits[0].path, "/ws/CS101/a.md");
@@ -967,6 +1149,11 @@ mod tests {
             Some("CS101"),
             None,
             None,
+            SearchPaging {
+                sort: SearchSort::Relevance,
+                limit: 20,
+                offset: 0,
+            },
         )
         .await
         .unwrap();
@@ -979,9 +1166,21 @@ mod tests {
         let pool = make_pool().await;
         seed_search_fixture(&pool).await;
 
-        let mut hits = search_notes(&pool, None, Some("\"shortest\"*"), None, None, None)
-            .await
-            .unwrap();
+        let mut hits = search_notes(
+            &pool,
+            None,
+            Some("\"shortest\"*"),
+            None,
+            None,
+            None,
+            SearchPaging {
+                sort: SearchSort::Relevance,
+                limit: 20,
+                offset: 0,
+            },
+        )
+        .await
+        .unwrap();
         hits.sort_by(|a, b| a.path.cmp(&b.path));
 
         let paths: Vec<&str> = hits.iter().map(|h| h.path.as_str()).collect();

@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
-import type { SearchResult } from '../types'
+import type { SearchResult, SearchSort } from '../types'
 import { api } from '../lib/tauri'
 import { useWorkspaceStore } from '../store/workspace'
 import { useWorkspace } from '../hooks/useWorkspace'
-import { parseSearchQuery } from '../lib/searchQuery'
+import { firstPositiveTerm, parseSearchQuery } from '../lib/searchQuery'
 import { setPendingHighlight } from '../lib/pendingHighlight'
 import {
   CommandDialog,
@@ -22,11 +22,14 @@ interface SearchModalProps {
 export function SearchModal({ onClose }: SearchModalProps) {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<SearchResult[]>([])
+  const [total, setTotal] = useState(0)
   const [allWorkspaces, setAllWorkspaces] = useState(false)
   const workspacePath = useWorkspaceStore((s) => s.path)
   const openTab = useWorkspaceStore((s) => s.openTab)
   const recentSearches = useWorkspaceStore((s) => s.recentSearches)
   const addRecentSearch = useWorkspaceStore((s) => s.addRecentSearch)
+  const sort = useWorkspaceStore((s) => s.searchSort)
+  const setSort = useWorkspaceStore((s) => s.setSearchSort)
   const { openWorkspaceAt } = useWorkspace()
 
   useEffect(() => {
@@ -34,16 +37,39 @@ export function SearchModal({ onClose }: SearchModalProps) {
     const { text, folder, tag, type } = parseSearchQuery(query)
     if (!text && !folder && !tag && !type) {
       setResults([])
+      setTotal(0)
       return
     }
+    let stale = false
     const timer = setTimeout(() => {
       api.notes
-        .search(workspacePath, text, folder, tag, type, allWorkspaces)
-        .then(setResults)
-        .catch(() => setResults([]))
+        .search(workspacePath, text, folder, tag, type, allWorkspaces, sort)
+        .then((page) => {
+          if (stale) return
+          setResults(page.results)
+          setTotal(page.total)
+        })
+        .catch(() => {
+          if (stale) return
+          setResults([])
+          setTotal(0)
+        })
     }, 150)
-    return () => clearTimeout(timer)
-  }, [query, workspacePath, allWorkspaces])
+    return () => {
+      stale = true
+      clearTimeout(timer)
+    }
+  }, [query, workspacePath, allWorkspaces, sort])
+
+  async function showMore() {
+    if (!workspacePath) return
+    const { text, folder, tag, type } = parseSearchQuery(query)
+    const page = await api.notes.search(
+      workspacePath, text, folder, tag, type, allWorkspaces, sort, results.length,
+    )
+    setResults((current) => [...current, ...page.results])
+    setTotal(page.total)
+  }
 
   async function open(result: SearchResult) {
     const { path, workspace } = result
@@ -52,9 +78,9 @@ export function SearchModal({ onClose }: SearchModalProps) {
       await openWorkspaceAt(workspace)
     }
     openTab(path)
-    const { text } = parseSearchQuery(query)
-    if (text) {
-      setPendingHighlight(path, text)
+    const term = firstPositiveTerm(parseSearchQuery(query).text)
+    if (term) {
+      setPendingHighlight(path, term)
       // NoteEditor may already be mounted for `path` (it was already the
       // active tab), in which case openTab above triggers no notePath/content
       // change for it to react to — this event covers that case; a fresh
@@ -75,7 +101,7 @@ export function SearchModal({ onClose }: SearchModalProps) {
       <Command shouldFilter={false}>
         <CommandInput
           className="search-modal-input"
-          placeholder="Search notes… (try folder:, tag:, or type:)"
+          placeholder={'Search notes… ("phrase", OR, -exclude, folder:, tag:, type:)'}
           value={query}
           onValueChange={setQuery}
         />
@@ -87,6 +113,21 @@ export function SearchModal({ onClose }: SearchModalProps) {
           />
           Search all workspaces
         </label>
+        {results.length > 0 && (
+          <div className="search-meta">
+            <span>{total} {total === 1 ? 'result' : 'results'}</span>
+            <select
+              className="search-sort"
+              aria-label="Sort results"
+              value={sort}
+              onChange={(e) => setSort(e.target.value as SearchSort)}
+            >
+              <option value="relevance">Relevance</option>
+              <option value="modified">Recently modified</option>
+              <option value="name">Name (A–Z)</option>
+            </select>
+          </div>
+        )}
         <CommandList className="search-results">
           {query.trim() === '' && recentSearches.length > 0 && (
             <CommandGroup className="search-recent">
@@ -110,6 +151,11 @@ export function SearchModal({ onClose }: SearchModalProps) {
                   <span className="search-result-snippet">{renderSnippet(r.snippet)}</span>
                 </CommandItem>
               ))}
+              {results.length < total && (
+                <CommandItem value="search-show-more" className="search-more items-stretch [&>svg]:hidden" onSelect={() => void showMore()}>
+                  Show more ({results.length} of {total})
+                </CommandItem>
+              )}
             </CommandGroup>
           )}
           {query.trim() !== '' && results.length === 0 && (

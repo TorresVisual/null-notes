@@ -44,3 +44,17 @@ export function parseSearchQuery(query: string): ParsedSearchQuery {
 
   return { text, folder, tag, type }
 }
+
+const TERM_PATTERN = /(-?)(?:"([^"]*)"|([^\s()"]+))/g
+
+/** The first term a note has to contain: a quoted phrase or bare word that
+ *  isn't excluded (`-x`) and isn't the `OR` operator. This is what a result
+ *  jump scrolls to, since the whole query text (operators and all) won't be
+ *  found in a note. */
+export function firstPositiveTerm(text: string): string | undefined {
+  for (const [, minus, phrase, word] of text.matchAll(TERM_PATTERN)) {
+    const term = phrase ?? word
+    if (!minus && term && (phrase !== undefined || term !== 'OR')) return term
+  }
+  return undefined
+}
