@@ -3,6 +3,7 @@ pub mod db;
 pub mod exercises;
 pub mod models;
 pub mod pdf;
+pub mod properties;
 pub mod sm2;
 
 use std::path::PathBuf;
