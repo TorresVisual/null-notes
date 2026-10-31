@@ -27,7 +27,7 @@ fn is_note_path(path: &Path) -> bool {
 }
 
 fn is_canvas_path(path: &Path) -> bool {
-    has_visible_ext(path, "canvas")
+    has_visible_ext(path, "canvas") || has_visible_ext(path, "base")
 }
 
 fn is_bookmarks_path(path: &Path) -> bool {
@@ -137,6 +137,13 @@ mod tests {
         assert!(!is_canvas_path(Path::new("/ws/.git/a.canvas")));
         assert!(!is_canvas_path(Path::new("/ws/a.md")));
         assert!(!is_note_path(Path::new("/ws/a.canvas")));
+    }
+
+    #[test]
+    fn test_is_canvas_path_also_classifies_bases() {
+        assert!(is_canvas_path(Path::new("/ws/Tasks.base")));
+        assert!(!is_canvas_path(Path::new("/ws/.Tasks.base.abc.tmp")));
+        assert!(!is_note_path(Path::new("/ws/Tasks.base")));
     }
 
     #[test]

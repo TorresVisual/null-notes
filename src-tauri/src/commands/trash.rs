@@ -113,8 +113,8 @@ fn trash_files(
 
     let moved = (|| -> std::io::Result<()> {
         move_path(src, &payload.join(file_name))?;
-        // A canvas shares its stem with a same-named note, whose sidecars aren't its own.
-        if !is_folder && !is_canvas(src) {
+        // A canvas or base shares its stem with a same-named note, whose sidecars aren't its own.
+        if !is_folder && !is_standalone(src) {
             for suffix in SIDECAR_SUFFIXES {
                 let sidecar = PathBuf::from(super::sidecar_dir_for(path, suffix));
                 if let Some(sidecar_name) = sidecar.file_name().filter(|_| sidecar.exists()) {
@@ -133,16 +133,21 @@ fn trash_files(
     Ok(entry)
 }
 
-fn is_canvas(path: &Path) -> bool {
-    path.extension().is_some_and(|e| e == "canvas")
+/// `.canvas` and `.base` files stand alone: they share a stem with a same-named
+/// note but own none of its sidecars.
+fn is_standalone(path: &Path) -> bool {
+    path.extension()
+        .is_some_and(|e| e == "canvas" || e == "base")
 }
 
 fn is_free(parent: &Path, entry: &TrashEntry, candidate: &str) -> bool {
     if entry.is_folder {
         return !parent.join(candidate).exists();
     }
-    if is_canvas(Path::new(&entry.original_path)) {
-        return !parent.join(format!("{candidate}.canvas")).exists();
+    let original = Path::new(&entry.original_path);
+    if is_standalone(original) {
+        let ext = original.extension().unwrap_or_default().to_string_lossy();
+        return !parent.join(format!("{candidate}.{ext}")).exists();
     }
     !parent.join(format!("{candidate}.md")).exists()
         && SIDECAR_SUFFIXES
@@ -179,7 +184,7 @@ fn restore_files(root: &Path, workspace: &str, id: &str) -> anyhow::Result<(Tras
         let suffix = item_name.strip_prefix(&stem).unwrap_or_default();
         let target = parent.join(format!("{candidate}{suffix}"));
         move_path(&item.path(), &target)?;
-        if suffix.is_empty() || suffix == ".md" || suffix == ".canvas" {
+        if suffix.is_empty() || matches!(suffix, ".md" | ".canvas" | ".base") {
             restored_root = target;
         }
     }
@@ -248,7 +253,7 @@ pub(super) async fn restore_at(
             let content = tokio::fs::read_to_string(&note.path).await?;
             index_note_at(&note.path, workspace, &content, db).await?;
         }
-    } else if !is_canvas(&restored) {
+    } else if !is_standalone(&restored) {
         let content = tokio::fs::read_to_string(&restored).await?;
         index_note_at(&restored_str, workspace, &content, db).await?;
     }
@@ -527,6 +532,37 @@ mod tests {
             .await
             .unwrap()
             .is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_trash_then_restore_base_keeps_a_sibling_notes_sidecars() {
+        let ws = tempdir().unwrap();
+        let trash = tempdir().unwrap();
+        write_note_with_sidecars(ws.path(), "Tasks");
+        let base = ws.path().join("Tasks.base");
+        std::fs::write(&base, "views: []\n").unwrap();
+        let pool = make_pool().await;
+        let workspace = ws.path().to_string_lossy().into_owned();
+
+        let entry = trash_note_at(trash.path(), &workspace, &base.to_string_lossy(), &pool)
+            .await
+            .unwrap();
+
+        assert!(!base.exists());
+        assert_note_with_sidecars(ws.path(), "Tasks");
+
+        std::fs::write(&base, "views: [new]\n").unwrap();
+        let restored = restore_at(trash.path(), &workspace, &entry.id, &pool)
+            .await
+            .unwrap();
+
+        assert_eq!(
+            restored,
+            ws.path().join("Tasks (restored).base").to_string_lossy()
+        );
+        assert_eq!(std::fs::read_to_string(&base).unwrap(), "views: [new]\n");
+        assert_eq!(std::fs::read_to_string(&restored).unwrap(), "views: []\n");
+        assert_note_with_sidecars(ws.path(), "Tasks");
     }
 
     #[tokio::test]

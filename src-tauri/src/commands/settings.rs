@@ -118,6 +118,7 @@ mod tests {
             cpp_compiler_command: "clang++".to_string(),
             code_run_timeout_secs: 30,
             keymap: [("search".to_string(), "Ctrl+Shift+S".to_string())].into(),
+            map_tile_url: "https://tiles.example/{z}/{x}/{y}.png".to_string(),
         };
         save_settings_to_dir(dir.path(), &original).await.unwrap();
         let loaded = load_settings_from_dir(dir.path()).await.unwrap();
@@ -130,6 +131,7 @@ mod tests {
             loaded.pdf_import_mode,
             crate::models::PdfImportMode::Markdown
         );
+        assert_eq!(loaded.map_tile_url, "https://tiles.example/{z}/{x}/{y}.png");
         assert_eq!(loaded.terminal_shell, "wsl -d Ubuntu");
         assert_eq!(loaded.code_indent_width, 4);
         assert_eq!(loaded.code_indent_char, crate::models::CodeIndentChar::Tab);

@@ -257,6 +257,45 @@ pub struct WorkspaceTree {
     pub canvases: Vec<String>,
 }
 
+/// One note as a base sees it: its frontmatter plus the file facts and link
+/// graph that `file.*` expressions read.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BaseRow {
+    pub path: String,
+    pub title: String,
+    pub properties: serde_json::Value,
+    pub parse_error: Option<String>,
+    pub ctime: i64,
+    pub mtime: i64,
+    pub size: u64,
+    pub tags: Vec<String>,
+    pub links: Vec<String>,
+    pub backlinks: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PropertiesResult {
+    pub properties: serde_json::Value,
+    pub error: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "camelCase")]
+pub enum PropertyEdit {
+    Set {
+        key: String,
+        value: serde_json::Value,
+    },
+    Remove {
+        key: String,
+    },
+    Rename {
+        from: String,
+        to: String,
+    },
+}
+
 // The connections graph's raw edges — link/tag resolution into an actual
 // node graph happens on the frontend, which already holds the notes list.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -516,6 +555,14 @@ pub struct AppSettings {
     /// the rest of settings.json.
     #[serde(default)]
     pub keymap: std::collections::HashMap<String, String>,
+    /// Raster tile URL template for the map layout of a base, with `{z}`,
+    /// `{x}` and `{y}` placeholders. Public OpenStreetMap by default.
+    #[serde(default = "default_map_tile_url")]
+    pub map_tile_url: String,
+}
+
+fn default_map_tile_url() -> String {
+    "https://tile.openstreetmap.org/{z}/{x}/{y}.png".to_string()
 }
 
 fn default_code_run_timeout_secs() -> u32 {
@@ -552,6 +599,7 @@ impl Default for AppSettings {
             cpp_compiler_command: String::new(),
             code_run_timeout_secs: default_code_run_timeout_secs(),
             keymap: Default::default(),
+            map_tile_url: default_map_tile_url(),
         }
     }
 }

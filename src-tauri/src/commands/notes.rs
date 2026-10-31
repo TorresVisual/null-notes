@@ -883,7 +883,7 @@ pub(super) async fn scan_dir_recursive(
             }
 
             let extension = path.extension().and_then(|e| e.to_str());
-            if extension == Some("canvas") {
+            if matches!(extension, Some("canvas" | "base")) {
                 shown.insert(dir.clone());
                 canvases.push(path.to_string_lossy().into_owned());
                 continue;
@@ -2092,9 +2092,10 @@ pub async fn rename_canvas(
 ) -> Result<String, String> {
     require_within_workspace(&workspace, &path)?;
     let old = Path::new(&path);
-    if old.extension().and_then(|e| e.to_str()) != Some("canvas") {
-        return Err(format!("not a canvas: {path}"));
-    }
+    let extension = match old.extension().and_then(|e| e.to_str()) {
+        Some(ext @ ("canvas" | "base")) => ext,
+        _ => return Err(format!("not a canvas: {path}")),
+    };
     let stem = safe_stem(&new_name);
     if stem.is_empty() {
         return Err("a canvas needs a name".to_string());
@@ -2102,7 +2103,7 @@ pub async fn rename_canvas(
     let parent = old
         .parent()
         .ok_or_else(|| format!("path has no parent directory: {path}"))?;
-    let new = parent.join(format!("{stem}.canvas"));
+    let new = parent.join(format!("{stem}.{extension}"));
     if tokio::fs::try_exists(&new)
         .await
         .map_err(|e| e.to_string())?
@@ -2202,7 +2203,7 @@ async fn seed_default_templates_at(
 // Same collision rule as `create_note_file`: refuse rather than silently
 // destroy an existing note. The only difference is the body comes from the
 // caller (a filled-in template) instead of a synthesized `# {title}` heading.
-async fn create_note_file_with_content(
+pub(super) async fn create_note_file_with_content(
     folder: &str,
     title: &str,
     content: &str,
@@ -3756,6 +3757,39 @@ mod tests {
 
         assert!(new.ends_with("New name.canvas"));
         assert!(!Path::new(&old).exists());
+        assert!(Path::new(&new).exists());
+    }
+
+    #[tokio::test]
+    async fn test_scan_dir_recursive_lists_bases_beside_canvases() {
+        let tmp = tempdir().unwrap();
+        let root = tmp.path();
+        std::fs::create_dir_all(root.join("Courses")).unwrap();
+        std::fs::write(root.join("Courses/Tasks.base"), "views: []\n").unwrap();
+        std::fs::write(root.join("map.canvas"), "{}").unwrap();
+
+        let ws = root.to_string_lossy().into_owned();
+        let (_, folders, mut canvases) = scan_dir_recursive(root, &ws).await.unwrap();
+
+        canvases.sort();
+        assert_eq!(folders.len(), 1);
+        assert_eq!(canvases.len(), 2);
+        assert!(canvases[0].ends_with("Tasks.base"));
+    }
+
+    #[tokio::test]
+    async fn test_rename_canvas_renames_a_base_keeping_its_extension() {
+        let tmp = tempdir().unwrap();
+        let ws = tmp.path().to_string_lossy().into_owned();
+        let old = tmp.path().join("a.base");
+        std::fs::write(&old, "views: []\n").unwrap();
+
+        let new = rename_canvas(ws, old.to_string_lossy().into_owned(), "b".into())
+            .await
+            .unwrap();
+
+        assert!(new.ends_with("b.base"));
+        assert!(!old.exists());
         assert!(Path::new(&new).exists());
     }
 
