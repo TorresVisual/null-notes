@@ -2479,6 +2479,40 @@ pre:has(code.language-expect)::before, pre:has(code.language-expected)::before {
    of source order (see CLAUDE.md's shadcn/Tailwind cascade note). */
 .wiki-link-preview { display: block; white-space: normal; text-align: left; max-width: 280px; }
 
+/* Note embeds (![[Note]]). Same 6px attached-box tier as the callout. */
+.note-embed {
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: 0 6px 6px 0;
+  margin: 0.8em 0;
+}
+
+.note-embed-header {
+  display: block;
+  width: 100%;
+  padding: 6px 14px;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-hover);
+  color: var(--text-secondary);
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.note-embed-header:hover { color: var(--accent-hover); }
+
+.note-embed-body { padding: 8px 14px; }
+.note-embed-body .ProseMirror > *:first-child { margin-top: 0; }
+.note-embed-body .ProseMirror > *:last-child { margin-bottom: 0; }
+
+.note-embed-missing {
+  padding: 8px 14px;
+  border-left-color: var(--border-strong);
+  color: var(--text-tertiary);
+  font-size: 13px;
+}
+
 /* Deliberately more muted and smaller than .shortcuts-row kbd: this is a
    peripheral hint next to the "Search" label, not the point of the row the
    way a shortcuts-overlay entry is — padding matches so the two don't drift
