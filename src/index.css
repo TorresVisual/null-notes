@@ -211,7 +211,7 @@ button, [role="button"], .tree-row, .tab, .search-result, .slash-menu-item,
 
 .context-menu, .slash-menu, .math-editor, .math-snippet-menu, .block-handle-menu,
 .search-modal, .settings-panel, .import-mode-dialog, .graph-view, .task-view,
-.review-session, .formula-sheet-prompt, .toast, .error-log-dialog, .update-dialog {
+.review-session, .formula-sheet-prompt, .toast, .error-log-dialog, .update-dialog, .trash-dialog {
   animation: surface-in var(--duration-base) var(--ease-spring);
 }
 
@@ -234,7 +234,23 @@ button, [role="button"], .tree-row, .tab, .search-result, .slash-menu-item,
   padding: var(--space-sm) var(--space-md);
   font-size: 13px;
   color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  pointer-events: auto;
 }
+
+.toast-action {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.toast-action:hover { color: var(--accent-hover); }
 
 /* Thin dark scrollbar for WebKit / WebView2 */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
@@ -4482,6 +4498,70 @@ input[type='checkbox']:focus-visible {
   width: min(640px, calc(100vw - 40px));
   max-height: min(600px, calc(100vh - 60px));
 }
+
+/* Trash dialog — reuses .settings-panel for chrome and .template-empty-hint
+   for the empty state; the rows below are its own. */
+.trash-dialog {
+  width: min(560px, calc(100vw - 40px));
+  max-height: min(600px, calc(100vh - 60px));
+}
+
+.trash-list { gap: 0; }
+
+.trash-entry {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-sm) 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.trash-entry:last-child { border-bottom: none; }
+
+.trash-entry-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.trash-entry-name {
+  font-size: 13px;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.trash-entry-meta {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-tertiary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.trash-entry-actions {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.trash-action {
+  padding: 2px 8px;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-tertiary);
+  font-size: 11px;
+  font-family: var(--font-mono);
+  cursor: pointer;
+}
+
+.trash-action:hover { color: var(--accent); border-color: var(--accent); }
+.trash-action.danger:hover { color: var(--danger); border-color: var(--danger); }
 
 .error-log-filter-input {
   width: 100%;

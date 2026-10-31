@@ -15,6 +15,7 @@ export type OverlayKind =
   | 'flashcard'
   | 'diagramPicker'
   | 'deck'
+  | 'trash'
 
 /**
  * One overlay open at a time, by construction: opening a new one always

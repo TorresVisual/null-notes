@@ -134,11 +134,13 @@ Consistently honored by the code but never written down until now (2026-07-29), 
 | `NoteName.pdf/` page sidecars (`pdf.rs`) | `recent-workspaces.json` (`workspace.rs`) |
 | `NoteName.assets/` pasted images (`assets.rs`) |  |
 | `.workspace.json` — UI state, gitignored |  |
+|  | `trash/` — deleted notes, folders and their sidecars (`trash.rs`) |
 
 Both sides are load-bearing:
 
 - `index.db` **is outside** because syncing a binary SQLite file produces conflicts nothing can merge — and it is *safe* to exclude only because principle #1 makes it rebuildable. The two rules hold each other up.
 - **Settings are outside** so machine-specific preferences don't fight across machines.
+- **Trash is outside** (#121) so a deleted note's ink never reaches git or Syncthing as dead weight, and the watcher sees a trashed note as the plain deletion it was. It is neither note content nor rebuildable — losing it loses only the undo net, never a live note — and it is deliberately machine-local: a deletion is recoverable on the machine where it happened. Entries are kept until emptied from the Trash dialog (File → Trash…); there is no automatic purge.
 - **Ink, PDF and image sidecars are inside** because a note whose drawings or figures didn't travel with it is a broken note. `NoteName.assets/` (P2-3) is the third of the same shape and needed no new argument — which is the point of having written the rule down.
 
 **The rule for new state:** decide which column it belongs in *before* choosing a file format, because that choice determines whether the format must also be a merge format. P5 makes this concrete — anything inside the workspace is now committed and pushed automatically — and P9-3 is the first feature where getting it wrong would be expensive. Anything that is neither note content nor rebuildable from note content needs an explicit decision recorded here.

@@ -5,8 +5,10 @@ import { confirm } from '@tauri-apps/plugin-dialog'
 import { TreeNode } from './TreeNode'
 import { useWorkspaceStore } from '../store/workspace'
 import { useNotesStore } from '../store/notes'
+import { useToastStore } from '../store/toast'
 import { api } from '../lib/tauri'
 import type { FolderTreeNode, NoteTreeNode } from '../lib/folderTree'
+import type { TrashEntry } from '../types'
 
 vi.mock('../lib/tauri', () => ({
   api: {
@@ -18,6 +20,9 @@ vi.mock('../lib/tauri', () => ({
       moveNote: vi.fn(),
       deleteFolder: vi.fn(),
     },
+    trash: {
+      restore: vi.fn(),
+    },
   },
 }))
 
@@ -27,6 +32,19 @@ vi.mock('@tauri-apps/plugin-dialog', () => ({
 }))
 
 const notesApi = vi.mocked(api.notes)
+const trashApi = vi.mocked(api.trash)
+
+function trashEntry(overrides: Partial<TrashEntry>): TrashEntry {
+  return {
+    id: 'trash-1',
+    workspace: '/ws',
+    originalPath: '/ws/Lecture 7.md',
+    isFolder: false,
+    name: 'Lecture 7',
+    trashedAt: 0,
+    ...overrides,
+  }
+}
 const dialog = vi.mocked({ confirm })
 
 const noteEntry: NoteTreeNode = {
@@ -57,6 +75,7 @@ beforeEach(() => {
     gitPendingPaths: [],
   })
   useNotesStore.setState({ notes: [noteEntry.note], folders: [], tags: [] })
+  useToastStore.setState({ toasts: [] })
   notesApi.scan.mockResolvedValue({ notes: [], folders: [] })
 })
 
@@ -69,8 +88,7 @@ describe('TreeNode delete (note)', () => {
   // deletion never reaches Git, because nothing told the auto-commit batch
   // a path had been removed.
   it('queues the deleted note path for auto-commit', async () => {
-    dialog.confirm.mockResolvedValue(true)
-    notesApi.delete.mockResolvedValue(undefined)
+    notesApi.delete.mockResolvedValue(trashEntry({}))
     render(<TreeNode entry={noteEntry} />)
 
     await userEvent.click(screen.getByRole('button', { name: `Delete ${noteEntry.name}` }))
@@ -87,14 +105,33 @@ describe('TreeNode delete (note)', () => {
     )
   })
 
-  it('does nothing when the confirm dialog is declined', async () => {
-    dialog.confirm.mockResolvedValue(false)
+  // Delete is recoverable now, so a single note goes without a confirm
+  // dialog and the toast's Undo is the safety net instead.
+  it('deletes without a confirm dialog and offers Undo', async () => {
+    notesApi.delete.mockResolvedValue(trashEntry({}))
     render(<TreeNode entry={noteEntry} />)
 
     await userEvent.click(screen.getByRole('button', { name: `Delete ${noteEntry.name}` }))
 
-    expect(notesApi.delete).not.toHaveBeenCalled()
-    expect(useWorkspaceStore.getState().gitPendingPaths).toEqual([])
+    expect(dialog.confirm).not.toHaveBeenCalled()
+    const [toast] = useToastStore.getState().toasts
+    expect(toast?.message).toBe('Deleted "Lecture 7"')
+    expect(toast?.action?.label).toBe('Undo')
+  })
+
+  it('Undo restores the trashed note and re-queues its paths', async () => {
+    notesApi.delete.mockResolvedValue(trashEntry({}))
+    trashApi.restore.mockResolvedValue('/ws/Lecture 7.md')
+    render(<TreeNode entry={noteEntry} />)
+    await userEvent.click(screen.getByRole('button', { name: `Delete ${noteEntry.name}` }))
+    useWorkspaceStore.setState({ gitPendingPaths: [] })
+
+    useToastStore.getState().toasts[0]?.action?.onClick()
+
+    await waitFor(() => expect(trashApi.restore).toHaveBeenCalledWith('/ws', 'trash-1'))
+    await waitFor(() =>
+      expect(useWorkspaceStore.getState().gitPendingPaths).toContain('/ws/Lecture 7.md'),
+    )
   })
 })
 
@@ -113,13 +150,13 @@ describe('TreeNode delete (folder, via right-click context menu)', () => {
       tags: [],
     })
     dialog.confirm.mockResolvedValue(true)
-    notesApi.deleteFolder.mockResolvedValue(undefined)
+    notesApi.deleteFolder.mockResolvedValue(trashEntry({ name: 'Target', originalPath: '/ws/Target', isFolder: true }))
     render(<TreeNode entry={folderEntry} />)
 
     fireEvent.contextMenu(screen.getByText('Target').closest('.tree-folder')!)
     await userEvent.click(await screen.findByRole('menuitem', { name: /Delete/ }))
 
-    expect(notesApi.deleteFolder).toHaveBeenCalledWith('/ws/Target')
+    expect(notesApi.deleteFolder).toHaveBeenCalledWith('/ws', '/ws/Target')
     expect(useWorkspaceStore.getState().gitPendingPaths).toEqual(['/ws/Target'])
   })
 

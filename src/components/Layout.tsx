@@ -26,6 +26,7 @@ import { FlashcardTypeDialog } from './FlashcardTypeDialog'
 import { DiagramPickerDialog } from './DiagramPickerDialog'
 import { ToastStack } from './ToastStack'
 import { UpdateDialog } from './UpdateDialog'
+import { TrashDialog } from './TrashDialog'
 import { useWorkspaceStore } from '../store/workspace'
 import { useNotesStore } from '../store/notes'
 import { useSettingsStore } from '../store/settings'
@@ -253,6 +254,9 @@ export function Layout() {
           break
         case 'settings':
           openOverlay('settings')
+          break
+        case 'trash':
+          if (workspacePath) openOverlay('trash')
           break
         case 'exit':
           await getCurrentWindow().close()
@@ -549,6 +553,7 @@ export function Layout() {
       {activeOverlay === 'search' && <SearchModal onClose={closeOverlay} />}
       {activeOverlay === 'switcher' && <QuickSwitcher onClose={closeOverlay} />}
       {activeOverlay === 'settings' && <SettingsPanel onClose={closeOverlay} />}
+      {activeOverlay === 'trash' && <TrashDialog onClose={closeOverlay} />}
       {activeOverlay === 'shortcuts' && <ShortcutsOverlay onClose={closeOverlay} />}
       <PromptDialog />
       <ToastStack />

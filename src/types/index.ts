@@ -108,6 +108,15 @@ export interface NoteHistoryEntry {
   path: string
 }
 
+export interface TrashEntry {
+  id: string
+  workspace: string
+  originalPath: string
+  isFolder: boolean
+  name: string
+  trashedAt: number
+}
+
 export interface GithubRepo {
   nameWithOwner: string
   url: string

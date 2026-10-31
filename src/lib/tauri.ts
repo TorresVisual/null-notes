@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core'
-import type { NoteMetadata, WorkspaceState, WorkspaceTree, SearchResult, AppSettings, GraphLink, GraphTag, RepoMode, CommitOutcome, PushOutcome, PullOutcome, RebaseOutcome, RepoInitOutcome, TemplateMetadata, CrossRefTarget, OpenTask, DueCard, Grade, NoteHistoryEntry, GithubRepo, BacklinkEntry, PrinterInfo, McGradeResult, CardSummary, ErrorLogEntry, CodeLinkStatus, CodeLinkTarget } from '../types'
+import type { NoteMetadata, WorkspaceState, WorkspaceTree, SearchResult, AppSettings, GraphLink, GraphTag, RepoMode, CommitOutcome, PushOutcome, PullOutcome, RebaseOutcome, RepoInitOutcome, TemplateMetadata, CrossRefTarget, OpenTask, DueCard, Grade, NoteHistoryEntry, GithubRepo, BacklinkEntry, PrinterInfo, McGradeResult, CardSummary, ErrorLogEntry, TrashEntry, CodeLinkStatus, CodeLinkTarget } from '../types'
 import type { PdfPage, PdfMarkdownImport } from '../pdf/types'
 import { useWorkspaceStore } from '../store/workspace'
 import { sidecarDir } from './pathPrefix'
@@ -25,7 +25,7 @@ export const api = {
     rename: (path: string, newTitle: string, workspace: string) =>
       invoke<NoteMetadata>('rename_note', { path, newTitle, workspace }),
     delete: (workspace: string, path: string) =>
-      invoke<void>('delete_note', { workspace, path }),
+      invoke<TrashEntry>('delete_note', { workspace, path }),
     search: (
       workspace: string,
       query: string,
@@ -69,8 +69,8 @@ export const api = {
       invoke<void>('open_in_editor', { workspace, target, line }),
     renameFolder: (oldPath: string, newPath: string) =>
       invoke<void>('rename_folder', { oldPath, newPath }),
-    deleteFolder: (path: string) =>
-      invoke<void>('delete_folder', { path }),
+    deleteFolder: (workspace: string, path: string) =>
+      invoke<TrashEntry>('delete_folder', { workspace, path }),
     moveNote: (path: string, destFolder: string) =>
       invoke<string>('move_note', { path, destFolder }),
     graphLinks: (workspace: string) =>
@@ -171,6 +171,16 @@ export const api = {
       invoke<AppSettings>('load_settings'),
     save: (settings: AppSettings) =>
       invoke<void>('save_settings', { settings }),
+  },
+  trash: {
+    list: (workspace: string) =>
+      invoke<TrashEntry[]>('list_trash', { workspace }),
+    restore: (workspace: string, id: string) =>
+      invoke<string>('restore_trash_entry', { workspace, id }),
+    purge: (id: string) =>
+      invoke<void>('purge_trash_entry', { id }),
+    empty: (workspace: string) =>
+      invoke<void>('empty_trash', { workspace }),
   },
   errorLog: {
     record: (source: string, message: string, context: string | null) =>

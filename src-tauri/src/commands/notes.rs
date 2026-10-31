@@ -13,7 +13,7 @@ use tauri::State;
 use tokio::io::AsyncWriteExt;
 use uuid::Uuid;
 
-fn now_ms() -> i64 {
+pub(super) fn now_ms() -> i64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
@@ -27,7 +27,7 @@ fn now_ms() -> i64 {
 // posture as that function and assets.rs's resolve_relative though: reject a
 // `..`/prefix-escaping component as written, before ever comparing against
 // the workspace, so a literal escape can't be normalised away first (M-1).
-fn require_within_workspace(workspace: &str, path: &str) -> Result<(), String> {
+pub(super) fn require_within_workspace(workspace: &str, path: &str) -> Result<(), String> {
     let candidate = Path::new(path);
     if !candidate.is_absolute() {
         return Err(format!("not an absolute path: {path}"));
@@ -816,7 +816,7 @@ pub(crate) fn is_excluded_dir(name: &str) -> bool {
         || name == TEMPLATES_DIR
 }
 
-async fn scan_dir_recursive(
+pub(super) async fn scan_dir_recursive(
     root: &std::path::Path,
     workspace: &str,
 ) -> anyhow::Result<(Vec<NoteMetadata>, Vec<String>)> {
@@ -1006,7 +1006,7 @@ async fn diagram_search_text_for(content: &str) -> String {
     texts.join("\n")
 }
 
-async fn index_note_at(
+pub(super) async fn index_note_at(
     path: &str,
     workspace: &str,
     content: &str,
@@ -1612,7 +1612,7 @@ pub async fn rename_tag(
         .map_err(|e| e.to_string())
 }
 
-async fn forget_note(path: &str, db: &DbPool) -> anyhow::Result<()> {
+pub(super) async fn forget_note(path: &str, db: &DbPool) -> anyhow::Result<()> {
     db::notes::remove_note(db, path).await?;
     db::notes::remove_from_fts(db, path).await?;
     db::notes::set_tags(db, path, &[]).await?;
@@ -1647,29 +1647,6 @@ pub async fn create_note(
         .map_err(|e| e.to_string())?;
 
     Ok(meta)
-}
-
-async fn delete_note_at(path: &str, db: &DbPool) -> anyhow::Result<()> {
-    tokio::fs::remove_file(path).await?;
-
-    // Every sidecar, not just .ink — a note's images/PDF pages/diagrams are
-    // just as orphaned on disk (and just as invisible to git) if left behind.
-    for suffix in ["ink", "pdf", "diagrams", "assets"] {
-        let dir = super::sidecar_dir_for(path, suffix);
-        let _ = tokio::fs::remove_dir_all(&dir).await;
-    }
-
-    forget_note(path, db).await
-}
-
-#[tauri::command]
-pub async fn delete_note(
-    workspace: String,
-    path: String,
-    db: State<'_, DbPool>,
-) -> Result<(), String> {
-    require_within_workspace(&workspace, &path)?;
-    delete_note_at(&path, &db).await.map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -2314,13 +2291,6 @@ async fn rename_folder_at(old_path: &str, new_path: &str, db: &DbPool) -> anyhow
     Ok(())
 }
 
-async fn delete_folder_at(path: &str, db: &DbPool) -> anyhow::Result<()> {
-    tokio::fs::remove_dir_all(path).await?;
-    let prefix = format!("{}{}", path, std::path::MAIN_SEPARATOR);
-    db::notes::remove_notes_under(db, &prefix).await?;
-    Ok(())
-}
-
 async fn move_note_at(path: &str, dest_folder: &str, db: &DbPool) -> anyhow::Result<String> {
     let file_name = std::path::Path::new(path)
         .file_name()
@@ -2364,13 +2334,6 @@ pub async fn rename_folder(
     db: State<'_, DbPool>,
 ) -> Result<(), String> {
     rename_folder_at(&old_path, &new_path, &db)
-        .await
-        .map_err(|e| e.to_string())
-}
-
-#[tauri::command]
-pub async fn delete_folder(path: String, db: State<'_, DbPool>) -> Result<(), String> {
-    delete_folder_at(&path, &db)
         .await
         .map_err(|e| e.to_string())
 }
@@ -4603,39 +4566,6 @@ mod folder_tests {
     }
 
     #[tokio::test]
-    async fn test_delete_folder_at_removes_dir_and_notes() {
-        let tmp = tempdir().unwrap();
-        let root = tmp.path();
-        let dir = root.join("ToDelete");
-        std::fs::create_dir_all(&dir).unwrap();
-        std::fs::write(dir.join("note.md"), "# Note").unwrap();
-
-        let pool = make_pool().await;
-        db_index_note(
-            &pool,
-            &NoteMetadata {
-                id: "a".into(),
-                title: "Note".into(),
-                path: dir.join("note.md").to_string_lossy().into_owned(),
-                workspace: root.to_string_lossy().into_owned(),
-                updated_at: 1000,
-            },
-        )
-        .await
-        .unwrap();
-
-        delete_folder_at(&dir.to_string_lossy(), &pool)
-            .await
-            .unwrap();
-
-        assert!(!dir.exists());
-        let notes = db::notes::list_by_workspace(&pool, &root.to_string_lossy())
-            .await
-            .unwrap();
-        assert!(notes.is_empty());
-    }
-
-    #[tokio::test]
     async fn test_move_note_at_moves_file_and_every_sidecar() {
         let tmp = tempdir().unwrap();
         let root = tmp.path();
@@ -4715,47 +4645,6 @@ mod folder_tests {
             "# Survivor",
             "existing note at the destination must not be overwritten"
         );
-    }
-
-    #[tokio::test]
-    async fn test_delete_note_at_removes_every_sidecar() {
-        let tmp = tempdir().unwrap();
-        let root = tmp.path();
-        std::fs::write(root.join("note.md"), "# Note").unwrap();
-        for suffix in ["ink", "pdf", "diagrams", "assets"] {
-            let dir = root.join(format!("note.{suffix}"));
-            std::fs::create_dir_all(&dir).unwrap();
-            std::fs::write(dir.join("child"), "content").unwrap();
-        }
-
-        let pool = make_pool().await;
-        let path = root.join("note.md").to_string_lossy().into_owned();
-        db_index_note(
-            &pool,
-            &NoteMetadata {
-                id: "a".into(),
-                title: "Note".into(),
-                path: path.clone(),
-                workspace: root.to_string_lossy().into_owned(),
-                updated_at: 1000,
-            },
-        )
-        .await
-        .unwrap();
-
-        delete_note_at(&path, &pool).await.unwrap();
-
-        assert!(!root.join("note.md").exists());
-        for suffix in ["ink", "pdf", "diagrams", "assets"] {
-            assert!(
-                !root.join(format!("note.{suffix}")).exists(),
-                "note.{suffix} must not survive delete"
-            );
-        }
-        let notes = db::notes::list_by_workspace(&pool, &root.to_string_lossy())
-            .await
-            .unwrap();
-        assert!(notes.is_empty());
     }
 
     #[test]

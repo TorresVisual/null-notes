@@ -1,5 +1,5 @@
-import { describe, it, expect, afterEach } from 'vitest'
-import { render, screen, cleanup, act } from '@testing-library/react'
+import { describe, it, expect, afterEach, vi } from 'vitest'
+import { render, screen, cleanup, act, fireEvent } from '@testing-library/react'
 import { ToastStack } from './ToastStack'
 import { useToastStore, showToast } from '../store/toast'
 
@@ -30,5 +30,18 @@ describe('ToastStack', () => {
 
     const items = screen.getAllByRole('status')
     expect(items.map((el) => el.textContent)).toEqual(['First', 'Second'])
+  })
+})
+
+describe('ToastStack action', () => {
+  it('runs the action and dismisses the toast when its button is clicked', () => {
+    const onClick = vi.fn()
+    render(<ToastStack />)
+    act(() => showToast('Deleted "Lecture 7"', { label: 'Undo', onClick }))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Undo' }))
+
+    expect(onClick).toHaveBeenCalledTimes(1)
+    expect(useToastStore.getState().toasts).toHaveLength(0)
   })
 })

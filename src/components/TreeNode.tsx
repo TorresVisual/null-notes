@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { ChevronRight, Pencil, Trash2 } from 'lucide-react'
 import { confirm } from '@tauri-apps/plugin-dialog'
+import { offerUndoDelete } from '../hooks/useTrash'
 import { useWorkspaceStore } from '../store/workspace'
 import { useNotesStore } from '../store/notes'
 import { promptText } from '../store/promptDialog'
@@ -24,6 +25,7 @@ interface TreeNodeProps {
 export function TreeNode({ entry }: TreeNodeProps) {
   const [dragOver, setDragOver] = useState(false)
   const expandedFolders = useWorkspaceStore((s) => s.expandedFolders)
+  const workspacePath = useWorkspaceStore((s) => s.path)
   const selectedFolder = useWorkspaceStore((s) => s.selectedFolder)
   const activeTab = useWorkspaceStore((s) => s.activeTab)
   const toggleFolder = useWorkspaceStore((s) => s.toggleFolder)
@@ -70,9 +72,9 @@ export function TreeNode({ entry }: TreeNodeProps) {
 
     async function handleDelete(e: React.MouseEvent) {
       e.stopPropagation()
-      if (!(await confirm(`Delete "${entry.name}"?`))) return
+      let trashed
       try {
-        await api.notes.delete(workspace, entry.path)
+        trashed = await api.notes.delete(workspace, entry.path)
       } catch (err) {
         setFolderError(err instanceof Error ? err.message : String(err))
         return
@@ -88,6 +90,7 @@ export function TreeNode({ entry }: TreeNodeProps) {
         useWorkspaceStore.getState().addGitPendingPath(sidecarDir(entry.path, suffix))
       }
       useWorkspaceStore.getState().addGitPendingPath(entry.path)
+      offerUndoDelete(workspace, trashed)
     }
 
     return (
@@ -191,11 +194,12 @@ export function TreeNode({ entry }: TreeNodeProps) {
   }
 
   async function handleDeleteFolder() {
+    if (!workspacePath) return
     const count = notes.filter((n) => isUnderPath(n.path, entry.path)).length
     const noun = count === 1 ? 'note' : 'notes'
-    if (!(await confirm(`Delete "${entry.name}" and its ${count} ${noun}? This cannot be undone.`))) return
+    if (!(await confirm(`Delete "${entry.name}" and its ${count} ${noun}? You can restore it from Trash.`))) return
     try {
-      await api.notes.deleteFolder(entry.path)
+      const trashed = await api.notes.deleteFolder(workspacePath, entry.path)
       closeTabsUnder(entry.path)
       setSelectedFolder(null)
       setFolderError(null)
@@ -203,6 +207,7 @@ export function TreeNode({ entry }: TreeNodeProps) {
       // no need to enumerate each note individually. Without this the whole
       // subtree's deletion never enters the auto-commit's pending list.
       useWorkspaceStore.getState().addGitPendingPath(entry.path)
+      offerUndoDelete(workspacePath, trashed)
       await refreshTree()
     } catch (e) {
       setFolderError(e instanceof Error ? e.message : String(e))

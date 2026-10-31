@@ -16,6 +16,7 @@ pub mod pdf;
 pub mod printing;
 pub mod settings;
 pub mod terminal;
+pub mod trash;
 pub mod watcher;
 pub mod window;
 pub mod workspace;
