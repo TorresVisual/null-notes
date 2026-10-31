@@ -110,7 +110,7 @@ Recorded so they are not silently reopened.
 
 | Question | Verdict | Date |
 | --- | --- | --- |
-| Freeform 2D canvas (true OneNote) | **Won't build.** Ink-in-flow is the answer; principle #1 below stands unamended. | 2026-08-13 |
+| Freeform 2D canvas (true OneNote) | **Won't build** as a freeform surface inside notes: ink-in-flow is the answer, and principle #1 below stands unamended. A standalone `.canvas` file for reviewing an external agent's brainstorm passes was added 2026-10-31 as a narrow exception (see `docs/specs/agent-canvas-design.md`). | 2026-08-13 |
 | Does the maintainer currently supply the daily-use signal §3 prioritizes by? | **No** — building, not using. Every priority call below M4 is an estimate. This is the argument for the dogfood slice in §6. | 2026-08-13 |
 | Will the maintainer actually dogfood for a couple of weeks before P5/P6/P9 continue, per §6 step 5? | **No.** The maintainer's mode is implementing features, verified by "does it work," not lived daily-use friction — that isn't going to change on its own, so a wait gate keyed on it never resolves. **Step 5's wait is dropped.** P5/P6/P9 proceed on the pre-dogfood priority order (§6's "superseded order": P5 → P6 → P9), the roadmap's best estimate rather than an observed one, revised opportunistically if a specific choice proves wrong when actually tried — not via a dedicated observation period that isn't happening. | 2026-08-17 |
 
