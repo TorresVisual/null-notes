@@ -3364,6 +3364,36 @@ li > .folder-tree.tree-guide {
   padding: 4px 0;
 }
 
+/* Outgoing-links panel: a card docked left of the outline rail, over the note
+   rather than reflowing it, same as the outline flyout. */
+.outgoing-panel {
+  position: absolute;
+  top: var(--space-md);
+  right: 56px;
+  width: 260px;
+  max-height: calc(100% - 2 * var(--space-md));
+  overflow-y: auto;
+  padding: var(--space-md);
+  background: var(--bg-raised);
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  box-shadow: var(--shadow-modal);
+  z-index: 20;
+}
+
+.outgoing-panel .outline-panel-title:not(:first-child) { margin-top: var(--space-md); }
+.outgoing-panel .backlink-item:disabled { cursor: default; opacity: 0.6; }
+.outgoing-panel .backlink-item:disabled .backlink-title { text-decoration: none; }
+.outgoing-panel .backlink-title.wiki-link-missing { color: var(--text-tertiary); }
+.outgoing-count { margin-left: 6px; color: var(--text-tertiary); font-size: 12px; }
+
+.outgoing-folder {
+  display: block;
+  color: var(--text-tertiary);
+  font-size: 12px;
+  margin-top: 1px;
+}
+
 .backlink-title { display: block; color: var(--accent); font-size: 13px; }
 .backlink-item:hover .backlink-title { text-decoration: underline; }
 
@@ -5394,6 +5424,7 @@ input[type='checkbox']:focus-visible {
 :is(.print-preview-pages, #print-root) .editor-status,
 :is(.print-preview-pages, #print-root) .backlinks-panel,
 :is(.print-preview-pages, #print-root) .outline-panel,
+:is(.print-preview-pages, #print-root) .outgoing-panel,
 :is(.print-preview-pages, #print-root) .search-overlay,
 :is(.print-preview-pages, #print-root) .code-block-open-in-ide-group,
 :is(.print-preview-pages, #print-root) .code-block-actions,

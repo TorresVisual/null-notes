@@ -10,6 +10,7 @@ import { takePendingHighlight } from '../lib/pendingHighlight'
 import { highlightHeading, highlightSearchMatch } from './extensions/SearchJumpHighlight'
 import { handleEditorKeyDown, handleEditorTextInput } from './extensions/CodeBlockEditor'
 import { splitIntoTasks, report, markdownOf } from './splitIntoTasks'
+import { linkMention, LINK_MENTION_EVENT } from './linkMention'
 import { EditorStatusBar } from './EditorStatusBar'
 import { BlockHandle } from './extensions/BlockHandle'
 import { EditorToolbar } from './toolbar/EditorToolbar'
@@ -208,6 +209,18 @@ export function NoteEditor({
     window.addEventListener('command:split-tasks', handler)
     return () => window.removeEventListener('command:split-tasks', handler)
   }, [editor, onChange])
+
+  // The outgoing-links panel's "link this mention" action. The note path in
+  // the event keeps a second pane showing a different note from reacting.
+  useEffect(() => {
+    if (!editor) return
+    const handler = (event: Event) => {
+      const detail = (event as CustomEvent<{ notePath: string; title: string }>).detail
+      if (detail.notePath === notePath) linkMention(editor, detail.title)
+    }
+    window.addEventListener(LINK_MENTION_EVENT, handler)
+    return () => window.removeEventListener(LINK_MENTION_EVENT, handler)
+  }, [editor, notePath])
 
   return (
     <div className="note-editor-wrap">

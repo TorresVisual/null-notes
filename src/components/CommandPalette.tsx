@@ -18,6 +18,7 @@ const NEEDS_NOTE = new Set([
   'export-pdf',
   'print',
   'toggle-outline',
+  'toggle-outgoing-links',
   'close-tab',
   'toggle-pin-tab',
   'next-tab',

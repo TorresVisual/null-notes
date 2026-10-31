@@ -24,11 +24,11 @@ export function useCreateNote() {
   const inFlight = useRef(false)
 
   return useCallback(
-    async (title: string, content?: string): Promise<NoteMetadata | null> => {
+    async (title: string, content?: string, folderOverride?: string): Promise<NoteMetadata | null> => {
       if (!workspacePath || inFlight.current) return null
       inFlight.current = true
       try {
-        const folder = selectedFolder ?? workspacePath
+        const folder = folderOverride ?? selectedFolder ?? workspacePath
         const meta =
           content === undefined
             ? await api.notes.create(workspacePath, folder, title)

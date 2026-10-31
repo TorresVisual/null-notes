@@ -49,6 +49,7 @@ export const COMMANDS: CommandDef[] = [
   def('graph-view', 'Connections Graph', 'View', 'Ctrl+G'),
   def('toggle-terminal', 'Toggle Terminal', 'View', 'Ctrl+`'),
   def('toggle-outline', 'Toggle Outline', 'View', 'Ctrl+Shift+O'),
+  def('toggle-outgoing-links', 'Toggle Outgoing Links', 'View'),
   def('toggle-sidebar', 'Toggle Sidebar', 'View', 'Ctrl+\\'),
   def('task-view', 'Tasks', 'Study', 'Ctrl+Shift+K'),
   def('review', 'Review', 'Study', 'Ctrl+Shift+R'),

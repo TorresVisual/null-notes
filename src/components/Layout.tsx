@@ -11,6 +11,7 @@ import { SearchModal } from './SearchModal'
 import { QuickSwitcher } from './QuickSwitcher'
 import { CommandPalette } from './CommandPalette'
 import { OutlinePanel } from './OutlinePanel'
+import { OutgoingLinksPanel } from './OutgoingLinksPanel'
 import { SettingsPanel } from './SettingsPanel'
 import { ShortcutsOverlay } from './ShortcutsOverlay'
 import { PromptDialog } from './PromptDialog'
@@ -148,6 +149,7 @@ export function Layout() {
   } = useNote(secondaryTab)
   const { activeOverlay, openOverlay, closeOverlay } = useOverlayManager()
   const [outlineOpen, setOutlineOpen] = useState(true)
+  const [outgoingLinksOpen, setOutgoingLinksOpen] = useState(false)
   const editorPaneRef = useRef<HTMLDivElement>(null)
   const [terminalMounted, setTerminalMounted] = useState(false)
   const [terminalOpen, setTerminalOpen] = useState(false)
@@ -355,6 +357,9 @@ export function Layout() {
           break
         case 'toggle-outline':
           if (activeTab) setOutlineOpen((o) => !o)
+          break
+        case 'toggle-outgoing-links':
+          if (activeTab) setOutgoingLinksOpen((o) => !o)
           break
         case 'close-tab':
           if (activeTab) await requestCloseTab(activeTab)
@@ -802,6 +807,9 @@ export function Layout() {
             {primaryEditorPane}
             {!isLoading && activeTab && primaryViewMode === 'wysiwyg' && outlineOpen && (
               <OutlinePanel content={content} containerRef={editorPaneRef} />
+            )}
+            {!isLoading && activeTab && primaryViewMode === 'wysiwyg' && outgoingLinksOpen && (
+              <OutgoingLinksPanel content={content} notePath={activeTab} />
             )}
           </div>
           {secondaryTab && (
