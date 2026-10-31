@@ -5,6 +5,7 @@ const reset = () =>
   useWorkspaceStore.setState({
     path: null,
     openTabs: [],
+    pinnedTabs: [],
     activeTab: null,
     secondaryTab: null,
     splitRatio: 0.5,
@@ -44,6 +45,58 @@ describe('useWorkspaceStore', () => {
     useWorkspaceStore.getState().closeTab('/ws/b.md')
     expect(useWorkspaceStore.getState().openTabs).not.toContain('/ws/b.md')
     expect(useWorkspaceStore.getState().activeTab).toBe('/ws/a.md')
+  })
+
+  describe('pinned tabs', () => {
+    const open = (...paths: string[]) => paths.forEach((p) => useWorkspaceStore.getState().openTab(p))
+    const state = () => useWorkspaceStore.getState()
+
+    it('pinning moves the tab to the front; unpinning puts it after the pinned ones', () => {
+      open('/ws/a.md', '/ws/b.md', '/ws/c.md')
+      state().togglePinTab('/ws/c.md')
+      expect(state().openTabs).toEqual(['/ws/c.md', '/ws/a.md', '/ws/b.md'])
+      state().togglePinTab('/ws/b.md')
+      expect(state().openTabs).toEqual(['/ws/c.md', '/ws/b.md', '/ws/a.md'])
+      state().togglePinTab('/ws/c.md')
+      expect(state().pinnedTabs).toEqual(['/ws/b.md'])
+      expect(state().openTabs).toEqual(['/ws/b.md', '/ws/c.md', '/ws/a.md'])
+    })
+
+    it('a link opened from a pinned tab lands in a new tab; the pinned note stays', () => {
+      open('/ws/ref.md')
+      state().togglePinTab('/ws/ref.md')
+      state().openTab('/ws/other.md')
+      expect(state().openTabs).toEqual(['/ws/ref.md', '/ws/other.md'])
+      expect(state().activeTab).toBe('/ws/other.md')
+    })
+
+    it('does not reorder across the pinned boundary', () => {
+      open('/ws/a.md', '/ws/b.md')
+      state().togglePinTab('/ws/a.md')
+      state().reorderTabs('/ws/b.md', '/ws/a.md')
+      expect(state().openTabs).toEqual(['/ws/a.md', '/ws/b.md'])
+    })
+
+    it('closing a tab drops its pin', () => {
+      open('/ws/a.md')
+      state().togglePinTab('/ws/a.md')
+      state().closeTab('/ws/a.md')
+      expect(state().pinnedTabs).toEqual([])
+    })
+
+    it('setPinnedTabs restores pins, ignoring tabs that are no longer open', () => {
+      open('/ws/a.md', '/ws/b.md')
+      state().setPinnedTabs(['/ws/b.md', '/ws/gone.md'])
+      expect(state().pinnedTabs).toEqual(['/ws/b.md'])
+      expect(state().openTabs).toEqual(['/ws/b.md', '/ws/a.md'])
+    })
+
+    it('follows a folder rename', () => {
+      open('/ws/C1/a.md')
+      state().togglePinTab('/ws/C1/a.md')
+      state().replaceOpenPath('/ws/C1', '/ws/C2')
+      expect(state().pinnedTabs).toEqual(['/ws/C2/a.md'])
+    })
   })
 
   it('closing the only tab sets activeTab to null', () => {

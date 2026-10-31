@@ -26,6 +26,7 @@ export function useGitConfig() {
         splitRatio,
         sidebarCollapsed,
         tagsCollapsed,
+        pinnedTabs,
         expandedFolders,
         recentSearches,
       } = useWorkspaceStore.getState()
@@ -39,6 +40,7 @@ export function useGitConfig() {
         splitRatio,
         sidebarCollapsed,
         tagsCollapsed,
+        pinnedTabs,
         expandedFolders,
         recentSearches,
         git: next,

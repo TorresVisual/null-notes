@@ -6,12 +6,22 @@ export interface PaletteContext {
   hasWorkspace: boolean
   hasNote: boolean
   repoMode: boolean
+  tabPinned?: boolean
 }
+
+// Ctrl+1..8 jump to that tab, Ctrl+9 to the last one.
+const GOTO_TAB_ACTIONS: MenuEntry[] = Array.from({ length: 9 }, (_, i) => ({
+  id: `goto-tab:${i + 1}`,
+  label: i === 8 ? 'Go to Last Tab' : `Go to Tab ${i + 1}`,
+  accel: `Ctrl+${i + 1}`,
+}))
 
 // Shortcut-only and git actions: not in the Titlebar menus, but routed
 // through the same runCommand ids.
 const EXTRA_ACTIONS: MenuEntry[] = [
   { id: 'close-tab', label: 'Close Tab', accel: 'Ctrl+W' },
+  { id: 'toggle-pin-tab', label: 'Pin Tab' },
+  ...GOTO_TAB_ACTIONS,
   { id: 'reopen-closed-tab', label: 'Reopen Closed Tab', accel: 'Ctrl+Shift+W' },
   { id: 'next-tab', label: 'Next Tab', accel: 'Ctrl+Tab' },
   { id: 'prev-tab', label: 'Previous Tab', accel: 'Ctrl+Shift+Tab' },
@@ -28,19 +38,22 @@ const NEEDS_NOTE = new Set([
   'print',
   'toggle-outline',
   'close-tab',
+  'toggle-pin-tab',
   'next-tab',
   'prev-tab',
 ])
 
-export function availableActions({ hasWorkspace, hasNote, repoMode }: PaletteContext): MenuEntry[] {
-  return [...buildFileMenu([]), ...VIEW_MENU, ...EXTRA_ACTIONS].filter(
-    (item): item is MenuEntry =>
-      'id' in item &&
-      item.id !== 'command-palette' &&
-      (hasWorkspace || NO_WORKSPACE_NEEDED.has(item.id)) &&
-      (hasNote || !NEEDS_NOTE.has(item.id)) &&
-      (repoMode || item.id !== 'sync-now'),
-  )
+export function availableActions({ hasWorkspace, hasNote, repoMode, tabPinned }: PaletteContext): MenuEntry[] {
+  return [...buildFileMenu([]), ...VIEW_MENU, ...EXTRA_ACTIONS]
+    .filter(
+      (item): item is MenuEntry =>
+        'id' in item &&
+        item.id !== 'command-palette' &&
+        (hasWorkspace || NO_WORKSPACE_NEEDED.has(item.id)) &&
+        (hasNote || !(NEEDS_NOTE.has(item.id) || item.id.startsWith('goto-tab:'))) &&
+        (repoMode || item.id !== 'sync-now'),
+    )
+    .map((item) => (item.id === 'toggle-pin-tab' && tabPinned ? { ...item, label: 'Unpin Tab' } : item))
 }
 
 interface CommandPaletteProps extends PaletteContext {
@@ -48,10 +61,10 @@ interface CommandPaletteProps extends PaletteContext {
   onClose: () => void
 }
 
-export function CommandPalette({ hasWorkspace, hasNote, repoMode, onRun, onClose }: CommandPaletteProps) {
+export function CommandPalette({ hasWorkspace, hasNote, repoMode, tabPinned, onRun, onClose }: CommandPaletteProps) {
   const actions = useMemo(
-    () => availableActions({ hasWorkspace, hasNote, repoMode }),
-    [hasWorkspace, hasNote, repoMode],
+    () => availableActions({ hasWorkspace, hasNote, repoMode, tabPinned }),
+    [hasWorkspace, hasNote, repoMode, tabPinned],
   )
 
   // Close first: a command that opens its own overlay must win the single

@@ -64,6 +64,7 @@ export interface WorkspaceState {
   splitRatio?: number
   sidebarCollapsed?: boolean
   tagsCollapsed?: boolean
+  pinnedTabs?: string[]
   expandedFolders: string[]
   recentSearches: string[]
   git: GitWorkspaceConfig

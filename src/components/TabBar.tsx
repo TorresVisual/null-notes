@@ -1,7 +1,9 @@
 import { useState } from 'react'
-import { ChevronLeft, ChevronRight, RefreshCw, X } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Pin, RefreshCw, X } from 'lucide-react'
 import { useWorkspaceStore } from '../store/workspace'
 import { useNotesStore, noteTitle } from '../store/notes'
+import { requestCloseTab } from '../lib/requestCloseTab'
+import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from './ui/context-menu'
 import { SaveStatus } from './SaveStatus'
 import { GitCommitStatus } from './GitCommitStatus'
 import { goBack, goForward, useNavigationHistoryStore } from '../lib/navigationHistory'
@@ -33,7 +35,7 @@ export function TabBar({
   onSyncNow,
   syncingNow,
 }: TabBarProps) {
-  const { openTabs, activeTab, setActiveTab, closeTab, flashTabPath, setFlashTabPath, reorderTabs } =
+  const { openTabs, pinnedTabs, activeTab, setActiveTab, togglePinTab, flashTabPath, setFlashTabPath, reorderTabs } =
     useWorkspaceStore()
   const repoMode = useWorkspaceStore((s) => s.repoMode)
   const autoCommit = useWorkspaceStore((s) => s.git.autoCommit)
@@ -56,13 +58,15 @@ export function TabBar({
           const name = noteTitle(notes, path)
           const isActive = path === activeTab
           const isFlashing = path === flashTabPath
+          const isPinned = pinnedTabs.includes(path)
           return (
+            <ContextMenu key={path}>
+            <ContextMenuTrigger asChild>
             <div
-              key={path}
               role="tab"
               aria-selected={isActive}
               draggable
-              className={`tab${isActive ? ' active' : ''}${isFlashing ? ' tab-flash' : ''}${draggedPath === path ? ' tab-dragging' : ''}`}
+              className={`tab${isActive ? ' active' : ''}${isPinned ? ' pinned' : ''}${isFlashing ? ' tab-flash' : ''}${draggedPath === path ? ' tab-dragging' : ''}`}
               onAnimationEnd={() => {
                 if (isFlashing) setFlashTabPath(null)
               }}
@@ -78,11 +82,20 @@ export function TabBar({
                 setDraggedPath(null)
               }}
             >
+              {isPinned && <Pin size={11} className="tab-pin-glyph" aria-hidden />}
               <button onClick={() => setActiveTab(path)} title={name}>{name}</button>
-              <button className="tab-close" onClick={() => closeTab(path)} aria-label={`Close ${name}`}>
+              <button className="tab-close" onClick={() => void requestCloseTab(path)} aria-label={`Close ${name}`}>
                 <X size={12} />
               </button>
             </div>
+            </ContextMenuTrigger>
+            <ContextMenuContent className="context-menu">
+              <ContextMenuItem onSelect={() => togglePinTab(path)}>
+                {isPinned ? 'Unpin tab' : 'Pin tab'}
+              </ContextMenuItem>
+              <ContextMenuItem onSelect={() => void requestCloseTab(path)}>Close tab</ContextMenuItem>
+            </ContextMenuContent>
+            </ContextMenu>
           )
         })}
       </div>

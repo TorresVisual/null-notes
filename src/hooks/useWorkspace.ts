@@ -41,6 +41,7 @@ export function useWorkspace() {
       splitRatio,
       sidebarCollapsed,
       tagsCollapsed,
+      pinnedTabs,
       expandedFolders,
       recentSearches,
       git,
@@ -53,6 +54,7 @@ export function useWorkspace() {
       splitRatio,
       sidebarCollapsed,
       tagsCollapsed,
+      pinnedTabs,
       expandedFolders,
       recentSearches,
       git,
@@ -86,6 +88,7 @@ export function useWorkspace() {
         setSplitRatio,
         setSidebarCollapsed,
         setTagsCollapsed,
+        setPinnedTabs,
       } = useWorkspaceStore.getState()
       setFolderLoading(true)
       let tree, session
@@ -119,6 +122,7 @@ export function useWorkspace() {
       for (const tab of session.openTabs) {
         openTab(tab)
       }
+      setPinnedTabs(session.pinnedTabs ?? [])
       await refreshTags()
       if (remember) {
         setRecentWorkspaces(await api.workspace.remember(selected))

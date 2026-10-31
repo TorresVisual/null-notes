@@ -354,6 +354,30 @@ mod tests {
         assert!(!legacy.tags_collapsed);
     }
 
+    #[tokio::test]
+    async fn test_pinned_tabs_roundtrip_and_default_empty() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().to_string_lossy().into_owned();
+        let original = WorkspaceState {
+            open_tabs: vec!["/ws/a.md".into(), "/ws/b.md".into()],
+            pinned_tabs: vec!["/ws/a.md".into()],
+            ..Default::default()
+        };
+
+        save_workspace_to_dir(&path, &original).await.unwrap();
+        let loaded = load_workspace_from_dir(&path).await.unwrap();
+        assert_eq!(loaded.pinned_tabs, original.pinned_tabs);
+
+        tokio::fs::write(
+            dir.path().join(".workspace.json"),
+            r#"{"openTabs":[],"activeTab":null}"#,
+        )
+        .await
+        .unwrap();
+        let legacy = load_workspace_from_dir(&path).await.unwrap();
+        assert!(legacy.pinned_tabs.is_empty());
+    }
+
     // idle_minutes/skip_hooks/auto_push are P5-2/P5-3 fields, added after
     // prompted/auto_commit shipped — a file written by that earlier build
     // has none of them and must still load with sane defaults, not zeros.

@@ -152,6 +152,10 @@ pub struct WorkspaceState {
     pub sidebar_collapsed: bool,
     #[serde(default)]
     pub tags_collapsed: bool,
+    // Pinned tabs (#155): a subset of `open_tabs`, which the frontend keeps
+    // ordered pinned-first. Absent in a file an older build wrote.
+    #[serde(default)]
+    pub pinned_tabs: Vec<String>,
 }
 
 /// Whether *this machine* should auto-commit in this workspace, and whether

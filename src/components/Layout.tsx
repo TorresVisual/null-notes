@@ -54,6 +54,7 @@ import { insertDiagram } from '../editor/toolbar/insertDiagram'
 import { report } from '../editor/splitIntoTasks'
 import type { DiagramMetadata } from '../types'
 import { goBack, goForward } from '../lib/navigationHistory'
+import { requestCloseTab } from '../lib/requestCloseTab'
 import { useFocusModeStore } from '../store/focusMode'
 import { canPushHere, pushIfAllowed, withGitLock } from '../lib/git'
 import { isMobile, isWeb } from '../lib/platform'
@@ -72,7 +73,8 @@ export function Layout() {
   const activeTab = useWorkspaceStore((s) => s.activeTab)
   const setActiveTab = useWorkspaceStore((s) => s.setActiveTab)
   const openTabs = useWorkspaceStore((s) => s.openTabs)
-  const closeTab = useWorkspaceStore((s) => s.closeTab)
+  const togglePinTab = useWorkspaceStore((s) => s.togglePinTab)
+  const activeTabPinned = useWorkspaceStore((s) => s.activeTab !== null && s.pinnedTabs.includes(s.activeTab))
   const reopenClosedTab = useWorkspaceStore((s) => s.reopenClosedTab)
   const focusMode = useFocusModeStore((s) => s.enabled)
   const toggleFocusMode = useFocusModeStore((s) => s.toggle)
@@ -228,6 +230,12 @@ export function Layout() {
         await openWorkspaceAt(id.slice('open-recent:'.length))
         return
       }
+      if (id.startsWith('goto-tab:')) {
+        const n = Number(id.slice('goto-tab:'.length))
+        const target = n === 9 ? openTabs[openTabs.length - 1] : openTabs[n - 1]
+        if (target) setActiveTab(target)
+        return
+      }
       switch (id) {
         case 'new-note': {
           const title = await promptText('Note title:')
@@ -331,7 +339,10 @@ export function Layout() {
           if (activeTab) setOutlineOpen((o) => !o)
           break
         case 'close-tab':
-          if (activeTab) closeTab(activeTab)
+          if (activeTab) await requestCloseTab(activeTab)
+          break
+        case 'toggle-pin-tab':
+          if (activeTab) togglePinTab(activeTab)
           break
         case 'reopen-closed-tab':
           reopenClosedTab()
@@ -357,7 +368,7 @@ export function Layout() {
       workspacePath,
       openTabs,
       setActiveTab,
-      closeTab,
+      togglePinTab,
       reopenClosedTab,
       toggleFocusMode,
       toggleSidebar,
@@ -527,7 +538,8 @@ export function Layout() {
     function onKey(e: KeyboardEvent) {
       if (!(e.ctrlKey || e.metaKey) || e.altKey) return
       const key = e.key.length === 1 ? e.key.toLowerCase() : e.key
-      const commandId = KEY_COMMANDS[e.shiftKey ? `shift+${key}` : key]
+      const commandId =
+        !e.shiftKey && /^[1-9]$/.test(key) ? `goto-tab:${key}` : KEY_COMMANDS[e.shiftKey ? `shift+${key}` : key]
       if (!commandId) return
       e.preventDefault()
       void runCommand(commandId)
@@ -565,6 +577,7 @@ export function Layout() {
         <CommandPalette
           hasWorkspace={!!workspacePath}
           hasNote={!!activeTab}
+          tabPinned={activeTabPinned}
           repoMode={!!repoMode}
           onRun={(id) => void runCommand(id)}
           onClose={closeOverlay}

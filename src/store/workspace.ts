@@ -20,9 +20,19 @@ const DEFAULT_GIT_CONFIG: GitWorkspaceConfig = {
 // isn't a real workflow.
 const CLOSED_TABS_CAP = 10
 
+const pinnedFirst = (tabs: string[], pinned: string[]) => [
+  ...tabs.filter((p) => pinned.includes(p)),
+  ...tabs.filter((p) => !pinned.includes(p)),
+]
+
 interface WorkspaceStore {
   path: string | null
+  // Invariant: pinnedTabs ⊆ openTabs, and pinned tabs are a prefix of openTabs,
+  // so tab order (and Ctrl+1..9) is just openTabs order.
   openTabs: string[]
+  pinnedTabs: string[]
+  togglePinTab: (notePath: string) => void
+  setPinnedTabs: (paths: string[]) => void
   activeTab: string | null
   // The second pane's note, or null for today's single-pane layout. A
   // pointer into openTabs, not a second tab list — see setSecondaryTab.
@@ -126,6 +136,7 @@ interface WorkspaceStore {
 export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   path: null,
   openTabs: [],
+  pinnedTabs: [],
   activeTab: null,
   secondaryTab: null,
   splitRatio: 0.5,
@@ -163,13 +174,14 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   },
 
   closeTab: (notePath) => {
-    const { openTabs, activeTab, secondaryTab, closedTabs } = get()
+    const { openTabs, pinnedTabs, activeTab, secondaryTab, closedTabs } = get()
     const next = openTabs.filter((p) => p !== notePath)
     const newActive =
       activeTab === notePath ? (next[next.length - 1] ?? null) : activeTab
     const nextClosed = [...closedTabs, notePath].slice(-CLOSED_TABS_CAP)
     set({
       openTabs: next,
+      pinnedTabs: pinnedTabs.filter((p) => p !== notePath),
       activeTab: newActive,
       secondaryTab: secondaryTab === notePath ? null : secondaryTab,
       closedTabs: nextClosed,
@@ -204,9 +216,25 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   toggleTags: () => set((s) => ({ tagsCollapsed: !s.tagsCollapsed })),
   setTagsCollapsed: (collapsed) => set({ tagsCollapsed: collapsed }),
 
+  togglePinTab: (notePath) => {
+    const { openTabs, pinnedTabs } = get()
+    if (!openTabs.includes(notePath)) return
+    const pinned = pinnedTabs.includes(notePath)
+      ? pinnedTabs.filter((p) => p !== notePath)
+      : [...pinnedTabs, notePath]
+    set({ pinnedTabs: pinned, openTabs: pinnedFirst(openTabs, pinned) })
+  },
+
+  setPinnedTabs: (paths) => {
+    const { openTabs } = get()
+    const pinned = paths.filter((p) => openTabs.includes(p))
+    set({ pinnedTabs: pinned, openTabs: pinnedFirst(openTabs, pinned) })
+  },
+
   reorderTabs: (fromPath, toPath) => {
     if (fromPath === toPath) return
-    const { openTabs } = get()
+    const { openTabs, pinnedTabs } = get()
+    if (pinnedTabs.includes(fromPath) !== pinnedTabs.includes(toPath)) return
     const next = openTabs.filter((p) => p !== fromPath)
     const toIndex = next.indexOf(toPath)
     next.splice(toIndex, 0, fromPath)
@@ -235,9 +263,10 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   setSelectedFolder: (path) => set({ selectedFolder: path }),
 
   replaceOpenPath: (oldPrefix, newPrefix) => {
-    const { openTabs, activeTab, secondaryTab, expandedFolders, selectedFolder } = get()
+    const { openTabs, pinnedTabs, activeTab, secondaryTab, expandedFolders, selectedFolder } = get()
     set({
       openTabs: openTabs.map((p) => replacePathPrefix(p, oldPrefix, newPrefix)),
+      pinnedTabs: pinnedTabs.map((p) => replacePathPrefix(p, oldPrefix, newPrefix)),
       activeTab: activeTab ? replacePathPrefix(activeTab, oldPrefix, newPrefix) : activeTab,
       secondaryTab: secondaryTab ? replacePathPrefix(secondaryTab, oldPrefix, newPrefix) : secondaryTab,
       expandedFolders: expandedFolders.map((p) => replacePathPrefix(p, oldPrefix, newPrefix)),
@@ -246,11 +275,16 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   },
 
   closeTabsUnder: (prefix) => {
-    const { openTabs, activeTab, secondaryTab } = get()
+    const { openTabs, pinnedTabs, activeTab, secondaryTab } = get()
     const next = openTabs.filter((p) => !isUnderPath(p, prefix))
     const newActive = activeTab && isUnderPath(activeTab, prefix) ? (next[next.length - 1] ?? null) : activeTab
     const newSecondary = secondaryTab && isUnderPath(secondaryTab, prefix) ? null : secondaryTab
-    set({ openTabs: next, activeTab: newActive, secondaryTab: newSecondary })
+    set({
+      openTabs: next,
+      pinnedTabs: pinnedTabs.filter((p) => !isUnderPath(p, prefix)),
+      activeTab: newActive,
+      secondaryTab: newSecondary,
+    })
   },
 
   setFolderError: (message) => set({ folderError: message }),
@@ -286,6 +320,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   resetForNewWorkspace: () =>
     set({
       openTabs: [],
+      pinnedTabs: [],
       activeTab: null,
       secondaryTab: null,
       splitRatio: 0.5,

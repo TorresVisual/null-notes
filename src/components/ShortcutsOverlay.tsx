@@ -33,6 +33,8 @@ const SHORTCUT_GROUPS: ShortcutGroup[] = [
       { keys: 'Ctrl Shift W', label: 'Reopen closed tab' },
       { keys: 'Ctrl Tab', label: 'Next tab' },
       { keys: 'Ctrl Shift Tab', label: 'Previous tab' },
+      { keys: 'Ctrl 1–8', label: 'Go to tab 1–8' },
+      { keys: 'Ctrl 9', label: 'Go to last tab' },
     ],
   },
   {
