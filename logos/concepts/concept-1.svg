@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <g id="background">
+    <rect width="512" height="512" rx="112" fill="#0d0f12"/>
+  </g>
+  <g id="icon">
+    <g id="ring">
+      <circle cx="256" cy="256" r="150" fill="none" stroke="#7ee787" stroke-width="40"/>
+      <path d="M93.4 418.6L124.5 336.6L393.2 67.9L444.1 118.8L175.4 387.5Z" fill="#0d0f12" stroke="#0d0f12" stroke-width="44" stroke-linejoin="round"/>
+    </g>
+    <g id="pencil">
+      <path d="M93.4 418.6L124.5 336.6L336.6 124.5L387.5 175.4L175.4 387.5Z" fill="#e6edf3"/>
+      <path d="M93.4 418.6L105.1 387.9L124.1 406.9Z" fill="#7ee787"/>
+      <path d="M336.6 124.5L393.2 67.9L444.1 118.8L387.5 175.4Z" fill="#8b949e"/>
+    </g>
+  </g>
+</svg>

@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" shape-rendering="crispEdges">
+  <g id="background">
+    <rect width="512" height="512" rx="96" fill="#0d0f12"/>
+  </g>
+  <g id="icon">
+    <g id="ring" fill="#7ee787">
+      <path d="M288 96H160L96 160V288H144V180L180 144H288Z"/>
+      <path d="M224 416H352L416 352V224H368V332L332 368H224Z"/>
+    </g>
+    <g id="pencil">
+      <g fill="#a3f0ac">
+        <rect x="96" y="384" width="32" height="32"/>
+        <rect x="128" y="320" width="32" height="96"/>
+        <rect x="160" y="288" width="32" height="96"/>
+      </g>
+      <g fill="#e6edf3">
+        <rect x="192" y="256" width="32" height="96"/>
+        <rect x="224" y="224" width="32" height="96"/>
+        <rect x="256" y="192" width="32" height="96"/>
+        <rect x="288" y="160" width="32" height="96"/>
+        <rect x="320" y="128" width="32" height="96"/>
+      </g>
+      <g fill="#8b949e">
+        <rect x="352" y="96" width="32" height="96"/>
+        <rect x="384" y="96" width="32" height="32"/>
+      </g>
+    </g>
+  </g>
+</svg>

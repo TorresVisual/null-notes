@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <g id="background">
+    <rect width="512" height="512" rx="112" fill="#f4efe6"/>
+  </g>
+  <g id="icon" transform="rotate(45 256 256)">
+    <g id="ring">
+      <path fill="#1c1c1e" fill-rule="evenodd" d="M256 108a148 148 0 1 0 0 296a148 148 0 1 0 0-296ZM256 148a108 108 0 1 1 0 216a108 108 0 1 1 0-216Z"/>
+      <rect x="212" y="90" width="88" height="332" fill="#f4efe6"/>
+    </g>
+    <g id="pencil">
+      <path fill="#e0604a" d="M228 113V87Q228 71 244 71H268Q284 71 284 87V113Z"/>
+      <rect x="228" y="113" width="56" height="30" fill="#1c1c1e"/>
+      <rect x="228" y="143" width="28" height="218" fill="#f2b632"/>
+      <rect x="256" y="143" width="28" height="218" fill="#d99a1c"/>
+      <path fill="#e8b98a" d="M228 361H284L256 451Z"/>
+      <path fill="#1c1c1e" d="M244.8 415H267.2L256 451Z"/>
+    </g>
+  </g>
+</svg>
