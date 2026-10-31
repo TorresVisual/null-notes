@@ -147,6 +147,18 @@ pub async fn run_migrations(pool: &SqlitePool) -> Result<()> {
     )
     .await?;
 
+    // Frontmatter properties, one JSON object per note. Rebuildable from the
+    // notes, like every other table here; `error` is the YAML parse error.
+    sqlx::query(
+        "CREATE TABLE IF NOT EXISTS note_properties (
+            note_path TEXT PRIMARY KEY,
+            json      TEXT NOT NULL,
+            error     TEXT
+        )",
+    )
+    .execute(pool)
+    .await?;
+
     // Code deep link drift detection (issue #52). `line` records the line
     // number written in the link, and `fingerprint` records the trimmed
     // live content of that line at index time.
@@ -210,5 +222,22 @@ mod tests {
         // Re-running against an already-migrated DB must not error on the
         // "duplicate column name" the second ALTER TABLE always produces.
         run_migrations(&pool).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_run_migrations_creates_note_properties() {
+        let pool = sqlx::sqlite::SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect("sqlite::memory:")
+            .await
+            .unwrap();
+        run_migrations(&pool).await.unwrap();
+        run_migrations(&pool).await.unwrap();
+        sqlx::query(
+            "INSERT INTO note_properties (note_path, json, error) VALUES ('/a.md', '{}', NULL)",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
     }
 }

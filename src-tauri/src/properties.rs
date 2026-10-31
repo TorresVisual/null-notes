@@ -1,5 +1,6 @@
-use crate::commands::notes::split_frontmatter;
+use crate::commands::notes::{extract_links, is_valid_tag, split_frontmatter};
 use serde_json::{Map, Value};
+use std::collections::HashSet;
 
 pub type Properties = Map<String, Value>;
 
@@ -102,6 +103,43 @@ pub fn frontmatter_for(props: &Properties) -> String {
     }
     out.push_str("---\n");
     out
+}
+
+/// Frontmatter `tags` (YAML list or comma string; the key is case-sensitive) as tag names.
+pub fn property_tags(props: &Properties) -> Vec<String> {
+    let raw: Vec<&str> = match props.get("tags") {
+        Some(Value::String(s)) => s.split(',').collect(),
+        Some(Value::Array(items)) => items.iter().filter_map(Value::as_str).collect(),
+        _ => return Vec::new(),
+    };
+    let mut seen = HashSet::new();
+    raw.into_iter()
+        .map(|t| t.trim().trim_start_matches('#'))
+        .filter(|t| is_valid_tag(t) && seen.insert(t.to_lowercase()))
+        .map(String::from)
+        .collect()
+}
+
+/// `[[wiki links]]` written inside property values.
+pub fn property_links(props: &Properties) -> Vec<String> {
+    extract_links(&property_text(props))
+}
+
+/// Every scalar value, one per line; keys are not searchable.
+pub fn property_text(props: &Properties) -> String {
+    fn collect(value: &Value, out: &mut Vec<String>) {
+        match value {
+            Value::String(s) => out.push(s.clone()),
+            Value::Number(n) => out.push(n.to_string()),
+            Value::Bool(b) => out.push(b.to_string()),
+            Value::Array(items) => items.iter().for_each(|i| collect(i, out)),
+            Value::Object(map) => map.values().for_each(|v| collect(v, out)),
+            Value::Null => {}
+        }
+    }
+    let mut out = Vec::new();
+    props.values().for_each(|v| collect(v, &mut out));
+    out.join("\n")
 }
 
 /// The YAML between the `---` fences; the whole input when it has none.
@@ -502,6 +540,39 @@ mod tests {
         assert!(parse_properties("---\n---\n").unwrap().is_empty());
         let err = parse_properties("---\na: [x\n---\n").unwrap_err();
         assert!(!err.is_empty());
+    }
+
+    fn props(value: Value) -> Properties {
+        value.as_object().cloned().unwrap()
+    }
+
+    #[test]
+    fn property_tags_reads_only_the_tags_key_as_list_or_comma_string() {
+        assert_eq!(
+            property_tags(&props(json!({"tags": ["a", "#b", " c ", "1x", "A"]}))),
+            vec!["a", "b", "c"]
+        );
+        assert_eq!(
+            property_tags(&props(json!({"tags": "x, y"}))),
+            vec!["x", "y"]
+        );
+        assert!(property_tags(&props(json!({"tag": "x", "Tags": "y"}))).is_empty());
+    }
+
+    #[test]
+    fn property_links_and_text_read_values_not_keys() {
+        let p = props(
+            json!({"related": "[[Target]]", "l": ["[[B|alias]]", "plain"], "n": 3, "[[Key]]": true}),
+        );
+        let mut links = property_links(&p);
+        links.sort();
+        assert_eq!(links, vec!["B", "Target"]);
+        let mut text: Vec<String> = property_text(&p).lines().map(String::from).collect();
+        text.sort();
+        assert_eq!(
+            text,
+            vec!["3", "[[B|alias]]", "[[Target]]", "plain", "true"]
+        );
     }
 
     #[test]

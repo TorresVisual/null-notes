@@ -99,6 +99,10 @@ pub async fn remove_notes_under(pool: &SqlitePool, prefix: &str) -> Result<()> {
         .bind(&like_pattern)
         .execute(pool)
         .await?;
+    sqlx::query("DELETE FROM note_properties WHERE note_path LIKE ? ESCAPE '\\'")
+        .bind(&like_pattern)
+        .execute(pool)
+        .await?;
     sqlx::query("DELETE FROM note_code_links WHERE source_path LIKE ? ESCAPE '\\'")
         .bind(&like_pattern)
         .execute(pool)
@@ -131,6 +135,11 @@ pub async fn update_path(pool: &SqlitePool, old_path: &str, new_path: &str) -> R
         .execute(pool)
         .await?;
     sqlx::query("UPDATE note_links SET source_path = ? WHERE source_path = ?")
+        .bind(new_path)
+        .bind(old_path)
+        .execute(pool)
+        .await?;
+    sqlx::query("UPDATE note_properties SET note_path = ? WHERE note_path = ?")
         .bind(new_path)
         .bind(old_path)
         .execute(pool)

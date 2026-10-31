@@ -4,6 +4,9 @@ use crate::models::{
     ExtractedFormula, ExtractedTask, GraphLink, GraphTag, McGradeResult, NoteMetadata, OpenTask,
     SearchPage, SearchPaging, SearchSort, WorkspaceTree,
 };
+use crate::properties::{
+    parse_properties, property_links, property_tags, property_text, Properties,
+};
 use crate::sm2;
 use regex::Regex;
 use std::collections::HashSet;
@@ -1047,6 +1050,12 @@ async fn diagram_search_text_for(content: &str) -> String {
     texts.join("\n")
 }
 
+fn merge_unique(mut base: Vec<String>, extra: Vec<String>) -> Vec<String> {
+    let mut seen: HashSet<String> = base.iter().map(|s| s.to_lowercase()).collect();
+    base.extend(extra.into_iter().filter(|s| seen.insert(s.to_lowercase())));
+    base
+}
+
 pub(super) async fn index_note_at(
     path: &str,
     workspace: &str,
@@ -1064,16 +1073,23 @@ pub(super) async fn index_note_at(
     db::notes::index_note(db, &meta).await?;
     let pdf_text = pdf_search_text_for(path).await;
     let diagram_text = diagram_search_text_for(content).await;
+    let (props, parse_error) = match parse_properties(split_frontmatter(content).0) {
+        Ok(props) => (props, None),
+        Err(e) => (Properties::new(), Some(e)),
+    };
     let mut fts_body = split_frontmatter(content).1.to_string();
-    for extra in [&pdf_text, &diagram_text] {
+    for extra in [&pdf_text, &diagram_text, &property_text(&props)] {
         if !extra.is_empty() {
             fts_body.push_str("\n\n");
             fts_body.push_str(extra);
         }
     }
     db::notes::index_note_content(db, path, &title, &fts_body).await?;
-    db::notes::set_tags(db, path, &extract_tags(content)).await?;
-    db::notes::set_links(db, path, &extract_links(content)).await?;
+    let tags = merge_unique(extract_tags(content), property_tags(&props));
+    db::notes::set_tags(db, path, &tags).await?;
+    let links = merge_unique(extract_links(content), property_links(&props));
+    db::notes::set_links(db, path, &links).await?;
+    db::properties::set_properties(db, path, &props, parse_error.as_deref()).await?;
     let code_links = extract_code_links_with_fingerprints(content, workspace).await;
     db::notes::set_code_links(db, path, &code_links).await?;
     db::notes::set_tasks(db, path, &extract_tasks(content)).await?;
@@ -1640,7 +1656,7 @@ async fn rename_tag_at(
 
 // `new_tag` has to match the shape `extract_tags` recognizes, or the rewrite
 // silently drops the tag from the index instead of renaming it.
-fn is_valid_tag(tag: &str) -> bool {
+pub(crate) fn is_valid_tag(tag: &str) -> bool {
     Regex::new(r"^[A-Za-z][\w-]*$")
         .map(|re| re.is_match(tag))
         .unwrap_or(false)
@@ -1670,6 +1686,7 @@ pub(super) async fn forget_note(path: &str, db: &DbPool) -> anyhow::Result<()> {
     db::notes::remove_from_fts(db, path).await?;
     db::notes::set_tags(db, path, &[]).await?;
     db::notes::set_links(db, path, &[]).await?;
+    db::properties::remove_properties(db, path).await?;
     db::notes::set_code_links(db, path, &[]).await?;
     db::notes::set_tasks(db, path, &[]).await?;
     db::notes::set_cards(db, path, &[]).await?;
@@ -4939,6 +4956,108 @@ mod folder_tests {
             .unwrap();
         run_migrations(&pool).await.unwrap();
         pool
+    }
+
+    fn paging() -> crate::models::SearchPaging {
+        crate::models::SearchPaging {
+            sort: crate::models::SearchSort::Relevance,
+            limit: 10,
+            offset: 0,
+        }
+    }
+
+    #[tokio::test]
+    async fn test_index_note_at_stores_properties_json_and_parse_error() {
+        let pool = make_pool().await;
+        index_note_at("/ws/a.md", "/ws", "---\nstatus: todo\n---\n# A\n", &pool)
+            .await
+            .unwrap();
+        index_note_at("/ws/b.md", "/ws", "---\nstatus: [oops\n---\n# B\n", &pool)
+            .await
+            .unwrap();
+        let mut rows = db::properties::all_properties(&pool, "/ws").await.unwrap();
+        rows.sort();
+        assert_eq!(rows[0].1, r#"{"status":"todo"}"#);
+        assert_eq!(rows[0].2, None);
+        assert_eq!(rows[1].1, "{}");
+        assert!(rows[1].2.is_some());
+    }
+
+    #[tokio::test]
+    async fn test_frontmatter_tags_merge_for_list_and_comma_string_but_not_tag_or_capital_tags_keys(
+    ) {
+        let pool = make_pool().await;
+        for (name, content) in [
+            ("flow", "---\ntags: [Calc, x]\n---\n# A #body\n"),
+            ("comma", "---\ntags: one, two\n---\n# B\n"),
+            ("block", "---\ntags:\n  - l1\n  - l2\n---\n# C\n"),
+            ("wrongkey", "---\ntag: nope\nTags: nope2\n---\n# D\n"),
+        ] {
+            index_note_at(&format!("/ws/{name}.md"), "/ws", content, &pool)
+                .await
+                .unwrap();
+        }
+        let all = db::notes::all_note_tags(&pool, "/ws").await.unwrap();
+        let tags_of = |name: &str| {
+            let mut t: Vec<String> = all
+                .iter()
+                .filter(|(p, _)| p == &format!("/ws/{name}.md"))
+                .map(|(_, t)| t.clone())
+                .collect();
+            t.sort();
+            t
+        };
+        assert_eq!(tags_of("flow"), vec!["Calc", "body", "x"]);
+        assert_eq!(tags_of("comma"), vec!["one", "two"]);
+        assert_eq!(tags_of("block"), vec!["l1", "l2"]);
+        assert!(tags_of("wrongkey").is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_bracket_links_in_property_values_become_outgoing_links_and_backlinks() {
+        let pool = make_pool().await;
+        let content = "---\nrelated: \"[[Target]]\"\nmore:\n  - \"[[Other|alias]]\"\n# [[Comment Link]]\n---\n# S\n";
+        index_note_at("/ws/s.md", "/ws", content, &pool)
+            .await
+            .unwrap();
+        for title in ["Target", "Other"] {
+            let back = db::notes::backlinks_for(&pool, "/ws", title).await.unwrap();
+            assert_eq!(back.len(), 1, "{title}");
+        }
+        assert!(db::notes::backlinks_for(&pool, "/ws", "Comment Link")
+            .await
+            .unwrap()
+            .is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_property_values_are_fts_searchable_but_keys_are_not() {
+        let pool = make_pool().await;
+        index_note_at(
+            "/ws/t.md",
+            "/ws",
+            "---\nstatus: inprogressword\n---\n# T\n",
+            &pool,
+        )
+        .await
+        .unwrap();
+        let ws = Some("/ws");
+        let by_value = db::notes::search_notes(
+            &pool,
+            ws,
+            Some("inprogressword"),
+            None,
+            None,
+            None,
+            paging(),
+        )
+        .await
+        .unwrap();
+        assert_eq!(by_value.len(), 1);
+        let by_key = db::notes::search_notes(&pool, ws, Some("status"), None, None, None, paging())
+            .await
+            .unwrap();
+        assert!(by_key.is_empty());
     }
 
     #[tokio::test]

@@ -4,6 +4,7 @@ use std::path::Path;
 
 pub mod fts_query;
 pub mod notes;
+pub mod properties;
 pub mod schema;
 
 pub type DbPool = SqlitePool;
