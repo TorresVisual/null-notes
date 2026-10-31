@@ -24,6 +24,7 @@ import { Callout } from './Callout'
 import { FootnoteReference } from './FootnoteReference'
 import { FootnoteDefinition } from './FootnoteDefinition'
 import { WikiLink } from './WikiLink'
+import { NoteEmbed } from './NoteEmbed'
 import { CodeLink } from './CodeLink'
 import { CodeBlockOpenInIde } from './CodeBlockOpenInIde'
 import { CodeBlockToolbar } from './CodeBlockToolbar'
@@ -199,6 +200,7 @@ export const coreExtensions = [
   FootnoteReference,
   FootnoteDefinition,
   WikiLink,
+  NoteEmbed,
   Tag,
   CodeLink,
   CodeBlockOpenInIde,
