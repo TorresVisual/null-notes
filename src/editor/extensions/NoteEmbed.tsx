@@ -1,22 +1,13 @@
 import { Node } from '@tiptap/core'
-import { ReactNodeViewRenderer, NodeViewWrapper } from '@tiptap/react'
-import type { ReactNodeViewProps } from '@tiptap/react'
+import { ReactNodeViewRenderer } from '@tiptap/react'
 import { encodeAttr } from '../../lib/htmlAttr'
 import { parseEmbedParagraph } from '../../lib/embedSyntax'
 import { formatWikiLink } from '../../lib/wikiLinkSyntax'
+import { NoteEmbedView } from './NoteEmbedView'
 
 interface NoteEmbedAttrs {
   title: string
   heading: string
-}
-
-function EmbedView({ node }: ReactNodeViewProps) {
-  const { title } = node.attrs as unknown as NoteEmbedAttrs
-  return (
-    <NodeViewWrapper className="note-embed" spellCheck={false}>
-      {title}
-    </NodeViewWrapper>
-  )
 }
 
 interface BlockState {
@@ -60,7 +51,7 @@ export const NoteEmbed = Node.create({
   },
 
   addNodeView() {
-    return ReactNodeViewRenderer(EmbedView)
+    return ReactNodeViewRenderer(NoteEmbedView)
   },
 
   addStorage() {
