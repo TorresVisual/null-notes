@@ -2194,14 +2194,17 @@ pre:has(code.language-expect)::before, pre:has(code.language-expected)::before {
   position: absolute;
   top: 0;
   left: -1.4em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   width: 1em;
-  text-align: center;
+  height: 1lh;
   line-height: inherit;
   color: var(--text-tertiary);
   cursor: pointer;
   user-select: none;
   opacity: 0;
-  transform: rotate(90deg) scale(0.75);
+  transform: rotate(90deg);
   transition: opacity var(--duration-base) var(--ease-standard), transform var(--duration-base) var(--ease-standard);
 }
 li .fold-toggle { left: -2.4em; }
@@ -2210,7 +2213,7 @@ li .fold-toggle { left: -2.4em; }
 .fold-able:hover > div > .fold-toggle { opacity: 1; }
 .fold-toggle:hover { color: var(--accent); }
 .fold-collapsed > .fold-toggle,
-.fold-collapsed > div > .fold-toggle { opacity: 0.7; transform: scale(0.75); }
+.fold-collapsed > div > .fold-toggle { opacity: 0.7; transform: none; }
 
 /* Focus mode (Ctrl+Shift+F) — every top-level block but the active one. */
 .focus-mode-dim { opacity: 0.35; transition: opacity 0.15s ease; }
