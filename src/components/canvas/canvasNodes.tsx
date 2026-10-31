@@ -4,9 +4,9 @@ import { Pencil, Trash2 } from 'lucide-react'
 import { confirm } from '@tauri-apps/plugin-dialog'
 import { api } from '../../lib/tauri'
 import { excerptForPreview } from '../../lib/notePreview'
-import { elementColor, groupLabel, type FlowNode } from '../../lib/canvasFlow'
+import { elementColor, groupLabel, nodeTypeLabel, type FlowNode } from '../../lib/canvasFlow'
 import { workspaceFilePath } from '../../lib/canvasPath'
-import type { CanvasNode } from '../../lib/jsonCanvas'
+import { passOf, type CanvasNode } from '../../lib/jsonCanvas'
 import { noteTitle, useNotesStore } from '../../store/notes'
 import { CanvasActionsContext } from './canvasActions'
 
@@ -32,10 +32,11 @@ interface CardProps {
 function Card({ node, selected, kind, inert, children }: CardProps) {
   const { locked, pulsePass } = useContext(CanvasActionsContext)
   const accent = elementColor(node)
-  const pulsing = kind === 'group' && node.pass !== undefined && node.pass === pulsePass
+  const pass = passOf(node)
+  const pulsing = kind === 'group' && pass !== undefined && pass === pulsePass
   return (
     <div
-      className={`canvas-card canvas-card--${kind}${node.pass !== undefined ? ' is-agent' : ''}${inert ? ' is-inert' : ''}${pulsing ? ' canvas-pulse' : ''}`}
+      className={`canvas-card canvas-card--${kind}${pass !== undefined ? ' is-agent' : ''}${inert ? ' is-inert' : ''}${pulsing ? ' canvas-pulse' : ''}`}
       style={accent ? ({ '--card-accent': accent } as CSSProperties) : undefined}
     >
       <NodeResizer isVisible={selected && !locked} minWidth={60} minHeight={30} />
@@ -123,7 +124,7 @@ export const CanvasFileNode = memo(function CanvasFileNode({ data, selected }: N
 export const CanvasGroupNode = memo(function CanvasGroupNode({ data, selected }: NodeProps<FlowNode>) {
   const { locked, deletePass } = useContext(CanvasActionsContext)
   const { node } = data
-  const pass = node.pass
+  const pass = passOf(node)
 
   async function removePass() {
     if (pass === undefined) return
@@ -163,7 +164,7 @@ export const CanvasUnknownNode = memo(function CanvasUnknownNode({ data, selecte
   const { node } = data
   return (
     <Card node={node} selected={selected} kind="unknown" inert>
-      <div className="canvas-link-tag">{node.type}</div>
+      <div className="canvas-link-tag">{nodeTypeLabel(node)}</div>
     </Card>
   )
 })

@@ -2,12 +2,14 @@ import { Copy, ExternalLink, FolderInput, Merge, FolderOpen, Link, Pencil, Trash
 import {
   copyNotePath,
   deleteNote,
+  renameCanvas,
   duplicateNote,
   moveNoteViaPicker,
   openNoteExternally,
   renameNote,
   revealNote,
 } from '../lib/noteActions'
+import { isCanvasPath } from '../lib/canvasPath'
 import { BookmarkMenuItem } from './BookmarkMenuItem'
 import { ContextMenuItem, ContextMenuSeparator } from './ui/context-menu'
 
@@ -16,6 +18,26 @@ interface NoteContextMenuItemsProps {
 }
 
 export function NoteContextMenuItems({ path }: NoteContextMenuItemsProps) {
+  // Duplicate, move and merge rewrite Markdown and move a note's sidecars, which a canvas has none of.
+  if (isCanvasPath(path)) {
+    return (
+      <>
+        <ContextMenuItem onSelect={() => void copyNotePath(path, 'absolute')}>
+          <Link size={14} /> Copy path
+        </ContextMenuItem>
+        <ContextMenuItem onSelect={() => void copyNotePath(path, 'relative')}>
+          <Link size={14} /> Copy relative path
+        </ContextMenuItem>
+        <ContextMenuSeparator />
+        <ContextMenuItem onSelect={() => void renameCanvas(path)}>
+          <Pencil size={14} /> Rename
+        </ContextMenuItem>
+        <ContextMenuItem variant="destructive" onSelect={() => void deleteNote(path)}>
+          <Trash2 size={14} /> Delete
+        </ContextMenuItem>
+      </>
+    )
+  }
   return (
     <>
       <BookmarkMenuItem bookmark={{ kind: 'note', path }} />

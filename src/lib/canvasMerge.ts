@@ -28,7 +28,14 @@ function keyed<T extends Element>(items: readonly T[]): Map<string, T> {
   return out
 }
 
-function mergeElements<T extends Element>(base: readonly T[], mine: readonly T[], theirs: readonly T[]): Merged<T> {
+export type Side = 'mine' | 'theirs'
+
+function mergeElements<T extends Element>(
+  base: readonly T[],
+  mine: readonly T[],
+  theirs: readonly T[],
+  prefer?: Side,
+): Merged<T> {
   const b = keyed(base)
   const m = keyed(mine)
   const t = keyed(theirs)
@@ -44,6 +51,7 @@ function mergeElements<T extends Element>(base: readonly T[], mine: readonly T[]
     if (same(mine, theirs)) pick = mine
     else if (same(base, theirs)) pick = mine
     else if (same(base, mine)) pick = theirs
+    else if (prefer) pick = prefer === 'mine' ? mine : theirs
     else {
       conflicts.push((mine ?? theirs)?.id ?? key)
       continue
@@ -53,9 +61,15 @@ function mergeElements<T extends Element>(base: readonly T[], mine: readonly T[]
   return conflicts.length > 0 ? { conflicts } : { items }
 }
 
-export function mergeCanvas(base: Canvas, mine: Canvas, theirs: Canvas): { merged: Canvas } | { conflicts: string[] } {
-  const nodes = mergeElements(base.nodes, mine.nodes, theirs.nodes)
-  const edges = mergeElements(base.edges, mine.edges, theirs.edges)
+/** With `prefer`, a clash resolves to that side's version instead of being reported; everything else merges as usual. */
+export function mergeCanvas(
+  base: Canvas,
+  mine: Canvas,
+  theirs: Canvas,
+  prefer?: Side,
+): { merged: Canvas } | { conflicts: string[] } {
+  const nodes = mergeElements(base.nodes, mine.nodes, theirs.nodes, prefer)
+  const edges = mergeElements(base.edges, mine.edges, theirs.edges, prefer)
   const conflicts = [
     ...('conflicts' in nodes ? nodes.conflicts : []),
     ...('conflicts' in edges ? edges.conflicts : []),

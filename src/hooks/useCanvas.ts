@@ -2,9 +2,10 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { listen } from '@tauri-apps/api/event'
 import { api } from '../lib/tauri'
 import { useWorkspaceStore } from '../store/workspace'
-import { parseCanvas, serializeCanvas, type Canvas } from '../lib/jsonCanvas'
+import { parseCanvas, passOf, serializeCanvas, type Canvas } from '../lib/jsonCanvas'
 import { mergeCanvas } from '../lib/canvasMerge'
 import { folderName } from '../lib/pathPrefix'
+import { registerCanvasFlush } from '../lib/canvasFlush'
 import { SAVE_DEBOUNCE_MS, type SaveState } from './useNote'
 
 const RECENT_WRITES = 4
@@ -16,7 +17,7 @@ interface DiskState {
 }
 
 function passesOf(canvas: Canvas): Set<number> {
-  return new Set(canvas.nodes.flatMap((n) => (typeof n.pass === 'number' ? [n.pass] : [])))
+  return new Set(canvas.nodes.flatMap((n) => passOf(n) ?? []))
 }
 
 function newPasses(before: Canvas, after: Canvas): number[] {
@@ -242,28 +243,45 @@ export function useCanvas(path: string) {
     return () => void unlisten.then((off) => off())
   }, [workspace, path, serial, adopt, blockWith])
 
+  // Resolves only the clashing cards; whatever else the other side added or I changed still merges.
+  const resolveConflict = useCallback(
+    (prefer: 'mine' | 'theirs') => {
+      const theirs = incoming.current
+      const mine = canvasRef.current
+      const known = base.current
+      if (!theirs || !mine || !known) return null
+      const result = mergeCanvas(known.canvas, mine, theirs.canvas, prefer)
+      if (!('merged' in result)) return null
+      adopt(theirs, result.merged)
+      return { theirs, merged: result.merged }
+    },
+    [adopt],
+  )
+
   const keepMine = useCallback(() => {
-    if (incoming.current) base.current = incoming.current
-    incoming.current = null
-    setConflict(false)
+    if (!resolveConflict('mine')) return
     dirty.current = true
     void flush()
-  }, [flush])
+  }, [resolveConflict, flush])
 
   const reloadTheirs = useCallback(() => {
-    const theirs = incoming.current
-    if (!theirs) return
     if (saveTimer.current) {
       clearTimeout(saveTimer.current)
       saveTimer.current = null
     }
-    dirty.current = false
-    recentWrites.current = [theirs.text]
-    adopt(theirs, theirs.canvas)
-    setSaveState('clean')
-  }, [adopt])
+    const resolved = resolveConflict('theirs')
+    if (!resolved) return
+    recentWrites.current = [resolved.theirs.text]
+    if (serializeCanvas(resolved.merged) === resolved.theirs.text) {
+      dirty.current = false
+      setSaveState('clean')
+    } else {
+      commit(resolved.merged)
+    }
+  }, [resolveConflict, commit])
 
   useEffect(() => () => void flush(), [flush])
+  useEffect(() => registerCanvasFlush(flush), [flush])
 
   useEffect(() => {
     const handler = () => void flush()

@@ -1,6 +1,7 @@
 import type { Edge, EdgeChange, MarkerType, Node, NodeChange } from '@xyflow/react'
 import {
   edgeEnds,
+  passOf,
   markEdited,
   membersOf,
   passColorIndex,
@@ -52,16 +53,33 @@ function defaultSides(from: CanvasNode, to: CanvasNode): [Side, Side] {
 
 /** CSS colour for a card or edge: the app's pass colour for agent elements, the file's own colour otherwise. */
 export function elementColor(el: { pass?: number; author?: string; color?: unknown }): string | undefined {
-  if (typeof el.pass === 'number') return `var(--pass-${passColorIndex(el.pass)})`
+  const pass = passOf(el)
+  if (pass !== undefined) return `var(--pass-${passColorIndex(pass)})`
   const color = resolveColor(el.color)
   if (!color) return undefined
   return color.kind === 'preset' ? `var(--canvas-color-${color.index})` : color.value
 }
 
+/** The card type as text. The file is untrusted, so a non-string `type` must not reach React as a child. */
+export function nodeTypeLabel(node: CanvasNode): string {
+  return typeof node.type === 'string' ? node.type : 'unknown'
+}
+
 export function groupLabel(node: CanvasNode): string {
   const label = typeof node.label === 'string' ? node.label : ''
-  if (node.pass === undefined || new RegExp(String.raw`^pass\s+${node.pass}\b`, 'i').test(label)) return label
-  return label ? `Pass ${node.pass} · ${label}` : `Pass ${node.pass}`
+  const pass = passOf(node)
+  if (pass === undefined || new RegExp(String.raw`^pass\s+${pass}\b`, 'i').test(label)) return label
+  return label ? `Pass ${pass} · ${label}` : `Pass ${pass}`
+}
+
+/** Carries the previous selection onto fresh nodes, minus anything hidden: a hidden card must not stay deletable. */
+export function keepSelection<T extends { id: string; selected?: boolean; hidden?: boolean }>(fresh: T[], previous: T[]): T[] {
+  const selected = new Set(previous.filter((p) => p.selected).map((p) => p.id))
+  return fresh.map((f) => (selected.has(f.id) && !f.hidden ? { ...f, selected: true } : f))
+}
+
+export function selectAllVisible(nodes: FlowNode[]): FlowNode[] {
+  return nodes.map((n) => ({ ...n, selected: !n.hidden }))
 }
 
 /** Passes to hide so only the newest one shows. */
@@ -74,8 +92,11 @@ export function toFlow(
   canvas: Canvas,
   hiddenPasses: ReadonlySet<number> = new Set(),
 ): { nodes: FlowNode[]; edges: FlowEdge[] } {
-  const isHidden = (pass: number | undefined) => pass !== undefined && hiddenPasses.has(pass)
-  const hiddenIds = new Set(canvas.nodes.filter((n) => isHidden(n.pass)).map((n) => n.id))
+  const isHidden = (el: { pass?: unknown }) => {
+    const pass = passOf(el)
+    return pass !== undefined && hiddenPasses.has(pass)
+  }
+  const hiddenIds = new Set(canvas.nodes.filter(isHidden).map((n) => n.id))
   const byId = new Map<string, CanvasNode>()
   const nodes: FlowNode[] = []
   for (const n of canvas.nodes) {
@@ -112,7 +133,7 @@ export function toFlow(
       markerStart: ends.from === 'arrow' ? { type: ARROW, color } : undefined,
       markerEnd: ends.to === 'arrow' ? { type: ARROW, color } : undefined,
       style: color ? { stroke: color } : undefined,
-      hidden: isHidden(e.pass) || hiddenIds.has(e.fromNode) || hiddenIds.has(e.toNode),
+      hidden: isHidden(e) || hiddenIds.has(e.fromNode) || hiddenIds.has(e.toNode),
       data: { edge: e },
     })
   }

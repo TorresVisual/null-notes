@@ -8,7 +8,10 @@ import {
   connectNodes,
   elementColor,
   groupLabel,
+  nodeTypeLabel,
   hiddenForLatestOnly,
+  keepSelection,
+  selectAllVisible,
   reconnectEdge,
   setEdgeLabel,
   setNodeText,
@@ -104,6 +107,40 @@ describe('toFlow with hidden passes', () => {
     const flow = toFlow(canvas(nodes, edges))
     expect(flow.nodes.some((n) => n.hidden)).toBe(false)
     expect(flow.edges.some((e) => e.hidden)).toBe(false)
+  })
+})
+
+describe('malformed agent fields', () => {
+  it('does not treat a non-integer pass as an agent pass when colouring or labelling', () => {
+    expect(elementColor({ pass: 1.5, color: '2' })).toBe('var(--canvas-color-2)')
+    expect(elementColor({ pass: {} as unknown as number })).toBeUndefined()
+    expect(groupLabel(node('g', 0, 0, { type: 'group', pass: '2' as unknown as number, label: 'x' }))).toBe('x')
+  })
+
+  it('names an unknown node type safely even when the file put an object there', () => {
+    expect(nodeTypeLabel(node('a', 0, 0, { type: 'hologram' }))).toBe('hologram')
+    expect(nodeTypeLabel(node('a', 0, 0, { type: {} as unknown as string }))).toBe('unknown')
+  })
+})
+
+describe('selection and hidden passes', () => {
+  const flow = toFlow(
+    canvas([node('g1', 0, 0, { type: 'group', pass: 1 }), node('c1', 0, 0, { pass: 1 }), node('mine', 0, 0)]),
+    new Set([1]),
+  )
+
+  it('select all never selects a hidden card, so Delete cannot remove a hidden pass', () => {
+    const selected = selectAllVisible(flow.nodes).filter((n) => n.selected)
+    expect(selected.map((n) => n.id)).toEqual(['mine'])
+  })
+
+  it('drops the selection of a card whose pass has just been hidden', () => {
+    const before = toFlow(canvas([node('c1', 0, 0, { pass: 1 }), node('mine', 0, 0)])).nodes.map((n) => ({
+      ...n,
+      selected: true,
+    }))
+    const after = keepSelection(toFlow(canvas([node('c1', 0, 0, { pass: 1 }), node('mine', 0, 0)]), new Set([1])).nodes, before)
+    expect(after.filter((n) => n.selected).map((n) => n.id)).toEqual(['mine'])
   })
 })
 

@@ -7,6 +7,7 @@ import { TabBar } from './TabBar'
 import { Titlebar } from './Titlebar'
 import { TooltipProvider } from './ui/tooltip'
 import { EditorPane } from './EditorPane'
+import { ErrorBoundary } from './ErrorBoundary'
 import { SearchModal } from './SearchModal'
 import { QuickSwitcher } from './QuickSwitcher'
 import { CommandPalette } from './CommandPalette'
@@ -35,6 +36,7 @@ import { useSettingsStore } from '../store/settings'
 import { useNote } from '../hooks/useNote'
 import { useCreateCanvas } from '../hooks/useCreateCanvas'
 import { isCanvasPath } from '../lib/canvasPath'
+import { flushAllCanvases } from '../lib/canvasFlush'
 import { useWorkspace, refreshTags, refreshRecents } from '../hooks/useWorkspace'
 import { useExternalChanges } from '../hooks/useExternalChanges'
 import { useBookmarksStore } from '../store/bookmarks'
@@ -179,6 +181,7 @@ export function Layout() {
       try {
         await flush()
         await flushSecondary()
+        await flushAllCanvases()
         await saveSession()
         // A hung commit hook or push must not trap the window open; the
         // notes are already on disk and the batch is only a convenience.
@@ -625,7 +628,7 @@ export function Layout() {
       {activeOverlay === 'palette' && (
         <CommandPalette
           hasWorkspace={!!workspacePath}
-          hasNote={!!activeTab}
+          hasNote={!!activeTab && !canvasTab}
           tabPinned={activeTabPinned}
           repoMode={!!repoMode}
           onRun={(id) => void runCommand(id)}
@@ -745,9 +748,11 @@ export function Layout() {
   )
 
   const primaryEditorPane = canvasTab && activeTab ? (
-    <Suspense fallback={null}>
-      <CanvasPane key={activeTab} path={activeTab} />
-    </Suspense>
+    <ErrorBoundary key={activeTab}>
+      <Suspense fallback={null}>
+        <CanvasPane path={activeTab} />
+      </Suspense>
+    </ErrorBoundary>
   ) : (
     <EditorPane
       ref={editorPaneRef}

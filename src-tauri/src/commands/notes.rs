@@ -1482,6 +1482,7 @@ async fn rename_note_at(
     workspace: &str,
     db: &DbPool,
 ) -> anyhow::Result<NoteMetadata> {
+    ensure_markdown(path)?;
     let old_content = tokio::fs::read_to_string(path).await?;
     let old_title = title_from_content(&old_content);
 
@@ -2022,6 +2023,15 @@ pub(super) fn safe_stem(title: &str) -> String {
     safe_name.trim().to_string()
 }
 
+// Rewrites a title heading, indexes and moves sidecars: all wrong for a `.canvas`
+// or any other non-note file, which shares the workspace but is not Markdown.
+pub(super) fn ensure_markdown(path: &str) -> anyhow::Result<()> {
+    if Path::new(path).extension().and_then(|e| e.to_str()) != Some("md") {
+        anyhow::bail!("not a note: {path}");
+    }
+    Ok(())
+}
+
 pub(super) fn note_filename(title: &str) -> String {
     format!("{}.md", safe_stem(title))
 }
@@ -2425,6 +2435,7 @@ async fn rename_folder_at(old_path: &str, new_path: &str, db: &DbPool) -> anyhow
 }
 
 async fn move_note_at(path: &str, dest_folder: &str, db: &DbPool) -> anyhow::Result<String> {
+    ensure_markdown(path)?;
     let file_name = std::path::Path::new(path)
         .file_name()
         .ok_or_else(|| anyhow::anyhow!("note path has no file name: {path}"))?
@@ -2511,6 +2522,7 @@ async fn duplicate_note_at(
     workspace: &str,
     db: &DbPool,
 ) -> anyhow::Result<NoteMetadata> {
+    ensure_markdown(path)?;
     let content = tokio::fs::read_to_string(path).await?;
     let folder = Path::new(path)
         .parent()
@@ -4927,6 +4939,30 @@ mod folder_tests {
             .unwrap();
         run_migrations(&pool).await.unwrap();
         pool
+    }
+
+    #[tokio::test]
+    async fn test_note_only_commands_refuse_a_canvas_and_leave_it_untouched() {
+        let tmp = tempdir().unwrap();
+        let ws = tmp.path().to_string_lossy().into_owned();
+        let canvas = tmp.path().join("map.canvas");
+        std::fs::write(&canvas, "{\"nodes\":[]}").unwrap();
+        std::fs::create_dir_all(tmp.path().join("Dest")).unwrap();
+        let path = canvas.to_string_lossy().into_owned();
+        let pool = make_pool().await;
+
+        assert!(rename_note_at(&path, "Renamed", &ws, &pool).await.is_err());
+        let dest = tmp.path().join("Dest").to_string_lossy().into_owned();
+        assert!(move_note_at(&path, &dest, &pool).await.is_err());
+        assert!(duplicate_note_at(&path, &ws, &pool).await.is_err());
+
+        assert_eq!(std::fs::read_to_string(&canvas).unwrap(), "{\"nodes\":[]}");
+        assert!(!tmp.path().join("Renamed.md").exists());
+        assert!(!tmp.path().join("Dest/map.canvas").exists());
+        assert!(db::notes::list_by_workspace(&pool, &ws)
+            .await
+            .unwrap()
+            .is_empty());
     }
 
     #[tokio::test]

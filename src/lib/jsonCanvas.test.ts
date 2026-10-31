@@ -7,6 +7,7 @@ import {
   membersOf,
   parseCanvas,
   passColorIndex,
+  passOf,
   resolveColor,
   serializeCanvas,
   type Canvas,
@@ -101,6 +102,24 @@ describe('serializeCanvas', () => {
   it('writes nodes, edges, lastPass in that order before extras', () => {
     const text = serializeCanvas({ extra: 1, lastPass: 1, edges: [], nodes: [] })
     expect(Object.keys(JSON.parse(text))).toEqual(['nodes', 'edges', 'lastPass', 'extra'])
+  })
+})
+
+describe('passOf', () => {
+  it('accepts a positive integer pass only', () => {
+    expect(passOf({ pass: 3 })).toBe(3)
+    for (const bad of [0, -1, 1.5, '2', {}, null, undefined, Infinity, NaN]) {
+      expect(passOf({ pass: bad })).toBeUndefined()
+    }
+  })
+
+  it('lets deletePass leave an element with a malformed pass alone', () => {
+    const start: Canvas = {
+      nodes: [node('real', 0, 0, { pass: 1 }), node('odd', 0, 0, { pass: 1.5 })],
+      edges: [],
+      lastPass: 1,
+    }
+    expect(deletePass(start, 1).nodes.map((n) => n.id)).toEqual(['odd'])
   })
 })
 

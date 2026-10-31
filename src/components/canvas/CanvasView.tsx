@@ -13,7 +13,7 @@ import { useCanvasFlow } from '../../hooks/useCanvasFlow'
 import { useCanvasFileStatus } from '../../hooks/useCanvasFileStatus'
 import { useCanvasViewport } from '../../hooks/useCanvasViewport'
 import { api } from '../../lib/tauri'
-import { isSafeWorkspacePath, type Canvas } from '../../lib/jsonCanvas'
+import { isSafeWorkspacePath, passOf, type Canvas } from '../../lib/jsonCanvas'
 import { workspaceFilePath } from '../../lib/canvasPath'
 import { hiddenForLatestOnly, type FlowEdge, type FlowNode } from '../../lib/canvasFlow'
 import { promptText } from '../../store/promptDialog'
@@ -59,7 +59,7 @@ export function CanvasView(props: CanvasViewProps) {
   const flow = useCanvasFlow(canvas, props.onChange, hidden)
   const viewport = useCanvasViewport(path)
   const passes = useMemo(
-    () => [...new Set(canvas.nodes.flatMap((n) => (n.pass === undefined ? [] : [n.pass])))].sort((a, b) => a - b),
+    () => [...new Set(canvas.nodes.flatMap((n) => passOf(n) ?? []))].sort((a, b) => a - b),
     [canvas.nodes],
   )
   const fileStatus = useCanvasFileStatus(workspace, path, canvas)
@@ -96,7 +96,7 @@ export function CanvasView(props: CanvasViewProps) {
       setHidden((h) => (h.has(pass) ? new Set([...h].filter((p) => p !== pass)) : h))
       // New or just-unhidden cards reach React Flow's store a render later.
       const attempt = (left: number) => {
-        const nodes = getNodes().filter((n) => n.data.node.pass === pass)
+        const nodes = getNodes().filter((n) => passOf(n.data.node) === pass)
         if (nodes.length > 0) fitNodes(nodes)
         else if (left > 0) setTimeout(() => attempt(left - 1), ARRIVAL_FIT_DELAY_MS)
       }

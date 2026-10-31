@@ -49,8 +49,13 @@ function isElement(value: unknown): value is Record<string, unknown> & { id: str
   return isRecord(value) && typeof value.id === 'string'
 }
 
-function maxPass(elements: readonly { pass?: number }[]): number {
-  return elements.reduce((max, el) => (typeof el.pass === 'number' ? Math.max(max, el.pass) : max), 0)
+/** The pass an element belongs to. An agent file is untrusted, so anything but a positive integer is no pass at all. */
+export function passOf(el: { pass?: unknown }): number | undefined {
+  return typeof el.pass === 'number' && Number.isInteger(el.pass) && el.pass > 0 ? el.pass : undefined
+}
+
+function maxPass(elements: readonly { pass?: unknown }[]): number {
+  return elements.reduce((max, el) => Math.max(max, passOf(el) ?? 0), 0)
 }
 
 export function parseCanvas(raw: string): ParseResult {
@@ -108,16 +113,16 @@ export function membersOf(canvas: Canvas, groupId: string): CanvasNode[] {
 }
 
 export function deletePass(canvas: Canvas, pass: number): Canvas {
-  const nodes = canvas.nodes.filter((n) => n.pass !== pass)
-  const removed = new Set(canvas.nodes.filter((n) => n.pass === pass).map((n) => n.id))
+  const nodes = canvas.nodes.filter((n) => passOf(n) !== pass)
+  const removed = new Set(canvas.nodes.filter((n) => passOf(n) === pass).map((n) => n.id))
   const edges = canvas.edges.filter(
-    (e) => e.pass !== pass && !removed.has(e.fromNode) && !removed.has(e.toNode),
+    (e) => passOf(e) !== pass && !removed.has(e.fromNode) && !removed.has(e.toNode),
   )
   return { ...canvas, nodes, edges }
 }
 
 export function markEdited(node: CanvasNode, text: string): CanvasNode {
-  const changed = node.pass !== undefined && node.text !== text
+  const changed = passOf(node) !== undefined && node.text !== text
   return changed ? { ...node, text, edited: true } : { ...node, text }
 }
 

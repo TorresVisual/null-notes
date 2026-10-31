@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { act, cleanup, renderHook, waitFor } from '@testing-library/react'
 import { useCanvas } from './useCanvas'
 import { SAVE_DEBOUNCE_MS } from './useNote'
+import { flushAllCanvases } from '../lib/canvasFlush'
 import { useWorkspaceStore } from '../store/workspace'
 import { api } from '../lib/tauri'
 import { serializeCanvas, type Canvas, type CanvasNode } from '../lib/jsonCanvas'
@@ -173,6 +174,36 @@ describe('useCanvas', () => {
     expect(disk).toContain('"x": 1')
   })
 
+  it('keepMine keeps my card on a clash but does not erase the pass the agent added', async () => {
+    const { result } = await mountCanvas()
+    act(() => result.current.update(canvas([node('a', 1, 1), node('b', 200, 0)])))
+    setDisk(canvas([node('a', 2, 2), node('b', 200, 0), ...passTwo], 2))
+    await externalChange()
+    expect(result.current.conflict).toBe(true)
+
+    act(() => result.current.keepMine())
+    await pastSave()
+
+    expect(disk).toContain('"x": 1')
+    expect(disk).toContain('"q2"')
+    expect(result.current.canvas?.nodes.map((n) => n.id)).toContain('q2')
+  })
+
+  it('reloadTheirs takes their card on a clash but keeps my unrelated edit', async () => {
+    const { result } = await mountCanvas()
+    act(() => result.current.update(canvas([node('a', 1, 1), node('b', 55, 55)])))
+    setDisk(canvas([node('a', 2, 2), node('b', 200, 0)]))
+    await externalChange()
+    expect(result.current.conflict).toBe(true)
+
+    act(() => result.current.reloadTheirs())
+    await pastSave()
+
+    expect(result.current.canvas?.nodes[0]).toMatchObject({ x: 2, y: 2 })
+    expect(result.current.canvas?.nodes[1]).toMatchObject({ x: 55, y: 55 })
+    expect(disk).toContain('"x": 55')
+  })
+
   it('undoes and redoes through the debounced save', async () => {
     const { result } = await mountCanvas()
     const one = canvas([node('a', 1, 1), node('b', 200, 0)])
@@ -201,5 +232,31 @@ describe('useCanvas', () => {
 
     act(() => result.current.undo())
     expect(result.current.canvas?.nodes.map((n) => n.id)).toContain('q2')
+  })
+})
+
+describe('useCanvas on window close', () => {
+  it('flushAllCanvases saves a dirty canvas without waiting for the debounce', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    useWorkspaceStore.setState({ path: '/ws', gitPendingPaths: [] })
+    setDisk(canvas([node('a'), node('b', 200, 0)]))
+    notes.open.mockImplementation(async () => disk)
+    notes.save.mockImplementation(async (_ws, _path, content) => {
+      disk = content
+    })
+    const { result } = await mountCanvas()
+    act(() => result.current.update(canvas([node('a', 9, 9), node('b', 200, 0)])))
+    expect(notes.save).not.toHaveBeenCalled()
+
+    await act(async () => {
+      await flushAllCanvases()
+    })
+
+    expect(notes.save).toHaveBeenCalledTimes(1)
+    expect(disk).toContain('"x": 9')
+    cleanup()
+    await vi.advanceTimersByTimeAsync(50)
+    vi.useRealTimers()
+    vi.clearAllMocks()
   })
 })

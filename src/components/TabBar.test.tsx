@@ -54,3 +54,30 @@ describe('TabBar drag payload', () => {
     expect(dataTransfer.getData('text/plain')).toBe('/ws/b.md')
   })
 })
+
+describe('TabBar context menu on a canvas tab', () => {
+  it('offers canvas actions only, never the note-only ones', async () => {
+    useWorkspaceStore.setState({ openTabs: ['/ws/map.canvas'], activeTab: '/ws/map.canvas' })
+    const { getByRole, findByText, queryByText } = render(
+      <TabBar
+        viewMode="wysiwyg"
+        onToggleView={noop}
+        saveState="clean"
+        saveError={null}
+        onRetrySave={noop}
+        onDismissSaveError={noop}
+        gitCommitStatus="idle"
+        gitCommitDetail={null}
+        onSyncNow={noop}
+        syncingNow={false}
+      />,
+    )
+
+    fireEvent.contextMenu(getByRole('tab', { name: /map/ }))
+
+    expect(await findByText('Rename')).toBeTruthy()
+    for (const noteOnly of ['Duplicate', 'Move to…', 'Merge into…']) {
+      expect(queryByText(noteOnly)).toBeNull()
+    }
+  })
+})

@@ -84,3 +84,37 @@ describe('mergeCanvas', () => {
     expect(mergeCanvas(base, mine, theirs)).toEqual({ conflicts: ['e'] })
   })
 })
+
+describe('mergeCanvas with a preferred side', () => {
+  const base = canvas([node('a'), node('b')])
+  const mine = canvas([node('a', 1, 1), node('b', 7, 7)])
+  const theirs = canvas([node('a', 2, 2), node('b'), node('c', 9, 9)])
+
+  it('takes my version of a clashing card and keeps their non-clashing additions', () => {
+    const result = mergeCanvas(base, mine, theirs, 'mine')
+    if (!('merged' in result)) throw new Error('expected merge')
+    expect(result.merged.nodes.map((n) => [n.id, n.x])).toEqual([
+      ['a', 1],
+      ['b', 7],
+      ['c', 9],
+    ])
+  })
+
+  it('takes their version of a clashing card and keeps my non-clashing edits', () => {
+    const result = mergeCanvas(base, mine, theirs, 'theirs')
+    if (!('merged' in result)) throw new Error('expected merge')
+    expect(result.merged.nodes.map((n) => [n.id, n.x])).toEqual([
+      ['a', 2],
+      ['b', 7],
+      ['c', 9],
+    ])
+  })
+
+  it('honours a deletion on the preferred side', () => {
+    const deletedByMe = canvas([node('b')])
+    const editedByThem = canvas([node('a', 5, 5), node('b')])
+    const result = mergeCanvas(base, deletedByMe, editedByThem, 'mine')
+    if (!('merged' in result)) throw new Error('expected merge')
+    expect(ids(result.merged)).toEqual(['b'])
+  })
+})

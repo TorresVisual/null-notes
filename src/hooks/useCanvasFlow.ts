@@ -13,7 +13,9 @@ import {
   applyEdgeFlowChanges,
   applyFlowChanges,
   connectNodes,
+  keepSelection,
   reconnectEdge,
+  selectAllVisible,
   setEdgeLabel,
   setNodeText,
   toFlow,
@@ -23,11 +25,6 @@ import {
 import { deletePass, membersOf, type Canvas } from '../lib/jsonCanvas'
 
 type Point = { x: number; y: number }
-
-function keepSelection<T extends { id: string; selected?: boolean }>(fresh: T[], previous: T[]): T[] {
-  const selected = new Set(previous.filter((p) => p.selected).map((p) => p.id))
-  return fresh.map((f) => (selected.has(f.id) ? { ...f, selected: true } : f))
-}
 
 /**
  * React Flow keeps its own copy of positions and selection so a drag is live;
@@ -145,7 +142,7 @@ export function useCanvasFlow(canvas: Canvas, onChange: (next: Canvas) => void, 
   )
 
   const selectAll = useCallback(() => {
-    const all = nodesRef.current.map((n) => ({ ...n, selected: true }))
+    const all = selectAllVisible(nodesRef.current)
     nodesRef.current = all
     setNodes(all)
   }, [])

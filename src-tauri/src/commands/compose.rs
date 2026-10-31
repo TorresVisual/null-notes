@@ -1,6 +1,6 @@
 use super::notes::{
-    encode_uri_stem, index_note_at, note_filename, now_ms, require_within_workspace, rewrite_links,
-    split_frontmatter, title_from_content, write_atomic,
+    encode_uri_stem, ensure_markdown, index_note_at, note_filename, now_ms,
+    require_within_workspace, rewrite_links, split_frontmatter, title_from_content, write_atomic,
 };
 use super::trash::{restore_at, trash_note_at, trash_root, TrashEntry};
 use crate::db::{self, DbPool};
@@ -257,6 +257,8 @@ pub async fn merge_note(
 ) -> Result<MergeOutcome, String> {
     require_within_workspace(&workspace, &source_path)?;
     require_within_workspace(&workspace, &dest_path)?;
+    ensure_markdown(&source_path).map_err(|e| e.to_string())?;
+    ensure_markdown(&dest_path).map_err(|e| e.to_string())?;
     merge_note_at(
         &trash_root(&app)?,
         &workspace,
