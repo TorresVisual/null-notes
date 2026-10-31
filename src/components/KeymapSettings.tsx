@@ -38,7 +38,6 @@ export function KeymapSettings({ overrides, onChange }: KeymapSettingsProps) {
 
   return (
     <div className="settings-section">
-      <p className="section-label">Shortcuts</p>
       <input
         type="search"
         className="keymap-search"
@@ -47,7 +46,7 @@ export function KeymapSettings({ overrides, onChange }: KeymapSettingsProps) {
         value={query}
         onChange={(e) => setQuery(e.target.value)}
       />
-      <ul className="keymap-list">
+      <ul className="keymap-list settings-card">
         {visible.map((c) => {
           const combo = bindings[c.id]
           const recording = recordingId === c.id

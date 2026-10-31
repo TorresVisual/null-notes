@@ -26,8 +26,7 @@ export function AboutSettings() {
   }
 
   return (
-    <div className="settings-section">
-      <p className="section-label">About</p>
+    <div className="settings-card">
       <div className="settings-row">
         <span>
           Null Notes{version && ` v${version}`}

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { X } from 'lucide-react'
+import { GitBranch, Info, Keyboard, SpellCheck, SquarePen, Wrench, X, type LucideIcon } from 'lucide-react'
 import { confirm, message } from '@tauri-apps/plugin-dialog'
 import { useSettingsStore, DEFAULT_SETTINGS } from '../store/settings'
 import { useWorkspaceStore } from '../store/workspace'
@@ -13,6 +13,17 @@ import { KeymapSettings } from './KeymapSettings'
 interface SettingsPanelProps {
   onClose: () => void
 }
+
+type SectionId = 'editor' | 'writing' | 'tools' | 'shortcuts' | 'git' | 'about'
+
+const SECTIONS: { id: SectionId; label: string; Icon: LucideIcon }[] = [
+  { id: 'editor', label: 'Editor', Icon: SquarePen },
+  { id: 'writing', label: 'Writing', Icon: SpellCheck },
+  { id: 'tools', label: 'Tools', Icon: Wrench },
+  { id: 'shortcuts', label: 'Shortcuts', Icon: Keyboard },
+  { id: 'git', label: 'Git', Icon: GitBranch },
+  { id: 'about', label: 'About', Icon: Info },
+]
 
 function clampNumber(raw: number, min: number, max: number): number {
   if (Number.isNaN(raw)) return min
@@ -32,6 +43,10 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
   const { updateGit } = useGitConfig()
   const [error, setError] = useState<string | null>(null)
   const [showErrorLog, setShowErrorLog] = useState(false)
+  const [section, setSection] = useState<SectionId>('editor')
+  const hasGit = Boolean(workspacePath && repoMode === null) || Boolean(repoMode)
+  const sections = SECTIONS.filter((s) => s.id !== 'git' || hasGit)
+  const currentId: SectionId = sections.some((s) => s.id === section) ? section : 'editor'
 
   async function update(patch: Partial<typeof settings>) {
     const next = { ...settings, ...patch }
@@ -48,18 +63,46 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
     <>
     <Dialog open onOpenChange={(next) => !next && onClose()}>
       <DialogContent className="settings-panel settings-panel--lg" showCloseButton={false}>
-        <div className="settings-panel-header">
+        <nav className="settings-nav" aria-label="Settings sections">
           <DialogTitle asChild>
             <h2>Settings</h2>
           </DialogTitle>
+          {sections.map(({ id, label, Icon }) => (
+            <button
+              key={id}
+              className={`settings-nav-item${id === currentId ? ' is-active' : ''}`}
+              aria-current={id === currentId ? 'page' : undefined}
+              onClick={() => setSection(id)}
+            >
+              <Icon size={15} />
+              {label}
+            </button>
+          ))}
+          <button
+            className="settings-reset settings-nav-reset"
+            onClick={() => {
+              void (async () => {
+                const proceed = await confirm('Reset every setting on this page to its default value?')
+                if (proceed) await update(DEFAULT_SETTINGS)
+              })()
+            }}
+          >
+            Reset to defaults
+          </button>
+        </nav>
+
+        <div className="settings-content">
+        <div className="settings-panel-header">
+          <h3>{sections.find((s) => s.id === currentId)?.label}</h3>
           <button className="settings-panel-close" onClick={onClose} aria-label="Close settings" title="Close settings">
             <X size={16} />
           </button>
         </div>
 
         <div className="settings-panel-body">
-          <div className="settings-section">
-            <p className="section-label">Editor</p>
+          {currentId === 'editor' && (
+          <>
+          <div className="settings-card">
             <label className="settings-row">
               <span>
                 Autosave delay
@@ -100,6 +143,10 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
               </span>
             </label>
 
+          </div>
+
+          <h4 className="settings-group-title">Code blocks</h4>
+          <div className="settings-card">
             <label className="settings-row">
               <span>
                 Code block indent
@@ -164,9 +211,11 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
               </span>
             </label>
           </div>
+          </>
+          )}
 
-          <div className="settings-section">
-            <p className="section-label">Writing</p>
+          {currentId === 'writing' && (
+          <div className="settings-card">
             <label className="settings-row">
               <span>
                 Spellcheck
@@ -199,9 +248,11 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
               </span>
             </label>
           </div>
+          )}
 
-          <div className="settings-section">
-            <p className="section-label">Tools</p>
+          {currentId === 'tools' && (
+          <>
+          <div className="settings-card">
             <label className="settings-row">
               <span>
                 Editor command
@@ -290,6 +341,10 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
               </span>
             </label>
 
+          </div>
+
+          <h4 className="settings-group-title">Diagnostics</h4>
+          <div className="settings-card">
             <label className="settings-row">
               <span>
                 Error log
@@ -302,12 +357,15 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
               </span>
             </label>
           </div>
+          </>
+          )}
 
-          <KeymapSettings overrides={settings.keymap} onChange={(keymap) => void update({ keymap })} />
+          {currentId === 'shortcuts' && (
+            <KeymapSettings overrides={settings.keymap} onChange={(keymap) => void update({ keymap })} />
+          )}
 
-          {(workspacePath && repoMode === null) || repoMode ? (
-            <div className="settings-section">
-              <p className="section-label">Git</p>
+          {currentId === 'git' && (
+            <div className="settings-card">
               {repoMode === null && workspacePath && (
                 <div className="settings-row">
                   <span>
@@ -472,25 +530,12 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
                 </>
               )}
             </div>
-          ) : null}
+          )}
 
-          <AboutSettings />
+          {currentId === 'about' && <AboutSettings />}
 
           {error && <p className="settings-error">{error}</p>}
         </div>
-
-        <div className="settings-panel-footer">
-          <button
-            className="settings-reset"
-            onClick={() => {
-              void (async () => {
-                const proceed = await confirm('Reset every setting on this page to its default value?')
-                if (proceed) await update(DEFAULT_SETTINGS)
-              })()
-            }}
-          >
-            Reset to defaults
-          </button>
         </div>
       </DialogContent>
     </Dialog>
