@@ -39,3 +39,8 @@ raw
 ## Harness (vitest probes)
 - `console.log` is swallowed by vitest here; write probe output with `appendFileSync` (a `/tmp/x` path lands in `D:\tmp\x`). Idempotent (`rt^3` stable) does not mean lossless: also eyeball src vs one-pass output and `getJSON()` before/after.
 - Probe pattern: scratch `src/editor/extensions/hunt*.test.ts` with `CASES` map; delete at session end.
+
+## Harness (watcher/conflict)
+- Write probe results to a log file in the fixture's parent dir (`appendFileSync`), not stdout: wdio `logLevel: info` floods the terminal; read only the log and `grep` the run output. Never `tail` the run output.
+- Watcher event reaches the app in ~0.4 s, inside the 600 ms autosave debounce, so "type, then immediately `writeFileSync` externally" reliably exercises the dirty-buffer conflict path.
+- Orphaned `tauri-driver`/`msedgedriver` pairs from older runs linger; harmless (each run uses new ports). The `null-notes.exe` processes under `Local\Null Notes\` and `target\debug` belong to the user — leave them.

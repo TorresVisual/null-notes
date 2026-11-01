@@ -1,3 +1,4 @@
 # Coverage (newest first)
+2026-11-01 @3534242 · watcher/conflict (clean-note reload, plain typing no false conflict, dirty-note external edit) · A/B clean, bug #174 (autosave clobbers external edit while ConflictBar shows)
 2026-11-01 @070e96b · idempotency rt^3 over 37 node/markdown cases (callout, details, div, span, mermaid, math, sr, footnote, tags, wiki, tasks, links, entities…) · stable, but bugs #172 (sr lapses), #173 (entity text), both fixed; nested callout/`<details open>`/html table flatten judged intended
 2026-11-01 @b2ba382 · markdown round-trip (16 hand-written notes: table, math, callout, tasks, footnote, code, wiki, breaks, crlf, frontmatter, adjacent, unicode, lists, html, links; open + 1 trailing edit, diff disk) · bugs #167-#171 (all fixed) + unfiled `</div>`/`</details>` follow-on block corruption (fixed)
