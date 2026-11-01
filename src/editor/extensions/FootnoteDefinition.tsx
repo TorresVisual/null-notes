@@ -104,10 +104,11 @@ export const FootnoteDefinition = Node.create({
           // itself, not just before `paragraph`, is what stops that.
           //
           // Scope, deliberate for a first cut: the definition's body is
-          // the rest of *this one line* only — no indented continuation
-          // lines for a second paragraph, matching how the overwhelming
-          // majority of real footnotes read (a sentence, maybe with a
-          // link). `state.md.renderInline` is what gives that one line
+          // its first line plus any directly following lines indented 4+
+          // spaces (a wrapped sentence, joined with a space on save) — no
+          // blank-line-separated second paragraph. Without the indented
+          // lines, they fell through to markdown-it's indented-code rule
+          // and were saved as a code fence. `state.md.renderInline` is what gives that text
           // real nested markdown (bold, links, code spans) rather than
           // literal text — the same API `paragraph`'s own block rule uses
           // internally (push an `inline` token and let the core inline
@@ -128,12 +129,13 @@ export const FootnoteDefinition = Node.create({
             markdownit.block.ruler.before(
               'reference',
               'footnote_definition',
-              (state: unknown, startLine: number, _endLine: number, silent: boolean): boolean => {
+              (state: unknown, startLine: number, endLine: number, silent: boolean): boolean => {
                 const st = state as {
                   src: string
                   bMarks: number[]
                   eMarks: number[]
                   tShift: number[]
+                  sCount: number[]
                   line: number
                   md: { renderInline: (src: string, env?: unknown) => string }
                   env: unknown
@@ -148,13 +150,21 @@ export const FootnoteDefinition = Node.create({
                 if (!match) return false
                 if (silent) return true
 
-                const [, label, text] = match
-                const rendered = st.md.renderInline(text ?? '', st.env)
+                const [, label, firstLine] = match
+                const lines = [firstLine ?? '']
+                let nextLine = startLine + 1
+                while (nextLine < endLine && st.sCount[nextLine]! >= 4) {
+                  const continuation = st.src.slice(st.bMarks[nextLine]! + st.tShift[nextLine]!, st.eMarks[nextLine])
+                  if (!continuation.trim()) break
+                  lines.push(continuation)
+                  nextLine++
+                }
+                const rendered = st.md.renderInline(lines.join('\n'), st.env)
                 const token = st.push('html_block', '', 0)
                 token.content = `<div data-type="footnote-def" data-label="${encodeAttr(label!)}">${rendered}</div>\n`
-                token.map = [startLine, startLine + 1]
+                token.map = [startLine, nextLine]
 
-                st.line = startLine + 1
+                st.line = nextLine
                 return true
               },
               { alt: ['paragraph', 'reference', 'blockquote', 'list'] },

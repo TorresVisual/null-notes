@@ -61,3 +61,13 @@ describe('table cells (#169)', () => {
     expect(roundTrip(src).trimEnd()).toBe(src)
   })
 })
+
+describe('footnote continuation lines (#170)', () => {
+  it('joins an indented continuation line into the definition instead of a code block', () => {
+    const out = roundTrip('Text[^1].\n\n[^1]: First\n    continued here.\n\n[^2]: Next.')
+    expect(out).toContain('[^1]: First continued here.')
+    expect(out).not.toContain('```')
+    expect(out).toContain('[^2]: Next.')
+  })
+})
+
