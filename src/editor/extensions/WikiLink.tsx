@@ -290,9 +290,12 @@ export const WikiLink = Node.create({
         },
         parse: {
           setup(markdownit: {
-            core: { ruler: { push: (name: string, fn: (state: unknown) => void) => void } }
+            core: { ruler: { before: (ref: string, name: string, fn: (state: unknown) => void) => void } }
           }) {
-            markdownit.core.ruler.push('wiki_link', (state: unknown) => {
+            // Before `text_join`, which folds the `text_special` tokens of an
+            // escaped `\[\[x\]\]` back into plain text: after it, this rule
+            // cannot tell an escaped literal from a real link.
+            markdownit.core.ruler.before('text_join', 'wiki_link', (state: unknown) => {
               const st = state as {
                 tokens: Array<{
                   type: string

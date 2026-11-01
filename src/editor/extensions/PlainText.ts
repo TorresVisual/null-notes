@@ -3,8 +3,8 @@ import { LINK_SOURCE_PATTERN } from './LinkSource'
 
 // Text that would re-parse as something other than text once its brackets are
 // bare: a link or image destination, a reference definition, a footnote
-// reference, a task checkbox.
-const BRACKETS_CHANGE_MEANING = /\]\(|\]:|\[\^|^\s*\[[ xX]\]/
+// reference, a task checkbox, a wiki-link.
+const BRACKETS_CHANGE_MEANING = /\]\(|\]:|\[\^|^\s*\[[ xX]\]|\[\[[^\]\n]+\]\]/
 
 interface SerializerState {
   esc(str: string, startOfLine?: boolean): string

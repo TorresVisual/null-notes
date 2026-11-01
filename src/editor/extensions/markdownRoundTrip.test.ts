@@ -71,3 +71,15 @@ describe('footnote continuation lines (#170)', () => {
   })
 })
 
+describe('escaped wiki-link text (#171)', () => {
+  it('keeps the escapes on literal [[x]] so it does not become a link on reload', () => {
+    const src = 'see \\[\\[x\\]\\] here'
+    const once = roundTrip(src)
+    expect(once).toBe(src)
+    expect(roundTrip(once)).toBe(src)
+  })
+
+  it('still writes a lone bracket without a backslash', () => {
+    expect(roundTrip('a [b] c')).toBe('a [b] c')
+  })
+})
