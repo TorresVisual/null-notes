@@ -20,7 +20,7 @@ vi.mock('../store/toast', () => ({ showToast: vi.fn() }))
 let mockWorkspace: ReturnType<typeof useWorkspace>
 
 beforeEach(() => {
-  useWorkspaceStore.setState({ recentWorkspaces: [], folderLoading: false })
+  useWorkspaceStore.setState({ recentWorkspaces: [], folderLoading: false, folderError: null })
   vi.mocked(platform).mockReturnValue('windows')
   mockWorkspace = {
     openWorkspace: vi.fn(),
@@ -50,6 +50,23 @@ describe('WorkspacePicker loading state', () => {
 
     const button = screen.getByRole('button', { name: /Choose a folder…/ })
     expect(button).toBeEnabled()
+  })
+})
+
+describe('WorkspacePicker open failure', () => {
+  it('announces why a folder could not be opened', () => {
+    useWorkspaceStore.setState({ folderError: 'No such file or directory (os error 2)' })
+    render(<WorkspacePicker />)
+
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      "Couldn't open that folder — No such file or directory (os error 2)",
+    )
+  })
+
+  it('shows no alert when nothing failed', () => {
+    render(<WorkspacePicker />)
+
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 })
 

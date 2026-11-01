@@ -13,6 +13,7 @@ import { showToast } from '../store/toast'
 export function WorkspacePicker() {
   const recents = useWorkspaceStore((s) => s.recentWorkspaces)
   const folderLoading = useWorkspaceStore((s) => s.folderLoading)
+  const folderError = useWorkspaceStore((s) => s.folderError)
   const { openWorkspace, openWorkspaceAt } = useWorkspace()
   const [cloning, setCloning] = useState(false)
   const [onboardUrl, setOnboardUrl] = useState('')
@@ -56,6 +57,12 @@ export function WorkspacePicker() {
         database. Paste in a lecture PDF and get real, editable text and equations back, not a
         scan.
       </p>
+
+      {folderError && (
+        <p className="workspace-picker-error" role="alert">
+          Couldn't open that folder — {folderError}
+        </p>
+      )}
 
       {mobile && (
         <form className="workspace-picker-onboarding" onSubmit={(e) => void handleMobileClone(e)}>

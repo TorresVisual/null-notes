@@ -685,7 +685,7 @@ button, [role="button"], .tree-row, .tab, .search-result, .slash-menu-item,
   color: var(--text-tertiary);
 }
 
-.sidebar .sidebar-search:hover { border-color: var(--border-strong); color: var(--text-secondary); }
+.sidebar .sidebar-search:hover:not(:disabled) { border-color: var(--border-strong); color: var(--text-secondary); }
 .sidebar-search span { flex: 1; }
 
 .sidebar-panel > .folder-tree {
@@ -3017,6 +3017,17 @@ li .fold-toggle { left: -2.4em; }
   color: var(--text-secondary);
   margin-bottom: var(--space-2xl);
   text-wrap: pretty;
+}
+
+.workspace-picker-error {
+  margin-bottom: var(--space-lg);
+  padding: var(--space-sm) var(--space-md);
+  background: color-mix(in srgb, var(--danger) 14%, var(--bg-raised));
+  border: 1px solid color-mix(in srgb, var(--danger) 35%, var(--bg-raised));
+  border-radius: 6px;
+  color: color-mix(in srgb, var(--danger) 55%, var(--text-primary));
+  font-size: 13px;
+  overflow-wrap: anywhere;
 }
 
 .workspace-picker-subtitle {

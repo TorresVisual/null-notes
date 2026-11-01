@@ -42,7 +42,7 @@ export function NoteList() {
 
   return (
     <>
-      {folderError && <p className="sidebar-error" role="alert">{folderError}</p>}
+      {folderError && workspacePath && <p className="sidebar-error" role="alert">{folderError}</p>}
       {tagFilter ? (
         <ul className="folder-tree">
           {tagFilteredNotes.map((note) => (

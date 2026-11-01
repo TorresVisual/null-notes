@@ -113,7 +113,7 @@ export function SidebarHeader({ onSearchOpen, onTemplateOpen }: SidebarHeaderPro
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
-      <button className="sidebar-search" onClick={onSearchOpen}>
+      <button className="sidebar-search" onClick={onSearchOpen} disabled={!workspacePath}>
         <Search size={14} />
         <span>Search notes</span>
         <kbd>Ctrl K</kbd>
