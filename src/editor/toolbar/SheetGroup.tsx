@@ -1,6 +1,7 @@
-import { SplitSquareVertical, Plus, Layers } from 'lucide-react'
+import { SplitSquareVertical, Plus, Layers, ListChecks, ChevronDown } from 'lucide-react'
 import type { Editor } from '@tiptap/core'
 import { message } from '@tauri-apps/plugin-dialog'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { splitIntoTasks, addNextTask, report, markdownOf } from '../splitIntoTasks'
 import { nextTaskLabel } from '../../lib/taskScaffold'
 import { insertFlashcardFromLastTask } from '../../lib/taskToFlashcard'
@@ -19,48 +20,60 @@ interface SheetGroupProps {
 export function SheetGroup({ editor }: SheetGroupProps) {
   return (
     <div className="toolbar-group" role="group" aria-label="Exercise sheet">
-      <button
-        className="toolbar-button"
-        aria-label="Split into tasks"
-        title="Rewrite this note as Task / Solution sections with a canvas each"
-        onClick={() => {
-          void splitIntoTasks(editor)
-            .then((outcome) => {
-              if (outcome === 'no-structure') {
-                void message('No exercise structure found in this note — nothing was changed.')
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button className="toolbar-button toolbar-button-labeled" aria-label="Exercise sheet" title="Exercise sheet actions">
+            <ListChecks size={15} />
+            <span>Tasks</span>
+            <ChevronDown size={12} />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent
+          align="end"
+          className="context-menu"
+          onCloseAutoFocus={(event) => {
+            event.preventDefault()
+            editor.commands.focus()
+          }}
+        >
+          <DropdownMenuItem
+            title="Rewrite this note as Task / Solution sections with a canvas each"
+            onSelect={() => {
+              void splitIntoTasks(editor)
+                .then((outcome) => {
+                  if (outcome === 'no-structure') {
+                    void message('No exercise structure found in this note — nothing was changed.')
+                  }
+                })
+                .catch(report)
+            }}
+          >
+            <SplitSquareVertical size={14} /> Split into tasks
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            title="Append the next numbered Task and Solution pair"
+            onSelect={() => {
+              void addNextTask(editor, nextTaskLabel(markdownOf(editor))).catch(report)
+            }}
+          >
+            <Plus size={14} /> Add next task
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            title="Turn the last Task's hand-drawn Solution into a review flashcard"
+            onSelect={() => {
+              try {
+                const outcome = insertFlashcardFromLastTask(editor)
+                const detail = FLASHCARD_OUTCOME_MESSAGE[outcome]
+                if (detail) void message(detail)
+              } catch (error) {
+                report(error)
               }
-            })
-            .catch(report)
-        }}
-      >
-        <SplitSquareVertical size={15} />
-      </button>
-      <button
-        className="toolbar-button"
-        aria-label="Add next task"
-        title="Append the next numbered Task and Solution pair"
-        onClick={() => {
-          void addNextTask(editor, nextTaskLabel(markdownOf(editor))).catch(report)
-        }}
-      >
-        <Plus size={15} />
-      </button>
-      <button
-        className="toolbar-button"
-        aria-label="Make flashcard from last task"
-        title="Turn the last Task's hand-drawn Solution into a review flashcard"
-        onClick={() => {
-          try {
-            const outcome = insertFlashcardFromLastTask(editor)
-            const detail = FLASHCARD_OUTCOME_MESSAGE[outcome]
-            if (detail) void message(detail)
-          } catch (error) {
-            report(error)
-          }
-        }}
-      >
-        <Layers size={15} />
-      </button>
+            }}
+          >
+            <Layers size={14} /> Flashcard from last task
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
     </div>
   )
 }

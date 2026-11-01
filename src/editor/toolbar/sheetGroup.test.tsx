@@ -1,5 +1,6 @@
 import { describe, it, expect, afterEach, vi } from 'vitest'
-import { render, cleanup, fireEvent, waitFor } from '@testing-library/react'
+import { render, cleanup, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 
 const splitIntoTasks = vi.fn<(editor: unknown) => Promise<'split' | 'no-structure'>>()
 splitIntoTasks.mockResolvedValue('split')
@@ -31,27 +32,33 @@ afterEach(() => {
   cleanup()
 })
 
+async function choose(view: ReturnType<typeof render>, item: string) {
+  const user = userEvent.setup()
+  await user.click(view.getByLabelText('Exercise sheet', { selector: 'button' }))
+  await user.click(await view.findByRole('menuitem', { name: item }))
+}
+
 describe('the exercise sheet group', () => {
   it('runs Split Into Tasks', async () => {
-    const { getByLabelText } = mount('<p>1. Erste</p>')
+    const view = mount('<p>1. Erste</p>')
 
-    fireEvent.click(getByLabelText('Split into tasks'))
+    await choose(view, 'Split into tasks')
 
     await waitFor(() => expect(splitIntoTasks).toHaveBeenCalledTimes(1))
   })
 
   it('appends the next task', async () => {
-    const { getByLabelText } = mount('<h2>Task 1</h2><h3>Solution</h3>')
+    const view = mount('<h2>Task 1</h2><h3>Solution</h3>')
 
-    fireEvent.click(getByLabelText('Add next task'))
+    await choose(view, 'Add next task')
 
     await waitFor(() => expect(addNextTask).toHaveBeenCalledTimes(1))
   })
 
   it('passes the next label, counted from the note', async () => {
-    const { getByLabelText } = mount('<h2>Task 3</h2><h3>Solution</h3>')
+    const view = mount('<h2>Task 3</h2><h3>Solution</h3>')
 
-    fireEvent.click(getByLabelText('Add next task'))
+    await choose(view, 'Add next task')
 
     await waitFor(() => expect(addNextTask.mock.calls[0]?.[1]).toBe('4'))
   })

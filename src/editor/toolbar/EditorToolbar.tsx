@@ -75,15 +75,15 @@ export function EditorToolbar({ editor, notePath }: EditorToolbarProps) {
       ) : (
         <>
           <div className="editor-toolbar-scroll">
+            {editor && !codeBlockState.active && (
+              <>
+                <TextFormatGroup editor={editor} />
+                <span className="toolbar-sep" aria-hidden />
+              </>
+            )}
             {editor && <InsertGroup editor={editor} notePath={notePath} />}
             {editor && <span className="toolbar-sep" aria-hidden />}
             {editor && <SheetGroup editor={editor} />}
-            {editor && !codeBlockState.active && (
-              <>
-                <span className="toolbar-sep" aria-hidden />
-                <TextFormatGroup editor={editor} />
-              </>
-            )}
           </div>
           {editor && codeBlockState.active && (
             <label className="code-language-control">

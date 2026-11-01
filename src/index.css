@@ -2539,18 +2539,31 @@ li .fold-toggle { left: -2.4em; }
 
 /* Same box as .ink-tool below: every group in the bar (formatting, insert,
    exercise sheet) shares one button look so the ink group is not the only
-   part of the toolbar that reads as designed rather than default. */
+   part of the toolbar that reads as designed rather than default. Buttons
+   rest flat — a bar of filled tiles reads as one grey wall — and only the
+   hovered or active one gets a surface. */
 .toolbar-button {
   width: 28px;
   height: 28px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--bg-hover);
+  background: transparent;
   border: 1px solid transparent;
-  border-radius: 6px;
+  border-radius: 4px;
   color: var(--text-secondary);
   cursor: pointer;
+}
+
+.toolbar-button-labeled {
+  width: auto;
+  gap: 6px;
+  padding: 0 8px;
+  font-size: 12px;
+}
+
+.toolbar-group[aria-label='Formatting'] .toolbar-button:not(:has(svg)) {
+  font: 600 11px/1 var(--font-mono);
 }
 
 @media (hover: none) {
@@ -2560,16 +2573,19 @@ li .fold-toggle { left: -2.4em; }
   .dialog-action, .dialog-action-primary { min-height: 44px; padding: 0 16px; }
 }
 
-.toolbar-button:hover { background: var(--border-strong); color: var(--text-primary); }
-.toolbar-button.active { background: var(--accent); color: var(--accent-contrast); }
+.toolbar-button:hover, .toolbar-button[aria-expanded='true'] { background: var(--bg-hover); color: var(--text-primary); }
+.toolbar-button.active { background: var(--accent-bg); border-color: var(--accent); color: var(--accent); }
+.toolbar-button.active:hover { background: var(--accent-bg-hover); }
+.toolbar-button:focus-visible { outline: none; box-shadow: var(--focus-ring); }
 
 /* Same divider as .ink-sep below, for the same reason .toolbar-button
-   matches .ink-tool. */
+   matches .ink-tool. Wider margins than the buttons' own gap, so a group
+   boundary reads as a boundary. */
 .toolbar-sep {
   width: 1px;
-  height: 20px;
+  height: 16px;
   background: var(--border-strong);
-  margin: 0 2px;
+  margin: 0 var(--space-sm);
 }
 
 .code-language-control {
@@ -3905,15 +3921,16 @@ li > .folder-tree.tree-guide {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--bg-hover);
+  background: transparent;
   border: 1px solid transparent;
-  border-radius: 6px;
+  border-radius: 4px;
   color: var(--text-secondary);
   cursor: pointer;
 }
 
-.ink-tool:hover { background: var(--border-strong); color: var(--text-primary); }
-.ink-tool.active { background: var(--accent); color: var(--accent-contrast); }
+.ink-tool:hover { background: var(--bg-hover); color: var(--text-primary); }
+.ink-tool.active { background: var(--accent-bg); border-color: var(--accent); color: var(--accent); }
+.ink-tool:focus-visible { outline: none; box-shadow: var(--focus-ring); }
 
 .toolbar-ink input[type="color"] {
   width: 26px;
@@ -3965,9 +3982,9 @@ li > .folder-tree.tree-guide {
 
 .ink-sep {
   width: 1px;
-  height: 20px;
+  height: 16px;
   background: var(--border-strong);
-  margin: 0 2px;
+  margin: 0 var(--space-sm);
 }
 
 .toolbar-ink button:disabled { opacity: 0.35; cursor: not-allowed; }
