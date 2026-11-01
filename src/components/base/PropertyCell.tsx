@@ -1,3 +1,4 @@
+import { plainPropertyKey } from '../../lib/baseColumns'
 import { inferType } from '../../lib/propertyType'
 import { toStr } from '../../lib/baseValue'
 import type { BaseValue } from '../../lib/baseValue'
@@ -11,13 +12,11 @@ interface PropertyCellProps {
   onWrite: (row: BaseRow, key: string, value: unknown) => void
 }
 
-const PLAIN_PROPERTY = /^(?:note\.)?([\w-]+)$/
-
 // Only a column that is exactly one frontmatter key can be edited in place;
 // file facts, formulas and anything computed are read-only.
 export function PropertyCell({ row, columnId, value, onWrite }: PropertyCellProps) {
-  const key = PLAIN_PROPERTY.exec(columnId)?.[1]
-  const editable = key !== undefined && (key !== 'tags' || 'tags' in row.properties)
+  const key = plainPropertyKey(columnId)
+  const editable = key !== null && (key !== 'tags' || 'tags' in row.properties)
   if (!editable) {
     return <span className="base-cell-text">{toStr(value)}</span>
   }

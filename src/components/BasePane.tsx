@@ -15,6 +15,8 @@ import { useWorkspaceStore } from '../store/workspace'
 import { ConflictBar } from './ConflictBar'
 import { BaseSource } from './base/BaseSource'
 import { BaseToolbar } from './base/BaseToolbar'
+import { CardsView } from './base/CardsView'
+import { KanbanView } from './base/KanbanView'
 import { ListView } from './base/ListView'
 import { TableView } from './base/TableView'
 
@@ -104,7 +106,9 @@ export function BasePane({ path, embedded = false, thisPath }: BasePaneProps) {
       {(sourceOpen || !base) && source !== '' && <BaseSource source={source} onChange={setSource} />}
       {layoutProps && view?.type === 'table' && <TableView {...layoutProps} />}
       {layoutProps && view?.type === 'list' && <ListView {...layoutProps} />}
-      {layoutProps && view && !['table', 'list'].includes(view.type) && (
+      {layoutProps && view?.type === 'cards' && <CardsView {...layoutProps} />}
+      {layoutProps && view?.type === 'kanban' && <KanbanView {...layoutProps} />}
+      {layoutProps && view && !['table', 'list', 'cards', 'kanban'].includes(view.type) && (
         <p className="base-empty">The {view.type} layout isn’t available yet.</p>
       )}
     </div>

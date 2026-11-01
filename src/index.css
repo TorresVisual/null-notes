@@ -6497,6 +6497,64 @@ input[type='checkbox']:focus-visible {
 .base-list li { padding: 2px 0; }
 .base-list-meta { margin-left: var(--space-sm); color: var(--text-tertiary); }
 
+.base-count { margin-left: 4px; color: var(--text-tertiary); font-weight: 400; }
+
+.base-kanban {
+  flex: 1;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-md);
+  padding: var(--space-md);
+  overflow-x: auto;
+}
+
+.base-kanban-column {
+  flex: 0 0 260px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding: var(--space-sm);
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.base-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: var(--space-sm);
+  background: var(--bg-base);
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+}
+
+.base-kanban .base-card { cursor: grab; }
+.base-card-meta { color: var(--text-tertiary); font-size: 12px; }
+
+.base-add-card {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 6px;
+  background: none;
+  border: none;
+  border-radius: 4px;
+  color: var(--text-tertiary);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.base-add-card:hover { background: var(--bg-hover); color: var(--text-secondary); }
+
+.base-cards-wrap { padding: var(--space-sm) var(--space-md); }
+.base-cards { display: grid; gap: var(--space-md); margin-bottom: var(--space-md); }
+.base-card-image { width: 100%; border-radius: 4px; background: var(--bg-sunken); }
+.base-card-fields { margin: 0; }
+.base-card-fields div { display: flex; gap: 6px; font-size: 12px; }
+.base-card-fields dt { color: var(--text-tertiary); }
+.base-card-fields dd { margin: 0; color: var(--text-secondary); }
+
 .canvas-pane {
   flex: 1;
   min-width: 0;
