@@ -2,6 +2,7 @@
 
 mod effects;
 mod query;
+mod tree;
 mod wire;
 
 use crate::client::Env;
