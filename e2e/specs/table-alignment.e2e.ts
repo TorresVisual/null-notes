@@ -5,6 +5,7 @@ import { fixtureWorkspace } from '../fixtureWorkspace.js'
 import { screenshot } from '../screenshot.js'
 import { fillPromptDialog } from '../promptDialog.js'
 import { clickNewMenuItem } from '../sidebar.js'
+import { clickInsertMenuItem } from '../insertMenu.js'
 
 async function clickInPage(selector: string): Promise<void> {
   await browser.execute((sel) => {
@@ -61,7 +62,7 @@ describe('table column alignment persistence', () => {
   it('cycles a column to centered, saves a GFM :---: delimiter, and renders centered text', async () => {
     const notePath = await createNote('Table Alignment')
 
-    await clickInPage('[aria-label="Insert table"]')
+    await clickInsertMenuItem('Table')
     await browser.waitUntil(async () => browser.execute(() => !!document.querySelector('.note-editor table')), {
       timeout: 5000,
       timeoutMsg: 'table never mounted',

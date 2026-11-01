@@ -41,6 +41,12 @@ afterEach(() => {
   cleanup()
 })
 
+async function chooseInsert(view: ReturnType<typeof render>, item: string) {
+  const user = userEvent.setup()
+  await user.click(view.getByLabelText('Insert block'))
+  await user.click(await view.findByRole('menuitem', { name: item }))
+}
+
 describe('the insert group', () => {
   it('inserts a block equation', async () => {
     const { getByLabelText } = mount()
@@ -51,17 +57,17 @@ describe('the insert group', () => {
   })
 
   it('inserts a table', async () => {
-    const { getByLabelText } = mount()
+    const view = mount()
 
-    fireEvent.click(getByLabelText('Insert table'))
+    await chooseInsert(view, 'Table')
 
     await waitFor(() => expect(nodeTypes()).toContain('table'))
   })
 
   it('inserts a code block', async () => {
-    const { getByLabelText } = mount()
+    const view = mount()
 
-    fireEvent.click(getByLabelText('Insert code block'))
+    await chooseInsert(view, 'Code block')
 
     await waitFor(() => expect(nodeTypes()).toContain('codeBlock'))
   })

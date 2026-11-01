@@ -5,17 +5,7 @@ import { fixtureWorkspace } from '../fixtureWorkspace.js'
 import { screenshot } from '../screenshot.js'
 import { fillPromptDialog } from '../promptDialog.js'
 import { clickNewMenuItem } from '../sidebar.js'
-
-// See sidebar.ts for why these two helpers exist.
-async function clickInPage(selector: string): Promise<void> {
-  await browser.execute((sel) => {
-    const el = document.querySelector(sel)
-    if (!(el instanceof HTMLElement)) {
-      throw new Error(`clickInPage: no element matching ${sel}`)
-    }
-    el.click()
-  }, selector)
-}
+import { clickInsertMenuItem } from '../insertMenu.js'
 
 async function focusEditorEnd(): Promise<void> {
   await browser.execute(() => {
@@ -56,7 +46,7 @@ describe('table styling', () => {
   it('centers cell text vertically and visually separates the header row from the zebra stripe', async () => {
     const notePath = await createNote('Table Styling')
 
-    await clickInPage('[aria-label="Insert table"]')
+    await clickInsertMenuItem('Table')
     await browser.waitUntil(async () => browser.execute(() => !!document.querySelector('.note-editor table')), {
       timeout: 5000,
       timeoutMsg: 'table never mounted',

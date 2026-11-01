@@ -1,5 +1,6 @@
 import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest'
 import { render, cleanup, fireEvent, waitFor, act } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { EditorToolbar } from './EditorToolbar'
 import { NoteEditor } from '../NoteEditor'
 import { useInkStore } from '../../store/ink'
@@ -202,7 +203,7 @@ describe('the editor toolbar', () => {
   // editor's own transaction and NoteEditor's re-render, not in EditorToolbar
   // alone.
   it('switches to the language select right after Insert code block, though the caret never moves', async () => {
-    const { container, getByLabelText } = render(
+    const { container, getByLabelText, findByRole } = render(
       <NoteEditor
         content="hello world"
         notePath="/ws/a.md"
@@ -216,7 +217,9 @@ describe('the editor toolbar', () => {
     await waitFor(() => expect(pmEl.textContent).toContain('hello world'))
     clickInto(pmEl)
 
-    fireEvent.click(getByLabelText('Insert code block'))
+    const user = userEvent.setup()
+    await user.click(getByLabelText('Insert block'))
+    await user.click(await findByRole('menuitem', { name: 'Code block' }))
 
     await waitFor(() => expect(getByLabelText('Code block language')).toBeInTheDocument())
   })

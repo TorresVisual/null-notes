@@ -5,6 +5,7 @@ import { fixtureWorkspace } from '../fixtureWorkspace.js'
 import { screenshot } from '../screenshot.js'
 import { fillPromptDialog } from '../promptDialog.js'
 import { clickNewMenuItem } from '../sidebar.js'
+import { clickInsertMenuItem } from '../insertMenu.js'
 
 async function clickInPage(selector: string): Promise<void> {
   await browser.execute((sel) => {
@@ -82,7 +83,7 @@ describe('table row/column grip menus', () => {
   it('deletes a column via its grip menu and adds a row via the persistent append control', async () => {
     const notePath = await createNote('Table Controls')
 
-    await clickInPage('[aria-label="Insert table"]')
+    await clickInsertMenuItem('Table')
     await browser.waitUntil(async () => browser.execute(() => !!document.querySelector('.note-editor table')), {
       timeout: 5000,
       timeoutMsg: 'table never mounted',
