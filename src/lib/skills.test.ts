@@ -10,7 +10,7 @@ function skillText(skill: string, file = 'SKILL.md'): string {
 
 function frontmatterField(text: string, key: string): string | undefined {
   const block = /^---\r?\n([\s\S]*?)\r?\n---/.exec(text)?.[1] ?? ''
-  return new RegExp(`^${key}:\\s*(.+)$`, 'm').exec(block)?.[1].trim()
+  return new RegExp(`^${key}:\\s*(.+)$`, 'm').exec(block)?.[1]?.trim()
 }
 
 describe('skill structure', () => {
@@ -33,7 +33,7 @@ describe('nullnotes-cli', () => {
       .split(/\r?\n/)
       .filter((l) => l.startsWith('|'))
       .slice(2)
-      .map((l) => l.split('|')[2].trim())
+      .map((l) => l.split('|')[2]?.trim() ?? '')
     expect(rows.length).toBe(5)
     const text = skillText('nullnotes-cli')
     for (const row of rows) expect(text, row).toContain(row)
@@ -108,5 +108,25 @@ describe('null-notes-bases', () => {
     expect(text).toMatch(/validate/i)
     expect(text).toMatch(/exactly one key/i)
     expect(text).toMatch(/\.base/)
+  })
+})
+
+describe('plugin manifests', () => {
+  const read = (file: string): Record<string, unknown> =>
+    JSON.parse(readFileSync(`${ROOT}.claude-plugin/${file}`, 'utf8')) as Record<string, unknown>
+
+  it('are valid and license-free', () => {
+    const plugin = read('plugin.json')
+    expect(plugin.name).toBe('null-notes')
+    expect(plugin.version).toBe('0.1.0')
+    expect((plugin.author as { name: string }).name).toBe('TorresVisual')
+    expect(plugin).not.toHaveProperty('license')
+
+    const marketplace = read('marketplace.json')
+    const plugins = marketplace.plugins as { name: string; source: string }[]
+    expect(plugins).toHaveLength(1)
+    expect(plugins[0]?.name).toBe('null-notes')
+    expect(plugins[0]?.source).toBe('./')
+    expect(marketplace).not.toHaveProperty('license')
   })
 })

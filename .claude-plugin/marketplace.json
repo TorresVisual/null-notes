@@ -1,0 +1,15 @@
+{
+  "name": "null-notes",
+  "owner": {
+    "name": "TorresVisual",
+    "url": "https://github.com/TorresVisual"
+  },
+  "plugins": [
+    {
+      "name": "null-notes",
+      "source": "./",
+      "description": "Agent skills for working in a Null Notes workspace: the nullnotes CLI, the app's Markdown, brainstorm canvases and Bases.",
+      "version": "0.1.0"
+    }
+  ]
+}

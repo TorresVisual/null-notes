@@ -257,6 +257,10 @@ npm run test:e2e             # rebuilds via `tauri build --debug`, then runs e2e
 
 ## Agent skills
 
+### Keeping skills true
+
+The plugin in `skills/` documents the CLI, the Markdown dialect, canvases and Bases for external agents. Changing the CLI surface, the `.base` evaluator, the canvas contract or a Markdown node means updating the matching skill in the same change; `src/lib/skills.test.ts` guards the CLI command table and the function list.
+
 ### Issue tracker
 
 Bugs and features are tracked as GitHub Issues on `TorresVisual/null-notes` (and `TorresVisual/null-ide` for IDE-side work) — not in `TODO.md`. Use the `file-issue` skill to turn a rough note into a filed issue. See `docs/agents/issue-tracker.md`.

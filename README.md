@@ -33,6 +33,7 @@ plain `.md` files on disk, never locked into a proprietary format — see
 - [Storage model](#storage-model)
 - [Syncing a workspace](#syncing-a-workspace)
 - [Project structure](#project-structure)
+- [Agent skills](#agent-skills)
 - [Documentation](#documentation)
 
 ## Features
@@ -160,6 +161,25 @@ src/              React frontend
   store/          Global state (Zustand)
   lib/            Pure utilities (no React)
 ```
+
+## Agent skills
+
+Four skills teach a coding agent (Claude Code, or any tool that reads `SKILL.md`) how to work in a Null Notes workspace correctly. They live in [`skills/`](skills/) and ship as one plugin, `null-notes`.
+
+- `nullnotes-cli` — read, search and edit notes through the `nullnotes` CLI
+- `null-notes-markdown` — the Markdown the app renders, sidecar paths, and what it does not support
+- `brainstorm-canvas` — append-only brainstorm passes in a `.canvas` file (`/null-notes:brainstorm-canvas <path> <topic>`)
+- `null-notes-bases` — `.base` files and the functions the evaluator implements
+
+The repo is private, so install from a local clone or with `gh` authentication:
+
+```
+/plugin marketplace add TorresVisual/null-notes
+/plugin marketplace add D:/path/to/null-notes
+/plugin install null-notes@null-notes
+```
+
+Use one of the `marketplace add` lines, not both. To try the skills without installing, run `claude --plugin-dir D:/path/to/null-notes`.
 
 ## Documentation
 

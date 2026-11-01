@@ -1,0 +1,11 @@
+{
+  "name": "null-notes",
+  "version": "0.1.0",
+  "description": "Agent skills for working in a Null Notes workspace: the nullnotes CLI, the app's Markdown, brainstorm canvases and Bases.",
+  "author": {
+    "name": "TorresVisual",
+    "url": "https://github.com/TorresVisual"
+  },
+  "repository": "https://github.com/TorresVisual/null-notes",
+  "keywords": ["null-notes", "markdown", "canvas", "bases", "cli", "notes"]
+}
