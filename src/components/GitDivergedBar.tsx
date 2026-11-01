@@ -34,7 +34,7 @@ export function GitDivergedBar({
     localPaths.length > 0 && remotePaths.length > 0 && !localPaths.some((p) => remotePaths.includes(p))
 
   return (
-    <div className="conflict-bar" role="alert">
+    <div className="conflict-bar is-warning" role="alert">
       <GitBranch size={14} />
       <span>
         Local and remote history have diverged — you&apos;re ahead by {ahead} ({noteNames(localPaths)}),

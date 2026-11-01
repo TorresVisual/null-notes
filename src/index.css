@@ -21,8 +21,8 @@
   /* Text */
   --text-primary: #e6edf3;
   --text-secondary: #9da7b3;
-  --text-tertiary: #565f6b;
-  --text-disabled: #3a4048;
+  --text-tertiary: #808a96;
+  --text-disabled: #6a737e;
 
   /* Accent (signal green) */
   --accent: #7ee787;
@@ -2466,7 +2466,14 @@ li .fold-toggle { left: -2.4em; }
   flex-shrink: 0;
 }
 
+/* Severity tint: danger = a decision about unsaved work (conflict), warning =
+   git state that needs attention, accent = an offer. Tint is mixed into
+   --bg-raised so text contrast doesn't depend on what sits behind it. */
+.conflict-bar { background: color-mix(in srgb, var(--danger) 10%, var(--bg-raised)); border-bottom-color: color-mix(in srgb, var(--danger) 40%, var(--bg-raised)); }
+.conflict-bar.is-warning { background: color-mix(in srgb, var(--warning) 10%, var(--bg-raised)); border-bottom-color: color-mix(in srgb, var(--warning) 40%, var(--bg-raised)); }
+.git-prompt { background: color-mix(in srgb, var(--accent) 7%, var(--bg-raised)); border-bottom-color: color-mix(in srgb, var(--accent) 30%, var(--bg-raised)); }
 .conflict-bar > svg { color: var(--danger); flex-shrink: 0; }
+.conflict-bar.is-warning > svg { color: var(--warning); }
 .git-prompt > svg { color: var(--accent); flex-shrink: 0; }
 
 .conflict-bar button, .git-prompt button {

@@ -16,7 +16,7 @@ interface GitPullBlockedBarProps {
 export function GitPullBlockedBar({ output, paths, onDismiss }: GitPullBlockedBarProps) {
   const names = paths.map((p) => p.split('/').pop() ?? p).join(', ')
   return (
-    <div className="conflict-bar" role="alert">
+    <div className="conflict-bar is-warning" role="alert">
       <GitBranch size={14} />
       <span title={output}>
         Couldn&apos;t sync with the remote — {names || 'a local uncommitted change'} conflicts with an

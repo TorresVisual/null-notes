@@ -12,7 +12,7 @@ interface GitAheadBarProps {
 // `.conflict-bar` styling rather than inventing a fourth bar look.
 export function GitAheadBar({ ahead, onDismiss }: GitAheadBarProps) {
   return (
-    <div className="conflict-bar" role="alert">
+    <div className="conflict-bar is-warning" role="alert">
       <GitBranch size={14} />
       <span>
         {ahead} local commit{ahead === 1 ? '' : 's'} still haven&apos;t reached the remote — the

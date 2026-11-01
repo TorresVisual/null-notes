@@ -19,8 +19,8 @@ All values are CSS custom properties in `src/index.css`'s `:root` block unless n
 | `--border-strong` | `#3a3a3a` | Emphasized borders (panels, inputs, cards) |
 | `--text-primary` | `#e6edf3` | Primary reading text |
 | `--text-secondary` | `#9da7b3` | De-emphasized text that's still read |
-| `--text-tertiary` | `#565f6b` | Labels, metadata, disabled-adjacent text |
-| `--text-disabled` | `#3a4048` | Placeholder / disabled text |
+| `--text-tertiary` | `#808a96` | Labels, metadata, disabled-adjacent text (4.7:1 on `--bg-base`) |
+| `--text-disabled` | `#6a737e` | Placeholder / disabled text (3.4:1 on `--bg-base`; not for anything that must be read) |
 | `--accent` | `#7ee787` | Signal green — links, active states, primary affordance |
 | `--accent-hover` | `#a3f0ac` | Accent hover |
 | `--accent-bg` / `--accent-bg-hover` | `rgba(126,231,135,0.12/0.22)` | Accent-tinted fills (selection, active row) |
