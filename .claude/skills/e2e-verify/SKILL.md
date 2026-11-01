@@ -1,6 +1,6 @@
 ---
 name: e2e-verify
-description: Use when asked to verify, test, or confirm that a new null-notes feature actually works end to end — driving the real compiled null-notes.exe with WebdriverIO, not just running unit tests or reading the code. Covers launching the app, writing a new spec, screenshotting and visually inspecting the result, and known gotchas (native dialogs, the --workspace arg, click/type timing, save debounce).
+description: Use when asked to verify, test, or confirm that a new null-notes feature actually works end to end — driving the real compiled null-notes.exe with WebdriverIO, not just running unit tests or reading the code. Covers launching the app, writing a new spec, screenshotting and visually inspecting the result, and known gotchas (sidebar menu and prompt-dialog helpers, native OS dialogs, the --workspace arg, click/type timing, save debounce).
 ---
 
 # Verifying a null-notes feature end to end
@@ -45,7 +45,8 @@ Two things that aren't obvious and cost real time to find:
   `devUrl` (Tauri's dev-profile default, meant for `tauri dev`'s own
   vite server) instead of the bundled frontend — nothing serves that
   URL during a test run, so the app loads a blank page. `pretest:e2e`
-  already does this; don't "optimize" it back to a bare `cargo build`.
+  already does this (and builds the `nullnotes` CLI first, which
+  `cli.e2e.ts` needs); don't "optimize" it back to a bare `cargo build`.
 - **`--workspace` and its value must be one token
   (`--workspace=<path>`), not two (`--workspace <path>`).** The driver
   toolchain that launches the app for testing reorders and re-splits
@@ -68,10 +69,13 @@ Two things that aren't obvious and cost real time to find:
    run their own overlap/visibility polling before acting, and each
    poll iteration is a slow round trip through this specific driver —
    turning a near-instant UI state into a 10-20s stall per click. Use
-   a helper like `create-note.e2e.ts`'s `clickInPage()`
+   a helper like `clickInPage()`
    (`browser.execute((sel) => document.querySelector(sel).click(),
    selector)`) instead — `findElement` succeeding is already
-   sufficient readiness signal here.
+   sufficient readiness signal here. There is no shared copy: each
+   spec defines its own near-identical `clickInPage` (e.g.
+   `flashcards.e2e.ts`; `bases.e2e.ts` adds a text filter), so copy
+   the nearest one.
 4. **Typing into a contenteditable needs a real focus + selection, not
    just a click.** A plain in-page `.click()` focuses the element but
    doesn't give ProseMirror a cursor position the way a mouse click
@@ -79,12 +83,20 @@ Two things that aren't obvious and cost real time to find:
    where you want to type (see `create-note.e2e.ts`'s selection-setup
    block) before sending keys. `browser.keys(...)` itself works fine
    and is fast — it's only element-readiness *waiting* that's slow.
-5. **Native dialogs** (`window.prompt`/`confirm`, e.g. note/folder
-   naming) render outside the WebView DOM — reach them with the
-   standard WebDriver user-prompt commands: `await
-   browser.sendAlertText('value'); await browser.acceptAlert()`,
-   guarded by polling `browser.getAlertText()` in a try/catch until it
-   stops throwing (see `create-note.e2e.ts`).
+5. **Create and name things through the shared helpers, not raw
+   clicks.** Both are in-app UI now, so WebDriver's alert commands
+   (`sendAlertText`/`acceptAlert`) don't reach them:
+   - `clickNewMenuItem('Note' | 'Folder' | 'Canvas' | 'From template')`
+     (`e2e/sidebar.ts`) opens the sidebar "+" menu. Radix opens it on
+     `pointerdown`, so a plain `.click()` on the trigger does nothing.
+   - `fillPromptDialog(name)` (`e2e/promptDialog.ts`) fills and submits
+     the PromptDialog that backs new note/folder/canvas and rename. It
+     sets the value through the native setter plus an `input` event
+     (React ignores a bare `.value =`) and waits for the dialog to
+     close.
+
+   Typical flow: `await clickNewMenuItem('Note'); await
+   fillPromptDialog('My note')` (see `create-note.e2e.ts`).
 6. **Assert on disk, not just DOM.** This app's source of truth is the
    `.md` file / SQLite index / `.workspace.json`, not React state —
    read the fixture workspace with Node's `fs` and assert file
@@ -136,6 +148,9 @@ look at it or describe what's in it.
 
 - Each spec shares the one fixture workspace (see above) — clean up
   your own artifacts, don't rely on an empty directory.
+- Static input files (a long note to paginate, say) live in
+  `e2e/fixtures/`; copy them into the workspace rather than editing
+  in place.
 - The real user's `%APPDATA%\dev.nullnotes.app\recent-workspaces.json`
   is never touched — the `--workspace` arg path opens via
   `openWorkspaceAt(path, { remember: false })` in `Layout.tsx`.
