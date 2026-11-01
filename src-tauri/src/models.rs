@@ -559,6 +559,14 @@ pub struct AppSettings {
     /// `{x}` and `{y}` placeholders. Public OpenStreetMap by default.
     #[serde(default = "default_map_tile_url")]
     pub map_tile_url: String,
+    /// Whether the `nullnotes` CLI may reach this app over the local pipe.
+    /// Read at launch (and by the CLI itself), so a change applies next launch.
+    #[serde(default = "default_cli_access")]
+    pub cli_access: bool,
+}
+
+fn default_cli_access() -> bool {
+    true
 }
 
 fn default_map_tile_url() -> String {
@@ -600,6 +608,7 @@ impl Default for AppSettings {
             code_run_timeout_secs: default_code_run_timeout_secs(),
             keymap: Default::default(),
             map_tile_url: default_map_tile_url(),
+            cli_access: default_cli_access(),
         }
     }
 }

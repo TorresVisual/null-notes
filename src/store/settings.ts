@@ -18,6 +18,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   codeRunTimeoutSecs: 10,
   keymap: {},
   mapTileUrl: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+  cliAccess: true,
 }
 
 interface SettingsStore {

@@ -119,9 +119,11 @@ mod tests {
             code_run_timeout_secs: 30,
             keymap: [("search".to_string(), "Ctrl+Shift+S".to_string())].into(),
             map_tile_url: "https://tiles.example/{z}/{x}/{y}.png".to_string(),
+            cli_access: false,
         };
         save_settings_to_dir(dir.path(), &original).await.unwrap();
         let loaded = load_settings_from_dir(dir.path()).await.unwrap();
+        assert!(!loaded.cli_access);
         assert_eq!(loaded.autosave_debounce_ms, 1200);
         assert_eq!(loaded.editor_max_width_px, 960);
         assert!(loaded.spellcheck);
@@ -299,6 +301,9 @@ mod tests {
         // Same guarantee for P10-2: an older settings.json loads with the
         // one timeout every run has always implicitly had, not 0.
         assert_eq!(loaded.code_run_timeout_secs, 10);
+        // The CLI is on for everyone who upgrades; only an explicit false
+        // in settings.json turns it off.
+        assert!(loaded.cli_access);
     }
 
     #[test]

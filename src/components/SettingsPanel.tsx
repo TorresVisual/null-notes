@@ -361,6 +361,26 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
 
           </div>
 
+          <h4 className="settings-group-title">Command line</h4>
+          <div className="settings-card">
+            <label className="settings-row">
+              <span>
+                Allow CLI access
+                <small>
+                  Lets the <code>nullnotes</code> command read and edit your notes while the app runs. Applies on
+                  next launch.
+                </small>
+              </span>
+              <span className="settings-row-control">
+                <input
+                  type="checkbox"
+                  checked={settings.cliAccess}
+                  onChange={(e) => void update({ cliAccess: e.target.checked })}
+                />
+              </span>
+            </label>
+          </div>
+
           <h4 className="settings-group-title">Diagnostics</h4>
           <div className="settings-card">
             <label className="settings-row">

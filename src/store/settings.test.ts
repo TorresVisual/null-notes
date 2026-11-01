@@ -8,6 +8,10 @@ describe('useSettingsStore', () => {
     expect(useSettingsStore.getState().settings).toEqual(DEFAULT_SETTINGS)
   })
 
+  it('allows CLI access by default', () => {
+    expect(useSettingsStore.getState().settings.cliAccess).toBe(true)
+  })
+
   it('replaces the settings wholesale', () => {
     useSettingsStore.getState().setSettings({
       autosaveDebounceMs: 1200,
@@ -26,6 +30,7 @@ describe('useSettingsStore', () => {
       keymap: {},
       mapTileUrl: 'https://tiles.example/{z}/{x}/{y}.png',
       codeRunTimeoutSecs: 30,
+      cliAccess: false,
     })
     expect(useSettingsStore.getState().settings).toEqual({
       autosaveDebounceMs: 1200,
@@ -44,6 +49,7 @@ describe('useSettingsStore', () => {
       keymap: {},
       mapTileUrl: 'https://tiles.example/{z}/{x}/{y}.png',
       codeRunTimeoutSecs: 30,
+      cliAccess: false,
     })
   })
 })

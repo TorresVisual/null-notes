@@ -207,6 +207,8 @@ export interface AppSettings {
   keymap: Record<string, string>
   /** Raster tile URL template for a base's map layout; `{z}`, `{x}`, `{y}` placeholders. */
   mapTileUrl: string
+  /** Whether the `nullnotes` CLI may reach the app. Applies on next launch. */
+  cliAccess: boolean
 }
 
 export interface ErrorLogEntry {
