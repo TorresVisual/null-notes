@@ -96,3 +96,12 @@ describe('blocks after a raw-HTML container', () => {
     expect(roundTrip(roundTrip(once))).toBe(once)
   })
 })
+
+describe('flashcard schedule comment (#172)', () => {
+  it.each([
+    'Q :: A\n\n<!-- sr due=2026-11-02 ease=2.5 interval=1 reps=1 grade=again streak=0 lapses=3 -->',
+    'Q :: A\n\n<!-- sr due=2026-11-02 ease=2.5 interval=1 reps=1 lapses=2 suspended=true -->',
+  ])('keeps lapses across a save: %s', (src) => {
+    expect(roundTrip(src).trimEnd()).toBe(src)
+  })
+})

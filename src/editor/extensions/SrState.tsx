@@ -7,6 +7,7 @@ interface SrStateAttrs {
   reps: string
   grade: string
   streak: string
+  lapses: string
   suspended: string
 }
 
@@ -37,6 +38,7 @@ export const SrState = Node.create({
       reps: { default: '' },
       grade: { default: '' },
       streak: { default: '' },
+      lapses: { default: '' },
       suspended: { default: '' },
     }
   },
@@ -52,6 +54,7 @@ export const SrState = Node.create({
           reps: (el as HTMLElement).getAttribute('data-reps') ?? '',
           grade: (el as HTMLElement).getAttribute('data-grade') ?? '',
           streak: (el as HTMLElement).getAttribute('data-streak') ?? '',
+          lapses: (el as HTMLElement).getAttribute('data-lapses') ?? '',
           suspended: (el as HTMLElement).getAttribute('data-suspended') ?? '',
         }),
       },
@@ -70,6 +73,7 @@ export const SrState = Node.create({
         'data-reps': attrs.reps,
         'data-grade': attrs.grade,
         'data-streak': attrs.streak,
+        'data-lapses': attrs.lapses,
         'data-suspended': attrs.suspended,
         style: 'display:none',
         contenteditable: 'false',
@@ -84,12 +88,13 @@ export const SrState = Node.create({
           state: { write: (s: string) => void; ensureNewLine: () => void; closeBlock: (n: unknown) => void },
           node: { attrs: SrStateAttrs },
         ) {
-          const { due, ease, interval, reps, grade, streak, suspended } = node.attrs
+          const { due, ease, interval, reps, grade, streak, lapses, suspended } = node.attrs
           state.ensureNewLine()
           const gradePart = grade ? ` grade=${grade}` : ''
           const streakPart = streak ? ` streak=${streak}` : ''
+          const lapsesPart = lapses ? ` lapses=${lapses}` : ''
           const suspendedPart = suspended === 'true' ? ' suspended=true' : ''
-          state.write(`<!-- sr due=${due} ease=${ease} interval=${interval} reps=${reps}${gradePart}${streakPart}${suspendedPart} -->`)
+          state.write(`<!-- sr due=${due} ease=${ease} interval=${interval} reps=${reps}${gradePart}${streakPart}${lapsesPart}${suspendedPart} -->`)
           state.closeBlock(node)
         },
         parse: {
@@ -113,6 +118,7 @@ export const SrState = Node.create({
               div.setAttribute('data-reps', match[4]!)
               div.setAttribute('data-grade', match[5] ?? '')
               div.setAttribute('data-streak', match[6] ?? '')
+              div.setAttribute('data-lapses', match[7] ?? '')
               div.setAttribute('data-suspended', match[8] ?? '')
               comment.replaceWith(div)
             }
