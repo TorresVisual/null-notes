@@ -6,9 +6,14 @@ import { useEffect } from 'react'
 import { extensionsFor } from './index'
 import { useNotesStore } from '../../store/notes'
 import { TooltipProvider } from '../../components/ui/tooltip'
+import { useWorkspaceStore } from '../../store/workspace'
+import { useBaseRowsStore } from '../../store/baseRows'
 
 vi.mock('../../lib/tauri', () => ({
-  api: { notes: { open: vi.fn() } },
+  api: {
+    notes: { open: vi.fn(), save: vi.fn() },
+    properties: { listRows: vi.fn(), writeProperty: vi.fn(), createNote: vi.fn() },
+  },
 }))
 
 type ChangeHandler = (event: { payload: string[] }) => void | Promise<void>
@@ -207,5 +212,45 @@ describe('NoteEmbedView', () => {
 
     await waitFor(() => expect(container.querySelector('.note-embed-body')?.textContent).toContain('second version'))
     expect(markdownOf()).toBe('![[B]]')
+  })
+})
+
+describe('base embed', () => {
+  const BASE = ['views:', '  - type: table', '    name: Table', '    order:', '      - file.name', '      - status', ''].join('\n')
+
+  beforeEach(() => {
+    useWorkspaceStore.setState({ path: '/ws' })
+    useBaseRowsStore.setState({ rows: [], workspace: null })
+    vi.mocked(api.properties.listRows).mockResolvedValue([
+      { path: '/ws/a.md', title: 'A', properties: { status: 'todo' }, parseError: null, ctime: 0, mtime: 0, size: 0, tags: [], links: [], backlinks: [] },
+    ])
+  })
+
+  it('serializes ![[Tasks.base]] back to the same Markdown', async () => {
+    useNotesStore.setState({ canvases: ['/ws/Tasks.base'] })
+    contents['/ws/Tasks.base'] = BASE
+    const { container } = mount('![[Tasks.base]]')
+    await waitFor(() => expect(container.querySelector('.note-embed')).toBeInTheDocument())
+
+    expect(markdownOf()).toBe('![[Tasks.base]]')
+  })
+
+  it('renders the base as a table, interactive, with spellcheck off', async () => {
+    useNotesStore.setState({ canvases: ['/ws/Courses/Tasks.base'] })
+    contents['/ws/Courses/Tasks.base'] = BASE
+    const { container } = mount('![[Tasks.base]]')
+
+    await waitFor(() => expect(container.querySelector('.note-embed table')).toBeInTheDocument())
+    expect(container.querySelector('.note-embed')?.getAttribute('spellcheck')).toBe('false')
+    await waitFor(() =>
+      expect((container.querySelector('.note-embed input[aria-label="status"]') as HTMLInputElement | null)?.value).toBe('todo'),
+    )
+  })
+
+  it('shows the existing not-found placeholder for a missing base', async () => {
+    useNotesStore.setState({ canvases: [] })
+    const { container } = mount('![[Nope.base]]')
+
+    await waitFor(() => expect(container.querySelector('.note-embed-missing')?.textContent).toBe('Note "Nope.base" not found'))
   })
 })
