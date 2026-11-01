@@ -3,6 +3,7 @@ import { listen } from '@tauri-apps/api/event'
 import { api } from '../lib/tauri'
 import { useWorkspaceStore } from '../store/workspace'
 import { useBookmarksStore } from '../store/bookmarks'
+import { useBaseRowsStore } from '../store/baseRows'
 import { refreshTree, refreshTags } from './useWorkspace'
 
 // Files are the source of truth, so anything that edits them — another editor,
@@ -20,7 +21,10 @@ export function useExternalChanges() {
   }, [])
 
   useEffect(() => {
-    const unlisten = listen('canvas-changed', () => void refreshTree())
+    const unlisten = listen('canvas-changed', () => {
+      void refreshTree()
+      void useBaseRowsStore.getState().reload()
+    })
     return () => void unlisten.then((off) => off())
   }, [])
 
@@ -33,6 +37,7 @@ export function useExternalChanges() {
       )
       await refreshTree()
       await refreshTags()
+      await useBaseRowsStore.getState().reload()
     })
     return () => void unlisten.then((off) => off())
   }, [])
