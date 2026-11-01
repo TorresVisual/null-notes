@@ -740,7 +740,7 @@ export function Layout() {
           onDismiss={() => useWorkspaceStore.getState().setGitAhead(null)}
         />
       )}
-      {repoMode && !gitPrompted && (
+      {repoMode && !gitPrompted && !gitDiverged && !gitPullBlocked && gitAhead === null && (
         <GitAutoCommitPrompt
           mode={repoMode}
           priorAutomation={gitPriorAutomation}

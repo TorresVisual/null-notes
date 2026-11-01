@@ -86,7 +86,7 @@ export const EditorPane = forwardRef<HTMLDivElement, EditorPaneProps>(function E
 
   return (
     <div className="editor-scroll" ref={scrollRef}>
-      {conflict && <ConflictBar onKeepMine={onKeepMine} onReloadTheirs={onReloadTheirs} />}
+      {conflict && <ConflictBar noteName={currentNote?.title} onKeepMine={onKeepMine} onReloadTheirs={onReloadTheirs} />}
       {onClose && (
         <div className="editor-pane-header">
           <button
