@@ -28,6 +28,7 @@ coverage
 # Tauri
 src-tauri/target/
 src-tauri/context-menu-handler/target/
+src-tauri/cli/target/
 
 scripts/windows/.dev-cert/
 identity-package/null-notes-identity.msix

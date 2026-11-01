@@ -1,0 +1,17 @@
+[package]
+name = "nullnotes-cli"
+version = "0.1.0"
+edition = "2021"
+description = "Command-line client for a running (or auto-started) Null Notes"
+
+[[bin]]
+name = "nullnotes"
+path = "src/main.rs"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["rt", "net", "time", "io-util", "macros"] }
+
+[dev-dependencies]
+tempfile = "3"
