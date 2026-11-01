@@ -12,6 +12,16 @@ pub fn resolve(
     cwd: &Path,
     recents_file: &Path,
 ) -> Result<PathBuf, ResolveError> {
+    pick(flag, cwd, recents_file).map(native)
+}
+
+// The app keys its index by the exact workspace string, and its own strings
+// use backslashes; `--workspace C:/notes` must not become a second workspace.
+fn native(path: PathBuf) -> PathBuf {
+    PathBuf::from(path.to_string_lossy().replace('/', "\\"))
+}
+
+fn pick(flag: Option<&Path>, cwd: &Path, recents_file: &Path) -> Result<PathBuf, ResolveError> {
     if let Some(flag) = flag {
         return Ok(cwd.join(flag));
     }
@@ -84,6 +94,18 @@ mod tests {
             &tmp.path().join("none.json"),
         );
         assert_eq!(found, Ok(tmp.path().join("notes")));
+    }
+
+    #[test]
+    fn a_forward_slash_flag_is_spelled_the_way_the_app_spells_it() {
+        let tmp = tempfile::tempdir().unwrap();
+        let flag = tmp.path().to_string_lossy().replace('\\', "/");
+        let found = resolve(
+            Some(Path::new(&flag)),
+            tmp.path(),
+            &tmp.path().join("none.json"),
+        );
+        assert_eq!(found, Ok(tmp.path().to_path_buf()));
     }
 
     #[test]

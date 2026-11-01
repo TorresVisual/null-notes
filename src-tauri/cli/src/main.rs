@@ -1,42 +1,41 @@
 mod client;
+mod commands;
 mod exit;
 mod protocol;
 mod workspace;
 
+use clap::Parser;
 use client::{ClientError, Env};
-use serde_json::{json, Value};
+use commands::Cli;
+use serde_json::json;
 
 fn main() {
     std::process::exit(run());
 }
 
 fn run() -> i32 {
-    let mut args = std::env::args().skip(1);
-    let Some(command) = args.next() else {
-        eprintln!("usage: nullnotes <command> [json-args]");
-        return 2;
-    };
-    let command_args = match args.next() {
-        Some(text) => match serde_json::from_str::<Value>(&text) {
-            Ok(value) => value,
-            Err(e) => {
-                eprintln!("arguments are not valid JSON: {e}");
-                return 2;
-            }
-        },
-        None => Value::Null,
+    let cli = Cli::parse();
+
+    let (command, args) = match commands::build_request(&cli, &mut std::io::stdin()) {
+        Ok(request) => request,
+        Err(commands::UsageError(message)) => {
+            eprintln!("{message}");
+            return 2;
+        }
     };
 
     let env = Env::from_system();
-    let workspace = std::env::current_dir()
-        .ok()
-        .and_then(|cwd| workspace::resolve(None, &cwd, &env.recents_file()).ok());
-    let Some(workspace) = workspace else {
-        eprintln!("no workspace found; run inside one or pass --workspace");
+    let resolved = std::env::current_dir()
+        .map_err(|_| workspace::ResolveError::NotFound)
+        .and_then(|cwd| workspace::resolve(cli.workspace.as_deref(), &cwd, &env.recents_file()));
+    let Ok(workspace) = resolved else {
+        eprintln!(
+            "no workspace found: run inside one, pass --workspace, or open one in Null Notes first"
+        );
         return 3;
     };
 
-    match client::request_with(&env, &command, Some(&workspace), command_args) {
+    match client::request_with(&env, &command, Some(&workspace), args) {
         Ok(result) => {
             println!("{}", json!({ "ok": true, "result": result }));
             0
