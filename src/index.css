@@ -818,6 +818,7 @@ button, [role="button"], .tree-row, .tab, .search-result, .slash-menu-item,
 
 .nav-history button {
   padding: 4px 6px;
+  transition: color var(--duration-fast) var(--ease-standard), background var(--duration-fast) var(--ease-standard);
   background: none;
   border: none;
   border-radius: 4px;
@@ -837,13 +838,14 @@ button, [role="button"], .tree-row, .tab, .search-result, .slash-menu-item,
   overflow: hidden;
   white-space: nowrap;
   font-size: 13px;
-  color: var(--text-tertiary);
+  color: var(--text-secondary);
 }
 
-.breadcrumb-sep { margin: 0 6px; }
+.breadcrumb-sep { margin: 0 6px; color: var(--text-disabled); }
 
 .breadcrumb-current {
   color: var(--text-primary);
+  font-weight: 500;
   overflow: hidden;
   text-overflow: ellipsis;
 }
@@ -859,9 +861,15 @@ button, [role="button"], .tree-row, .tab, .search-result, .slash-menu-item,
 .tab-bar-status {
   display: flex;
   align-items: center;
+  gap: 2px;
   flex-shrink: 0;
   margin-left: auto;
 }
+
+.nav-history button:focus-visible,
+.tab button:focus-visible,
+.git-sync-now:focus-visible,
+.view-toggle:focus-visible { outline: none; box-shadow: var(--focus-ring); }
 
 .tab {
   display: flex;
@@ -2361,11 +2369,11 @@ li .fold-toggle { left: -2.4em; }
 
 /* View source/preview toggle button */
 .view-toggle {
-  padding: 6px 12px;
+  padding: 4px var(--space-sm);
   background: none;
   border: none;
-  border-left: 1px solid var(--border);
-  color: var(--text-tertiary);
+  border-radius: 4px;
+  color: var(--text-secondary);
   cursor: pointer;
   font-size: 12px;
   letter-spacing: 0.03em;
@@ -2380,16 +2388,17 @@ li .fold-toggle { left: -2.4em; }
   display: flex;
   align-items: center;
   gap: var(--space-xs);
-  padding: 0 var(--space-md);
+  padding: 0 var(--space-sm);
   font-size: 12px;
   letter-spacing: 0.03em;
-  color: var(--text-tertiary);
+  color: var(--text-secondary);
   white-space: nowrap;
   flex-shrink: 0;
 }
 
-.save-status.dirty,
-.save-status.saving { color: var(--text-secondary); }
+.save-status > svg:first-child { color: var(--text-tertiary); }
+.save-status.dirty > svg:first-child,
+.save-status.saving > svg:first-child { color: var(--text-secondary); }
 .save-status.error { color: var(--danger); }
 
 .save-status-detail {
@@ -2415,9 +2424,9 @@ li .fold-toggle { left: -2.4em; }
   display: flex;
   align-items: center;
   gap: var(--space-xs);
-  padding: 0 var(--space-md);
+  padding: 0 var(--space-sm);
   font-size: 12px;
-  color: var(--text-tertiary);
+  color: var(--text-secondary);
   white-space: nowrap;
   flex-shrink: 0;
 }
@@ -2429,10 +2438,11 @@ li .fold-toggle { left: -2.4em; }
   display: flex;
   align-items: center;
   gap: var(--space-xs);
-  padding: 0 var(--space-md);
+  padding: 4px var(--space-sm);
   background: none;
   border: none;
-  color: var(--text-tertiary);
+  border-radius: 4px;
+  color: var(--text-secondary);
   cursor: pointer;
   font-size: 12px;
   letter-spacing: 0.03em;
