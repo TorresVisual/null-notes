@@ -132,7 +132,7 @@ export const Details = Node.create({
           s.renderContent(node)
           s.ensureNewLine()
           s.write('</details>')
-          s.ensureNewLine()
+          s.closeBlock(node)
         },
         parse: {
           updateDOM(element: HTMLElement) {

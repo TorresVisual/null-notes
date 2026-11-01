@@ -83,3 +83,16 @@ describe('escaped wiki-link text (#171)', () => {
     expect(roundTrip('a [b] c')).toBe('a [b] c')
   })
 })
+
+describe('blocks after a raw-HTML container', () => {
+  const after = 'after **bold** and `code`'
+
+  it.each([
+    ['div', '<div align="center">\n\nhi\n\n</div>'],
+    ['details', '<details>\n<summary>S</summary>\n\nbody\n\n</details>'],
+  ])('keeps the block after a %s parseable across repeated saves', (_name, container) => {
+    const once = roundTrip(`${container}\n\n${after}`)
+    expect(once).toContain(`\n\n${after}`)
+    expect(roundTrip(roundTrip(once))).toBe(once)
+  })
+})

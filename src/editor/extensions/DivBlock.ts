@@ -110,7 +110,7 @@ export const DivBlock = Node.create({
           s.renderContent(node)
           s.ensureNewLine()
           s.write('</div>')
-          s.ensureNewLine()
+          s.closeBlock(node)
         },
       },
     }
