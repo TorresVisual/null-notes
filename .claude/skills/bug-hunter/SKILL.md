@@ -12,7 +12,7 @@ Exploratory testing of the real app. Unit tests check what someone thought of; t
 - **Hunt, don't fix** — until the user picks "fix now" at the checkpoint below. No source edits, no commits of product code while hunting.
 - **Never touch the user's real workspace or `%APPDATA%\dev.nullnotes.app`.** Drive the app only against the fixture workspace (`e2e/fixtureWorkspace.ts`, opened via `--workspace=<path>`, which doesn't touch `recent-workspaces.json`).
 - **A bug is only a bug once it reproduces twice** and you can state expected vs. actual. One-off failures are driver noise (see `e2e-verify` gotchas); a failure that survives retry is real.
-- **Don't file what's already known:** open/closed GitHub issues, `docs/ROADMAP.md` §7 (out of scope) and §8 (polish backlog), and `.claude/bug-hunter/FINDINGS.md`. PDF-to-Markdown conversion bugs go to the `pdf-bug-triager` agent first — that pipeline is frozen (`src-tauri/src/pdf/CLAUDE.md`).
+- **Don't file what's already known:** open/closed GitHub issues, `docs/ROADMAP.md` §7 (out of scope) and §8 (polish backlog), and `.claude/bug-hunter/FINDINGS.md`. PDF-to-Markdown conversion bugs go to the `pdf-bug-triager` agent first.
 
 ## Notes (persistent memory)
 
