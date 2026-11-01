@@ -45,3 +45,19 @@ describe('HTML comments (#168)', () => {
   })
 })
 
+describe('table cells (#169)', () => {
+  it('re-escapes a pipe in cell text', () => {
+    const src = '| a | b \\| c |\n| --- | --- |\n| 1 | 2 |'
+    expect(roundTrip(src).trimEnd()).toBe(src)
+  })
+
+  it('does not double-escape a pipe that is already escaped, or a literal backslash before one', () => {
+    const src = '| a |\n| --- |\n| x \\\\\\| y |'
+    expect(roundTrip(src).trimEnd()).toBe(src)
+  })
+
+  it('escapes a pipe inside a code span in a cell', () => {
+    const src = '| a |\n| --- |\n| `x\\|y` |'
+    expect(roundTrip(src).trimEnd()).toBe(src)
+  })
+})

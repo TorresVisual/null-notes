@@ -44,11 +44,18 @@ function delimiterFor(align: string | null): string {
 }
 
 interface MarkdownState {
+  out: string
   write: (text: string) => void
   ensureNewLine: () => void
   closeBlock: (node: PMNode) => void
   renderInline: (node: PMNode) => void
   inTable: boolean
+}
+
+// A bare `|` ends the cell, in a code span too, so cell text needs `\|`. A `|`
+// already behind an odd run of backslashes is escaped and is left alone.
+function escapeCellPipes(text: string): string {
+  return text.replace(/(\\*)\|/g, (match, slashes: string) => (slashes.length % 2 === 0 ? `${slashes}\\|` : match))
 }
 
 export const TableMarkdown = Table.extend({
@@ -79,7 +86,9 @@ export const TableMarkdown = Table.extend({
               if (colIndex) state.write(' | ')
               const content = cell.firstChild
               if (content && content.content.size > 0) {
+                const start = state.out.length
                 state.renderInline(content)
+                state.out = state.out.slice(0, start) + escapeCellPipes(state.out.slice(start))
               }
             })
             state.write(' |')
