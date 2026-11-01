@@ -108,3 +108,14 @@ Verb-noun, mapped 1:1 to existing commands: `note list|read|create|append|rename
 - **TUI** (`nullnotes tui`): interactive browsing/search built on these same commands.
 - **Live-UI commands** (open tab, active note, selection) over the same pipe.
 - Docs: a `docs/cli.md` agent-facing reference, and a line in the user's agent instructions so Claude knows to use it.
+
+## Changes found while planning
+
+Supersede the sections above where they differ ([plan](../plans/cli.md)).
+
+- **No `tauri-plugin-single-instance`.** It forwards *every* second launch into one process, which would break Explorer's "Open in null-notes" launches (their own `--open-file=` process) and the e2e suite (each spec launches its own app). Instead a normal launch asks a running instance over the pipe: if it is hidden and never shown, it is promoted (no target args) or shut down (target args given); otherwise nothing changes and multi-instance behaves as today. Ceiling: two *visible* instances means only the pipe owner serves the CLI, so dirty-buffer refusal covers its windows only; the existing watcher prompt still protects the other.
+- **CLI is a sibling crate `src-tauri/cli/`, not a second `[[bin]]`**, following `context-menu-handler/`: no Tauri/pdfium linkage, shipped via `bundle.resources`, built in CI beside the DLL.
+- **Workspace walk-up requires `.workspace.json`**, not `git.rs::is_workspace_folder`'s "any root `.md`" fallback, which would treat any repo with a `README.md` as a workspace when an agent runs from an IDE project root. Then: cwd inside a recents entry, then the most recent entry.
+- **No custom pipe DACL**: `reject_remote_clients(true)` plus the token (stored in the user's own app-data dir) is the gate; a per-launch token written only after a successful bind, so a second instance cannot clobber it.
+- **Extra exit codes**: `6` CLI access disabled (the CLI reads `settings.json` itself), `7` version mismatch or bad token.
+- A normal no-args launch while a hidden instance exists shows that instance's workspace rather than the user's usual start screen (my call; avoids a second process).
