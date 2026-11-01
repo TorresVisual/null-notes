@@ -3,6 +3,7 @@ import { listen } from '@tauri-apps/api/event'
 import { api } from '../lib/tauri'
 import { useWorkspaceStore } from '../store/workspace'
 import { useSettingsStore } from '../store/settings'
+import { useDirtyPathsStore } from '../store/dirtyPaths'
 import { folderName, sidecarDir } from '../lib/pathPrefix'
 
 export type SaveState = 'clean' | 'dirty' | 'saving' | 'error'
@@ -58,6 +59,22 @@ export function useNote(path: string | null) {
       .catch((e: unknown) => setSaveError(`Could not open note: ${String(e)}`))
       .finally(() => setIsLoading(false))
   }, [path, workspacePath, setContentAndRef])
+
+  // The backend refuses CLI writes to a note whose edits are not on disk yet,
+  // so "on disk" is the only clean state: saving and error count as dirty.
+  useEffect(() => {
+    if (!path) return
+    const { markDirty, markClean } = useDirtyPathsStore.getState()
+    if (saveState === 'clean') markClean(path)
+    else markDirty(path)
+  }, [path, saveState])
+
+  useEffect(
+    () => () => {
+      if (path) useDirtyPathsStore.getState().markClean(path)
+    },
+    [path],
+  )
 
   const flushIndex = useCallback(async () => {
     if (indexTimer.current) {

@@ -223,6 +223,10 @@ export const api = {
     setGitToken: (token: string) =>
       invoke<void>('set_git_token', { token }),
   },
+  cli: {
+    reportDirtyPaths: (workspace: string, paths: string[]) =>
+      invoke<void>('report_dirty_paths', { workspace, paths }),
+  },
   settings: {
     load: () =>
       invoke<AppSettings>('load_settings'),

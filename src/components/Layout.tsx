@@ -52,6 +52,7 @@ import { GitPullBlockedBar } from './GitPullBlockedBar'
 import { GitAheadBar } from './GitAheadBar'
 import { useGitConfig } from '../hooks/useGitConfig'
 import { useGitAutoCommit } from '../hooks/useGitAutoCommit'
+import { useReportDirtyPaths } from '../hooks/useReportDirtyPaths'
 import { useGitAutoPull } from '../hooks/useGitAutoPull'
 import { promptText } from '../store/promptDialog'
 import {
@@ -123,6 +124,7 @@ export function Layout() {
   const { saveSession, openWorkspace, openWorkspaceAt, closeWorkspace } = useWorkspace()
   const { updateGit } = useGitConfig()
   const { flushGitCommit } = useGitAutoCommit()
+  useReportDirtyPaths()
   const { checkForUpdates } = useGitAutoPull()
   const repoMode = useWorkspaceStore((s) => s.repoMode)
   const gitPrompted = useWorkspaceStore((s) => s.git.prompted)

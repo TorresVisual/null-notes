@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { useNote, SAVE_DEBOUNCE_MS, REINDEX_DEBOUNCE_MS } from './useNote'
 import { useWorkspaceStore } from '../store/workspace'
+import { useDirtyPathsStore } from '../store/dirtyPaths'
 import { api } from '../lib/tauri'
 
 vi.mock('../lib/tauri', () => ({
@@ -41,6 +42,7 @@ describe('useNote', () => {
   beforeEach(() => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
     useWorkspaceStore.setState({ path: '/ws' })
+    useDirtyPathsStore.setState({ paths: new Set() })
     notes.open.mockResolvedValue('# Note\n')
     notes.save.mockResolvedValue(undefined)
     notes.reindex.mockResolvedValue(undefined)
@@ -49,6 +51,39 @@ describe('useNote', () => {
   afterEach(() => {
     vi.useRealTimers()
     vi.clearAllMocks()
+  })
+
+  it('marks the path dirty while unsaved and clean once the save lands', async () => {
+    const { result } = await mountNote()
+    const dirty = () => useDirtyPathsStore.getState().paths.has('/ws/note.md')
+
+    act(() => result.current.save('# Note\nx'))
+    expect(dirty()).toBe(true)
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(PAST_SAVE)
+    })
+    expect(dirty()).toBe(false)
+  })
+
+  it('keeps the path dirty when the save fails', async () => {
+    notes.save.mockRejectedValue(new Error('disk full'))
+    const { result } = await mountNote()
+
+    act(() => result.current.save('# Note\nx'))
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(PAST_SAVE)
+    })
+
+    expect(result.current.saveState).toBe('error')
+    expect(useDirtyPathsStore.getState().paths.has('/ws/note.md')).toBe(true)
+  })
+
+  it('forgets the path when the note closes', async () => {
+    const { result, unmount } = await mountNote()
+    act(() => result.current.save('# Note\nx'))
+    unmount()
+    expect(useDirtyPathsStore.getState().paths.has('/ws/note.md')).toBe(false)
   })
 
   it('coalesces rapid edits into a single save', async () => {
