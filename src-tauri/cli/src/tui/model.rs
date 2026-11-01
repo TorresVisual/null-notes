@@ -399,22 +399,14 @@ mod tests {
     }
 
     #[test]
-    fn replies_go_to_their_owning_view_and_keepalive_to_none() {
-        let (mut state, _) = ready();
-        update(
-            &mut state,
-            reply(Slot::Backlinks, Ok(serde_json::Value::Null)),
-        );
-        update(
-            &mut state,
-            reply(Slot::TagNotes, Ok(serde_json::Value::Null)),
-        );
-        update(
-            &mut state,
-            reply(Slot::Keepalive, Ok(serde_json::Value::Null)),
-        );
-        assert_eq!(state.views.notes.replies, [Slot::Backlinks]);
-        assert_eq!(state.views.tags.replies, [Slot::TagNotes]);
+    fn slots_belong_to_the_view_that_issued_them() {
+        assert_eq!(View::owning(Slot::Backlinks), Some(View::Notes));
+        assert_eq!(View::owning(Slot::Preview), Some(View::Notes));
+        assert_eq!(View::owning(Slot::TagNotes), Some(View::Tags));
+        assert_eq!(View::owning(Slot::TrashRestore), Some(View::Trash));
+        assert_eq!(View::owning(Slot::CardWrite), Some(View::Cards));
+        assert_eq!(View::owning(Slot::Keepalive), None);
+        assert_eq!(View::owning(Slot::Capture), None);
     }
 
     #[test]
