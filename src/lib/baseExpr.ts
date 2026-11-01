@@ -424,9 +424,7 @@ function evalId(name: string, scope: Scope): BaseValue {
     case 'this':
       return scope.thisRow ? { ...propsOf(scope.thisRow), file: fileRef(scope.thisRow, scope) } : null
     case 'formula': return null
-    case 'tags':
-      if (!('tags' in scope.row.properties)) return scope.row.tags
-      return fromJson(scope.row.tags)
+    case 'tags': return scope.row.tags
     default: return fromJson(scope.row.properties[name])
   }
 }
