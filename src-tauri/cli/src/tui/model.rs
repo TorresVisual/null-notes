@@ -1,11 +1,12 @@
 use super::effects::{Job, Reply, Slot};
 use super::input::{InputOutcome, InputPurpose, TextInput};
 use super::views::Views;
+use super::wire::{decode, NoteMeta};
 use crate::client::ClientError;
 use crate::exit;
 use crate::protocol::ErrorCode;
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
-use serde_json::Value;
+use serde_json::{json, Value};
 use std::time::{Duration, Instant};
 
 pub const SEARCH_DEBOUNCE: Duration = Duration::from_millis(150);
@@ -85,6 +86,7 @@ pub struct State {
     pub help: bool,
     pub quit: bool,
     pub input: Option<TextInput>,
+    pub capturing: bool,
     pub views: Views,
     clock: Instant,
     last_sent: Instant,
@@ -101,10 +103,15 @@ impl State {
             help: false,
             quit: false,
             input: None,
+            capturing: false,
             views: Views::default(),
             clock: now,
             last_sent: now,
         }
+    }
+
+    pub fn focused_note(&self) -> Option<String> {
+        self.views.focused_note(self.view)
     }
 
     pub fn begin(&mut self) -> Vec<Job> {
@@ -169,7 +176,7 @@ fn on_key(state: &mut State, key: KeyEvent) -> Vec<Job> {
     if key.kind == KeyEventKind::Release {
         return Vec::new();
     }
-    if is_quit(&key, state.input.is_some()) {
+    if is_quit(&key, state.input.is_some() || state.capturing) {
         state.quit = true;
         return Vec::new();
     }
@@ -192,6 +199,9 @@ fn on_key(state: &mut State, key: KeyEvent) -> Vec<Job> {
     if state.input.is_some() {
         return on_input_key(state, key);
     }
+    if state.capturing {
+        return on_capture_key(state, key);
+    }
     let ctrl = key.modifiers.contains(KeyModifiers::CONTROL);
     match key.code {
         KeyCode::Char('?') => {
@@ -199,6 +209,10 @@ fn on_key(state: &mut State, key: KeyEvent) -> Vec<Job> {
             Vec::new()
         }
         KeyCode::Char('r') if ctrl => state.enter_current(),
+        KeyCode::Char('c') if !ctrl => {
+            state.capturing = true;
+            Vec::new()
+        }
         KeyCode::Char('/') => {
             state.view = View::Search;
             state.status = None;
@@ -220,6 +234,42 @@ fn on_key(state: &mut State, key: KeyEvent) -> Vec<Job> {
     }
 }
 
+fn capture_job(command: &'static str, args: Value) -> Vec<Job> {
+    vec![Job {
+        slot: Slot::Capture,
+        command,
+        args,
+    }]
+}
+
+fn on_capture_key(state: &mut State, key: KeyEvent) -> Vec<Job> {
+    let focused = state.focused_note();
+    match key.code {
+        KeyCode::Esc => state.capturing = false,
+        KeyCode::Char('a') => {
+            state.capturing = false;
+            match focused {
+                Some(path) => {
+                    state.input = Some(TextInput::new(InputPurpose::Append { path }, String::new()))
+                }
+                None => state.status = Some("No note in focus — open one first".to_string()),
+            }
+        }
+        KeyCode::Char('n') => {
+            state.capturing = false;
+            let folder = focused
+                .and_then(|path| path.rsplit_once('/').map(|(folder, _)| folder.to_string()))
+                .unwrap_or_default();
+            state.input = Some(TextInput::new(
+                InputPurpose::NewTitle { folder },
+                String::new(),
+            ));
+        }
+        _ => {}
+    }
+    Vec::new()
+}
+
 fn on_input_key(state: &mut State, key: KeyEvent) -> Vec<Job> {
     let Some(input) = state.input.as_mut() else {
         return Vec::new();
@@ -231,17 +281,51 @@ fn on_input_key(state: &mut State, key: KeyEvent) -> Vec<Job> {
             state.views.search.set_query(&value, state.clock);
             Vec::new()
         }
-        (InputOutcome::Submit(text), InputPurpose::Search) => {
-            state.input = None;
-            state.views.search.set_query(&text, state.clock);
-            let actions = state.views.search.tick(state.clock + SEARCH_DEBOUNCE);
-            state.apply(actions)
-        }
+        (InputOutcome::Editing, _) => Vec::new(),
         (InputOutcome::Cancel, _) => {
             state.input = None;
             Vec::new()
         }
+        (InputOutcome::Submit(text), purpose) => {
+            state.input = None;
+            match purpose {
+                InputPurpose::Search => {
+                    state.views.search.set_query(&text, state.clock);
+                    let actions = state.views.search.tick(state.clock + SEARCH_DEBOUNCE);
+                    state.apply(actions)
+                }
+                _ if text.trim().is_empty() => Vec::new(),
+                InputPurpose::Append { path } => capture_job(
+                    "note.append",
+                    json!({ "path": path, "content": format!("{text}
+") }),
+                ),
+                InputPurpose::NewTitle { folder } => capture_job(
+                    "note.create",
+                    json!({ "folder": folder, "title": text.trim() }),
+                ),
+            }
+        }
     }
+}
+
+fn capture_done(state: &mut State, reply: Reply) -> Vec<Job> {
+    let Ok(value) = reply.result else {
+        return Vec::new();
+    };
+    let actions = match reply.command {
+        "note.create" => match decode::<NoteMeta>(value) {
+            Ok(note) => vec![Action::OpenNote(note.path)],
+            Err(message) => vec![Action::Status(message)],
+        },
+        "note.append" => {
+            let path = reply.args["path"].as_str().unwrap_or_default().to_string();
+            state.status = Some(format!("Added to {path}"));
+            state.views.notes.refresh(&path)
+        }
+        _ => Vec::new(),
+    };
+    state.apply(actions)
 }
 
 fn forward(state: &mut State, key: KeyEvent) -> Vec<Job> {
@@ -274,6 +358,7 @@ fn on_reply(state: &mut State, reply: Reply) -> Vec<Job> {
             let actions = state.views.reply(view, reply);
             state.apply(actions)
         }
+        None if reply.slot == Slot::Capture => capture_done(state, reply),
         None => Vec::new(),
     }
 }
@@ -589,5 +674,206 @@ mod tests {
         assert_eq!(state.view, View::Cards);
         assert_eq!(jobs[0].slot, Slot::CardWrite);
         assert_eq!(jobs[0].args["grade"], "good");
+    }
+
+    fn notes_loaded(state: &mut State, notes: &[(&str, &str)]) {
+        let list: Vec<_> = notes
+            .iter()
+            .map(|(p, t)| serde_json::json!({"id": p, "title": t, "path": p, "workspace": "W", "updatedAt": 1}))
+            .collect();
+        update(state, reply(Slot::Notes, Ok(serde_json::json!(list))));
+    }
+
+    fn capture_reply(
+        command: &'static str,
+        args: serde_json::Value,
+        result: Result<serde_json::Value, ClientError>,
+    ) -> Msg {
+        Msg::Reply(Reply {
+            slot: Slot::Capture,
+            id: 1,
+            command,
+            args,
+            result,
+        })
+    }
+
+    #[test]
+    fn c_opens_the_chooser_and_a_n_pick_the_purpose() {
+        let (mut state, _) = ready();
+        notes_loaded(&mut state, &[("d/x.md", "X")]);
+        press(&mut state, KeyCode::Char('l'));
+        press(&mut state, KeyCode::Char('j'));
+        press(&mut state, KeyCode::Char('c'));
+        assert!(state.capturing);
+        press(&mut state, KeyCode::Char('a'));
+        assert!(!state.capturing);
+        assert_eq!(
+            state.input.as_ref().map(|i| i.purpose.clone()),
+            Some(InputPurpose::Append {
+                path: "d/x.md".into()
+            })
+        );
+        press(&mut state, KeyCode::Esc);
+        press(&mut state, KeyCode::Char('c'));
+        press(&mut state, KeyCode::Char('n'));
+        assert_eq!(
+            state.input.as_ref().map(|i| i.purpose.clone()),
+            Some(InputPurpose::NewTitle { folder: "d".into() })
+        );
+    }
+
+    #[test]
+    fn esc_cancels_the_chooser() {
+        let (mut state, _) = ready();
+        press(&mut state, KeyCode::Char('c'));
+        press(&mut state, KeyCode::Esc);
+        assert!(!state.capturing && state.input.is_none());
+    }
+
+    #[test]
+    fn append_without_a_focused_note_sets_status_and_opens_no_prompt() {
+        let (mut state, _) = ready();
+        press(&mut state, KeyCode::Char('c'));
+        press(&mut state, KeyCode::Char('a'));
+        assert!(state.input.is_none() && !state.capturing);
+        assert_eq!(
+            state.status.as_deref(),
+            Some("No note in focus — open one first")
+        );
+    }
+
+    #[test]
+    fn append_submits_note_append_with_a_trailing_newline() {
+        let (mut state, _) = ready();
+        notes_loaded(&mut state, &[("a.md", "A")]);
+        press(&mut state, KeyCode::Char('c'));
+        press(&mut state, KeyCode::Char('a'));
+        type_text(&mut state, "hello");
+        let jobs = press(&mut state, KeyCode::Enter);
+        assert!(state.input.is_none());
+        assert_eq!(jobs[0].slot, Slot::Capture);
+        assert_eq!(jobs[0].command, "note.append");
+        assert_eq!(
+            jobs[0].args,
+            serde_json::json!({"path": "a.md", "content": "hello\n"})
+        );
+    }
+
+    #[test]
+    fn new_note_uses_the_focused_notes_folder_and_the_root_otherwise() {
+        let (mut state, _) = ready();
+        notes_loaded(&mut state, &[("d/x.md", "X")]);
+        press(&mut state, KeyCode::Char('c'));
+        press(&mut state, KeyCode::Char('n'));
+        type_text(&mut state, "Fresh");
+        let jobs = press(&mut state, KeyCode::Enter);
+        assert_eq!(jobs[0].command, "note.create");
+        assert_eq!(
+            jobs[0].args,
+            serde_json::json!({"folder": "", "title": "Fresh"})
+        );
+
+        press(&mut state, KeyCode::Char('l'));
+        press(&mut state, KeyCode::Char('j'));
+        press(&mut state, KeyCode::Char('c'));
+        press(&mut state, KeyCode::Char('n'));
+        type_text(&mut state, "Deep");
+        let jobs = press(&mut state, KeyCode::Enter);
+        assert_eq!(
+            jobs[0].args,
+            serde_json::json!({"folder": "d", "title": "Deep"})
+        );
+    }
+
+    #[test]
+    fn new_note_reply_opens_the_created_note() {
+        let (mut state, _) = ready();
+        press(&mut state, KeyCode::Char('3'));
+        let created = serde_json::json!({"id": "n", "title": "Fresh", "path": "Fresh.md", "workspace": "W", "updatedAt": 1});
+        let jobs = update(
+            &mut state,
+            capture_reply("note.create", serde_json::json!({}), Ok(created)),
+        );
+        assert_eq!(state.view, View::Notes);
+        assert_eq!(jobs[0].command, "note.list");
+    }
+
+    #[test]
+    fn append_ok_reports_and_refreshes_the_shown_preview() {
+        let (mut state, _) = ready();
+        notes_loaded(&mut state, &[("a.md", "A")]);
+        let args = serde_json::json!({"path": "a.md", "content": "x\n"});
+        let jobs = update(
+            &mut state,
+            capture_reply("note.append", args, Ok(serde_json::Value::Null)),
+        );
+        assert_eq!(state.status.as_deref(), Some("Added to a.md"));
+        assert_eq!(
+            (jobs[0].slot, jobs[0].command),
+            (Slot::Preview, "note.read")
+        );
+    }
+
+    #[test]
+    fn empty_submit_sends_nothing() {
+        let (mut state, _) = ready();
+        notes_loaded(&mut state, &[("a.md", "A")]);
+        press(&mut state, KeyCode::Char('c'));
+        press(&mut state, KeyCode::Char('a'));
+        type_text(&mut state, "   ");
+        assert!(press(&mut state, KeyCode::Enter).is_empty());
+        assert!(state.input.is_none());
+    }
+
+    #[test]
+    fn typing_q_and_digits_into_capture_does_not_quit_or_switch() {
+        let (mut state, _) = ready();
+        notes_loaded(&mut state, &[("a.md", "A")]);
+        press(&mut state, KeyCode::Char('c'));
+        press(&mut state, KeyCode::Char('q'));
+        press(&mut state, KeyCode::Char('3'));
+        assert!(!state.quit && state.view == View::Notes && state.capturing);
+        press(&mut state, KeyCode::Char('a'));
+        type_text(&mut state, "q3c/?");
+        assert!(!state.quit && !state.help && state.view == View::Notes);
+        assert_eq!(
+            state.input.as_ref().map(|i| i.value.as_str()),
+            Some("q3c/?")
+        );
+    }
+
+    #[test]
+    fn dirty_buffer_on_append_sets_the_status_and_the_prompt_is_closed() {
+        let (mut state, _) = ready();
+        notes_loaded(&mut state, &[("a.md", "A")]);
+        press(&mut state, KeyCode::Char('c'));
+        press(&mut state, KeyCode::Char('a'));
+        type_text(&mut state, "x");
+        press(&mut state, KeyCode::Enter);
+        update(
+            &mut state,
+            capture_reply(
+                "note.append",
+                serde_json::json!({}),
+                rejected(ErrorCode::DirtyBuffer, "dirty"),
+            ),
+        );
+        assert!(state.input.is_none());
+        assert_eq!(
+            state.status.as_deref(),
+            Some("Unsaved edits in the app — nothing written")
+        );
+    }
+
+    #[test]
+    fn unicode_text_round_trips_into_the_job_args() {
+        let (mut state, _) = ready();
+        notes_loaded(&mut state, &[("a.md", "A")]);
+        press(&mut state, KeyCode::Char('c'));
+        press(&mut state, KeyCode::Char('a'));
+        type_text(&mut state, "日本語 🙂 e\u{301}");
+        let jobs = press(&mut state, KeyCode::Enter);
+        assert_eq!(jobs[0].args["content"], "日本語 🙂 e\u{301}\n");
     }
 }

@@ -47,6 +47,10 @@ pub fn draw(frame: &mut Frame, state: &State) {
     frame.render_widget(tab_row(state.view), tabs);
     match &state.input {
         Some(input) => draw_input(frame, input, status),
+        None if state.capturing => frame.render_widget(
+            Line::from("Capture: a append · n new note · Esc cancel"),
+            status,
+        ),
         None => frame.render_widget(status_line(state), status),
     }
 
@@ -93,6 +97,8 @@ fn status_line(state: &State) -> Line<'static> {
 fn draw_input(frame: &mut Frame, input: &TextInput, area: Rect) {
     let prompt = match input.purpose {
         InputPurpose::Search => "/ ",
+        InputPurpose::Append { .. } => "Add line: ",
+        InputPurpose::NewTitle { .. } => "New note title: ",
     };
     frame.render_widget(
         Line::from(vec![Span::raw(prompt), Span::raw(input.value.as_str())]),

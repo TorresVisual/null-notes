@@ -3,6 +3,8 @@ use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum InputPurpose {
     Search,
+    Append { path: String },
+    NewTitle { folder: String },
 }
 
 #[derive(Debug, PartialEq, Eq)]

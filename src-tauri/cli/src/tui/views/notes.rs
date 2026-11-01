@@ -62,6 +62,13 @@ impl NotesState {
         self.enter()
     }
 
+    pub fn refresh(&mut self, path: &str) -> Vec<Action> {
+        if self.preview_path.as_deref() != Some(path) {
+            return Vec::new();
+        }
+        vec![send(Slot::Preview, "note.read", json!({ "path": path }))]
+    }
+
     pub fn focused_note(&self) -> Option<String> {
         match self.rows.get(self.selected) {
             Some(Row::Note { path, .. }) => Some(path.clone()),
