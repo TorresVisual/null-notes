@@ -4,7 +4,7 @@ use super::notes::{
 use crate::db::{self, DbPool};
 use serde::{Deserialize, Serialize};
 use std::path::{Component, Path, PathBuf};
-use tauri::{AppHandle, Manager, State};
+use tauri::{AppHandle, Manager, Runtime, State};
 use uuid::Uuid;
 
 const MANIFEST: &str = "manifest.json";
@@ -22,7 +22,7 @@ pub struct TrashEntry {
     pub trashed_at: i64,
 }
 
-pub(super) fn trash_root(app: &AppHandle) -> Result<PathBuf, String> {
+pub(super) fn trash_root<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, String> {
     app.path()
         .app_data_dir()
         .map(|dir| dir.join("trash"))
@@ -261,8 +261,8 @@ pub(super) async fn restore_at(
 }
 
 #[tauri::command]
-pub async fn delete_note(
-    app: AppHandle,
+pub async fn delete_note<R: Runtime>(
+    app: AppHandle<R>,
     workspace: String,
     path: String,
     db: State<'_, DbPool>,
@@ -274,8 +274,8 @@ pub async fn delete_note(
 }
 
 #[tauri::command]
-pub async fn delete_folder(
-    app: AppHandle,
+pub async fn delete_folder<R: Runtime>(
+    app: AppHandle<R>,
     workspace: String,
     path: String,
     db: State<'_, DbPool>,
@@ -287,7 +287,10 @@ pub async fn delete_folder(
 }
 
 #[tauri::command]
-pub async fn list_trash(app: AppHandle, workspace: String) -> Result<Vec<TrashEntry>, String> {
+pub async fn list_trash<R: Runtime>(
+    app: AppHandle<R>,
+    workspace: String,
+) -> Result<Vec<TrashEntry>, String> {
     let root = trash_root(&app)?;
     blocking(move || Ok(list_entries(&root, &workspace)))
         .await
@@ -295,8 +298,8 @@ pub async fn list_trash(app: AppHandle, workspace: String) -> Result<Vec<TrashEn
 }
 
 #[tauri::command]
-pub async fn restore_trash_entry(
-    app: AppHandle,
+pub async fn restore_trash_entry<R: Runtime>(
+    app: AppHandle<R>,
     workspace: String,
     id: String,
     db: State<'_, DbPool>,

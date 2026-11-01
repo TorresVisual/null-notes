@@ -1,3 +1,5 @@
+#[cfg(windows)]
+pub mod cli_server;
 pub mod commands;
 pub mod db;
 pub mod exercises;

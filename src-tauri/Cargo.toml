@@ -91,4 +91,5 @@ pdf-native = ["pdfium-render"]
 
 [dev-dependencies]
 tokio = { version = "1", features = ["full", "test-util"] }
+tauri = { version = "2", features = ["test"] }
 
