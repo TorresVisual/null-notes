@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { X } from 'lucide-react'
 import { LoadingStatus } from './LoadingStatus'
+import { Dialog, DialogContent, DialogTitle } from './ui/dialog'
 import { api } from '../lib/tauri'
 import { useWorkspaceStore } from '../store/workspace'
 import { groupByNote } from '../lib/taskGroups'
@@ -20,15 +21,18 @@ export function TaskView({ onClose }: TaskViewProps) {
   const openTab = useWorkspaceStore((s) => s.openTab)
   const [tasks, setTasks] = useState<OpenTask[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [checkingKeys, setCheckingKeys] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     if (!workspacePath) return
     setIsLoading(true)
-    api.notes.listOpenTasks(workspacePath).then((t) => {
-      setTasks(t)
-      setIsLoading(false)
-    })
+    setLoadError(null)
+    api.notes
+      .listOpenTasks(workspacePath)
+      .then(setTasks)
+      .catch((e: unknown) => setLoadError(String(e)))
+      .finally(() => setIsLoading(false))
   }, [workspacePath])
 
   const groups = useMemo(() => groupByNote(tasks), [tasks])
@@ -63,16 +67,23 @@ export function TaskView({ onClose }: TaskViewProps) {
   }
 
   return (
-    <div className="search-overlay" onMouseDown={onClose}>
-      <div className="task-view" onMouseDown={(e) => e.stopPropagation()}>
+    <Dialog open onOpenChange={(next) => !next && onClose()}>
+      <DialogContent className="task-view" showCloseButton={false} aria-describedby={undefined}>
         <div className="settings-panel-header">
-          <h2>Tasks</h2>
+          <DialogTitle asChild>
+            <h2>Tasks</h2>
+          </DialogTitle>
           <button className="settings-panel-close" onClick={onClose} aria-label="Close tasks" title="Close tasks">
             <X size={16} />
           </button>
         </div>
         {isLoading ? (
           <LoadingStatus />
+        ) : loadError ? (
+          <p className="empty-state">
+            Couldn't load tasks.
+            <span className="empty-state-detail">{loadError}</span>
+          </p>
         ) : groups.length === 0 ? (
           <p className="empty-state">
             No open tasks in this workspace.
@@ -109,7 +120,7 @@ export function TaskView({ onClose }: TaskViewProps) {
             ))}
           </div>
         )}
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   )
 }

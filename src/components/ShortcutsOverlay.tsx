@@ -1,3 +1,4 @@
+import { X } from 'lucide-react'
 import { COMMANDS, formatCombo, type CommandGroup } from '../lib/keymap'
 import { useKeymap } from '../hooks/useKeymap'
 import { Dialog, DialogContent, DialogTitle } from './ui/dialog'
@@ -15,13 +16,16 @@ export function ShortcutsOverlay({ onClose }: ShortcutsOverlayProps) {
   const keymap = useKeymap()
   return (
     <Dialog open onOpenChange={(next) => !next && onClose()}>
-      <DialogContent className="settings-panel" showCloseButton={false}>
+      <DialogContent className="settings-panel" showCloseButton={false} aria-describedby={undefined}>
         <div className="settings-panel-header">
           <DialogTitle asChild>
             <h2>Keyboard Shortcuts</h2>
           </DialogTitle>
+          <button className="settings-panel-close" onClick={onClose} aria-label="Close shortcuts" title="Close shortcuts">
+            <X size={16} />
+          </button>
         </div>
-        <div className="settings-panel-body">
+        <div className="settings-panel-body" tabIndex={0} role="region" aria-label="Shortcut list">
           {GROUPS.map((group) => {
             const shortcuts = [
               ...COMMANDS.filter((c) => c.group === group && keymap[c.id]).map((c) => ({

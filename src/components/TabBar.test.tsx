@@ -55,6 +55,35 @@ describe('TabBar drag payload', () => {
   })
 })
 
+describe('TabBar keyboard', () => {
+  it('is a tablist with one tab stop; arrow keys move focus and activate, wrapping at the ends', () => {
+    const { getByRole, getAllByRole } = render(
+      <TabBar
+        viewMode="wysiwyg"
+        onToggleView={noop}
+        saveState="clean"
+        saveError={null}
+        onRetrySave={noop}
+        onDismissSaveError={noop}
+        gitCommitStatus="idle"
+        gitCommitDetail={null}
+        onSyncNow={noop}
+        syncingNow={false}
+      />,
+    )
+    const [a, b] = getAllByRole('tab') as HTMLElement[]
+    expect(getByRole('tablist', { name: 'Open notes' })).toBeTruthy()
+    expect([a!.tabIndex, b!.tabIndex]).toEqual([0, -1])
+
+    fireEvent.keyDown(a!, { key: 'ArrowRight' })
+    expect(useWorkspaceStore.getState().activeTab).toBe('/ws/b.md')
+    expect(document.activeElement).toBe(b)
+
+    fireEvent.keyDown(b!, { key: 'ArrowRight' })
+    expect(useWorkspaceStore.getState().activeTab).toBe('/ws/a.md')
+  })
+})
+
 describe('TabBar context menu on a canvas tab', () => {
   it('offers canvas actions only, never the note-only ones', async () => {
     useWorkspaceStore.setState({ openTabs: ['/ws/map.canvas'], activeTab: '/ws/map.canvas' })

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type KeyboardEvent } from 'react'
 import { ChevronLeft, ChevronRight, Pin, RefreshCw, X } from 'lucide-react'
 import { useWorkspaceStore } from '../store/workspace'
 import { useNotesStore, noteTitle } from '../store/notes'
@@ -11,6 +11,20 @@ import { GitCommitStatus } from './GitCommitStatus'
 import { goBack, goForward, useNavigationHistoryStore } from '../lib/navigationHistory'
 import type { SaveState } from '../hooks/useNote'
 import type { GitCommitStatus as GitStatus } from '../types'
+
+const TAB_KEY_STEP: Record<string, number> = { ArrowRight: 1, ArrowLeft: -1 }
+
+function moveTabFocus(e: KeyboardEvent<HTMLButtonElement>) {
+  const tabs = [...e.currentTarget.closest('[role="tablist"]')!.querySelectorAll<HTMLElement>('[role="tab"]')]
+  const here = tabs.indexOf(e.currentTarget)
+  const step = TAB_KEY_STEP[e.key]
+  const target =
+    e.key === 'Home' ? tabs[0] : e.key === 'End' ? tabs[tabs.length - 1] : step ? tabs[(here + step + tabs.length) % tabs.length] : undefined
+  if (!target) return
+  e.preventDefault()
+  target.focus()
+  target.click()
+}
 
 interface TabBarProps {
   viewMode: 'wysiwyg' | 'raw'
@@ -48,8 +62,8 @@ export function TabBar({
   if (openTabs.length === 0) return null
   return (
     <>
-    <div className="tab-bar" role="tablist">
-      <div className="tab-bar-tabs">
+    <div className="tab-bar">
+      <div className="tab-bar-tabs" role="tablist" aria-label="Open notes">
         {openTabs.map((path) => {
           const name = noteTitle(notes, path)
           const isActive = path === activeTab
@@ -59,8 +73,7 @@ export function TabBar({
             <ContextMenu key={path}>
             <ContextMenuTrigger asChild>
             <div
-              role="tab"
-              aria-selected={isActive}
+              role="presentation"
               draggable
               className={`tab${isActive ? ' active' : ''}${isPinned ? ' pinned' : ''}${isFlashing ? ' tab-flash' : ''}${draggedPath === path ? ' tab-dragging' : ''}`}
               onAnimationEnd={() => {
@@ -79,8 +92,22 @@ export function TabBar({
               }}
             >
               {isPinned && <Pin size={11} className="tab-pin-glyph" aria-hidden />}
-              <button onClick={() => setActiveTab(path)} title={name}>{name}</button>
-              <button className="tab-close" onClick={() => void requestCloseTab(path)} aria-label={`Close ${name}`}>
+              <button
+                role="tab"
+                aria-selected={isActive}
+                tabIndex={isActive ? 0 : -1}
+                onClick={() => setActiveTab(path)}
+                onKeyDown={moveTabFocus}
+                title={name}
+              >
+                {name}
+              </button>
+              <button
+                className="tab-close"
+                tabIndex={isActive ? 0 : -1}
+                onClick={() => void requestCloseTab(path)}
+                aria-label={`Close ${name}`}
+              >
                 <X size={12} />
               </button>
             </div>

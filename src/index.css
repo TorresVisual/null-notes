@@ -4289,6 +4289,13 @@ li > .folder-tree.tree-guide {
 
 .settings-panel-close:hover { color: var(--text-primary); }
 
+.settings-panel-close:focus-visible,
+.settings-panel-body:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+
+/* The Radix DialogContent carries Tailwind's `sm:max-w-sm`; the overlays that
+   size themselves with min(…) need it cancelled the way .settings-panel does. */
+.graph-view, .task-view, .review-session { max-width: calc(100vw - 40px); }
+
 /* Groups related settings (Editor / Writing / Tools / Git) so a panel that
    can carry up to nine rows reads as sections, not one flat undifferentiated
    list. Tighter gap within a section than .settings-panel's own gap between
@@ -5101,7 +5108,10 @@ input[type='checkbox']:focus-visible {
   stroke: var(--accent);
   stroke-width: 1.5;
 }
-.graph-node:hover circle { fill: var(--accent-bg); }
+.graph-node:hover circle, .graph-node:focus-visible circle { fill: var(--accent-bg); }
+.graph-node:focus-visible { outline: none; }
+.graph-node:focus-visible circle { stroke-width: 3; }
+.graph-node:focus-visible text { fill: var(--text-primary); }
 .graph-node text {
   fill: var(--text-secondary);
   font-size: 10px;

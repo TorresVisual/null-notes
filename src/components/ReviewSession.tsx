@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { X } from 'lucide-react'
 import { LoadingStatus } from './LoadingStatus'
+import { Dialog, DialogContent, DialogTitle } from './ui/dialog'
 import { api } from '../lib/tauri'
 import { useWorkspaceStore } from '../store/workspace'
 import { CardText } from './CardText'
@@ -172,14 +173,16 @@ export function ReviewSession({ onClose, mode = { kind: 'due' }, onSwitchCategor
   }
 
   return (
-    <div className="search-overlay" onMouseDown={onClose}>
-      <div className="review-session" onMouseDown={(e) => e.stopPropagation()}>
+    <Dialog open onOpenChange={(next) => !next && onClose()}>
+      <DialogContent className="review-session" showCloseButton={false} aria-describedby={undefined}>
         <div className="settings-panel-header">
-          <h2>
-            {cramStreak !== null
-              ? `Cram — ${cramStruggling ? 'Struggling' : cramStreak === 0 ? 'New' : `Category ${cramStreak}`}${queue.length > 0 ? ` (${queue.length} left)` : ''}`
-              : `Review${queue.length > 0 ? ` (${queue.length} due)` : ''}`}
-          </h2>
+          <DialogTitle asChild>
+            <h2>
+              {cramStreak !== null
+                ? `Cram — ${cramStruggling ? 'Struggling' : cramStreak === 0 ? 'New' : `Category ${cramStreak}`}${queue.length > 0 ? ` (${queue.length} left)` : ''}`
+                : `Review${queue.length > 0 ? ` (${queue.length} due)` : ''}`}
+            </h2>
+          </DialogTitle>
           <button className="settings-panel-close" onClick={onClose} aria-label="Close review" title="Close review">
             <X size={16} />
           </button>
@@ -276,7 +279,7 @@ export function ReviewSession({ onClose, mode = { kind: 'due' }, onSwitchCategor
             )}
           </div>
         )}
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   )
 }

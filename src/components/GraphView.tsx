@@ -3,6 +3,7 @@ import { forceSimulation, forceLink, forceManyBody, forceCenter, forceCollide } 
 import type { SimulationNodeDatum, SimulationLinkDatum } from 'd3-force'
 import { X } from 'lucide-react'
 import { LoadingStatus } from './LoadingStatus'
+import { Dialog, DialogContent, DialogTitle } from './ui/dialog'
 import { useNotesStore } from '../store/notes'
 import { useWorkspaceStore } from '../store/workspace'
 import { api } from '../lib/tauri'
@@ -77,16 +78,20 @@ export function GraphView({ onClose }: GraphViewProps) {
   const [links, setLinks] = useState<GraphLink[]>([])
   const [tags, setTags] = useState<GraphTag[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [query, setQuery] = useState('')
 
   useEffect(() => {
     if (!workspacePath) return
     setIsLoading(true)
-    Promise.all([api.notes.graphLinks(workspacePath), api.notes.graphTags(workspacePath)]).then(([l, t]) => {
-      setLinks(l)
-      setTags(t)
-      setIsLoading(false)
-    })
+    setLoadError(null)
+    Promise.all([api.notes.graphLinks(workspacePath), api.notes.graphTags(workspacePath)])
+      .then(([l, t]) => {
+        setLinks(l)
+        setTags(t)
+      })
+      .catch((e: unknown) => setLoadError(String(e)))
+      .finally(() => setIsLoading(false))
   }, [workspacePath])
 
   const scopedNotes = useMemo(() => scopeNotes(notes, tags, query), [notes, tags, query])
@@ -102,10 +107,12 @@ export function GraphView({ onClose }: GraphViewProps) {
   }
 
   return (
-    <div className="search-overlay" onMouseDown={onClose}>
-      <div className="graph-view" onMouseDown={(e) => e.stopPropagation()}>
+    <Dialog open onOpenChange={(next) => !next && onClose()}>
+      <DialogContent className="graph-view" showCloseButton={false} aria-describedby={undefined}>
         <div className="settings-panel-header">
-          <h2>Connections</h2>
+          <DialogTitle asChild>
+            <h2>Connections</h2>
+          </DialogTitle>
           <button className="settings-panel-close" onClick={onClose} aria-label="Close connections graph" title="Close connections graph">
             <X size={16} />
           </button>
@@ -119,6 +126,11 @@ export function GraphView({ onClose }: GraphViewProps) {
         />
         {isLoading ? (
           <LoadingStatus />
+        ) : loadError ? (
+          <p className="empty-state">
+            Couldn't load the graph.
+            <span className="empty-state-detail">{loadError}</span>
+          </p>
         ) : notes.length === 0 ? (
           <p className="empty-state">
             No notes yet.
@@ -149,7 +161,14 @@ export function GraphView({ onClose }: GraphViewProps) {
                 key={n.id}
                 className="graph-node"
                 onClick={() => open(n.id)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault()
+                    open(n.id)
+                  }
+                }}
                 role="button"
+                tabIndex={0}
                 aria-label={`Open ${n.title}`}
               >
                 <circle cx={n.x} cy={n.y} r={8} />
@@ -160,7 +179,7 @@ export function GraphView({ onClose }: GraphViewProps) {
             ))}
           </svg>
         )}
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   )
 }
