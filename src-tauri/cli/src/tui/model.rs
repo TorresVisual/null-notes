@@ -1,4 +1,5 @@
 use super::effects::{Job, Reply, Slot};
+use super::input::{InputOutcome, InputPurpose, TextInput};
 use super::views::Views;
 use crate::client::ClientError;
 use crate::exit;
@@ -83,6 +84,7 @@ pub struct State {
     pub starting: bool,
     pub help: bool,
     pub quit: bool,
+    pub input: Option<TextInput>,
     pub views: Views,
     clock: Instant,
     last_sent: Instant,
@@ -98,6 +100,7 @@ impl State {
             starting: true,
             help: false,
             quit: false,
+            input: None,
             views: Views::default(),
             clock: now,
             last_sent: now,
@@ -136,16 +139,16 @@ pub fn update(state: &mut State, msg: Msg) -> Vec<Job> {
         Msg::Reply(reply) => on_reply(state, reply),
         Msg::Tick(now) => {
             state.clock = now;
-            let idle = now.saturating_duration_since(state.last_sent) >= KEEPALIVE;
-            if idle {
-                vec![Job {
+            let actions = state.views.search.tick(now);
+            let mut jobs = state.apply(actions);
+            if now.saturating_duration_since(state.last_sent) >= KEEPALIVE {
+                jobs.push(Job {
                     slot: Slot::Keepalive,
                     command: "tags.list",
                     args: Value::Null,
-                }]
-            } else {
-                Vec::new()
+                });
             }
+            jobs
         }
     };
     if !jobs.is_empty() {
@@ -154,9 +157,9 @@ pub fn update(state: &mut State, msg: Msg) -> Vec<Job> {
     jobs
 }
 
-fn is_quit(key: &KeyEvent) -> bool {
+fn is_quit(key: &KeyEvent, input_open: bool) -> bool {
     match key.code {
-        KeyCode::Char('q') => key.modifiers.is_empty(),
+        KeyCode::Char('q') => key.modifiers.is_empty() && !input_open,
         KeyCode::Char('c') => key.modifiers.contains(KeyModifiers::CONTROL),
         _ => false,
     }
@@ -166,7 +169,7 @@ fn on_key(state: &mut State, key: KeyEvent) -> Vec<Job> {
     if key.kind == KeyEventKind::Release {
         return Vec::new();
     }
-    if is_quit(&key) {
+    if is_quit(&key, state.input.is_some()) {
         state.quit = true;
         return Vec::new();
     }
@@ -186,6 +189,9 @@ fn on_key(state: &mut State, key: KeyEvent) -> Vec<Job> {
         }
         return Vec::new();
     }
+    if state.input.is_some() {
+        return on_input_key(state, key);
+    }
     let ctrl = key.modifiers.contains(KeyModifiers::CONTROL);
     match key.code {
         KeyCode::Char('?') => {
@@ -193,6 +199,13 @@ fn on_key(state: &mut State, key: KeyEvent) -> Vec<Job> {
             Vec::new()
         }
         KeyCode::Char('r') if ctrl => state.enter_current(),
+        KeyCode::Char('/') => {
+            state.view = View::Search;
+            state.status = None;
+            let query = state.views.search.query().to_string();
+            state.input = Some(TextInput::new(InputPurpose::Search, query));
+            Vec::new()
+        }
         KeyCode::Char(c) => match View::from_digit(c).filter(|_| !ctrl) {
             Some(view) => {
                 state.view = view;
@@ -202,6 +215,30 @@ fn on_key(state: &mut State, key: KeyEvent) -> Vec<Job> {
             None => forward(state, key),
         },
         _ => forward(state, key),
+    }
+}
+
+fn on_input_key(state: &mut State, key: KeyEvent) -> Vec<Job> {
+    let Some(input) = state.input.as_mut() else {
+        return Vec::new();
+    };
+    let outcome = input.handle(key);
+    let (purpose, value) = (input.purpose.clone(), input.value.clone());
+    match (outcome, purpose) {
+        (InputOutcome::Editing, InputPurpose::Search) => {
+            state.views.search.set_query(&value, state.clock);
+            Vec::new()
+        }
+        (InputOutcome::Submit(text), InputPurpose::Search) => {
+            state.input = None;
+            state.views.search.set_query(&text, state.clock);
+            let actions = state.views.search.tick(state.clock + SEARCH_DEBOUNCE);
+            state.apply(actions)
+        }
+        (InputOutcome::Cancel, _) => {
+            state.input = None;
+            Vec::new()
+        }
     }
 }
 
@@ -216,11 +253,13 @@ fn on_reply(state: &mut State, reply: Reply) -> Vec<Job> {
         match error {
             ClientError::Disabled | ClientError::Unreachable(_) => {
                 state.fatal = Some(exit::message_for(error));
+                state.input = None;
                 return Vec::new();
             }
             ClientError::Rejected(body) => match body.code {
                 ErrorCode::VersionMismatch | ErrorCode::Unauthorized => {
                     state.fatal = Some(exit::message_for(error));
+                    state.input = None;
                     return Vec::new();
                 }
                 ErrorCode::DirtyBuffer => state.status = Some(DIRTY_BUFFER_STATUS.to_string()),
@@ -444,5 +483,93 @@ mod tests {
         key.kind = ratatui::crossterm::event::KeyEventKind::Release;
         update(&mut state, Msg::Key(key));
         assert!(!state.quit);
+    }
+
+    fn type_text(state: &mut State, text: &str) {
+        for c in text.chars() {
+            press(state, KeyCode::Char(c));
+        }
+    }
+
+    #[test]
+    fn slash_opens_search_with_the_input_focused() {
+        let (mut state, _) = ready();
+        press(&mut state, KeyCode::Char('3'));
+        let jobs = press(&mut state, KeyCode::Char('/'));
+        assert_eq!(state.view, View::Search);
+        assert!(jobs.is_empty());
+        assert_eq!(
+            state.input.as_ref().map(|i| i.purpose.clone()),
+            Some(InputPurpose::Search)
+        );
+    }
+
+    #[test]
+    fn typing_q_and_digits_in_the_input_does_not_quit_or_switch_view() {
+        let (mut state, _) = ready();
+        press(&mut state, KeyCode::Char('/'));
+        type_text(&mut state, "q3c/?");
+        assert!(!state.quit);
+        assert!(!state.help);
+        assert_eq!(state.view, View::Search);
+        assert_eq!(
+            state.input.as_ref().map(|i| i.value.as_str()),
+            Some("q3c/?")
+        );
+    }
+
+    #[test]
+    fn ctrl_c_quits_even_with_the_input_open() {
+        let (mut state, _) = ready();
+        press(&mut state, KeyCode::Char('/'));
+        ctrl(&mut state, 'c');
+        assert!(state.quit);
+    }
+
+    #[test]
+    fn editing_the_input_feeds_the_search_debounce() {
+        let (mut state, t0) = ready();
+        press(&mut state, KeyCode::Char('/'));
+        type_text(&mut state, "ab");
+        assert!(update(
+            &mut state,
+            Msg::Tick(t0 + SEARCH_DEBOUNCE - Duration::from_millis(1))
+        )
+        .is_empty());
+        let jobs = update(&mut state, Msg::Tick(t0 + SEARCH_DEBOUNCE));
+        assert_eq!(jobs[0].slot, Slot::Search);
+        assert_eq!(jobs[0].args, serde_json::json!({"query": "ab"}));
+    }
+
+    #[test]
+    fn enter_submits_closes_the_input_and_searches_at_once() {
+        let (mut state, _) = ready();
+        press(&mut state, KeyCode::Char('/'));
+        type_text(&mut state, "ab");
+        let jobs = press(&mut state, KeyCode::Enter);
+        assert!(state.input.is_none());
+        assert_eq!(jobs[0].args, serde_json::json!({"query": "ab"}));
+    }
+
+    #[test]
+    fn esc_closes_the_input_and_keeps_the_text() {
+        let (mut state, _) = ready();
+        press(&mut state, KeyCode::Char('/'));
+        type_text(&mut state, "ab");
+        press(&mut state, KeyCode::Esc);
+        assert!(state.input.is_none());
+        assert_eq!(state.views.search.query(), "ab");
+        press(&mut state, KeyCode::Char('/'));
+        assert_eq!(state.input.as_ref().map(|i| i.value.as_str()), Some("ab"));
+    }
+
+    #[test]
+    fn a_fatal_error_closes_the_input() {
+        let (mut state, _) = ready();
+        press(&mut state, KeyCode::Char('/'));
+        update(&mut state, reply(Slot::Search, Err(ClientError::Disabled)));
+        assert!(state.input.is_none());
+        press(&mut state, KeyCode::Char('q'));
+        assert!(state.quit);
     }
 }

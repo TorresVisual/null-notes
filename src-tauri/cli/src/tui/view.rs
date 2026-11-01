@@ -1,3 +1,4 @@
+use super::input::{InputPurpose, TextInput};
 use super::model::{State, View};
 use ratatui::buffer::Buffer;
 use ratatui::layout::{Alignment, Constraint, Layout, Rect};
@@ -44,7 +45,10 @@ pub fn draw(frame: &mut Frame, state: &State) {
         header,
     );
     frame.render_widget(tab_row(state.view), tabs);
-    frame.render_widget(status_line(state), status);
+    match &state.input {
+        Some(input) => draw_input(frame, input, status),
+        None => frame.render_widget(status_line(state), status),
+    }
 
     if let Some(message) = &state.fatal {
         let text = format!("{message}\n\nr retry · q quit");
@@ -84,6 +88,22 @@ fn status_line(state: &State) -> Line<'static> {
     }
     spans.push(Span::styled(HINTS, dim()));
     Line::from(spans)
+}
+
+fn draw_input(frame: &mut Frame, input: &TextInput, area: Rect) {
+    let prompt = match input.purpose {
+        InputPurpose::Search => "/ ",
+    };
+    frame.render_widget(
+        Line::from(vec![Span::raw(prompt), Span::raw(input.value.as_str())]),
+        area,
+    );
+    let before: String = input.value.chars().take(input.cursor()).collect();
+    let offset = Span::raw(prompt).width() + Span::raw(before).width();
+    let x = area.x.saturating_add(offset.min(u16::MAX as usize) as u16);
+    if x < area.right() && area.height > 0 {
+        frame.set_cursor_position((x, area.y));
+    }
 }
 
 fn centered(text: String) -> Paragraph<'static> {
@@ -229,5 +249,20 @@ mod tests {
             .content()
             .iter()
             .any(|cell| cell.modifier.contains(ratatui::style::Modifier::REVERSED)));
+    }
+
+    #[test]
+    fn draw_shows_the_input_line_and_places_the_cursor() {
+        let mut state = ready("W");
+        state.input = Some(crate::tui::input::TextInput::new(
+            crate::tui::input::InputPurpose::Search,
+            "日本x".into(),
+        ));
+        let mut terminal = Terminal::new(TestBackend::new(40, 6)).unwrap();
+        terminal.draw(|frame| draw(frame, &state)).unwrap();
+        let buffer = terminal.backend().buffer();
+        let last: String = (0..40).map(|x| buffer[(x, 5)].symbol()).collect();
+        assert!(last.replace(' ', "").starts_with("/日本x"), "{last}");
+        terminal.backend_mut().assert_cursor_position((7, 5));
     }
 }

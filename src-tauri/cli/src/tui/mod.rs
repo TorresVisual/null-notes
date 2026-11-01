@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 
 mod effects;
+mod input;
 mod markdown;
 mod model;
 mod query;
