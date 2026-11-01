@@ -3,6 +3,7 @@
 use null_notes_lib::cli_server::dispatch::dispatch;
 use null_notes_lib::cli_server::protocol::PROTOCOL_VERSION;
 use null_notes_lib::cli_server::protocol::{ErrorCode, Request, Response};
+use null_notes_lib::cli_server::state::CliState;
 use null_notes_lib::db::{self, DbPool};
 use serde_json::{json, Value};
 use tauri::test::{mock_app, MockRuntime};
@@ -41,6 +42,7 @@ async fn fixture() -> Fixture {
     let pool: DbPool = db::init_db(data.path()).await.unwrap();
     let app = mock_app();
     app.manage(pool);
+    app.manage(CliState::default());
     Fixture {
         app,
         workspace: tempfile::tempdir().unwrap(),
@@ -141,4 +143,194 @@ async fn trash_list_with_nothing_trashed_is_an_empty_array() {
     let response = dispatch(fx.app.handle(), request(&fx, "trash.list", Value::Null)).await;
     assert!(response.ok, "{response:?}");
     assert_eq!(response.result, Some(json!([])));
+}
+
+async fn call(fx: &Fixture, command: &str, args: Value) -> Response {
+    dispatch(fx.app.handle(), request(fx, command, args)).await
+}
+
+fn workspace_file(fx: &Fixture, name: &str) -> std::path::PathBuf {
+    fx.workspace.path().join(name)
+}
+
+fn mark_dirty(fx: &Fixture, name: &str) {
+    let path = workspace_file(fx, name).to_string_lossy().into_owned();
+    fx.app
+        .state::<CliState>()
+        .set_dirty(&fx.workspace.path().to_string_lossy(), vec![path]);
+}
+
+#[tokio::test]
+async fn a_write_to_a_dirty_buffer_is_refused_and_leaves_the_file_alone() {
+    let fx = fixture().await;
+    std::fs::write(
+        workspace_file(&fx, "a.md"),
+        "# A
+",
+    )
+    .unwrap();
+    mark_dirty(&fx, "A.MD");
+    for (command, args) in [
+        ("note.write", json!({ "path": "a.md", "content": "new" })),
+        ("note.append", json!({ "path": "a.md", "content": "new" })),
+        ("note.rename", json!({ "path": "a.md", "title": "B" })),
+        ("note.delete", json!({ "path": "a.md" })),
+    ] {
+        let response = call(&fx, command, args).await;
+        assert_eq!(
+            code_of(&response),
+            Some(ErrorCode::DirtyBuffer),
+            "{command}"
+        );
+    }
+    assert_eq!(
+        std::fs::read_to_string(workspace_file(&fx, "a.md")).unwrap(),
+        "# A
+"
+    );
+}
+
+#[tokio::test]
+async fn a_write_to_a_clean_note_lands_and_is_searchable() {
+    let fx = fixture().await;
+    std::fs::write(
+        workspace_file(&fx, "a.md"),
+        "# A
+",
+    )
+    .unwrap();
+    let response = call(
+        &fx,
+        "note.write",
+        json!({ "path": "a.md", "content": "# A
+
+zebra
+" }),
+    )
+    .await;
+    assert!(response.ok, "{response:?}");
+    assert_eq!(
+        std::fs::read_to_string(workspace_file(&fx, "a.md")).unwrap(),
+        "# A
+
+zebra
+"
+    );
+    let found = call(&fx, "search", json!({ "query": "zebra" })).await;
+    let result = found.result.unwrap_or_default();
+    assert_eq!(result["results"][0]["path"], json!("a.md"), "{result}");
+}
+
+#[tokio::test]
+async fn concurrent_appends_to_one_note_both_land() {
+    let fx = fixture().await;
+    std::fs::write(
+        workspace_file(&fx, "a.md"),
+        "# A
+",
+    )
+    .unwrap();
+    let (one, two) = tokio::join!(
+        call(
+            &fx,
+            "note.append",
+            json!({ "path": "a.md", "content": "first
+" })
+        ),
+        call(
+            &fx,
+            "note.append",
+            json!({ "path": "a.md", "content": "second
+" })
+        ),
+    );
+    assert!(one.ok && two.ok, "{one:?} {two:?}");
+    let text = std::fs::read_to_string(workspace_file(&fx, "a.md")).unwrap();
+    assert!(text.contains("first") && text.contains("second"), "{text}");
+}
+
+#[tokio::test]
+async fn note_delete_trashes_and_trash_restore_brings_it_back() {
+    let fx = fixture().await;
+    std::fs::write(
+        workspace_file(&fx, "a.md"),
+        "# A
+",
+    )
+    .unwrap();
+    let deleted = call(&fx, "note.delete", json!({ "path": "a.md" })).await;
+    assert!(deleted.ok, "{deleted:?}");
+    assert!(!workspace_file(&fx, "a.md").exists());
+    let listed = call(&fx, "trash.list", Value::Null)
+        .await
+        .result
+        .unwrap_or_default();
+    assert_eq!(listed.as_array().map(Vec::len), Some(1), "{listed}");
+    assert_eq!(listed[0]["originalPath"], json!("a.md"));
+    let id = listed[0]["id"].as_str().unwrap_or_default().to_string();
+    let restored = call(&fx, "trash.restore", json!({ "id": id })).await;
+    assert_eq!(restored.result, Some(json!("a.md")), "{restored:?}");
+    assert!(workspace_file(&fx, "a.md").exists());
+}
+
+#[tokio::test]
+async fn the_first_request_scans_the_workspace_and_later_ones_do_not() {
+    let fx = fixture().await;
+    std::fs::write(
+        workspace_file(&fx, "before.md"),
+        "# Before
+",
+    )
+    .unwrap();
+    let first = call(&fx, "note.list", Value::Null)
+        .await
+        .result
+        .unwrap_or_default();
+    assert_eq!(first.as_array().map(Vec::len), Some(1), "{first}");
+    std::fs::write(
+        workspace_file(&fx, "after.md"),
+        "# After
+",
+    )
+    .unwrap();
+    let second = call(&fx, "note.list", Value::Null)
+        .await
+        .result
+        .unwrap_or_default();
+    assert_eq!(second.as_array().map(Vec::len), Some(1), "{second}");
+}
+
+#[tokio::test]
+async fn note_create_writes_the_given_content() {
+    let fx = fixture().await;
+    let created = call(
+        &fx,
+        "note.create",
+        json!({ "folder": "", "title": "Fresh", "content": "# Fresh
+
+body
+" }),
+    )
+    .await;
+    assert!(created.ok, "{created:?}");
+    assert_eq!(
+        created.result.unwrap_or_default()["path"],
+        json!("Fresh.md")
+    );
+    assert_eq!(
+        std::fs::read_to_string(workspace_file(&fx, "Fresh.md")).unwrap(),
+        "# Fresh
+
+body
+"
+    );
+}
+
+#[tokio::test]
+async fn git_commit_refuses_a_dash_leading_path_before_spawning_anything() {
+    let fx = fixture().await;
+    let response = call(&fx, "git.commit", json!({ "paths": ["-rf"] })).await;
+    assert_eq!(code_of(&response), Some(ErrorCode::Usage), "{response:?}");
+    let message = response.error.map(|e| e.message).unwrap_or_default();
+    assert!(!message.contains("not exposed"), "{message}");
 }

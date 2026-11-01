@@ -158,6 +158,8 @@ pub fn run() {
             app.manage(commands::watcher::WatcherState::default());
             app.manage(commands::terminal::PtyState::default());
             app.manage(commands::code_run::RunState::default());
+            #[cfg(windows)]
+            app.manage(cli_server::state::CliState::default());
             app.manage(commands::workspace::InitialWorkspace(initial_workspace));
             app.manage(commands::workspace::InitialSelectFile(initial_select_file));
 
@@ -197,6 +199,8 @@ pub fn run() {
             commands::notes::reindex_note,
             commands::notes::reindex_from_disk,
             commands::watcher::watch_workspace,
+            #[cfg(windows)]
+            cli_server::report_dirty_paths,
             commands::bookmarks::read_bookmarks,
             commands::bookmarks::write_bookmarks,
             commands::notes::create_note,
