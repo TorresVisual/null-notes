@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 
 mod effects;
+mod query;
 mod wire;
 
 use crate::client::Env;
