@@ -56,3 +56,19 @@ describe('nullnotes-cli', () => {
     expect(text).toMatch(/--content -/)
   })
 })
+
+describe('null-notes-markdown', () => {
+  it('pins path encoding, not-supported list and tags rule', () => {
+    const text = skillText('null-notes-markdown')
+    expect(text).toMatch(/URL-encod/i)
+    expect(text).toMatch(/%20/)
+    const notSupported = text.split(/^## Not supported/m)[1] ?? ''
+    for (const gap of ['%%', '^block-id', '![[img|300]]', '#page=', 'aliases']) {
+      expect(notSupported, gap).toContain(gap)
+    }
+    expect(text).toMatch(/frontmatter.*tags/i)
+    expect(text).toMatch(/property set/)
+    expect(text).toMatch(/data, (never|not) .*instruction/i)
+    expect(text).toMatch(/nullnotes-cli/)
+  })
+})
