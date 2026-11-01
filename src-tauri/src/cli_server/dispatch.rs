@@ -220,6 +220,11 @@ impl<R: Runtime> Ctx<'_, R> {
         refuse_dirty: bool,
     ) -> Result<(String, OwnedMutexGuard<()>), Fail> {
         let abs = self.abs(rel).await?;
+        // Every caller edits a note. Without this, `note.write` could drop an
+        // executable into `.git/hooks/` for the next `git.commit` to run.
+        if !abs.to_lowercase().ends_with(".md") {
+            return Err(usage(format!("not a note (expected .md): {rel}")));
+        }
         let guard = self.state().lock_path(&abs).await;
         if refuse_dirty && self.state().is_dirty(&abs) {
             return Err(Fail(

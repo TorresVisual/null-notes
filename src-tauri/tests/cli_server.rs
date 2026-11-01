@@ -524,3 +524,23 @@ mod lifecycle {
         );
     }
 }
+
+#[tokio::test]
+async fn note_writes_refuse_a_path_that_is_not_markdown() {
+    let fx = fixture().await;
+    std::fs::create_dir_all(workspace_file(&fx, ".git/hooks")).unwrap();
+    for (command, path) in [
+        ("note.write", ".git/hooks/pre-commit"),
+        ("note.append", "script.bat"),
+        ("note.write", ".workspace.json"),
+        ("note.delete", "image.png"),
+    ] {
+        let response = call(&fx, command, json!({ "path": path, "content": "x" })).await;
+        assert_eq!(
+            code_of(&response),
+            Some(ErrorCode::Usage),
+            "{command} {path}"
+        );
+    }
+    assert!(!workspace_file(&fx, ".git/hooks/pre-commit").exists());
+}
