@@ -354,6 +354,56 @@ describe('useNote', () => {
     expect(result.current.conflict).toBe(false)
   })
 
+  it('holds autosave while a conflict is pending, so theirs is not overwritten unasked', async () => {
+    const { result } = await mountNote()
+
+    act(() => result.current.save('# Note\nmine'))
+    notes.open.mockResolvedValue('# Note\ntheirs')
+    await act(async () => {
+      await emitWorkspaceChanged({ payload: ['/ws/note.md'] })
+    })
+    expect(result.current.conflict).toBe(true)
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(PAST_SAVE)
+    })
+    expect(notes.save).not.toHaveBeenCalled()
+    expect(result.current.conflict).toBe(true)
+
+    act(() => result.current.save('# Note\nmine, more'))
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(PAST_SAVE)
+    })
+    expect(notes.save).not.toHaveBeenCalled()
+
+    await act(async () => {
+      result.current.keepMine()
+      await vi.advanceTimersByTimeAsync(PAST_SAVE)
+    })
+    expect(notes.save).toHaveBeenLastCalledWith('/ws', '/ws/note.md', '# Note\nmine, more')
+  })
+
+  it('writes the held buffer once the disk comes to match it', async () => {
+    const { result } = await mountNote()
+
+    act(() => result.current.save('# Note\nmine'))
+    notes.open.mockResolvedValue('# Note\ntheirs')
+    await act(async () => {
+      await emitWorkspaceChanged({ payload: ['/ws/note.md'] })
+      await vi.advanceTimersByTimeAsync(PAST_SAVE)
+    })
+    expect(result.current.conflict).toBe(true)
+
+    notes.open.mockResolvedValue('# Note\nmine')
+    await act(async () => {
+      await emitWorkspaceChanged({ payload: ['/ws/note.md'] })
+      await vi.advanceTimersByTimeAsync(PAST_SAVE)
+    })
+
+    expect(result.current.conflict).toBe(false)
+    expect(result.current.saveState).toBe('clean')
+  })
+
   it('dismissing a save error leaves the note marked unsaved, never saved', async () => {
     const { result } = await mountNote()
     notes.save.mockRejectedValue('permission denied')

@@ -146,7 +146,9 @@ export function useNote(path: string | null) {
       pendingWrite.current = { path, workspace: workspacePath, content: markdown }
       setSaveState('dirty')
       if (saveTimer.current) clearTimeout(saveTimer.current)
-      saveTimer.current = setTimeout(() => void flushSave(), saveDebounceMs)
+      saveTimer.current = setTimeout(() => {
+        if (incoming.current === null) void flushSave()
+      }, saveDebounceMs)
     },
     [path, workspacePath, flushSave, saveDebounceMs, setContentAndRef],
   )
@@ -159,7 +161,8 @@ export function useNote(path: string | null) {
   }, [])
 
   // An unmodified buffer follows the disk; a modified one never gets
-  // overwritten silently — the user decides which version wins.
+  // overwritten silently — the user decides which version wins. Autosave stays
+  // held while the prompt is up (`incoming` set), or it would clobber theirs.
   useEffect(() => {
     if (!path || !workspacePath) return
     const unlisten = listen<string[]>('workspace-changed', async (event) => {
@@ -169,8 +172,10 @@ export function useNote(path: string | null) {
       // is still in flight. If the disk holds the buffer or anything we just
       // wrote, nobody else touched it — and any earlier prompt is stale.
       if (fresh === contentRef.current || recentWrites.current.includes(fresh)) {
+        const held = incoming.current !== null
         incoming.current = null
         setConflict(false)
+        if (held) void flushSave()
         return
       }
       if (pendingWrite.current || saveTimer.current) {
@@ -182,7 +187,7 @@ export function useNote(path: string | null) {
       setSaveState('clean')
     })
     return () => void unlisten.then((off) => off())
-  }, [path, workspacePath, setContentAndRef])
+  }, [path, workspacePath, setContentAndRef, flushSave])
 
   const keepMine = useCallback(() => {
     incoming.current = null
