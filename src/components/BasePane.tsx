@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { lazy, Suspense, useMemo, useState } from 'react'
 import { AlertTriangle } from 'lucide-react'
 import { useBase } from '../hooks/useBase'
 import { useBaseRows } from '../hooks/useBaseRows'
@@ -19,6 +19,9 @@ import { CardsView } from './base/CardsView'
 import { KanbanView } from './base/KanbanView'
 import { ListView } from './base/ListView'
 import { TableView } from './base/TableView'
+
+// Leaflet and its stylesheet only load when a map view is shown.
+const MapView = lazy(() => import('./base/MapView').then((m) => ({ default: m.MapView })))
 
 interface BasePaneProps {
   path: string
@@ -108,7 +111,12 @@ export function BasePane({ path, embedded = false, thisPath }: BasePaneProps) {
       {layoutProps && view?.type === 'list' && <ListView {...layoutProps} />}
       {layoutProps && view?.type === 'cards' && <CardsView {...layoutProps} />}
       {layoutProps && view?.type === 'kanban' && <KanbanView {...layoutProps} />}
-      {layoutProps && view && !['table', 'list', 'cards', 'kanban'].includes(view.type) && (
+      {layoutProps && view?.type === 'map' && (
+        <Suspense fallback={null}>
+          <MapView {...layoutProps} />
+        </Suspense>
+      )}
+      {layoutProps && view && !['table', 'list', 'cards', 'kanban', 'map'].includes(view.type) && (
         <p className="base-empty">The {view.type} layout isn’t available yet.</p>
       )}
     </div>

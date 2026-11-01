@@ -100,6 +100,17 @@ export function BaseToolbar({
             <option value="">Group: none</option>
             {ids.map((id) => <option key={id} value={id}>{labelOf(id)}</option>)}
           </select>
+          {view.type === 'map' && (
+            <select
+              className="base-select"
+              aria-label="Coordinates"
+              value={typeof view.coordinates === 'string' ? view.coordinates : ''}
+              onChange={(e) => setView({ coordinates: e.target.value || undefined })}
+            >
+              <option value="">Coordinates: none</option>
+              {ids.map((id) => <option key={id} value={id}>{labelOf(id)}</option>)}
+            </select>
+          )}
         </div>
       )}
       <span className="base-save-state">{saveLabel}</span>

@@ -6497,6 +6497,18 @@ input[type='checkbox']:focus-visible {
 .base-list li { padding: 2px 0; }
 .base-list-meta { margin-left: var(--space-sm); color: var(--text-tertiary); }
 
+.base-map-wrap { flex: 1; display: flex; flex-direction: column; min-height: 360px; }
+.base-map { flex: 1; min-height: 360px; background: var(--bg-sunken); }
+
+.base-map-pin {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid var(--bg-base);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
 .base-count { margin-left: 4px; color: var(--text-tertiary); font-weight: 400; }
 
 .base-kanban {

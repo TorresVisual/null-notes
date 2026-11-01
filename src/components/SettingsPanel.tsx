@@ -291,6 +291,24 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
 
             <label className="settings-row">
               <span>
+                Map tile URL
+                <small>
+                  Raster tiles for the map layout of a base, with <code>{'{z}'}</code>, <code>{'{x}'}</code> and{' '}
+                  <code>{'{y}'}</code>. The default is the public OpenStreetMap server; offline, pins show on a blank map.
+                </small>
+              </span>
+              <span className="settings-row-control">
+                <input
+                  type="text"
+                  className="settings-text settings-text-wide"
+                  value={settings.mapTileUrl}
+                  onChange={(e) => void update({ mapTileUrl: e.target.value.trim() })}
+                />
+              </span>
+            </label>
+
+            <label className="settings-row">
+              <span>
                 Python command
                 <small>
                   Runs a <code>python</code> code block&apos;s Run button. No shell, no sandbox — same trust
