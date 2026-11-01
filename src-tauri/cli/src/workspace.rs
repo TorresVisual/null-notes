@@ -7,6 +7,14 @@ pub enum ResolveError {
     NotFound,
 }
 
+pub const NOT_FOUND_MESSAGE: &str =
+    "no workspace found: run inside one, pass --workspace, or open one in Null Notes first";
+
+pub fn resolve_here(flag: Option<&Path>, recents_file: &Path) -> Result<PathBuf, ResolveError> {
+    let cwd = std::env::current_dir().map_err(|_| ResolveError::NotFound)?;
+    resolve(flag, &cwd, recents_file)
+}
+
 pub fn resolve(
     flag: Option<&Path>,
     cwd: &Path,

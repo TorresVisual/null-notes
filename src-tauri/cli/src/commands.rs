@@ -142,6 +142,8 @@ pub enum Command {
     Property(PropertyCmd),
     #[command(subcommand)]
     Git(GitCmd),
+    /// Interactive full-screen browser; needs a terminal.
+    Tui,
 }
 
 #[derive(Debug, Subcommand)]
@@ -491,6 +493,7 @@ pub fn build_request(cli: &Cli, stdin: &mut impl Read) -> Result<(String, Value)
             GitCmd::History { path } => ("git.history", json!({ "path": path })),
             GitCmd::Commit { paths } => ("git.commit", json!({ "paths": paths })),
         },
+        Command::Tui => return Err(UsageError("tui is interactive, not a wire command".into())),
     };
     Ok((wire.to_string(), args))
 }
@@ -503,6 +506,12 @@ mod tests {
     fn build(argv: &[&str], stdin: &[u8]) -> Result<(String, Value), UsageError> {
         let cli = Cli::try_parse_from(argv).expect("argv parses");
         build_request(&cli, &mut &stdin[..])
+    }
+
+    #[test]
+    fn tui_is_not_a_wire_command() {
+        let cli = Cli::try_parse_from(["nullnotes", "tui"]).expect("argv parses");
+        assert!(build_request(&cli, &mut &b""[..]).is_err());
     }
 
     #[test]

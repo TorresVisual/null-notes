@@ -2,6 +2,7 @@ mod client;
 mod commands;
 mod exit;
 mod protocol;
+mod tui;
 mod workspace;
 
 use clap::Parser;
@@ -16,6 +17,10 @@ fn main() {
 fn run() -> i32 {
     let cli = Cli::parse();
 
+    if matches!(cli.command, commands::Command::Tui) {
+        return tui::run(cli.workspace.as_deref());
+    }
+
     let (command, args) = match commands::build_request(&cli, &mut std::io::stdin()) {
         Ok(request) => request,
         Err(commands::UsageError(message)) => {
@@ -25,13 +30,9 @@ fn run() -> i32 {
     };
 
     let env = Env::from_system();
-    let resolved = std::env::current_dir()
-        .map_err(|_| workspace::ResolveError::NotFound)
-        .and_then(|cwd| workspace::resolve(cli.workspace.as_deref(), &cwd, &env.recents_file()));
-    let Ok(workspace) = resolved else {
-        eprintln!(
-            "no workspace found: run inside one, pass --workspace, or open one in Null Notes first"
-        );
+    let Ok(workspace) = workspace::resolve_here(cli.workspace.as_deref(), &env.recents_file())
+    else {
+        eprintln!("{}", workspace::NOT_FOUND_MESSAGE);
         return 3;
     };
 
