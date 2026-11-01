@@ -275,7 +275,33 @@ export function handleEditorTextInput(view: EditorView, from: number, to: number
   return false
 }
 
+interface CodeFenceWriter {
+  write: (text: string) => void
+  text: (text: string, escape: boolean) => void
+  ensureNewLine: () => void
+  closeBlock: (node: ProseMirrorNode) => void
+}
+
 export const CodeBlockEditor = CodeBlockLowlight.extend({
+  // tiptap-markdown's own serializer always writes ``` — a block that itself
+  // contains a ``` run (a note about Markdown) would close early on reload.
+  // Only `serialize` is overridden; getMarkdownSpec merges the stock `parse`.
+  addStorage() {
+    return {
+      ...this.parent?.(),
+      markdown: {
+        serialize(state: CodeFenceWriter, node: ProseMirrorNode) {
+          const longestRun = Math.max(0, ...(node.textContent.match(/`+/g) ?? []).map((run) => run.length))
+          const fence = '`'.repeat(Math.max(3, longestRun + 1))
+          state.write(fence + ((node.attrs['language'] as string | null) ?? '') + '\n')
+          state.text(node.textContent, false)
+          state.ensureNewLine()
+          state.write(fence)
+          state.closeBlock(node)
+        },
+      },
+    }
+  },
 
   // Presentation-only, like `Details`' collapse state (P6-1): word-wrap is a
   // per-block view preference, not content, and tiptap-markdown's built-in
