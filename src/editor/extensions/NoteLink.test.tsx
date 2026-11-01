@@ -159,7 +159,7 @@ describe('PlainText brackets', () => {
 })
 
 describe('LinkSource', () => {
-  const NOTE = `${WS}\A.md`
+  const NOTE = `${WS}A.md`
 
   function focused(content: string) {
     const instance = new Editor({ extensions: extensionsFor(NOTE), content })

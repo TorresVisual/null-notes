@@ -42,9 +42,9 @@ describe('buildFolderTree', () => {
   it('places a canvas under its folder, named without the extension, after the notes', () => {
     const tree = buildFolderTree(
       '/ws',
-      ['/ws/\Notes'],
-      [note('Alpha', '/ws/\Notes/Alpha.md')],
-      ['/ws/\Notes/\map.canvas', '/ws/root.canvas'],
+      ['/ws/Notes'],
+      [note('Alpha', '/ws/Notes/Alpha.md')],
+      ['/ws/Notes/map.canvas', '/ws/root.canvas'],
     )
     const notes = tree[0]
     expect(notes?.type === 'folder' && notes.children.map((c) => [c.type, c.name])).toEqual([
