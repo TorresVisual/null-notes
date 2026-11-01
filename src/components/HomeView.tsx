@@ -71,96 +71,103 @@ export function HomeView({ onOpenTaskView, onOpenReview, onOpenDeckView, onOpenS
       <p className="home-summary">
         {buildHomeSummary({ taskCount: tasks.length, dueCount: dueCards.length, gitStatus })}
       </p>
-      <div className="home-view-grid">
-      <section className="home-section home-section--primary">
-        <h2><History size={14} /> Continue</h2>
-        {continueItems.length === 0 ? (
-          <p className="home-empty">No open notes.</p>
-        ) : (
-          <ul>
-            {continueItems.map((path) => (
-              <li key={path}>
-                <button className="home-section-item" onClick={() => setActiveTab(path)}>
-                  {noteTitle(notes, path)}
+      <div className="home-layout">
+        <div className="home-main">
+          <section className="home-section">
+            <h2><History size={14} /> Continue</h2>
+            {continueItems.length === 0 ? (
+              <p className="home-empty">No open notes.</p>
+            ) : (
+              <ul>
+                {continueItems.map((path) => (
+                  <li key={path}>
+                    <button className="home-section-item" onClick={() => setActiveTab(path)}>
+                      {noteTitle(notes, path)}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+          <section className="home-section">
+            <h2><Clock size={14} /> Recent</h2>
+            {recentItems.length === 0 ? (
+              <p className="home-empty">No notes yet.</p>
+            ) : (
+              <ul>
+                {recentItems.map((note) => (
+                  <li key={note.path}>
+                    <button className="home-section-item" onClick={() => openTab(note.path)}>
+                      <span className="home-section-item-label">{note.title}</span>
+                      <span className="home-section-item-meta">{relativeTime(note.updatedAt)}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        </div>
+        <aside className="home-rail">
+          <section className="home-section">
+            <div className="home-section-head">
+              <h2><ListTodo size={14} /> Tasks</h2>
+              {tasks.length > 0 && <span className="home-count">{tasks.length} open</span>}
+            </div>
+            {tasks.length === 0 ? (
+              <p className="home-empty">No open tasks.</p>
+            ) : (
+              <>
+                <ul>
+                  {taskItems.map((task) => (
+                    <li key={`${task.notePath}:${task.position}`}>
+                      <button className="home-section-item" onClick={() => openTab(task.notePath)}>
+                        <span className="home-section-item-label">{task.text}</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+                <button className="home-view-all" onClick={onOpenTaskView}>
+                  View all
                 </button>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-      <section className="home-section home-section--primary">
-        <h2><Clock size={14} /> Recent</h2>
-        {recentItems.length === 0 ? (
-          <p className="home-empty">No notes yet.</p>
-        ) : (
-          <ul>
-            {recentItems.map((note) => (
-              <li key={note.path}>
-                <button className="home-section-item" onClick={() => openTab(note.path)}>
-                  <span className="home-section-item-label">{note.title}</span>
-                  <span className="home-section-item-meta">{relativeTime(note.updatedAt)}</span>
+              </>
+            )}
+          </section>
+          <section className="home-section">
+            <div className="home-section-head">
+              <h2><GraduationCap size={14} /> Study</h2>
+              {dueCards.length > 0 && <span className="home-count">{dueCards.length} due</span>}
+            </div>
+            {dueCards.length === 0 && <p className="home-empty">Nothing due.</p>}
+            <div className="home-actions">
+              {dueCards.length > 0 && (
+                <button className="home-action-primary" onClick={onOpenReview}>
+                  Start review
                 </button>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-      <section className="home-section">
-        <h2><ListTodo size={14} /> Tasks</h2>
-        {tasks.length === 0 ? (
-          <p className="home-empty">No open tasks.</p>
-        ) : (
-          <>
-            <p className="home-count">{tasks.length} open</p>
-            <ul>
-              {taskItems.map((task) => (
-                <li key={`${task.notePath}:${task.position}`}>
-                  <button className="home-section-item" onClick={() => openTab(task.notePath)}>
-                    {task.text}
-                  </button>
-                </li>
-              ))}
-            </ul>
-            <button className="home-view-all" onClick={onOpenTaskView}>
-              View all
-            </button>
-          </>
-        )}
-      </section>
-      <section className="home-section">
-        <h2><GraduationCap size={14} /> Study</h2>
-        {dueCards.length === 0 ? (
-          <p className="home-empty">Nothing due.</p>
-        ) : (
-          <>
-            <p className="home-count">{dueCards.length} due</p>
-            <button className="home-view-all" onClick={onOpenReview}>
-              Start review
-            </button>
-          </>
-        )}
-        <button className="home-view-all" onClick={onOpenDeckView}>
-          Browse all cards
-        </button>
-      </section>
-      <section className="home-section home-section--git">
-        <h2><GitBranch size={14} /> Git</h2>
-        {gitStatus ? (
-          <p className="home-status">{gitStatus}</p>
-        ) : (
-          <>
-            <p className="home-empty">
-              Not a Git repository.
-              <span className="empty-state-detail">
-                Turn this workspace into one for version history and backups.
-              </span>
-            </p>
-            <button className="home-view-all" onClick={onOpenSettings}>
-              Open Settings
-            </button>
-          </>
-        )}
-      </section>
+              )}
+              <button className="home-view-all" onClick={onOpenDeckView}>
+                Browse all cards
+              </button>
+            </div>
+          </section>
+          <section className="home-section">
+            <h2><GitBranch size={14} /> Git</h2>
+            {gitStatus ? (
+              <p className="home-status">{gitStatus}</p>
+            ) : (
+              <>
+                <p className="home-empty">
+                  Not a Git repository.
+                  <span className="empty-state-detail">
+                    Turn this workspace into one for version history and backups.
+                  </span>
+                </p>
+                <button className="home-view-all" onClick={onOpenSettings}>
+                  Open Settings
+                </button>
+              </>
+            )}
+          </section>
+        </aside>
       </div>
     </div>
   )
