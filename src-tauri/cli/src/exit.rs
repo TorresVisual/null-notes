@@ -14,6 +14,14 @@ pub fn code_for(error: &ClientError) -> i32 {
     }
 }
 
+pub fn message_for(error: &ClientError) -> String {
+    match error {
+        ClientError::Disabled => "CLI access is turned off in Null Notes (Settings → Tools)".into(),
+        ClientError::Unreachable(reason) => reason.clone(),
+        ClientError::Rejected(body) => body.message.clone(),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -24,6 +32,23 @@ mod tests {
             code,
             message: String::new(),
         })
+    }
+
+    #[test]
+    fn message_for_covers_every_variant() {
+        assert_eq!(
+            message_for(&ClientError::Disabled),
+            "CLI access is turned off in Null Notes (Settings → Tools)"
+        );
+        assert_eq!(
+            message_for(&ClientError::Unreachable("gone".into())),
+            "gone"
+        );
+        let body = ErrorBody {
+            code: ErrorCode::Failed,
+            message: "nope".into(),
+        };
+        assert_eq!(message_for(&ClientError::Rejected(body)), "nope");
     }
 
     #[test]

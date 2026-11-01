@@ -1,3 +1,8 @@
+#![allow(dead_code)]
+
+mod effects;
+mod wire;
+
 use crate::client::Env;
 use crate::workspace;
 use ratatui::crossterm::event::{self, Event, KeyCode, KeyEventKind, KeyModifiers};

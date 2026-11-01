@@ -46,10 +46,9 @@ fn run() -> i32 {
                 ClientError::Rejected(body) => {
                     println!("{}", json!({ "ok": false, "error": body }))
                 }
-                ClientError::Disabled => {
-                    eprintln!("CLI access is turned off in Null Notes (Settings → Tools)")
+                ClientError::Disabled | ClientError::Unreachable(_) => {
+                    eprintln!("{}", exit::message_for(&error))
                 }
-                ClientError::Unreachable(reason) => eprintln!("{reason}"),
             }
             exit::code_for(&error)
         }
