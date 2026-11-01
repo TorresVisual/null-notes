@@ -1,5 +1,6 @@
 import { readdirSync, readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
+import { KNOWN_NAMES } from '@/lib/baseFunctions'
 
 const ROOT = `${process.cwd().replaceAll('\\', '/')}/`
 
@@ -90,5 +91,22 @@ describe('brainstorm-canvas', () => {
     expect(format).toContain('"pass"')
     expect(format).toContain('"author"')
     expect(format).toContain('Pass <n> ·')
+  })
+})
+
+describe('null-notes-bases', () => {
+  it('names every evaluator function', () => {
+    const text = skillText('null-notes-bases')
+    for (const name of KNOWN_NAMES) expect(text, name).toContain(`\`${name}\``)
+  })
+
+  it('pins the workflow', () => {
+    const text = skillText('null-notes-bases')
+    expect(text).toMatch(/unsupported/i)
+    expect(text).toMatch(/re-read/i)
+    expect(text).toMatch(/table.*list.*cards.*kanban.*map/is)
+    expect(text).toMatch(/validate/i)
+    expect(text).toMatch(/exactly one key/i)
+    expect(text).toMatch(/\.base/)
   })
 })
