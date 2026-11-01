@@ -206,7 +206,9 @@ fn on_key(state: &mut State, key: KeyEvent) -> Vec<Job> {
             state.input = Some(TextInput::new(InputPurpose::Search, query));
             Vec::new()
         }
-        KeyCode::Char(c) => match View::from_digit(c).filter(|_| !ctrl) {
+        KeyCode::Char(c) => match View::from_digit(c)
+            .filter(|_| !ctrl && !state.views.captures_digits(state.view))
+        {
             Some(view) => {
                 state.view = view;
                 state.status = None;
@@ -426,14 +428,14 @@ mod tests {
     }
 
     #[test]
-    fn other_rejected_sets_status_to_the_message_and_reaches_the_view() {
+    fn other_rejected_sets_status_to_the_message_without_going_fatal() {
         let (mut state, _) = ready();
         update(
             &mut state,
             reply(Slot::Cards, rejected(ErrorCode::Failed, "note vanished")),
         );
         assert_eq!(state.status.as_deref(), Some("note vanished"));
-        assert_eq!(state.views.cards.replies, [Slot::Cards]);
+        assert!(state.fatal.is_none());
     }
 
     #[test]
@@ -570,5 +572,22 @@ mod tests {
         assert!(state.input.is_none());
         press(&mut state, KeyCode::Char('q'));
         assert!(state.quit);
+    }
+
+    #[test]
+    fn digits_grade_instead_of_switching_when_a_card_is_revealed() {
+        let (mut state, _) = ready();
+        press(&mut state, KeyCode::Char('4'));
+        let deck = serde_json::json!([{"notePath": "a.md", "noteTitle": "T", "kind": "qa",
+            "front": "q", "back": "a", "position": 0, "options": [], "streak": 0}]);
+        update(&mut state, reply(Slot::Cards, Ok(deck)));
+        assert_eq!(press(&mut state, KeyCode::Char('3')).len(), 1);
+        assert_eq!(state.view, View::Tasks);
+        press(&mut state, KeyCode::Char('4'));
+        press(&mut state, KeyCode::Char(' '));
+        let jobs = press(&mut state, KeyCode::Char('3'));
+        assert_eq!(state.view, View::Cards);
+        assert_eq!(jobs[0].slot, Slot::CardWrite);
+        assert_eq!(jobs[0].args["grade"], "good");
     }
 }

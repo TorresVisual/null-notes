@@ -66,6 +66,10 @@ impl Views {
         }
     }
 
+    pub fn captures_digits(&self, view: View) -> bool {
+        view == View::Cards && self.cards.captures_digits()
+    }
+
     pub fn focused_note(&self, view: View) -> Option<String> {
         match view {
             View::Notes => self.notes.focused_note(),
