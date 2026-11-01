@@ -46,6 +46,7 @@ pub fn run(workspace_flag: Option<&Path>) -> i32 {
     let mut terminal = match ratatui::try_init() {
         Ok(terminal) => terminal,
         Err(error) => {
+            ratatui::restore();
             eprintln!("cannot start the terminal UI: {error}");
             return 1;
         }
