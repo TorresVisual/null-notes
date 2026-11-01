@@ -15,7 +15,7 @@
     "test": "vitest run",
     "test:ui": "vitest --ui",
     "test:coverage": "vitest run --coverage",
-    "pretest:e2e": "npm run tauri build -- --debug",
+    "pretest:e2e": "cargo build --release --manifest-path src-tauri/cli/Cargo.toml && npm run tauri build -- --debug",
     "test:e2e": "wdio run e2e/wdio.conf.ts",
     "release": "node scripts/release.mjs"
   },

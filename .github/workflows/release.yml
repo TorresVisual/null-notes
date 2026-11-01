@@ -60,9 +60,14 @@ jobs:
           workspaces: |
             src-tauri
             src-tauri/context-menu-handler
+            src-tauri/cli
 
       - name: Build context-menu-handler DLL
         working-directory: src-tauri/context-menu-handler
+        run: cargo build --release
+
+      - name: Build nullnotes CLI
+        working-directory: src-tauri/cli
         run: cargo build --release
 
       - uses: actions/setup-node@v4

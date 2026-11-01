@@ -5,6 +5,8 @@
       "../identity-package/null-notes-identity.msix": "",
       "../scripts/windows/trust-cert.ps1": "",
       "../scripts/windows/null-notes-dev.cer": "",
+      "../scripts/windows/cli-path.ps1": "",
+      "cli/target/release/nullnotes.exe": "",
       "vendor/pdfium.dll": "",
       "context-menu-handler/target/release/null_notes_context_menu.dll": "shell-integration/null_notes_context_menu.dll"
     }
