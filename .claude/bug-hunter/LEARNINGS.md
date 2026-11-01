@@ -35,3 +35,7 @@ raw
 
 ## Harness (tooling)
 - Bash heredocs and Python-in-heredocs collapse backslash levels (`\[` became `\[`), so tests written that way pass vacuously. Write/Edit backslash-heavy test strings with the Edit/Write tools, then `grep | cat -A` to confirm what landed.
+
+## Harness (vitest probes)
+- `console.log` is swallowed by vitest here; write probe output with `appendFileSync` (a `/tmp/x` path lands in `D:\tmp\x`). Idempotent (`rt^3` stable) does not mean lossless: also eyeball src vs one-pass output and `getJSON()` before/after.
+- Probe pattern: scratch `src/editor/extensions/hunt*.test.ts` with `CASES` map; delete at session end.

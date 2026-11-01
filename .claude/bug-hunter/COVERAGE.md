@@ -1,2 +1,3 @@
 # Coverage (newest first)
+2026-11-01 @070e96b · idempotency rt^3 over 37 node/markdown cases (callout, details, div, span, mermaid, math, sr, footnote, tags, wiki, tasks, links, entities…) · stable, but 2 lossy bugs (sr lapses, entity text); nested callout/`<details open>`/html table flatten judged intended
 2026-11-01 @b2ba382 · markdown round-trip (16 hand-written notes: table, math, callout, tasks, footnote, code, wiki, breaks, crlf, frontmatter, adjacent, unicode, lists, html, links; open + 1 trailing edit, diff disk) · bugs #167-#171 (all fixed) + unfiled `</div>`/`</details>` follow-on block corruption (fixed)
