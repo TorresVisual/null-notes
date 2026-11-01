@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 
 mod effects;
+mod markdown;
 mod query;
 mod tree;
 mod wire;
