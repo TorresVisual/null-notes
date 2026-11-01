@@ -9,4 +9,4 @@
 | #171 | round-trip/escape | `\[\[x\]\]` saved as `[[x]]` (becomes a wiki-link on reload) | 595d050 | fixed |
 | - | round-trip/html | block after `</div>` or `</details>` is swallowed into the raw-HTML block and gets more backslashes on every save | 595d050 | fixed (no issue filed) |
 | #172 | round-trip/flashcards | `<!-- sr ... lapses=3 -->` saved as `<!-- sr ... reps=1 -->`: SrState never stores/writes `lapses`, so any editor save of a note with reviewed cards resets lapse counts (Rust writes `lapses=`, frontend drops it) | 070e96b | fixed |
-| - | round-trip/entity | literal text `&lt;` / `&amp;` (from source `&amp;lt;`, or typed) saved as `&lt;` / `&amp;`, reloads as `<` / `&` — `&` not escaped before entity-like text | 070e96b | found |
+| #173 | round-trip/entity | literal text `&lt;` / `&amp;` (from source `&amp;lt;`, or typed) saved as `&lt;` / `&amp;`, reloads as `<` / `&` — `&` not escaped before entity-like text | 070e96b | fixed |
