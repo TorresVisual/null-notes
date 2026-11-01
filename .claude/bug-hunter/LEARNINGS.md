@@ -44,3 +44,4 @@ raw
 - Write probe results to a log file in the fixture's parent dir (`appendFileSync`), not stdout: wdio `logLevel: info` floods the terminal; read only the log and `grep` the run output. Never `tail` the run output.
 - Watcher event reaches the app in ~0.4 s, inside the 600 ms autosave debounce, so "type, then immediately `writeFileSync` externally" reliably exercises the dirty-buffer conflict path.
 - Orphaned `tauri-driver`/`msedgedriver` pairs from older runs linger; harmless (each run uses new ports). The `null-notes.exe` processes under `Local\Null Notes\` and `target\debug` belong to the user — leave them.
+- Rename probe: wait for the new H1 in the renamed file, not just its existence — `rename_note_at` moves the file first and `write_atomic`s the rewritten content afterwards, so reading right after the rename sees pre-rewrite content.
