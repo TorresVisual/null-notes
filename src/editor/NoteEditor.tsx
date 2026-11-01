@@ -38,7 +38,7 @@ interface NoteEditorProps {
 // prose comes back underlined word for word.
 function buildEditorProps(spellcheck: boolean, language: string) {
   return {
-    attributes: { spellcheck: String(spellcheck), lang: language },
+    attributes: { spellcheck: String(spellcheck), lang: language, role: 'textbox', 'aria-label': 'Note', 'aria-multiline': 'true' },
     handleKeyDown: handleEditorKeyDown,
     handleTextInput: handleEditorTextInput,
     ...caretScrollProps(isMobile()),
@@ -251,8 +251,6 @@ export function NoteEditor({
       <EditorToolbar editor={editor} notePath={notePath} />
       <EditorContent
         editor={editor}
-        role="textbox"
-        aria-multiline="true"
         className="note-editor"
         data-code-theme={codeTheme}
         style={{ '--code-font-size': `${codeFontSizePx}px` } as CSSProperties}

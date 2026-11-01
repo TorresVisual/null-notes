@@ -851,7 +851,7 @@ export function Layout() {
           }}
         />
       )}
-      <div className="main">
+      <main className="main">
         <TabBar
           viewMode={primaryViewMode}
           onToggleView={() => setPrimaryViewMode((m) => (m === 'wysiwyg' ? 'raw' : 'wysiwyg'))}
@@ -918,7 +918,7 @@ export function Layout() {
             />
           </Suspense>
         )}
-      </div>
+      </main>
     </div>
     </div>
     </TooltipProvider>

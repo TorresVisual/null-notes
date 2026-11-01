@@ -149,3 +149,18 @@ describe('command:split-tasks focus guard', () => {
     await waitFor(() => expect(confirm).toHaveBeenCalledTimes(1))
   })
 })
+
+describe('NoteEditor accessible name', () => {
+  it('labels the one editable textbox and leaves the wrapper out of the a11y tree', async () => {
+    const { container } = render(
+      <NoteEditor content="Hello" notePath="/ws/a.md" spellcheck={false} spellcheckLanguage="en" onChange={() => {}} onFlashcardCommand={() => {}} />,
+    )
+    await waitFor(() => expect(container.querySelector('.ProseMirror')).not.toBeNull())
+
+    const textboxes = container.querySelectorAll('[role="textbox"]')
+    expect(textboxes).toHaveLength(1)
+    expect(textboxes[0]).toHaveAttribute('aria-label', 'Note')
+    expect(textboxes[0]).toHaveAttribute('aria-multiline', 'true')
+    expect(textboxes[0]).toHaveClass('ProseMirror')
+  })
+})
