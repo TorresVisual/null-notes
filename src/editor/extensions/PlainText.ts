@@ -32,7 +32,7 @@ export const PlainText = Text.extend({
             state.text(`[${state.esc(label)}](${destination.trim().replace(/ /g, '%20')})`, false)
             return
           }
-          const escapeHtml = raw.replace(/</g, '&lt;').replace(/>/g, '&gt;')
+          const escapeHtml = raw.replace(/&(?=#?\w+;)/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
           if (BRACKETS_CHANGE_MEANING.test(raw)) {
             state.text(escapeHtml)
             return

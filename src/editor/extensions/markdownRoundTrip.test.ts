@@ -105,3 +105,15 @@ describe('flashcard schedule comment (#172)', () => {
     expect(roundTrip(src).trimEnd()).toBe(src)
   })
 })
+
+describe('entity-like literal text (#173)', () => {
+  it.each(['&amp;lt; and &amp;amp;', 'a &amp;#35; b'])('keeps %s as literal text across saves', (src) => {
+    const once = roundTrip(src)
+    expect(once).toBe(src)
+    expect(roundTrip(once)).toBe(src)
+  })
+
+  it('leaves a bare ampersand alone', () => {
+    expect(roundTrip('A & B &c')).toBe('A & B &c')
+  })
+})
