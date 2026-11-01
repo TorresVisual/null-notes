@@ -35,7 +35,7 @@ import { useNotesStore } from '../store/notes'
 import { useSettingsStore } from '../store/settings'
 import { useNote } from '../hooks/useNote'
 import { useCreateCanvas } from '../hooks/useCreateCanvas'
-import { isCanvasPath } from '../lib/canvasPath'
+import { isBasePath, isCanvasPath } from '../lib/canvasPath'
 import { flushAllCanvases } from '../lib/canvasFlush'
 import { useWorkspace, refreshTags, refreshRecents } from '../hooks/useWorkspace'
 import { useExternalChanges } from '../hooks/useExternalChanges'
@@ -81,6 +81,7 @@ import { isMobile, isWeb } from '../lib/platform'
 // them and only load when their overlay/pane is first opened.
 const ExportPdfDialog = lazy(() => import('./ExportPdfDialog').then((m) => ({ default: m.ExportPdfDialog })))
 const PrintDialog = lazy(() => import('./PrintDialog').then((m) => ({ default: m.PrintDialog })))
+const BasePane = lazy(() => import('./BasePane').then((m) => ({ default: m.BasePane })))
 const CanvasPane = lazy(() => import('./CanvasPane').then((m) => ({ default: m.CanvasPane })))
 const TerminalPane = lazy(() => import('./TerminalPane').then((m) => ({ default: m.TerminalPane })))
 
@@ -90,7 +91,8 @@ const GIT_FLUSH_ON_CLOSE_TIMEOUT_MS = 5000
 
 export function Layout() {
   const activeTab = useWorkspaceStore((s) => s.activeTab)
-  const canvasTab = activeTab !== null && isCanvasPath(activeTab)
+  // A canvas or a base: a file tab with its own pane instead of the note editor.
+  const canvasTab = activeTab !== null && (isCanvasPath(activeTab) || isBasePath(activeTab))
   const setActiveTab = useWorkspaceStore((s) => s.setActiveTab)
   const openTabs = useWorkspaceStore((s) => s.openTabs)
   const togglePinTab = useWorkspaceStore((s) => s.togglePinTab)
@@ -750,7 +752,7 @@ export function Layout() {
   const primaryEditorPane = canvasTab && activeTab ? (
     <ErrorBoundary key={activeTab}>
       <Suspense fallback={null}>
-        <CanvasPane path={activeTab} />
+        {isBasePath(activeTab) ? <BasePane path={activeTab} /> : <CanvasPane path={activeTab} />}
       </Suspense>
     </ErrorBoundary>
   ) : (

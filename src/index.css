@@ -6340,6 +6340,163 @@ input[type='checkbox']:focus-visible {
 
 /* Agent canvas — the React Flow surface for `.canvas` files. Card chrome
    reads --card-accent (set per card from its pass or its own colour). */
+/* Bases: .base file pane (table / list / cards / kanban / map). */
+.base-pane {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: auto;
+  background: var(--bg-base);
+  font-size: 13px;
+}
+
+.base-pane--embedded {
+  flex: none;
+  max-height: 420px;
+  margin: var(--space-md) 0;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.base-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.base-tabs, .base-controls { display: flex; align-items: center; gap: var(--space-xs); }
+.base-controls { margin-left: var(--space-sm); }
+.base-save-state { margin-left: auto; color: var(--text-tertiary); font-size: 12px; }
+
+.base-tab, .base-button, .base-menu summary {
+  padding: 3px 10px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  list-style: none;
+}
+
+.base-tab:hover, .base-button:hover, .base-menu summary:hover { background: var(--bg-hover); color: var(--text-primary); }
+.base-tab.active, .base-button.active { background: var(--accent-bg); color: var(--accent); }
+.base-button { border-color: var(--border-strong); }
+
+.base-select {
+  padding: 3px 6px;
+  background: var(--bg-raised);
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.base-icon-button {
+  display: flex;
+  padding: 4px;
+  background: none;
+  border: none;
+  border-radius: 4px;
+  color: var(--text-tertiary);
+  cursor: pointer;
+}
+
+.base-icon-button:hover:not(:disabled) { color: var(--text-primary); background: var(--bg-hover); }
+.base-icon-button:disabled { opacity: var(--disabled-opacity); cursor: default; }
+
+.base-menu { position: relative; }
+.base-menu summary::-webkit-details-marker { display: none; }
+
+.base-menu-panel {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 20;
+  min-width: 220px;
+  max-height: 320px;
+  overflow-y: auto;
+  margin-top: 4px;
+  padding: var(--space-xs);
+  background: var(--bg-raised);
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+}
+
+.base-menu-row { display: flex; align-items: center; gap: var(--space-xs); padding: 2px 4px; }
+.base-menu-row label { flex: 1; display: flex; align-items: center; gap: 6px; color: var(--text-secondary); cursor: pointer; }
+
+.base-banner {
+  padding: var(--space-xs) var(--space-md);
+  background: var(--bg-hover);
+  border-bottom: 1px solid var(--border-strong);
+  color: var(--warning);
+  font-size: 12px;
+}
+
+.base-banner p { margin: 2px 0; }
+
+.base-source {
+  min-height: 160px;
+  margin: var(--space-md);
+  padding: var(--space-sm);
+  background: var(--bg-sunken);
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  color: var(--text-primary);
+  font: var(--text-code);
+  resize: vertical;
+}
+
+.base-empty { margin: var(--space-lg); color: var(--text-tertiary); font: var(--text-empty-state); }
+
+.base-table-wrap, .base-list-wrap { padding: var(--space-sm) var(--space-md); overflow-x: auto; }
+.base-table { width: 100%; border-collapse: collapse; }
+
+.base-table th[scope='col'] {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border-strong);
+  color: var(--text-tertiary);
+  font: var(--text-metadata);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.base-table td { padding: 2px 8px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+.base-table tbody tr:hover td { background: var(--bg-hover); }
+.base-group-row th { padding: var(--space-md) 8px 4px; text-align: left; }
+
+.base-group-title {
+  margin: 0;
+  color: var(--text-secondary);
+  font: var(--text-heading-6);
+}
+
+.base-link {
+  padding: 0;
+  background: none;
+  border: none;
+  color: var(--text-primary);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.base-link:hover { color: var(--accent); text-decoration: underline; }
+.base-cell-text { color: var(--text-secondary); }
+.base-list { margin: 4px 0 var(--space-md); padding-left: var(--space-lg); }
+.base-list li { padding: 2px 0; }
+.base-list-meta { margin-left: var(--space-sm); color: var(--text-tertiary); }
+
 .canvas-pane {
   flex: 1;
   min-width: 0;
