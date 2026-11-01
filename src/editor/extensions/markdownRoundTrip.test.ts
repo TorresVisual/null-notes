@@ -29,3 +29,19 @@ describe('code fences (#167)', () => {
   })
 })
 
+describe('HTML comments (#168)', () => {
+  it('keeps a standalone comment', () => {
+    expect(roundTrip('before\n\n<!-- keep me -->\n\nafter')).toContain('<!-- keep me -->')
+  })
+
+  it('keeps a multi-line comment verbatim', () => {
+    const src = 'before\n\n<!--\nline one\nline two\n-->\n\nafter'
+    expect(roundTrip(src)).toContain('<!--\nline one\nline two\n-->')
+  })
+
+  it('leaves a flashcard schedule comment to SrState, once', () => {
+    const out = roundTrip('Q :: A\n\n<!-- sr due=2026-11-02 ease=2.5 interval=1 reps=1 -->')
+    expect(out.match(/<!-- sr /g)).toHaveLength(1)
+  })
+})
+

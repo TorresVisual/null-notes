@@ -49,6 +49,7 @@ import { SpanStyle } from './SpanStyle'
 import { HTMLInline } from './HTMLInline'
 import { HTMLBlock } from './HTMLBlock'
 import { SrState } from './SrState'
+import { HtmlComment } from './HtmlComment'
 import { SrCardHighlight } from './SrCardHighlight'
 import { DivBlock } from './DivBlock'
 import { Details } from './Details'
@@ -231,6 +232,7 @@ export const coreExtensions = [
   HTMLBlock,
   HTMLInline,
   SrState,
+  HtmlComment,
   SrCardHighlight,
   TextAlignment,
   SmartSymbols,
