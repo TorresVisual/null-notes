@@ -5,11 +5,8 @@ use serde_json::Value;
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct NoteMeta {
-    pub id: String,
     pub title: String,
     pub path: String,
-    pub workspace: String,
-    pub updated_at: i64,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -17,8 +14,6 @@ pub struct NoteMeta {
 pub struct SearchHit {
     pub path: String,
     pub title: String,
-    pub workspace: String,
-    pub updated_at: i64,
     pub snippet: String,
 }
 
@@ -50,19 +45,16 @@ pub struct OpenTask {
 pub struct DueCard {
     pub note_path: String,
     pub note_title: String,
-    pub kind: String,
     pub front: String,
     pub back: String,
     pub position: i64,
     pub options: Vec<String>,
-    pub streak: i64,
 }
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TrashEntry {
     pub id: String,
-    pub workspace: String,
     pub original_path: String,
     pub is_folder: bool,
     pub name: String,
@@ -82,10 +74,7 @@ mod tests {
     fn decodes_note_meta() {
         let v = json!({"id":"1","title":"T","path":"a/b.md","workspace":"W","updatedAt":5,"extra":true});
         let n: NoteMeta = decode(v).unwrap();
-        assert_eq!(
-            (n.title.as_str(), n.path.as_str(), n.updated_at),
-            ("T", "a/b.md", 5)
-        );
+        assert_eq!((n.title.as_str(), n.path.as_str()), ("T", "a/b.md"));
     }
 
     #[test]
@@ -118,7 +107,7 @@ mod tests {
     fn decodes_due_card() {
         let v = json!({"notePath":"p.md","noteTitle":"T","kind":"mc","front":"f","back":"b","position":2,"options":["a","b"],"streak":4,"due":"x"});
         let c: DueCard = decode(v).unwrap();
-        assert_eq!((c.kind.as_str(), c.options.len(), c.streak), ("mc", 2, 4));
+        assert_eq!((c.front.as_str(), c.options.len()), ("f", 2));
     }
 
     #[test]

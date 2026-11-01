@@ -31,6 +31,21 @@ nullnotes note append Idea.md --content "- follow up"
 
 `search` returns `{"results":[{path,title,snippet,…}],"total":n}`, 20 per page; page with `--offset`.
 
+## Interactive TUI
+
+`nullnotes tui` opens a full-screen terminal browser over the workspace: read notes with backlinks, search, triage open tasks, review due flashcards, browse tags, restore from the trash, and capture a line or a new note. It uses only the commands above, so it obeys the same access switch and save-path rules.
+
+| Key | Action |
+| --- | --- |
+| `1`–`6` | Notes · Search · Tasks · Cards · Tags · Trash |
+| `/` | search from anywhere (`tag:x folder:y block:code` filter) |
+| `c` | capture: `a` append a line to the focused note, `n` new note beside it |
+| `Ctrl+R` | refresh the current view |
+| `?` | key help |
+| `q`, `Ctrl+C` | quit |
+
+It needs an interactive terminal (exit 2 otherwise). A clean quit exits 0; quitting from the error screen (app unreachable, access off, version mismatch) exits with that error's code below. Agents do not use it — use the JSON commands.
+
 ## Exit codes
 
 | Code | Meaning |

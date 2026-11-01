@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 mod effects;
 mod input;
 mod markdown;
@@ -57,7 +55,7 @@ pub fn run(workspace_flag: Option<&Path>) -> i32 {
     let worker = Worker::spawn(effects::pipe_call(env, workspace.clone()), replies);
     let state = State::new(workspace.to_string_lossy().into_owned(), Instant::now());
     match event_loop(&mut terminal, state, worker, inbox) {
-        Ok(()) => 0,
+        Ok(code) => code,
         Err(error) => {
             drop(guard);
             eprintln!("terminal error: {error}");
@@ -81,7 +79,7 @@ fn event_loop(
     mut state: State,
     mut worker: Worker,
     inbox: mpsc::Receiver<effects::Reply>,
-) -> std::io::Result<()> {
+) -> std::io::Result<i32> {
     let strip = no_color();
     submit(&mut worker, state.begin());
     loop {
@@ -92,7 +90,7 @@ fn event_loop(
             }
         })?;
         if state.quit {
-            return Ok(());
+            return Ok(state.exit_code());
         }
         if event::poll(POLL)? {
             if let Event::Key(key) = event::read()? {

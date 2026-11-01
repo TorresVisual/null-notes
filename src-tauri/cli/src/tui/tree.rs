@@ -74,7 +74,6 @@ mod tests {
 
     fn note(path: &str) -> NoteMeta {
         NoteMeta {
-            id: path.into(),
             title: path
                 .rsplit('/')
                 .next()
@@ -82,8 +81,6 @@ mod tests {
                 .trim_end_matches(".md")
                 .into(),
             path: path.into(),
-            workspace: "W".into(),
-            updated_at: 0,
         }
     }
 

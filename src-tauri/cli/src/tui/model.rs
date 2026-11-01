@@ -82,6 +82,7 @@ pub struct State {
     pub workspace: String,
     pub status: Option<String>,
     pub fatal: Option<String>,
+    fatal_code: i32,
     pub starting: bool,
     pub help: bool,
     pub quit: bool,
@@ -99,6 +100,7 @@ impl State {
             workspace,
             status: None,
             fatal: None,
+            fatal_code: 0,
             starting: true,
             help: false,
             quit: false,
@@ -110,12 +112,27 @@ impl State {
         }
     }
 
+    pub fn exit_code(&self) -> i32 {
+        if self.fatal.is_some() {
+            self.fatal_code
+        } else {
+            0
+        }
+    }
+
     pub fn focused_note(&self) -> Option<String> {
         self.views.focused_note(self.view)
     }
 
     pub fn begin(&mut self) -> Vec<Job> {
         self.enter_current()
+    }
+
+    fn set_fatal(&mut self, error: &ClientError) {
+        self.fatal = Some(exit::message_for(error));
+        self.fatal_code = exit::code_for(error);
+        self.input = None;
+        self.capturing = false;
     }
 
     fn enter_current(&mut self) -> Vec<Job> {
@@ -338,14 +355,12 @@ fn on_reply(state: &mut State, reply: Reply) -> Vec<Job> {
     if let Err(error) = &reply.result {
         match error {
             ClientError::Disabled | ClientError::Unreachable(_) => {
-                state.fatal = Some(exit::message_for(error));
-                state.input = None;
+                state.set_fatal(error);
                 return Vec::new();
             }
             ClientError::Rejected(body) => match body.code {
                 ErrorCode::VersionMismatch | ErrorCode::Unauthorized => {
-                    state.fatal = Some(exit::message_for(error));
-                    state.input = None;
+                    state.set_fatal(error);
                     return Vec::new();
                 }
                 ErrorCode::DirtyBuffer => state.status = Some(DIRTY_BUFFER_STATUS.to_string()),
@@ -875,5 +890,46 @@ mod tests {
         type_text(&mut state, "日本語 🙂 e\u{301}");
         let jobs = press(&mut state, KeyCode::Enter);
         assert_eq!(jobs[0].args["content"], "日本語 🙂 e\u{301}\n");
+    }
+
+    #[test]
+    fn quitting_from_a_fatal_screen_reports_the_cli_exit_code() {
+        let code = |msg: Msg| {
+            let (mut state, _) = ready();
+            update(&mut state, msg);
+            press(&mut state, KeyCode::Char('q'));
+            assert!(state.quit);
+            state.exit_code()
+        };
+        assert_eq!(
+            code(reply(
+                Slot::Notes,
+                Err(ClientError::Unreachable("x".into()))
+            )),
+            4
+        );
+        assert_eq!(code(reply(Slot::Notes, Err(ClientError::Disabled))), 6);
+        assert_eq!(
+            code(reply(
+                Slot::Notes,
+                rejected(ErrorCode::VersionMismatch, "v")
+            )),
+            7
+        );
+        assert_eq!(
+            code(reply(Slot::Notes, rejected(ErrorCode::Unauthorized, "t"))),
+            7
+        );
+        let (mut state, _) = ready();
+        press(&mut state, KeyCode::Char('q'));
+        assert_eq!(state.exit_code(), 0);
+    }
+
+    #[test]
+    fn retrying_clears_the_pending_exit_code() {
+        let (mut state, _) = ready();
+        update(&mut state, reply(Slot::Notes, Err(ClientError::Disabled)));
+        press(&mut state, KeyCode::Char('r'));
+        assert_eq!(state.exit_code(), 0);
     }
 }
