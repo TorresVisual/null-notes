@@ -1465,14 +1465,14 @@ pub(super) fn rewrite_sidecar_links(content: &str, old_stem: &str, new_stem: &st
     out
 }
 
-// Mirrors the frontend's `encodeURI` boundary encoding (NoteImage.tsx) for
-// exactly the characters `note_filename` can produce: alphanumerics, spaces
-// and dashes. Spaces become `%20`; non-ASCII letters are percent-encoded by
-// UTF-8 byte, same as JS's encodeURI.
+// Mirrors the frontend's `encodeURI` boundary encoding (NoteImage.tsx): its
+// unescaped set stays raw (stems of externally created notes are not limited to
+// what `note_filename` produces); everything else, spaces and non-ASCII letters
+// included, is percent-encoded by UTF-8 byte.
 pub(super) fn encode_uri_stem(stem: &str) -> String {
     let mut out = String::new();
     for c in stem.chars() {
-        if c.is_ascii_alphanumeric() || c == '-' {
+        if c.is_ascii_alphanumeric() || "-_.!~*'();,/?:@&=+$#".contains(c) {
             out.push(c);
         } else if c == ' ' {
             out.push_str("%20");
@@ -2625,6 +2625,26 @@ pub fn open_note_externally(workspace: String, path: String) -> Result<(), Strin
 mod tests {
     use super::*;
     use tempfile::tempdir;
+
+    #[test]
+    fn encode_uri_stem_matches_js_encode_uri() {
+        assert_eq!(encode_uri_stem("v1.2 notes"), "v1.2%20notes");
+        assert_eq!(encode_uri_stem("Lecture_7 (draft)"), "Lecture_7%20(draft)");
+        assert_eq!(encode_uri_stem("C# intro"), "C#%20intro");
+        assert_eq!(encode_uri_stem("Q&A it's"), "Q&A%20it's");
+        assert_eq!(encode_uri_stem("a%b"), "a%25b");
+        assert_eq!(encode_uri_stem("Ünï"), "%C3%9Cn%C3%AF");
+    }
+
+    #[test]
+    fn rewrite_sidecar_links_handles_stems_encode_uri_leaves_raw() {
+        let out = rewrite_sidecar_links(
+            "![](v1.2%20notes.assets/a.png)\n",
+            "v1.2 notes",
+            "Renamed 3",
+        );
+        assert_eq!(out, "![](Renamed%203.assets/a.png)\n");
+    }
 
     #[test]
     fn require_within_workspace_accepts_a_path_inside_the_workspace() {
