@@ -441,7 +441,7 @@ Generated from [feature-inventory.json](feature-inventory.json) (the source of t
 
 | ID | Feature | Status | Source | Issue | Note |
 |---|---|---|---|---|---|
-| BS-001 | Bases: database views over note properties (table, list, cards, kanban, map) | Missing | [bases](https://obsidian.md/help/bases) | - | No structured views over notes. |
+| BS-001 | Bases: database views over note properties (table, list, cards, kanban, map) | Done | [bases](https://obsidian.md/help/bases) | - | Properties block, `.base` files, five layouts, `![[X.base]]` embed (2026-11-01). Filters and formulas are edited as raw YAML. |
 | BS-002 | Formulas, functions, summaries, embed a base, export CSV | Missing | [formulas](https://obsidian.md/help/formulas) | - | Depends on BS-001; same decision. |
 
 ## Import and export

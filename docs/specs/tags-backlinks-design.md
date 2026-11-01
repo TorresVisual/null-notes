@@ -4,7 +4,7 @@
 
 **Why now:** Second of two organization features scoped alongside folder navigation. Unlike folders (purely filesystem-derived), tags and backlinks are genuinely new relational data extracted from note *content*, so they share one mechanism — a content-indexing step — that folders never needed.
 
-**Non-goals (out of scope for this spec):** Frontmatter-based tags, nested/hierarchical tags, renaming a tag across all notes, resolving backlink title collisions when two notes share a title (pre-existing `WikiLink` limitation, unchanged here).
+**Non-goals (out of scope for this spec):** Nested/hierarchical tags, renaming a tag across all notes, resolving backlink title collisions when two notes share a title (pre-existing `WikiLink` limitation, unchanged here).
 
 ---
 
