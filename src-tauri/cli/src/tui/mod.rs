@@ -2,18 +2,25 @@
 
 mod effects;
 mod markdown;
+mod model;
 mod query;
 mod tree;
+mod view;
+mod views;
 mod wire;
 
 use crate::client::Env;
 use crate::workspace;
-use ratatui::crossterm::event::{self, Event, KeyCode, KeyEventKind, KeyModifiers};
-use ratatui::widgets::{Block, Paragraph};
+use effects::{Job, Worker};
+use model::{update, Msg, State};
+use ratatui::crossterm::event::{self, Event};
 use ratatui::DefaultTerminal;
 use std::io::IsTerminal;
 use std::path::Path;
-use std::time::Duration;
+use std::sync::mpsc;
+use std::time::{Duration, Instant};
+
+const POLL: Duration = Duration::from_millis(50);
 
 #[derive(Debug)]
 struct TerminalGuard;
@@ -45,7 +52,10 @@ pub fn run(workspace_flag: Option<&Path>) -> i32 {
         }
     };
     let guard = TerminalGuard;
-    match event_loop(&mut terminal, &workspace.to_string_lossy()) {
+    let (replies, inbox) = mpsc::channel();
+    let worker = Worker::spawn(effects::pipe_call(env, workspace.clone()), replies);
+    let state = State::new(workspace.to_string_lossy().into_owned(), Instant::now());
+    match event_loop(&mut terminal, state, worker, inbox) {
         Ok(()) => 0,
         Err(error) => {
             drop(guard);
@@ -55,23 +65,44 @@ pub fn run(workspace_flag: Option<&Path>) -> i32 {
     }
 }
 
-fn event_loop(terminal: &mut DefaultTerminal, workspace: &str) -> std::io::Result<()> {
+fn no_color() -> bool {
+    std::env::var_os("NO_COLOR").is_some_and(|value| !value.is_empty())
+}
+
+fn submit(worker: &mut Worker, jobs: Vec<Job>) {
+    for job in jobs {
+        worker.submit(job);
+    }
+}
+
+fn event_loop(
+    terminal: &mut DefaultTerminal,
+    mut state: State,
+    mut worker: Worker,
+    inbox: mpsc::Receiver<effects::Reply>,
+) -> std::io::Result<()> {
+    let strip = no_color();
+    submit(&mut worker, state.begin());
     loop {
         terminal.draw(|frame| {
-            let block = Block::bordered().title("Null Notes");
-            frame.render_widget(
-                Paragraph::new(workspace.to_string()).block(block),
-                frame.area(),
-            );
+            view::draw(frame, &state);
+            if strip {
+                view::strip_color(frame.buffer_mut());
+            }
         })?;
-        if event::poll(Duration::from_millis(50))? {
+        if state.quit {
+            return Ok(());
+        }
+        if event::poll(POLL)? {
             if let Event::Key(key) = event::read()? {
-                let ctrl_c =
-                    key.code == KeyCode::Char('c') && key.modifiers.contains(KeyModifiers::CONTROL);
-                if key.kind == KeyEventKind::Press && (ctrl_c || key.code == KeyCode::Char('q')) {
-                    return Ok(());
-                }
+                submit(&mut worker, update(&mut state, Msg::Key(key)));
             }
         }
+        while let Ok(reply) = inbox.try_recv() {
+            if worker.is_current(&reply) {
+                submit(&mut worker, update(&mut state, Msg::Reply(reply)));
+            }
+        }
+        submit(&mut worker, update(&mut state, Msg::Tick(Instant::now())));
     }
 }
