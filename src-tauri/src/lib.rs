@@ -160,6 +160,8 @@ pub fn run() {
             app.manage(commands::code_run::RunState::default());
             #[cfg(windows)]
             app.manage(cli_server::state::CliState::default());
+            #[cfg(windows)]
+            cli_server::start(app.handle());
             app.manage(commands::workspace::InitialWorkspace(initial_workspace));
             app.manage(commands::workspace::InitialSelectFile(initial_select_file));
 

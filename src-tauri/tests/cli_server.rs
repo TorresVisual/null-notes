@@ -334,3 +334,118 @@ async fn git_commit_refuses_a_dash_leading_path_before_spawning_anything() {
     let message = response.error.map(|e| e.message).unwrap_or_default();
     assert!(!message.contains("not exposed"), "{message}");
 }
+
+mod pipe {
+    use super::*;
+    use null_notes_lib::cli_server::pipe::{send, send_raw, serve};
+
+    const TOKEN: &str = "secret-token";
+
+    fn unique_pipe() -> String {
+        format!(r"\\.\pipe\nullnotes-test-{}", uuid::Uuid::new_v4())
+    }
+
+    async fn serving(fx: &Fixture) -> String {
+        let name = unique_pipe();
+        let (bound_tx, bound_rx) = tokio::sync::oneshot::channel();
+        let app = fx.app.handle().clone();
+        let served = name.clone();
+        tokio::spawn(async move {
+            let _ = serve(app, TOKEN.to_string(), served, move || {
+                let _ = bound_tx.send(());
+            })
+            .await;
+        });
+        bound_rx.await.unwrap();
+        name
+    }
+
+    fn with_token(fx: &Fixture, token: &str, command: &str) -> Request {
+        Request {
+            token: token.to_string(),
+            ..request(fx, command, Value::Null)
+        }
+    }
+
+    #[tokio::test]
+    async fn a_valid_request_round_trips() {
+        let fx = fixture().await;
+        let name = serving(&fx).await;
+        let response = send(&name, &with_token(&fx, TOKEN, "tags.list"))
+            .await
+            .unwrap();
+        assert!(response.ok, "{response:?}");
+        assert_eq!(response.result, Some(json!([])));
+    }
+
+    #[tokio::test]
+    async fn a_wrong_token_is_unauthorized() {
+        let fx = fixture().await;
+        let name = serving(&fx).await;
+        let response = send(&name, &with_token(&fx, "nope", "tags.list"))
+            .await
+            .unwrap();
+        assert_eq!(code_of(&response), Some(ErrorCode::Unauthorized));
+    }
+
+    #[tokio::test]
+    async fn a_wrong_version_is_a_version_mismatch() {
+        let fx = fixture().await;
+        let name = serving(&fx).await;
+        let mut req = with_token(&fx, TOKEN, "tags.list");
+        req.v = 99;
+        let response = send(&name, &req).await.unwrap();
+        assert_eq!(code_of(&response), Some(ErrorCode::VersionMismatch));
+    }
+
+    #[tokio::test]
+    async fn an_unknown_command_is_a_usage_error() {
+        let fx = fixture().await;
+        let name = serving(&fx).await;
+        let response = send(&name, &with_token(&fx, TOKEN, "run_code"))
+            .await
+            .unwrap();
+        assert_eq!(code_of(&response), Some(ErrorCode::Usage));
+    }
+
+    #[tokio::test]
+    async fn garbage_gets_an_error_and_the_server_keeps_serving() {
+        let fx = fixture().await;
+        let name = serving(&fx).await;
+
+        let malformed = send_raw(&name, b"{not json\n").await.unwrap();
+        let malformed: Response = serde_json::from_str(&malformed).unwrap();
+        assert_eq!(code_of(&malformed), Some(ErrorCode::Usage));
+
+        let mut oversized = vec![b'a'; 1024 * 1024 + 10];
+        oversized.push(b'\n');
+        let oversized = send_raw(&name, &oversized).await.unwrap();
+        let oversized: Response = serde_json::from_str(&oversized).unwrap();
+        assert_eq!(code_of(&oversized), Some(ErrorCode::Usage));
+
+        let response = send(&name, &with_token(&fx, TOKEN, "tags.list"))
+            .await
+            .unwrap();
+        assert!(response.ok, "{response:?}");
+    }
+
+    #[tokio::test]
+    async fn a_second_server_on_the_same_pipe_fails_before_announcing_itself() {
+        let fx = fixture().await;
+        let name = serving(&fx).await;
+        let announced = std::sync::atomic::AtomicBool::new(false);
+        let second = serve(
+            fx.app.handle().clone(),
+            "other".to_string(),
+            name.clone(),
+            || announced.store(true, std::sync::atomic::Ordering::SeqCst),
+        )
+        .await;
+        assert!(second.is_err());
+        assert!(!announced.load(std::sync::atomic::Ordering::SeqCst));
+        let response = send(&name, &with_token(&fx, TOKEN, "tags.list"))
+            .await
+            .unwrap();
+        assert!(response.ok, "{response:?}");
+    }
+}
