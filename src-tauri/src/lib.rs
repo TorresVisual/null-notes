@@ -29,6 +29,18 @@ pub fn run() {
     // Only meaningful alongside a real `--workspace=` (the `--open-file=`
     // fallback above already lands on its one file via the temp workspace).
     let initial_select_file = commands::workspace::select_file_from_args(std::env::args().skip(1));
+    let headless = commands::workspace::headless_from_args(std::env::args().skip(1));
+
+    #[cfg(windows)]
+    if !headless {
+        let has_target_args = initial_workspace.is_some()
+            || commands::workspace::open_file_from_args(std::env::args().skip(1)).is_some();
+        if cli_server::lifecycle::defer_to_hidden_instance(has_target_args)
+            == cli_server::lifecycle::Handshake::Promoted
+        {
+            return;
+        }
+    }
 
     #[cfg(windows)]
     unsafe {
@@ -141,10 +153,13 @@ pub fn run() {
                         );
                     }
                 }
-                let recents =
-                    tauri::async_runtime::block_on(commands::workspace::present_recents(&data_dir))
-                        .unwrap_or_default();
-                let _ = commands::jumplist::rebuild(&recents);
+                if !headless {
+                    let recents = tauri::async_runtime::block_on(
+                        commands::workspace::present_recents(&data_dir),
+                    )
+                    .unwrap_or_default();
+                    let _ = commands::jumplist::rebuild(&recents);
+                }
             }
             let _ = ERROR_LOG_DIR.set(data_dir.clone());
             std::panic::set_hook(Box::new(|info| {
@@ -160,8 +175,18 @@ pub fn run() {
             app.manage(commands::code_run::RunState::default());
             #[cfg(windows)]
             app.manage(cli_server::state::CliState::default());
+            if !headless {
+                #[cfg(windows)]
+                app.state::<cli_server::state::CliState>().mark_shown();
+                if let Some(window) = app.get_webview_window("main") {
+                    let _ = window.show();
+                }
+            }
             #[cfg(windows)]
-            cli_server::start(app.handle());
+            {
+                cli_server::start(app.handle());
+                cli_server::lifecycle::spawn_idle_quit(app.handle());
+            }
             app.manage(commands::workspace::InitialWorkspace(initial_workspace));
             app.manage(commands::workspace::InitialSelectFile(initial_select_file));
 

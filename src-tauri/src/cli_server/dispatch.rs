@@ -1,12 +1,14 @@
 use super::paths::{relativize_paths, to_absolute, to_relative};
 use super::protocol::{ErrorCode, Request, Response, PROTOCOL_VERSION};
 use super::state::CliState;
+use crate::commands::workspace::InitialWorkspace;
 use crate::commands::{bases, bookmarks, git, notes, trash};
 use crate::db::DbPool;
 use crate::sm2::Grade;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
+use serde_json::{json, Value};
+use std::time::Duration;
 use tauri::{AppHandle, Manager, Runtime, State};
 use tokio::sync::OwnedMutexGuard;
 
@@ -446,6 +448,37 @@ impl<R: Runtime> Ctx<'_, R> {
                     return Err(Fail(ErrorCode::Failed, "not a git repository".into()));
                 };
                 json(git::auto_commit(ws, mode, paths, false).await?)
+            }
+            "status" => Ok(json!({
+                "shown": self.state().is_shown(),
+                "workspace": self
+                    .app
+                    .try_state::<InitialWorkspace>()
+                    .and_then(|initial| initial.0.clone()),
+            })),
+            "promote" => {
+                self.state().mark_shown();
+                if let Some(window) = self.app.get_webview_window("main") {
+                    let _ = window.show();
+                    let _ = window.set_focus();
+                }
+                Ok(Value::Null)
+            }
+            // Quits only an instance nobody has seen: a visible window may hold
+            // unsaved edits, and exiting here skips the close veto that flushes them.
+            "shutdown" => {
+                if self.state().is_shown() {
+                    return Err(Fail(
+                        ErrorCode::Failed,
+                        "the window is visible; not quitting".into(),
+                    ));
+                }
+                let app = self.app.clone();
+                tauri::async_runtime::spawn(async move {
+                    tokio::time::sleep(Duration::from_millis(200)).await;
+                    app.exit(0);
+                });
+                Ok(Value::Null)
             }
             other => Err(usage(format!("command not exposed: {other}"))),
         }

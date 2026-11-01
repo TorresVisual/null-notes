@@ -67,6 +67,12 @@ pub fn initial_workspace_from_args<I: IntoIterator<Item = String>>(args: I) -> O
         .find_map(|arg| arg.strip_prefix("--workspace=").map(str::to_string))
 }
 
+// Set by the `nullnotes` CLI when it has to start the app itself: the window
+// stays hidden and the instance quits when idle.
+pub fn headless_from_args<I: IntoIterator<Item = String>>(args: I) -> bool {
+    args.into_iter().any(|arg| arg == "--headless")
+}
+
 // Sibling to `--workspace=`: the Explorer "Open in null-notes" file handler
 // (the context-menu-handler COM DLL's Invoke()) sends this for a single
 // file, since a lone file isn't a workspace. The caller copies it into a
@@ -135,6 +141,15 @@ pub async fn recent_workspaces(app: AppHandle) -> Result<Vec<String>, String> {
 #[tauri::command]
 pub async fn remember_workspace(app: AppHandle, path: String) -> Result<Vec<String>, String> {
     let dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    // A window nobody has seen belongs to the CLI, whose workspaces never
+    // become "recent".
+    #[cfg(windows)]
+    if app
+        .try_state::<crate::cli_server::state::CliState>()
+        .is_some_and(|state| !state.is_shown())
+    {
+        return present_recents(&dir).await.map_err(|e| e.to_string());
+    }
     let recents = push_recent(&dir, &path).await.map_err(|e| e.to_string())?;
     #[cfg(windows)]
     let _ = crate::commands::jumplist::rebuild(&recents);
@@ -157,6 +172,13 @@ pub async fn save_workspace(path: String, state: WorkspaceState) -> Result<(), S
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn headless_is_only_the_literal_flag() {
+        assert!(headless_from_args(["--headless".to_string()]));
+        assert!(!headless_from_args(["--workspace=x".to_string()]));
+        assert!(!headless_from_args(["--headless=1".to_string()]));
+    }
+
     use super::*;
     use crate::models::CanvasViewport;
     use tempfile::tempdir;

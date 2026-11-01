@@ -1,4 +1,5 @@
 pub mod dispatch;
+pub mod lifecycle;
 pub mod paths;
 pub mod pipe;
 pub mod protocol;
@@ -7,7 +8,7 @@ pub mod state;
 use crate::commands::error_log;
 use tauri::{AppHandle, Manager, Runtime, State};
 
-const TOKEN_FILE: &str = "cli-token";
+pub(crate) const TOKEN_FILE: &str = "cli-token";
 
 // Binds the pipe first and publishes the per-launch token only once the bind
 // succeeded, so an instance that loses the bind cannot invalidate the token

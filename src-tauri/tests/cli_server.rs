@@ -335,17 +335,17 @@ async fn git_commit_refuses_a_dash_leading_path_before_spawning_anything() {
     assert!(!message.contains("not exposed"), "{message}");
 }
 
-mod pipe {
+mod pipe_helpers {
     use super::*;
-    use null_notes_lib::cli_server::pipe::{send, send_raw, serve};
+    use null_notes_lib::cli_server::pipe::serve;
 
-    const TOKEN: &str = "secret-token";
+    pub const TOKEN: &str = "secret-token";
 
     fn unique_pipe() -> String {
         format!(r"\\.\pipe\nullnotes-test-{}", uuid::Uuid::new_v4())
     }
 
-    async fn serving(fx: &Fixture) -> String {
+    pub async fn serving(fx: &Fixture) -> String {
         let name = unique_pipe();
         let (bound_tx, bound_rx) = tokio::sync::oneshot::channel();
         let app = fx.app.handle().clone();
@@ -360,12 +360,18 @@ mod pipe {
         name
     }
 
-    fn with_token(fx: &Fixture, token: &str, command: &str) -> Request {
+    pub fn with_token(fx: &Fixture, token: &str, command: &str) -> Request {
         Request {
             token: token.to_string(),
             ..request(fx, command, Value::Null)
         }
     }
+}
+
+mod pipe {
+    use super::pipe_helpers::*;
+    use super::*;
+    use null_notes_lib::cli_server::pipe::{send, send_raw, serve};
 
     #[tokio::test]
     async fn a_valid_request_round_trips() {
@@ -447,5 +453,74 @@ mod pipe {
             .await
             .unwrap();
         assert!(response.ok, "{response:?}");
+    }
+}
+
+mod lifecycle {
+    use super::pipe_helpers::*;
+    use super::*;
+    use null_notes_lib::cli_server::lifecycle::{defer_via, Handshake};
+
+    async fn status(fx: &Fixture) -> Value {
+        call(fx, "status", Value::Null)
+            .await
+            .result
+            .unwrap_or_default()
+    }
+
+    #[tokio::test]
+    async fn a_fresh_instance_reports_its_window_as_never_shown() {
+        let fx = fixture().await;
+        assert_eq!(status(&fx).await["shown"], json!(false));
+    }
+
+    #[tokio::test]
+    async fn promote_marks_the_instance_shown() {
+        let fx = fixture().await;
+        assert!(call(&fx, "promote", Value::Null).await.ok);
+        assert_eq!(status(&fx).await["shown"], json!(true));
+    }
+
+    #[tokio::test]
+    async fn shutdown_is_refused_once_the_window_has_been_shown() {
+        let fx = fixture().await;
+        call(&fx, "promote", Value::Null).await;
+        let response = call(&fx, "shutdown", Value::Null).await;
+        assert_eq!(code_of(&response), Some(ErrorCode::Failed), "{response:?}");
+    }
+
+    #[tokio::test]
+    async fn with_no_token_file_there_is_no_instance_to_defer_to() {
+        let fx = fixture().await;
+        let name = serving(&fx).await;
+        let empty = tempfile::tempdir().unwrap();
+        assert_eq!(
+            defer_via(empty.path(), &name, false).await,
+            Handshake::NoInstance
+        );
+    }
+
+    #[tokio::test]
+    async fn a_launch_without_target_args_promotes_a_hidden_instance() {
+        let fx = fixture().await;
+        let name = serving(&fx).await;
+        std::fs::write(fx._data.path().join("cli-token"), TOKEN).unwrap();
+        assert_eq!(
+            defer_via(fx._data.path(), &name, false).await,
+            Handshake::Promoted
+        );
+        assert_eq!(status(&fx).await["shown"], json!(true));
+    }
+
+    #[tokio::test]
+    async fn a_launch_beside_an_already_visible_instance_runs_on_its_own() {
+        let fx = fixture().await;
+        let name = serving(&fx).await;
+        std::fs::write(fx._data.path().join("cli-token"), TOKEN).unwrap();
+        call(&fx, "promote", Value::Null).await;
+        assert_eq!(
+            defer_via(fx._data.path(), &name, true).await,
+            Handshake::NoInstance
+        );
     }
 }

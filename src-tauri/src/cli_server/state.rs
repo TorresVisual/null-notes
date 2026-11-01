@@ -1,4 +1,5 @@
 use std::collections::{HashMap, HashSet};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, PoisonError};
 use std::time::Duration;
 use tokio::sync::OwnedMutexGuard;
@@ -18,6 +19,7 @@ pub struct CliState {
     locks: Mutex<HashMap<String, Arc<tokio::sync::Mutex<()>>>>,
     scanned: Mutex<HashSet<String>>,
     last_request: Mutex<Instant>,
+    shown: AtomicBool,
 }
 
 impl Default for CliState {
@@ -27,6 +29,7 @@ impl Default for CliState {
             locks: Mutex::default(),
             scanned: Mutex::default(),
             last_request: Mutex::new(Instant::now()),
+            shown: AtomicBool::new(false),
         }
     }
 }
@@ -72,6 +75,14 @@ impl CliState {
             .last_request
             .lock()
             .unwrap_or_else(PoisonError::into_inner) = Instant::now();
+    }
+
+    pub fn mark_shown(&self) {
+        self.shown.store(true, Ordering::SeqCst);
+    }
+
+    pub fn is_shown(&self) -> bool {
+        self.shown.load(Ordering::SeqCst)
     }
 
     pub fn idle_for(&self) -> Duration {
