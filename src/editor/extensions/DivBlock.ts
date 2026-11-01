@@ -97,12 +97,16 @@ export const DivBlock = Node.create({
           const s = state as {
             write: (text: string) => void
             ensureNewLine: () => void
+            closeBlock: (node: unknown) => void
             renderContent: (node: unknown) => void
             wrapBlock: (delim: string, firstDelim: string | null, node: unknown, fn: () => void) => void
           }
           s.ensureNewLine()
           s.write(buildDivTag(node.attrs))
-          s.ensureNewLine()
+          // A blank line, not just a newline: the tag opens a raw-HTML block
+          // that swallows lines until a blank one, so the body would reload as
+          // literal text and get backslash-escaped. See Details.tsx.
+          s.closeBlock(node)
           s.renderContent(node)
           s.ensureNewLine()
           s.write('</div>')

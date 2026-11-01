@@ -58,4 +58,16 @@ describe('DivBlock markdown serialize', () => {
     expect(md).toContain('&quot;')
     expect(md).not.toContain('x"onmouseover="alert(1)"')
   })
+
+  // The opening tag starts a CommonMark raw-HTML block that swallows every
+  // line until a blank one, so without a blank line after it the body came
+  // back as literal text on the next load and was backslash-escaped (#168).
+  it('keeps markdown inside a div parseable across repeated saves', () => {
+    const e = mount()
+    e.commands.setContent('<div align="center">\n\n**hi**\n\n</div>')
+    const once = getMarkdown(e)
+    expect(once).toContain('**hi**')
+    e.commands.setContent(once)
+    expect(getMarkdown(e)).toBe(once)
+  })
 })
