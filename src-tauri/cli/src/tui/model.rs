@@ -412,7 +412,7 @@ mod tests {
     }
 
     #[test]
-    fn dirty_buffer_sets_the_exact_status_and_still_reaches_the_view() {
+    fn dirty_buffer_sets_the_exact_status_without_going_fatal() {
         let (mut state, _) = ready();
         update(
             &mut state,
@@ -422,7 +422,6 @@ mod tests {
             state.status.as_deref(),
             Some("Unsaved edits in the app — nothing written")
         );
-        assert_eq!(state.views.tasks.replies, [Slot::TaskToggle]);
         assert!(state.fatal.is_none());
     }
 

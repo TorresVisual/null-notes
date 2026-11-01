@@ -265,4 +265,56 @@ mod tests {
         assert!(last.replace(' ', "").starts_with("/日本x"), "{last}");
         terminal.backend_mut().assert_cursor_position((7, 5));
     }
+
+    #[test]
+    fn a_dirty_toggle_reply_still_reaches_the_tasks_view_and_unstrikes_the_row() {
+        use crate::client::ClientError;
+        use crate::protocol::{ErrorBody, ErrorCode};
+        use crate::tui::effects::{Reply, Slot};
+        use crate::tui::model::{update, Msg};
+        use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+        use serde_json::json;
+
+        let struck = |state: &State| {
+            let mut terminal = Terminal::new(TestBackend::new(60, 8)).unwrap();
+            terminal.draw(|frame| draw(frame, state)).unwrap();
+            terminal.backend().buffer().content().iter().any(|cell| {
+                cell.modifier
+                    .contains(ratatui::style::Modifier::CROSSED_OUT)
+            })
+        };
+        let mut state = ready("W");
+        let key = |code| Msg::Key(KeyEvent::new(code, KeyModifiers::NONE));
+        update(&mut state, key(KeyCode::Char('3')));
+        let list = json!([{"notePath": "a.md", "noteTitle": "A", "text": "x", "position": 3}]);
+        let reply = |slot, args, result| {
+            Msg::Reply(Reply {
+                slot,
+                id: 1,
+                command: "x",
+                args,
+                result,
+            })
+        };
+        update(&mut state, reply(Slot::Tasks, json!(null), Ok(list)));
+        update(&mut state, key(KeyCode::Char(' ')));
+        assert!(struck(&state));
+        let dirty = Err(ClientError::Rejected(ErrorBody {
+            code: ErrorCode::DirtyBuffer,
+            message: "dirty".into(),
+        }));
+        update(
+            &mut state,
+            reply(
+                Slot::TaskToggle,
+                json!({"path": "a.md", "position": 3}),
+                dirty,
+            ),
+        );
+        assert!(!struck(&state));
+        assert_eq!(
+            state.status.as_deref(),
+            Some("Unsaved edits in the app — nothing written")
+        );
+    }
 }
