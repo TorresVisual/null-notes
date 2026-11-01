@@ -4093,6 +4093,7 @@ li > .folder-tree.tree-guide {
   border-radius: 10px;
   width: 440px;
   max-width: calc(100vw - 40px);
+  max-height: calc(100vh - 60px);
   box-shadow: var(--shadow-modal);
   padding: var(--space-lg);
   display: flex;

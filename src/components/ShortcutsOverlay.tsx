@@ -21,29 +21,31 @@ export function ShortcutsOverlay({ onClose }: ShortcutsOverlayProps) {
             <h2>Keyboard Shortcuts</h2>
           </DialogTitle>
         </div>
-        {GROUPS.map((group) => {
-          const shortcuts = [
-            ...COMMANDS.filter((c) => c.group === group && keymap[c.id]).map((c) => ({
-              label: c.label,
-              keys: formatCombo(keymap[c.id]),
-            })),
-            ...FIXED_SHORTCUTS.filter((s) => s.group === group),
-          ]
-          if (!shortcuts.length) return null
-          return (
-            <div className="settings-section" key={group}>
-              <p className="section-label">{group}</p>
-              <ul className="shortcuts-list">
-                {shortcuts.map((s) => (
-                  <li key={s.label} className="shortcuts-row">
-                    <span>{s.label}</span>
-                    <kbd>{s.keys}</kbd>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )
-        })}
+        <div className="settings-panel-body">
+          {GROUPS.map((group) => {
+            const shortcuts = [
+              ...COMMANDS.filter((c) => c.group === group && keymap[c.id]).map((c) => ({
+                label: c.label,
+                keys: formatCombo(keymap[c.id]),
+              })),
+              ...FIXED_SHORTCUTS.filter((s) => s.group === group),
+            ]
+            if (!shortcuts.length) return null
+            return (
+              <div className="settings-section" key={group}>
+                <p className="section-label">{group}</p>
+                <ul className="shortcuts-list">
+                  {shortcuts.map((s) => (
+                    <li key={s.label} className="shortcuts-row">
+                      <span>{s.label}</span>
+                      <kbd>{s.keys}</kbd>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )
+          })}
+        </div>
       </DialogContent>
     </Dialog>
   )
