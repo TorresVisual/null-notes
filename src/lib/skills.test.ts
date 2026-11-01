@@ -72,3 +72,23 @@ describe('null-notes-markdown', () => {
     expect(text).toMatch(/nullnotes-cli/)
   })
 })
+
+describe('brainstorm-canvas', () => {
+  it('pins the append-only protocol', () => {
+    const text = skillText('brainstorm-canvas')
+    const description = frontmatterField(text, 'description') ?? ''
+    expect(description).toContain('visual brainstorming')
+    expect(description).toContain('.canvas')
+    expect(text).toMatch(/never (modify|delete)/i)
+    expect(text).toMatch(/max.*pass.*\+ ?1|pass.*max.*\+ ?1/i)
+    expect(text).toMatch(/atomic|temp file.*rename/i)
+    expect(text).toMatch(/summary/i)
+    expect(text).toMatch(/does not exist/i)
+    expect(text).toMatch(/ask/i)
+    expect(text).toContain('docs/brainstorm/')
+    const format = skillText('brainstorm-canvas', 'references/format.md')
+    expect(format).toContain('"pass"')
+    expect(format).toContain('"author"')
+    expect(format).toContain('Pass <n> ·')
+  })
+})
