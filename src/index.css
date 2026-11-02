@@ -1014,11 +1014,17 @@ button, [role="button"], .tree-row, .tab, .search-result, .slash-menu-item,
 .properties-value:focus {
   outline: none;
   background: var(--bg-raised);
-  border-color: var(--border-strong);
+  border-color: var(--accent);
 }
+.properties-key:focus-visible,
+.properties-value:focus-visible { box-shadow: var(--focus-ring); }
 
 .properties-remove {
   display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  min-height: 24px;
   padding: 4px;
   background: none;
   border: none;
@@ -2030,6 +2036,7 @@ code {
   gap: 6px;
 }
 .code-block-copy, .code-block-wrap-toggle, .code-block-format {
+  min-height: 24px;
   padding: 2px 8px;
   background: var(--bg-raised);
   border: 1px solid var(--border);
@@ -4416,9 +4423,9 @@ input[type='checkbox']:focus-visible {
    has to reset every property the global checkmark ::after sets. */
 .settings-row-control input[type='checkbox'] {
   position: relative;
-  width: 34px;
-  height: 20px;
-  border-radius: 10px;
+  width: 40px;
+  height: 24px;
+  border-radius: 12px;
   border-color: var(--border-strong);
   transition: background var(--duration-base) var(--ease-standard), border-color var(--duration-base) var(--ease-standard);
 }
@@ -4428,8 +4435,8 @@ input[type='checkbox']:focus-visible {
   position: absolute;
   top: 2px;
   left: 2px;
-  width: 14px;
-  height: 14px;
+  width: 18px;
+  height: 18px;
   border: 0;
   border-radius: 50%;
   background: var(--text-secondary);
@@ -4439,11 +4446,11 @@ input[type='checkbox']:focus-visible {
 }
 
 .settings-row-control input[type='checkbox']:checked::after {
-  width: 14px;
-  height: 14px;
+  width: 18px;
+  height: 18px;
   border-width: 0;
   background: var(--accent-contrast);
-  transform: translateX(14px);
+  transform: translateX(16px);
   animation: none;
 }
 
@@ -4762,8 +4769,8 @@ input[type='checkbox']:focus-visible {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
   background: none;
   border: 1px solid transparent;
   border-radius: 3px;
@@ -6191,6 +6198,9 @@ input[type='checkbox']:focus-visible {
 @layer base {
   * {
     @apply border-border outline-ring/50; }
+  :where(button, a, summary, select, [role='button'], [role='tab'], [tabindex]):focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px; }
   body {
     @apply bg-background text-foreground; }
   html {
