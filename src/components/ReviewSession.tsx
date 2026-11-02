@@ -58,6 +58,7 @@ export function ReviewSession({ onClose, mode = { kind: 'due' }, onSwitchCategor
   const [mcResult, setMcResult] = useState<number[] | null>(null)
   const [mcSubmitting, setMcSubmitting] = useState(false)
   const [categories, setCategories] = useState<CardStreakGroup[]>([])
+  const [allWorkspaces, setAllWorkspaces] = useState(false)
 
   // Lets the header offer a one-click switch to another category without
   // leaving the review overlay — Deck View computes the same buckets, but
@@ -79,7 +80,7 @@ export function ReviewSession({ onClose, mode = { kind: 'due' }, onSwitchCategor
     if (tagsKey !== null) {
       return shuffleCards(await api.notes.listTagCards(workspace, tagsKey.split(',')))
     }
-    return api.notes.listDueCards(workspace)
+    return api.notes.listDueCards(workspace, allWorkspaces)
   }
 
   useEffect(() => {
@@ -90,7 +91,7 @@ export function ReviewSession({ onClose, mode = { kind: 'due' }, onSwitchCategor
       .then(setQueue)
       .catch((e: unknown) => setError(`Couldn't load the review queue: ${String(e)}`))
       .finally(() => setIsLoading(false))
-  }, [workspacePath, cramStreak, cramStruggling, tagsKey])
+  }, [workspacePath, cramStreak, cramStruggling, tagsKey, allWorkspaces])
 
   const current = queue[0]
   const optionOrder = useMemo(
@@ -127,7 +128,7 @@ export function ReviewSession({ onClose, mode = { kind: 'due' }, onSwitchCategor
     // then drops its stale queue entry on its own) — refetch regardless so a
     // ghost card can't get stuck un-gradeable forever.
     void api.notes
-      .gradeCard(notePath, current.position, g, workspacePath)
+      .gradeCard(notePath, current.position, g, current.workspace)
       .then(() => useWorkspaceStore.getState().addGitPendingPath(notePath))
       .catch(() => {})
       .finally(refetch)
@@ -137,7 +138,7 @@ export function ReviewSession({ onClose, mode = { kind: 'due' }, onSwitchCategor
     if (!workspacePath || !current) return
     const notePath = current.notePath
     void api.notes
-      .setCardSuspended(notePath, current.position, true, workspacePath)
+      .setCardSuspended(notePath, current.position, true, current.workspace)
       .then(() => useWorkspaceStore.getState().addGitPendingPath(notePath))
       .catch(() => {})
       .finally(refetch)
@@ -157,7 +158,7 @@ export function ReviewSession({ onClose, mode = { kind: 'due' }, onSwitchCategor
     const notePath = current.notePath
     setMcSubmitting(true)
     void api.notes
-      .gradeMcCard(notePath, current.position, Array.from(picked), workspacePath)
+      .gradeMcCard(notePath, current.position, Array.from(picked), current.workspace)
       .then((result) => {
         useWorkspaceStore.getState().addGitPendingPath(notePath)
         setMcResult(result.correct)
@@ -212,6 +213,16 @@ export function ReviewSession({ onClose, mode = { kind: 'due' }, onSwitchCategor
             ))}
           </div>
         )}
+        {cramStreak === null && tagsKey === null && (
+          <label className="search-scope-toggle">
+            <input
+              type="checkbox"
+              checked={allWorkspaces}
+              onChange={(e) => setAllWorkspaces(e.target.checked)}
+            />
+            Review all workspaces
+          </label>
+        )}
         {isLoading ? (
           <LoadingStatus />
         ) : error ? (
@@ -227,7 +238,12 @@ export function ReviewSession({ onClose, mode = { kind: 'due' }, onSwitchCategor
         ) : (
           <div className="review-card">
             <div className="review-card-header">
-              <p className="review-card-note">{current.noteTitle}</p>
+              <p className="review-card-note">
+                {current.noteTitle}
+                {current.workspace !== workspacePath && (
+                  <span className="search-result-workspace">{current.workspace.split(/[/\\]/).pop()}</span>
+                )}
+              </p>
               <button
                 className="review-card-suspend"
                 onClick={suspend}

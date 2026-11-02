@@ -303,7 +303,7 @@ impl<R: Runtime> Ctx<'_, R> {
             "graph.links" => json(notes::graph_links(self.ws().await?, db()).await?),
             "graph.tags" => json(notes::graph_tags(self.ws().await?, db()).await?),
             "tasks.list" => json(notes::list_open_tasks(self.ws().await?, db()).await?),
-            "cards.due" => json(notes::list_due_cards(self.ws().await?, db()).await?),
+            "cards.due" => json(notes::list_due_cards(self.ws().await?, false, db()).await?),
             "cards.list" => json(notes::list_all_cards(self.ws().await?, db()).await?),
             "template.list" => json(notes::list_templates(self.ws().await?).await?),
             "template.read" => {

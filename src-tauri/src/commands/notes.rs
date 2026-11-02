@@ -1869,11 +1869,20 @@ pub async fn set_card_suspended(
 #[tauri::command]
 pub async fn list_due_cards(
     workspace: String,
+    all_workspaces: bool,
     db: State<'_, DbPool>,
 ) -> Result<Vec<DueCard>, String> {
-    db::notes::due_cards(&db, &workspace, &sm2::today())
-        .await
-        .map_err(|e| e.to_string())
+    db::notes::due_cards(
+        &db,
+        if all_workspaces {
+            None
+        } else {
+            Some(&workspace)
+        },
+        &sm2::today(),
+    )
+    .await
+    .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -4201,7 +4210,7 @@ mod save_tests {
             .await
             .unwrap();
 
-        let due = db::notes::due_cards(&pool, "/ws", "9999-12-31")
+        let due = db::notes::due_cards(&pool, Some("/ws"), "9999-12-31")
             .await
             .unwrap();
         assert_eq!(due.len(), 1);
@@ -4221,7 +4230,7 @@ mod save_tests {
             .unwrap();
         forget_note("/ws/a.md", &pool).await.unwrap();
 
-        let due = db::notes::due_cards(&pool, "/ws", "9999-12-31")
+        let due = db::notes::due_cards(&pool, Some("/ws"), "9999-12-31")
             .await
             .unwrap();
         assert!(due.is_empty());
@@ -4247,7 +4256,7 @@ mod save_tests {
         let result = grade_card_at("/ws/gone.md", 0, sm2::Grade::Good, "/ws", &pool).await;
 
         assert!(result.is_err());
-        let due = db::notes::due_cards(&pool, "/ws", "9999-12-31")
+        let due = db::notes::due_cards(&pool, Some("/ws"), "9999-12-31")
             .await
             .unwrap();
         assert!(due.is_empty());
@@ -4396,7 +4405,7 @@ mod save_tests {
         let result = grade_mc_card_at("/ws/gone.md", 0, &[0], "/ws", &pool).await;
 
         assert!(result.is_err());
-        let due = db::notes::due_cards(&pool, "/ws", "9999-12-31")
+        let due = db::notes::due_cards(&pool, Some("/ws"), "9999-12-31")
             .await
             .unwrap();
         assert!(due.is_empty());

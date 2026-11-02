@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 import { ReviewSession } from './ReviewSession'
 import { api } from '../lib/tauri'
 import { useWorkspaceStore } from '../store/workspace'
@@ -20,13 +20,13 @@ vi.mock('../lib/tauri', () => ({
 }))
 
 const cards: DueCard[] = [
-  { notePath: '/ws/a.md', noteTitle: 'A', kind: 'qa', front: 'Q1', back: 'A1', position: 0, options: [], streak: 0 },
-  { notePath: '/ws/b.md', noteTitle: 'B', kind: 'cloze', front: 'Q2 [...]', back: 'Q2 full', position: 3, options: [], streak: 0 },
+  { notePath: '/ws/a.md', noteTitle: 'A', workspace: '/ws', kind: 'qa', front: 'Q1', back: 'A1', position: 0, options: [], streak: 0 },
+  { notePath: '/ws/b.md', noteTitle: 'B', workspace: '/ws', kind: 'cloze', front: 'Q2 [...]', back: 'Q2 full', position: 3, options: [], streak: 0 },
 ]
 
 const mcCard: DueCard = {
   notePath: '/ws/c.md',
-  noteTitle: 'C',
+  noteTitle: 'C', workspace: '/ws',
   kind: 'mc',
   front: 'What is 2+2?',
   back: '',
@@ -85,6 +85,22 @@ describe('ReviewSession', () => {
     expect(api.notes.gradeCard).toHaveBeenCalledWith('/ws/a.md', 0, 'good', '/ws')
     await waitFor(() => expect(screen.getByText('Q2 [...]')).toBeInTheDocument())
     expect(screen.queryByText('Reveal answer')).toBeInTheDocument()
+  })
+
+  it('with "Review all workspaces" on, fetches across workspaces and grades against its own workspace', async () => {
+    const other: DueCard = { ...cards[0]!, notePath: '/other/z.md', workspace: '/other', front: 'QZ' }
+    vi.mocked(api.notes.listDueCards).mockImplementation(async (_ws, all) => (all ? [other] : cards))
+
+    render(<ReviewSession onClose={vi.fn()} />)
+    await waitFor(() => screen.getByText('Q1'))
+    fireEvent.click(screen.getByLabelText('Review all workspaces'))
+    await waitFor(() => screen.getByText('QZ'))
+    expect(api.notes.listDueCards).toHaveBeenLastCalledWith('/ws', true)
+    expect(screen.getByText('other')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByText('Reveal answer'))
+    fireEvent.click(screen.getByText('Good'))
+    expect(api.notes.gradeCard).toHaveBeenCalledWith('/other/z.md', 0, 'good', '/other')
   })
 
   it('queues the graded note for auto-commit, like a normal save does', async () => {
@@ -150,7 +166,7 @@ describe('ReviewSession — multiple choice', () => {
     render(<ReviewSession onClose={vi.fn()} />)
 
     await waitFor(() => screen.getByText('What is 2+2?'))
-    expect(screen.getAllByRole('checkbox').map((input) => input.getAttribute('aria-label'))).toEqual(['4', '5', '3'])
+    expect(within(screen.getByRole('list')).getAllByRole('checkbox').map((input) => input.getAttribute('aria-label'))).toEqual(['4', '5', '3'])
 
     fireEvent.click(screen.getByLabelText('4'))
     fireEvent.click(screen.getByText('Submit'))

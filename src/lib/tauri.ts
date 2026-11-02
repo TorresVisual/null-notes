@@ -139,8 +139,8 @@ export const api = {
       invoke<void>('toggle_task', { path, position, workspace }),
     generateFormulaSheet: (workspace: string, folder: string | null, tag: string | null) =>
       invoke<NoteMetadata>('generate_formula_sheet', { workspace, folder, tag }),
-    listDueCards: (workspace: string) =>
-      invoke<DueCard[]>('list_due_cards', { workspace }),
+    listDueCards: (workspace: string, allWorkspaces = false) =>
+      invoke<DueCard[]>('list_due_cards', { workspace, allWorkspaces }),
     gradeCard: (path: string, position: number, grade: Grade, workspace: string) =>
       invoke<void>('grade_card', { path, position, grade, workspace }),
     gradeMcCard: (path: string, position: number, picked: number[], workspace: string) =>

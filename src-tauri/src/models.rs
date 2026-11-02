@@ -411,6 +411,7 @@ pub struct ExtractedCard {
 pub struct DueCard {
     pub note_path: String,
     pub note_title: String,
+    pub workspace: String,
     pub kind: String,
     pub front: String,
     pub back: String,

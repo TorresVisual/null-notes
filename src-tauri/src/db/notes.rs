@@ -471,6 +471,7 @@ pub async fn set_cards(pool: &SqlitePool, note_path: &str, cards: &[ExtractedCar
 struct DueCardRow {
     note_path: String,
     note_title: String,
+    workspace: String,
     kind: String,
     front: String,
     back: String,
@@ -490,6 +491,7 @@ impl TryFrom<DueCardRow> for DueCard {
         Ok(DueCard {
             note_path: r.note_path,
             note_title: r.note_title,
+            workspace: r.workspace,
             kind: r.kind,
             front: r.front,
             back: r.back,
@@ -500,12 +502,19 @@ impl TryFrom<DueCardRow> for DueCard {
     }
 }
 
-pub async fn due_cards(pool: &SqlitePool, workspace: &str, today: &str) -> Result<Vec<DueCard>> {
+// `workspace: None` is an explicit opt-in (issue #63) to review every indexed
+// workspace's due cards at once, for the sibling-course-folders shape
+// `NotesMonorepo` supports.
+pub async fn due_cards(
+    pool: &SqlitePool,
+    workspace: Option<&str>,
+    today: &str,
+) -> Result<Vec<DueCard>> {
     let rows = sqlx::query_as::<_, DueCardRow>(
-        "SELECT rc.note_path, n.title as note_title, rc.kind, rc.front, rc.back, rc.position, rc.options, rc.streak
+        "SELECT rc.note_path, n.title as note_title, n.workspace, rc.kind, rc.front, rc.back, rc.position, rc.options, rc.streak
          FROM review_cards rc
          JOIN notes n ON n.path = rc.note_path
-         WHERE n.workspace = ? AND rc.due <= ? AND COALESCE(rc.suspended, 0) = 0
+         WHERE n.workspace = COALESCE(?, n.workspace) AND rc.due <= ? AND COALESCE(rc.suspended, 0) = 0
          ORDER BY rc.due, n.title COLLATE NOCASE, rc.position",
     )
     .bind(workspace)
@@ -531,7 +540,7 @@ pub async fn list_cards_by_category(
     struggling: bool,
 ) -> Result<Vec<DueCard>> {
     let rows = sqlx::query_as::<_, DueCardRow>(
-        "SELECT rc.note_path, n.title as note_title, rc.kind, rc.front, rc.back, rc.position, rc.options, rc.streak
+        "SELECT rc.note_path, n.title as note_title, n.workspace, rc.kind, rc.front, rc.back, rc.position, rc.options, rc.streak
          FROM review_cards rc
          JOIN notes n ON n.path = rc.note_path
          WHERE n.workspace = ? AND rc.streak = ? AND COALESCE(rc.suspended, 0) = 0
@@ -559,7 +568,7 @@ pub async fn list_cards_by_tags(
     tags: &[String],
 ) -> Result<Vec<DueCard>> {
     let rows = sqlx::query_as::<_, DueCardRow>(
-        "SELECT rc.note_path, n.title as note_title, rc.kind, rc.front, rc.back, rc.position, rc.options, rc.streak
+        "SELECT rc.note_path, n.title as note_title, n.workspace, rc.kind, rc.front, rc.back, rc.position, rc.options, rc.streak
          FROM review_cards rc
          JOIN notes n ON n.path = rc.note_path
          WHERE n.workspace = ? AND COALESCE(rc.suspended, 0) = 0
@@ -2141,7 +2150,7 @@ mod tests {
             .await
             .unwrap();
 
-        let due = due_cards(&pool, "/ws", "9999-12-31").await.unwrap();
+        let due = due_cards(&pool, Some("/ws"), "9999-12-31").await.unwrap();
         assert_eq!(due.len(), 1);
         assert_eq!(due[0].front, "only");
     }
@@ -2160,7 +2169,7 @@ mod tests {
         .await
         .unwrap();
 
-        let due = due_cards(&pool, "/ws", &sm2::today()).await.unwrap();
+        let due = due_cards(&pool, Some("/ws"), &sm2::today()).await.unwrap();
         assert_eq!(due.len(), 1);
         assert_eq!(due[0].kind, "cloze");
     }
@@ -2188,8 +2197,32 @@ mod tests {
         .await
         .unwrap();
 
-        let due = due_cards(&pool, "/ws", "2026-08-20").await.unwrap();
+        let due = due_cards(&pool, Some("/ws"), "2026-08-20").await.unwrap();
         assert!(due.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_due_cards_none_reaches_every_workspace_and_labels_source() {
+        let pool = make_pool().await;
+        index_note(&pool, &note("a", "A", "/ws/a.md", "/ws"))
+            .await
+            .unwrap();
+        index_note(&pool, &note("c", "C", "/other/c.md", "/other"))
+            .await
+            .unwrap();
+        set_cards(&pool, "/ws/a.md", &[card(CardKind::Qa, "q1", "a1", 0)])
+            .await
+            .unwrap();
+        set_cards(&pool, "/other/c.md", &[card(CardKind::Qa, "q2", "a2", 0)])
+            .await
+            .unwrap();
+
+        let due = due_cards(&pool, None, "9999-12-31").await.unwrap();
+        let mut workspaces: Vec<_> = due.iter().map(|d| d.workspace.as_str()).collect();
+        workspaces.sort_unstable();
+        assert_eq!(workspaces, ["/other", "/ws"]);
+        let scoped = due_cards(&pool, Some("/ws"), "9999-12-31").await.unwrap();
+        assert_eq!(scoped.len(), 1);
     }
 
     #[tokio::test]
@@ -2206,7 +2239,7 @@ mod tests {
             .await
             .unwrap();
 
-        let due = due_cards(&pool, "/ws", "9999-12-31").await.unwrap();
+        let due = due_cards(&pool, Some("/ws"), "9999-12-31").await.unwrap();
         assert_eq!(due[0].note_path, "/ws/Folder/old.md");
     }
 
@@ -2222,7 +2255,7 @@ mod tests {
 
         remove_notes_under(&pool, "/ws/Folder/").await.unwrap();
 
-        let due = due_cards(&pool, "/ws", "9999-12-31").await.unwrap();
+        let due = due_cards(&pool, Some("/ws"), "9999-12-31").await.unwrap();
         assert!(due.is_empty());
     }
 
@@ -2292,7 +2325,7 @@ mod tests {
         }];
         set_cards(&pool, "/ws/a.md", &cards).await.unwrap();
 
-        let due = due_cards(&pool, "/ws", "9999-12-31").await.unwrap();
+        let due = due_cards(&pool, Some("/ws"), "9999-12-31").await.unwrap();
         assert_eq!(due.len(), 1);
         assert_eq!(due[0].kind, "mc");
         assert_eq!(due[0].options, vec!["a", "b"]);
@@ -2331,7 +2364,7 @@ mod tests {
         }];
         set_cards(&pool, "/ws/a.md", &cards).await.unwrap();
 
-        let due = due_cards(&pool, "/ws", "9999-12-31").await.unwrap();
+        let due = due_cards(&pool, Some("/ws"), "9999-12-31").await.unwrap();
         assert!(due[0].options.is_empty());
     }
 
@@ -2366,7 +2399,7 @@ mod tests {
         c.streak = Some(2);
         set_cards(&pool, "/ws/a.md", &[c]).await.unwrap();
 
-        let due = due_cards(&pool, "/ws", &sm2::today()).await.unwrap();
+        let due = due_cards(&pool, Some("/ws"), &sm2::today()).await.unwrap();
         assert_eq!(due[0].streak, 2);
     }
 
@@ -2503,7 +2536,7 @@ mod tests {
             .await
             .unwrap();
 
-        let due = due_cards(&pool, "/ws", "9999-12-31").await.unwrap();
+        let due = due_cards(&pool, Some("/ws"), "9999-12-31").await.unwrap();
         assert_eq!(due.len(), 1);
         assert_eq!(due[0].front, "active");
 

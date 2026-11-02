@@ -256,6 +256,7 @@ export type Grade = 'again' | 'hard' | 'good' | 'easy'
 export interface DueCard {
   notePath: string
   noteTitle: string
+  workspace: string
   kind: string
   front: string
   back: string
