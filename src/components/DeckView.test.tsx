@@ -55,7 +55,7 @@ describe('DeckView', () => {
   it('shows total, due, and mastered counts', async () => {
     render(<DeckView onClose={vi.fn()} onOpenCram={vi.fn()} onOpenTagReview={vi.fn()} />)
     await waitFor(() => screen.getByText('Q1'))
-    expect(screen.getByText('2')).toBeInTheDocument() // total
+    expect(screen.getByText('2', { selector: '.deck-view-stats span' })).toBeInTheDocument() // total
   })
 
   it('narrows the list by tag', async () => {
@@ -167,5 +167,18 @@ describe('DeckView — suspended cards', () => {
       expect(api.notes.setCardSuspended).toHaveBeenCalledWith('/ws/a.md', 0, true, '/ws'),
     )
     expect(useWorkspaceStore.getState().gitPendingPaths).toContain('/ws/a.md')
+  })
+})
+
+describe('DeckView forecast', () => {
+  it('renders a 14-day due forecast scoped to the active tags', async () => {
+    render(<DeckView onClose={vi.fn()} onOpenCram={vi.fn()} onOpenTagReview={vi.fn()} />)
+    await waitFor(() => screen.getByText('Q1'))
+    const forecast = screen.getByRole('img', { name: /due over the next 14 days/i })
+    expect(forecast.querySelectorAll('.deck-view-forecast-day')).toHaveLength(14)
+    expect(forecast.querySelector('.deck-view-forecast-count')?.textContent).toBe('2')
+
+    fireEvent.click(screen.getByLabelText('cs'))
+    expect(forecast.querySelector('.deck-view-forecast-count')?.textContent).toBe('1')
   })
 })

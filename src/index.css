@@ -5518,6 +5518,35 @@ input[type='checkbox']:focus-visible {
   color: var(--text-tertiary);
 }
 
+.deck-view-forecast {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.deck-view-forecast-day {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 2px;
+  font-size: 10px;
+  color: var(--text-tertiary);
+}
+
+.deck-view-forecast-count {
+  min-height: 12px;
+  color: var(--text-secondary);
+}
+
+.deck-view-forecast-bar {
+  width: 100%;
+  min-height: 2px;
+  background: var(--accent);
+  border-radius: 2px 2px 0 0;
+}
+
 .deck-view-suspended-filter {
   background: none;
   border: 1px solid var(--border);

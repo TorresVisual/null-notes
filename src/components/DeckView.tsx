@@ -7,6 +7,7 @@ import { useWorkspaceStore } from '../store/workspace'
 import { promptText } from '../store/promptDialog'
 import { groupCardsByNote, groupCardsByStreak } from '../lib/cardGroups'
 import { CardText } from './CardText'
+import { DueForecast } from './DueForecast'
 import type { CardSummary } from '../types'
 
 interface DeckViewProps {
@@ -162,6 +163,7 @@ export function DeckView({ onClose, onOpenCram, onOpenTagReview }: DeckViewProps
                 </button>
               )}
             </div>
+            <DueForecast cards={activeCardsForCategories} />
             {allTags.length > 0 && (
               <div className="deck-view-tags">
                 {allTags.map((tag) => (
