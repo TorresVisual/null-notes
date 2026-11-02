@@ -11,6 +11,7 @@ import { PropertiesBlock } from './PropertiesBlock'
 import { LoadingStatus } from './LoadingStatus'
 import { WorkspacePicker } from './WorkspacePicker'
 import { HomeView } from './HomeView'
+import { EmptyWorkspace } from './EmptyWorkspace'
 import { useWorkspaceStore } from '../store/workspace'
 import { useNotesStore } from '../store/notes'
 import { useSettingsStore } from '../store/settings'
@@ -131,11 +132,7 @@ export const EditorPane = forwardRef<HTMLDivElement, EditorPaneProps>(function E
           />
         )}
         {emptyState && !notePath && !workspacePath && <WorkspacePicker />}
-        {emptyState && !notePath && workspacePath && notes.length === 0 && (
-          <p className="empty-state">
-            Press Ctrl N to create your first note, or press ? for shortcuts
-          </p>
-        )}
+        {emptyState && !notePath && workspacePath && notes.length === 0 && <EmptyWorkspace />}
         {emptyState && !notePath && workspacePath && notes.length > 0 && (
           <HomeView
             onOpenTaskView={emptyState.onOpenTaskView}

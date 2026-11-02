@@ -5781,6 +5781,56 @@ input[type='checkbox']:focus-visible {
 .home-action-primary:hover { background: var(--accent-bg-hover); }
 .home-action-primary:focus-visible { outline: none; box-shadow: var(--focus-ring); }
 
+.empty-workspace {
+  max-width: 44ch;
+  margin: 20vh auto 0;
+  padding: 0 var(--space-lg);
+}
+
+.empty-workspace-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: var(--space-sm);
+}
+
+.empty-workspace-body {
+  font: var(--text-empty-state);
+  color: var(--text-secondary);
+  margin-bottom: var(--space-lg);
+  text-wrap: pretty;
+}
+
+.empty-workspace-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-md);
+}
+
+.empty-workspace-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: 8px 14px;
+  font-size: 13px;
+}
+
+.empty-workspace-hint {
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+
+.empty-workspace-hint kbd {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-secondary);
+  background: var(--bg-base);
+  border: 1px solid var(--border-strong);
+  border-radius: 3px;
+  padding: 1px 5px;
+}
+
 .home-view-all {
   margin-top: var(--space-sm);
   background: none;
