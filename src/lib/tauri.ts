@@ -280,6 +280,8 @@ export const api = {
     },
     readPage: (path: string) =>
       invoke<string>('read_pdf_page', { path }),
+    findPage: (notePath: string, term: string) =>
+      invoke<number | null>('find_pdf_page', { notePath, term }),
     hasTextLayer: (pdfPath: string) =>
       invoke<boolean>('pdf_has_text_layer', { pdfPath }),
     importMarkdown: (pdfPath: string) =>

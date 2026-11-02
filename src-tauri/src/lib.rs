@@ -325,6 +325,7 @@ pub fn run() {
             commands::pdf::ensure_pdf_dir,
             commands::pdf::import_pdf_pages,
             commands::pdf::read_pdf_page,
+            commands::pdf::find_pdf_page,
             commands::pdf::import_pdf_markdown,
             commands::pdf::pdf_has_text_layer,
             commands::assets::write_note_asset,

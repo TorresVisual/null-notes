@@ -130,10 +130,41 @@ pub async fn read_pdf_page(path: String) -> Result<String, String> {
     Ok(base64::engine::general_purpose::STANDARD.encode(bytes))
 }
 
+/// Zero-based index of the first page of a Pages-mode note whose text contains
+/// `term` (case-insensitive), or `None` when it matches nowhere or the note
+/// has no page-delimited search text (see `pdf::extract::pages_to_text`).
+fn find_page(text: &str, term: &str) -> Option<usize> {
+    if !text.contains('\u{c}') {
+        return None;
+    }
+    let term = term.to_lowercase();
+    text.split('\u{c}')
+        .position(|page| page.to_lowercase().contains(&term))
+}
+
+#[tauri::command]
+pub async fn find_pdf_page(note_path: String, term: String) -> Option<usize> {
+    let text_path = Path::new(&pdf_dir_for(&note_path)).join(PDF_SEARCH_TEXT_FILE);
+    let text = tokio::fs::read_to_string(text_path).await.ok()?;
+    find_page(&text, &term)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use tempfile::tempdir;
+
+    #[test]
+    fn test_find_page_returns_the_first_matching_page_case_insensitively() {
+        let text = "intro\u{c}Quicksort partitioning\u{c}quicksort again\u{c}";
+        assert_eq!(find_page(text, "QUICKSORT"), Some(1));
+        assert_eq!(find_page(text, "mergesort"), None);
+    }
+
+    #[test]
+    fn test_find_page_ignores_text_without_page_boundaries() {
+        assert_eq!(find_page("quicksort\n\npartitioning", "quicksort"), None);
+    }
 
     #[test]
     fn test_pdf_dir_for() {

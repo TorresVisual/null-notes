@@ -139,18 +139,22 @@ pub fn pages_to_markdown(pages: &[ExtractedPage]) -> models::PdfMarkdownImport {
 /// spacing, nothing more. No column ordering, no maths reconstruction, no
 /// figure handling — those exist to make `pages_to_markdown` readable prose,
 /// which a search index doesn't need.
+///
+/// Every page, including the last, ends in a form feed (`pdftotext`'s
+/// convention) so `commands::pdf::find_page` can recover page numbers; a
+/// sidecar with no form feed predates that and carries no page boundaries.
 pub fn pages_to_text(pages: &[ExtractedPage]) -> String {
     pages
         .iter()
         .map(|page| {
-            layout::group_lines(&page.chars)
+            let lines = layout::group_lines(&page.chars)
                 .iter()
                 .map(|line| line.text())
                 .collect::<Vec<_>>()
-                .join("\n")
+                .join("\n");
+            format!("{lines}\u{c}")
         })
-        .collect::<Vec<_>>()
-        .join("\n\n")
+        .collect()
 }
 
 /// Distance from `x` to the nearest edge of `bounds` — `0.0` when `x` falls
@@ -587,9 +591,9 @@ mod tests {
     }
 
     #[test]
-    fn pages_to_text_joins_pages_with_a_blank_line() {
+    fn pages_to_text_ends_every_page_with_a_form_feed() {
         let pages = vec![page_of("first page"), page_of("second page")];
-        assert_eq!(pages_to_text(&pages), "first page\n\nsecond page");
+        assert_eq!(pages_to_text(&pages), "first page\u{c}second page\u{c}");
     }
 
     #[test]

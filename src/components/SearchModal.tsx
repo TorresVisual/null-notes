@@ -83,10 +83,11 @@ export function SearchModal({ onClose }: SearchModalProps) {
     if (workspace !== workspacePath) {
       await openWorkspaceAt(workspace)
     }
-    openTab(path)
     const term = firstPositiveTerm(parseSearchQuery(query).text)
+    const page = term ? await api.pdf.findPage(path, term) : null
+    openTab(path)
     if (term) {
-      setPendingHighlight(path, term)
+      setPendingHighlight(path, term, false, page ?? undefined)
       // NoteEditor may already be mounted for `path` (it was already the
       // active tab), in which case openTab above triggers no notePath/content
       // change for it to react to — this event covers that case; a fresh

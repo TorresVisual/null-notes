@@ -38,8 +38,12 @@ export const SearchJumpHighlight = Extension.create({
           decorations(state) {
             const range = searchJumpKey.getState(state)
             if (!range) return DecorationSet.empty
+            const attrs = { class: 'search-jump-target' }
+            const isBlock = state.doc.nodeAt(range.from)?.type.name === 'pdfPageBlock'
             return DecorationSet.create(state.doc, [
-              Decoration.inline(range.from, range.to, { class: 'search-jump-target' }),
+              isBlock
+                ? Decoration.node(range.from, range.to, attrs)
+                : Decoration.inline(range.from, range.to, attrs),
             ])
           },
         },
@@ -79,6 +83,24 @@ export function highlightHeading(editor: Editor, heading: string): void {
   const hit = found[0]
   if (hit) {
     revealPos(editor.view, hit.heading)
+    flashRange(editor, hit.from, hit.to)
+  }
+}
+
+/** Scrolls to and briefly highlights the `index`th (zero-based) Pages-mode
+ *  page of `editor`'s document. An index past the last page leaves the note
+ *  at the top. */
+export function highlightPdfPage(editor: Editor, index: number): void {
+  let seen = 0
+  let hit: { from: number; to: number } | undefined
+  editor.state.doc.descendants((node, pos) => {
+    if (hit) return false
+    if (node.type.name !== 'pdfPageBlock') return true
+    if (seen++ === index) hit = { from: pos, to: pos + node.nodeSize }
+    return false
+  })
+  if (hit) {
+    revealPos(editor.view, hit.from)
     flashRange(editor, hit.from, hit.to)
   }
 }
