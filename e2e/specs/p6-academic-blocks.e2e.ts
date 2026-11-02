@@ -119,11 +119,11 @@ describe('P6-1: theorem-family callout blocks', () => {
     const content = await waitForSavedContent(notePath, 'Trivial by inspection.')
     expect(content).toContain('[!PROOF]')
 
-    // QED mark is a CSS ::after pseudo-element on the proof body's last
-    // child — never stored, so assert it via getComputedStyle rather than
-    // textContent.
+    // QED mark is a CSS ::after pseudo-element on the proof's last block (the
+    // body's only child is the node-view wrapper) — never stored, so assert
+    // it via getComputedStyle rather than textContent.
     const qed = await browser.execute(() => {
-      const lastChild = document.querySelector('.callout-proof .callout-body > *:last-child')
+      const lastChild = document.querySelector('.callout-proof .callout-body > * > *:last-child')
       if (!lastChild) return null
       return window.getComputedStyle(lastChild, '::after').content
     })

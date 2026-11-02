@@ -1780,7 +1780,10 @@ code {
    overlapping table content. Resizing is off (see TableMarkdown.configure in
    extensions/index.ts): column widths aren't persisted to the .md file, so a
    drag handle here would only ever be a session-local illusion of control. */
-.note-editor .tableWrapper { position: relative; overflow-x: auto; margin: 0.8em 0; padding: 22px 18px 18px 22px; }
+/* Negative side margins cancel the padding, so the table's own edge lines up
+   with the text column while the grip strips hang in the pane's side padding. */
+.note-editor .tableWrapper { position: relative; overflow-x: auto; margin: 0 -18px 0 -22px; padding: 22px 18px 18px 22px; }
+.note-embed-body .tableWrapper { margin: 0.8em 0; }
 .note-editor table {
   border-collapse: separate;
   border-spacing: 0;
@@ -2751,10 +2754,19 @@ li .fold-toggle { left: -2.4em; }
 .callout-example    { --callout-color: #6bcf7f; --callout-bg: #12240f; }
 .callout-algorithm  { --callout-color: #f472b6; --callout-bg: #2a1220; }
 
-/* Traditional QED mark closing a proof — visual only, never stored */
-.callout-proof .callout-body > :last-child::after {
+/* Traditional QED mark closing a proof — visual only, never stored. The body's
+   only child is the node-view wrapper, so the mark targets the last block
+   inside it: after a paragraph it trails the final line, after anything else
+   (display maths, a list) it closes the proof flush right on its own line. */
+.callout-proof .callout-body > :last-child > p:last-child::after {
   content: '∎';
   margin-left: 0.4em;
+  color: var(--callout-color);
+}
+.callout-proof .callout-body > :last-child:has(> :last-child:not(p))::after {
+  content: '∎';
+  display: block;
+  text-align: right;
   color: var(--callout-color);
 }
 
@@ -5948,7 +5960,7 @@ input[type='checkbox']:focus-visible {
    and column grips, neither of which exists on paper. Fixed layout plus
    anywhere-wrapping makes long inline code shrink the column instead of
    widening the table past the page. */
-:is(.print-preview-pages, #print-root) .tableWrapper { overflow: visible; padding: 0; }
+:is(.print-preview-pages, #print-root) .tableWrapper { overflow: visible; padding: 0; margin: 0.8em 0; }
 :is(.print-preview-pages, #print-root) .table-controls,
 :is(.print-preview-pages, #print-root) .table-append-col,
 :is(.print-preview-pages, #print-root) .table-append-row,
