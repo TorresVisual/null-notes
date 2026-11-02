@@ -45,3 +45,10 @@ raw
 - Watcher event reaches the app in ~0.4 s, inside the 600 ms autosave debounce, so "type, then immediately `writeFileSync` externally" reliably exercises the dirty-buffer conflict path.
 - Orphaned `tauri-driver`/`msedgedriver` pairs from older runs linger; harmless (each run uses new ports). The `null-notes.exe` processes under `Local\Null Notes\` and `target\debug` belong to the user — leave them.
 - Rename probe: wait for the new H1 in the renamed file, not just its existence — `rename_note_at` moves the file first and `write_atomic`s the rewritten content afterwards, so reading right after the rename sees pre-rewrite content.
+
+## Harness (2026-11-02)
+- Files written to the fixture in `before()` may never reach the sidebar tree (watcher not ready at launch); rewrite the file just before looking for its tree row (sleep 3 s, write, sleep 1.5 s).
+- `npm run test:e2e` fails with `failed to remove file ...debug
+ull-notes.exe` when a `tauri dev` debug exe (cmdline `target\debug
+ull-notes.exe`, no `--workspace`) is running: ask the user, then kill that exact PID.
+- Add-property can be driven without the palette: `window.dispatchEvent(new Event('command:add-property'))`, then `browser.keys` into `input[aria-label="New property name"]`.

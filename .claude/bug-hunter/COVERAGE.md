@@ -1,4 +1,6 @@
 # Coverage (newest first)
+2026-11-02 @becfc1c · properties block (Escape cancel, add to frontmatter-less note, remove last property, 10 odd keys `a: b` `#h` `---` `[z]` unicode, dup key) · clean; removing the last property leaves an empty `---
+---` shell, judged harmless
 2026-11-01 @7665eb6 · rename note with .assets sidecar + image embed, 6 stems (`_ ( ) # & ' .`, unicode, plain; note closed) · bug #175: embed not rewritten for stems with chars encodeURI leaves raw
 2026-11-01 @3534242 · watcher/conflict (clean-note reload, plain typing no false conflict, dirty-note external edit) · A/B clean, bug #174 (autosave clobbers external edit while ConflictBar shows)
 2026-11-01 @070e96b · idempotency rt^3 over 37 node/markdown cases (callout, details, div, span, mermaid, math, sr, footnote, tags, wiki, tasks, links, entities…) · stable, but bugs #172 (sr lapses), #173 (entity text), both fixed; nested callout/`<details open>`/html table flatten judged intended
