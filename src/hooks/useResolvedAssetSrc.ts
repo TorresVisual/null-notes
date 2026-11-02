@@ -28,7 +28,10 @@ export function useResolvedAssetSrc(
     api.assets
       .read(notePath, src)
       .then((base64) => {
-        if (!cancelled) setResolved(`data:image;base64,${base64}`)
+        // A bare `image` type is sniffed for raster formats only; an SVG
+        // (every diagram sidecar) needs its own type to render at all.
+        const mime = /\.svg$/i.test(src) ? 'image/svg+xml' : 'image'
+        if (!cancelled) setResolved(`data:${mime};base64,${base64}`)
       })
       .catch(() => {
         if (!cancelled) setFailed(true)

@@ -429,6 +429,7 @@ pub async fn set_cards(pool: &SqlitePool, note_path: &str, cards: &[ExtractedCar
             CardKind::Qa => "qa",
             CardKind::Cloze => "cloze",
             CardKind::Mc => "mc",
+            CardKind::Occlusion => "occlusion",
         };
         let due = card.due.clone().unwrap_or_else(sm2::today);
         let ease = card.ease.unwrap_or(2.5);

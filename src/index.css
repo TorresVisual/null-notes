@@ -6359,7 +6359,8 @@ input[type='checkbox']:focus-visible {
 .diagram-block-actions .figure-number:not(:focus-within):not(.has-value) { opacity: 0.7; }
 
 .diagram-block-edit,
-.diagram-block-copy {
+.diagram-block-copy,
+.diagram-block-occlusion {
   padding: 4px 10px;
   background: var(--bg-raised);
   border: 1px solid var(--border-strong);
@@ -6372,6 +6373,117 @@ input[type='checkbox']:focus-visible {
 .diagram-block-copy.copied {
   color: var(--accent);
   border-color: var(--accent);
+}
+
+/* Image occlusion cards. The dialog reuses .settings-panel for its chrome and
+   .settings-reset for its buttons. .occlusion-box is the card's own overlay and
+   is positioned in percentages of .note-image, which wraps the image tightly. */
+.occlusion-dialog {
+  width: min(760px, calc(100vw - 60px));
+  max-width: calc(100vw - 40px);
+}
+
+.occlusion-hint {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.occlusion-surface {
+  position: relative;
+  align-self: flex-start;
+  max-width: 100%;
+  cursor: crosshair;
+  touch-action: none;
+  user-select: none;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+
+.occlusion-surface img {
+  display: block;
+  max-width: 100%;
+  max-height: calc(100vh - 300px);
+  width: auto;
+  height: auto;
+}
+
+.occlusion-region {
+  position: absolute;
+  box-sizing: border-box;
+  padding: 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-start;
+  background: var(--accent-bg-hover);
+  border: 2px solid var(--accent);
+  cursor: pointer;
+}
+
+.occlusion-region:hover { border-color: var(--danger); }
+.occlusion-region:hover .occlusion-region-number { background: var(--danger); }
+
+/* The image behind a region is usually light, so the number sits on its own chip. */
+.occlusion-region-number {
+  padding: 0 5px;
+  background: var(--accent);
+  color: var(--accent-contrast);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 16px;
+}
+.occlusion-region--draft { border-style: dashed; pointer-events: none; }
+
+.occlusion-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-sm);
+}
+
+.occlusion-confirm { color: var(--accent); border-color: var(--accent); }
+.occlusion-confirm:disabled { opacity: 0.5; cursor: default; }
+
+.occlusion-box {
+  position: absolute;
+  box-sizing: border-box;
+  pointer-events: none;
+}
+
+.occlusion-box--occlude {
+  background: var(--bg-raised);
+  border: 2px solid var(--accent);
+}
+
+.occlusion-box--reveal {
+  border: 2px solid var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-bg-hover);
+}
+
+/* In the note, a card is just a thumbnail of its own region. */
+.note-image--occlusion img {
+  max-height: 96px;
+  width: auto;
+}
+
+.occlusion-trigger {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  padding: 2px 8px;
+  background: var(--bg-raised);
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-size: 12px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity var(--duration-base) var(--ease-standard);
+}
+
+.note-image:hover > .occlusion-trigger,
+.occlusion-trigger:focus-visible {
+  opacity: 1;
 }
 
 .diagram-editor-overlay {

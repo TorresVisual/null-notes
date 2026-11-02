@@ -16,6 +16,7 @@ vi.mock('../lib/tauri', () => ({
       gradeMcCard: vi.fn(),
       setCardSuspended: vi.fn(),
     },
+    assets: { read: vi.fn().mockResolvedValue('YmFzZTY0') },
   },
 }))
 
@@ -62,6 +63,30 @@ describe('ReviewSession', () => {
     expect(screen.getByText('Hard')).toBeInTheDocument()
     expect(screen.getByText('Good')).toBeInTheDocument()
     expect(screen.getByText('Easy')).toBeInTheDocument()
+  })
+
+  it('swaps an occlusion card from hidden region to outlined region without repeating the image', async () => {
+    const occlusion: DueCard = {
+      notePath: '/ws/d.md',
+      noteTitle: 'D',
+      workspace: '/ws',
+      kind: 'occlusion',
+      front: '![fig](a.png "occlude=0.1,0.1,0.2,0.2")',
+      back: '![fig](a.png "reveal=0.1,0.1,0.2,0.2")',
+      position: 2,
+      options: [],
+      streak: 0,
+    }
+    vi.mocked(api.notes.listDueCards).mockResolvedValue([occlusion])
+    render(<ReviewSession onClose={vi.fn()} />)
+
+    await waitFor(() => expect(screen.getByTestId('occlusion-occlude')).toBeInTheDocument())
+    expect(screen.queryByTestId('occlusion-reveal')).toBeNull()
+
+    fireEvent.click(screen.getByText('Reveal answer'))
+    await waitFor(() => expect(screen.getByTestId('occlusion-reveal')).toBeInTheDocument())
+    expect(screen.queryByTestId('occlusion-occlude')).toBeNull()
+    expect(screen.getAllByAltText('fig')).toHaveLength(1)
   })
 
   it('grades the card, re-fetches the queue, and advances to the next card', async () => {

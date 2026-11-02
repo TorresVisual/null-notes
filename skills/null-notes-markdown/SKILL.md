@@ -64,6 +64,7 @@ One card per line, authored in ordinary notes:
 - `front :: back`
 - a line with one or more `{{cloze}}` spans (all spans on a line are one card)
 - multiple choice: a `Question ::` line followed by a `- [x]` / `- [ ]` option list
+- image occlusion: a line that is only `![alt](path "occlude=x,y,w,h")`, the rectangle as 0–1 fractions of the image (left, top, width, height). The front hides that region, the back outlines it. One region per line, so a diagram with six hidden labels is six lines sharing one path, each scheduled on its own. The app writes these from the "Occlusion cards" button on an image or diagram
 
 The app writes a `<!-- sr … -->` schedule comment under a card after its first review; leave those comments alone.
 

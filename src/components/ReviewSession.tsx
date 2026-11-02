@@ -253,9 +253,13 @@ export function ReviewSession({ onClose, mode = { kind: 'due' }, onSwitchCategor
                 Suspend
               </button>
             </div>
-            <p className="review-card-front">
-              <CardText text={current.front} notePath={current.notePath} />
-            </p>
+            {/* An occlusion back is the same image with the answer outlined, so
+                keeping the front above it would show the picture twice. */}
+            {!(revealed && current.kind === 'occlusion') && (
+              <p className="review-card-front">
+                <CardText text={current.front} notePath={current.notePath} />
+              </p>
+            )}
             {current.kind === 'mc' ? (
               <>
                 <ul className="review-card-options">

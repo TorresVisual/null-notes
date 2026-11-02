@@ -7,6 +7,9 @@ import { sanitizeNoteHtml } from '../../lib/sanitizeHtml'
 import { writeToClipboard } from '../../lib/clipboard'
 import { encodeSrc } from './NoteImage'
 import { FigureNumberInput } from '../../components/FigureNumberInput'
+import { OcclusionDialog } from '../../components/OcclusionDialog'
+import { insertOcclusionCards } from '../occlusionCards'
+import type { OcclusionRect } from '../../lib/occlusion'
 
 // Dynamically imported so @excalidraw/excalidraw (a multi-MB bundle) only
 // loads once a diagram is actually opened for editing — a note that never
@@ -39,7 +42,7 @@ export function relativeToNoteDir(notePath: string, absolutePath: string): strin
   return absolutePath.slice(prefix.length).split('\\').join('/')
 }
 
-function DiagramBlockView({ node, editor, updateAttributes }: ReactNodeViewProps) {
+function DiagramBlockView({ node, editor, getPos, updateAttributes }: ReactNodeViewProps) {
   // width/height are stored (see DiagramBlockAttrs below) but intentionally
   // not applied here — the preview sizes itself to the actual exported SVG's
   // own dimensions (see .diagram-block-preview svg's max-width/height:auto
@@ -51,6 +54,15 @@ function DiagramBlockView({ node, editor, updateAttributes }: ReactNodeViewProps
   const [svg, setSvg] = useState('')
   const [editing, setEditing] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [authoring, setAuthoring] = useState(false)
+  const relativeSvg = relativeToNoteDir(notePath, svgSrc)
+
+  function createCards(rects: OcclusionRect[]) {
+    const pos = getPos()
+    if (pos === undefined || !relativeSvg) return
+    insertOcclusionCards(editor, pos + node.nodeSize, relativeSvg, 'diagram', rects)
+    setAuthoring(false)
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -110,6 +122,11 @@ function DiagramBlockView({ node, editor, updateAttributes }: ReactNodeViewProps
             {copied ? 'Copied' : 'Copy for card'}
           </button>
         )}
+        {editor.isEditable && relativeSvg && svg && (
+          <button type="button" className="diagram-block-occlusion" onClick={() => setAuthoring(true)}>
+            Occlusion cards
+          </button>
+        )}
         {editor.isEditable && <FigureNumberInput number={number} onCommit={(next) => updateAttributes({ number: next })} />}
         {editor.isEditable && (
           <button type="button" className="diagram-block-edit" aria-label="Edit diagram" onClick={() => setEditing(true)}>
@@ -117,6 +134,14 @@ function DiagramBlockView({ node, editor, updateAttributes }: ReactNodeViewProps
           </button>
         )}
       </div>
+      {authoring && relativeSvg && (
+        <OcclusionDialog
+          notePath={notePath}
+          src={relativeSvg}
+          onConfirm={createCards}
+          onClose={() => setAuthoring(false)}
+        />
+      )}
       {editing && (
         <Suspense fallback={null}>
           <DiagramEditorOverlay

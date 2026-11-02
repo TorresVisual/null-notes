@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Node, mergeAttributes } from '@tiptap/core'
 import type { Editor } from '@tiptap/core'
 import { Plugin } from '@tiptap/pm/state'
@@ -7,6 +8,11 @@ import type { ReactNodeViewProps } from '@tiptap/react'
 import { api } from '../../lib/tauri'
 import { useResolvedAssetSrc } from '../../hooks/useResolvedAssetSrc'
 import { FigureNumberInput } from '../../components/FigureNumberInput'
+import { OcclusionBox } from '../../components/OcclusionBox'
+import { OcclusionDialog } from '../../components/OcclusionDialog'
+import { parseOcclusionTitle } from '../../lib/occlusion'
+import type { OcclusionRect } from '../../lib/occlusion'
+import { insertOcclusionCards } from '../occlusionCards'
 
 interface NoteImageAttrs {
   src: string
@@ -40,18 +46,54 @@ export function decodeSrc(src: string): string {
   }
 }
 
-function NoteImageView({ node, editor, updateAttributes }: ReactNodeViewProps) {
+function NoteImageView({ node, editor, getPos, updateAttributes }: ReactNodeViewProps) {
   const { src, alt, title, number } = node.attrs as unknown as NoteImageAttrs
   const notePath = editor.storage.noteContext.notePath
   const { resolved, failed } = useResolvedAssetSrc(notePath, src)
+  const [authoring, setAuthoring] = useState(false)
+  // An occlusion card is itself an image line; it shows its own region and is
+  // not a source to author further cards from.
+  const mark = parseOcclusionTitle(title)
+
+  function createCards(rects: OcclusionRect[]) {
+    const pos = getPos()
+    if (pos === undefined) return
+    insertOcclusionCards(editor, editor.state.doc.resolve(pos).after(), src, alt ?? '', rects)
+    setAuthoring(false)
+  }
 
   return (
-    <NodeViewWrapper as="span" className="note-image" data-number={number ?? undefined}>
+    <NodeViewWrapper
+      as="span"
+      className={`note-image${mark ? ' note-image--occlusion' : ''}`}
+      data-number={number ?? undefined}
+    >
       {resolved && <img src={resolved} alt={alt ?? ''} title={title ?? undefined} />}
+      {resolved && mark && <OcclusionBox mark={mark} />}
       {/* Same posture as an unresolved wiki-link: say the target is missing
           rather than rendering a broken box the user can't interpret. */}
       {failed && <span className="note-image-missing">Missing image: {src}</span>}
-      {editor.isEditable && <FigureNumberInput number={number} onCommit={(next) => updateAttributes({ number: next })} />}
+      {editor.isEditable && !mark && (
+        <FigureNumberInput number={number} onCommit={(next) => updateAttributes({ number: next })} />
+      )}
+      {editor.isEditable && !mark && resolved && (
+        <button
+          type="button"
+          className="occlusion-trigger"
+          contentEditable={false}
+          onClick={() => setAuthoring(true)}
+        >
+          Occlusion cards
+        </button>
+      )}
+      {authoring && (
+        <OcclusionDialog
+          notePath={notePath}
+          src={src}
+          onConfirm={createCards}
+          onClose={() => setAuthoring(false)}
+        />
+      )}
     </NodeViewWrapper>
   )
 }

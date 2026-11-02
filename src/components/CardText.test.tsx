@@ -47,6 +47,37 @@ describe('CardText', () => {
     await waitFor(() => expect(screen.getByText(/Missing image/)).toBeInTheDocument())
   })
 
+  it('hides the region on an occlusion front and outlines it on the back', async () => {
+    vi.mocked(api.assets.read).mockResolvedValue('YmFzZTY0')
+    const front = render(
+      <CardText text={'![fig](Note.assets/a.png "occlude=0.1,0.2,0.3,0.4")'} notePath="/ws/a.md" />,
+    )
+    await waitFor(() => expect(screen.getByAltText('fig')).toBeInTheDocument())
+    expect(api.assets.read).toHaveBeenCalledWith('/ws/a.md', 'Note.assets/a.png')
+    const hidden = screen.getByTestId('occlusion-occlude')
+    expect(hidden).toHaveStyle({ left: '10%', top: '20%', width: '30%', height: '40%' })
+    expect(screen.queryByTestId('occlusion-reveal')).toBeNull()
+    front.unmount()
+
+    render(<CardText text={'![fig](Note.assets/a.png "reveal=0.1,0.2,0.3,0.4")'} notePath="/ws/a.md" />)
+    await waitFor(() => expect(screen.getByTestId('occlusion-reveal')).toBeInTheDocument())
+    expect(screen.queryByTestId('occlusion-occlude')).toBeNull()
+  })
+
+  it('gives an svg diagram its own image type so it renders', async () => {
+    vi.mocked(api.assets.read).mockResolvedValue('PHN2Zy8+')
+    render(<CardText text="![diagram](Note.diagrams/d.svg)" notePath="/ws/a.md" />)
+    await waitFor(() => expect(screen.getByAltText('diagram')).toBeInTheDocument())
+    expect(screen.getByAltText('diagram')).toHaveAttribute('src', 'data:image/svg+xml;base64,PHN2Zy8+')
+  })
+
+  it('renders an image with an ordinary title and no overlay', async () => {
+    vi.mocked(api.assets.read).mockResolvedValue('YmFzZTY0')
+    const { container } = render(<CardText text={'![fig](Note.assets/a.png "a title")'} notePath="/ws/a.md" />)
+    await waitFor(() => expect(screen.getByAltText('fig')).toBeInTheDocument())
+    expect(container.querySelector('.occlusion-box')).toBeNull()
+  })
+
   it('renders inline math through KaTeX', () => {
     const { container } = render(<CardText text="Compute $\\int_0^1 x^2\\,dx$ to proceed" notePath="/ws/a.md" />)
     expect(screen.getByText(/Compute/)).toBeInTheDocument()

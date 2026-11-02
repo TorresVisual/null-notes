@@ -373,6 +373,7 @@ pub enum CardKind {
     Qa,
     Cloze,
     Mc,
+    Occlusion,
 }
 
 /// A review card extracted from a note's raw markdown (P9-3), mirroring how

@@ -2,20 +2,25 @@ import type { ReactNode } from 'react'
 import { useResolvedAssetSrc } from '../hooks/useResolvedAssetSrc'
 import { decodeSrc } from '../editor/extensions/NoteImage'
 import { renderMath } from '../lib/mathRender'
+import { parseOcclusionTitle } from '../lib/occlusion'
+import { OcclusionBox } from './OcclusionBox'
 
-const TOKEN_RE = /!\[([^\]]*)\]\(([^)]+)\)|\$\$([\s\S]+?)\$\$|\$([^$\n]+?)\$/g
+const TOKEN_RE = /!\[([^\]]*)\]\(([^)]+?)(?:\s+"([^"]*)")?\)|\$\$([\s\S]+?)\$\$|\$([^$\n]+?)\$/g
 
 interface CardImageProps {
   notePath: string
   alt: string
   src: string
+  title: string | undefined
 }
 
-function CardImage({ notePath, alt, src }: CardImageProps) {
+function CardImage({ notePath, alt, src, title }: CardImageProps) {
   const { resolved, failed } = useResolvedAssetSrc(notePath, src)
+  const mark = parseOcclusionTitle(title)
   return (
     <span className="note-image">
       {resolved && <img src={resolved} alt={alt} />}
+      {resolved && mark && <OcclusionBox mark={mark} />}
       {failed && <span className="note-image-missing">Missing image: {src}</span>}
     </span>
   )
@@ -57,12 +62,18 @@ export function CardText({ text, notePath }: CardTextProps) {
     if (match.index > lastIndex) parts.push(text.slice(lastIndex, match.index))
     if (match[1] !== undefined && match[2] !== undefined) {
       parts.push(
-        <CardImage key={match.index} notePath={notePath} alt={match[1]} src={decodeSrc(match[2])} />,
+        <CardImage
+          key={match.index}
+          notePath={notePath}
+          alt={match[1]}
+          src={decodeSrc(match[2])}
+          title={match[3]}
+        />,
       )
-    } else if (match[3] !== undefined) {
-      parts.push(<CardMath key={match.index} latex={match[3]} displayMode={true} />)
     } else if (match[4] !== undefined) {
-      parts.push(<CardMath key={match.index} latex={match[4]} displayMode={false} />)
+      parts.push(<CardMath key={match.index} latex={match[4]} displayMode={true} />)
+    } else if (match[5] !== undefined) {
+      parts.push(<CardMath key={match.index} latex={match[5]} displayMode={false} />)
     }
     lastIndex = match.index + match[0].length
   }

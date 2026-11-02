@@ -689,14 +689,44 @@ fn mc_option_line_positions(content: &str) -> HashSet<usize> {
     positions
 }
 
+// An image-occlusion card is one whole line, `![alt](src "occlude=x,y,w,h")`
+// with the rectangle as 0-1 fractions of the image. The back is the same image
+// with the region outlined (`reveal=`) instead of hidden. Each hidden region of
+// a diagram is its own line with its own schedule comment, so a region's
+// identity is the same line-plus-comment pair every other card has. A
+// rectangle that is not a real region is not a card, so a mangled title
+// degrades to an ordinary image.
+fn parse_occlusion_line(trimmed: &str) -> Option<(String, String)> {
+    let re = Regex::new(r#"^!\[(.*)\]\((.+?)\s+"occlude=([^",]+(?:,[^",]+){3})"\)$"#).ok()?;
+    let caps = re.captures(trimmed)?;
+    let rect: Vec<f64> = caps[3]
+        .split(',')
+        .map(str::parse)
+        .collect::<Result<_, _>>()
+        .ok()?;
+    let [x, y, w, h] = rect[..] else {
+        return None;
+    };
+    let within = |start: f64, len: f64| start >= 0.0 && len > 0.0 && start + len <= 1.0 + 1e-6;
+    if !within(x, w) || !within(y, h) {
+        return None;
+    }
+    let back = format!(r#"![{}]({} "reveal={}")"#, &caps[1], &caps[2], &caps[3]);
+    Some((trimmed.to_string(), back))
+}
+
 // Q::A checked first; a line matching both forms (rare — a "::" pair inside
 // a {{cloze}} span) reads as Q::A, which is the more explicit authoring
 // intent. One card per line, matching every other extractor in this file:
 // all {{}} spans on a cloze line reveal together as a single card, not
-// Anki-style per-span sub-cards.
+// Anki-style per-span sub-cards. An occlusion line is checked before both,
+// because its alt text is free text that may contain either form.
 fn classify_card_line(trimmed: &str) -> Option<(CardKind, String, String)> {
     if trimmed.is_empty() || trimmed.starts_with("<!--") {
         return None;
+    }
+    if let Some((front, back)) = parse_occlusion_line(trimmed) {
+        return Some((CardKind::Occlusion, front, back));
     }
     let qa_re = Regex::new(r"^(.+?)\s::\s(.+)$").ok()?;
     if let Some(caps) = qa_re.captures(trimmed) {
@@ -3149,6 +3179,79 @@ mod tests {
         assert_eq!(cards[0].back, "O(log n)");
         assert_eq!(cards[0].position, 2);
         assert_eq!(cards[0].due, None);
+    }
+
+    const OCCLUSION_NOTE: &str = concat!(
+        "![Pipeline](Lecture%207.assets/p.png)\n",
+        "\n",
+        "![Pipeline](Lecture%207.assets/p.png \"occlude=0.1,0.2,0.3,0.1\")\n",
+        "<!-- sr due=2026-08-21 ease=2.50 interval=6 reps=2 -->\n",
+        "![Pipeline](Lecture%207.assets/p.png \"occlude=0.5,0.5,0.25,0.25\")\n",
+    );
+
+    #[test]
+    fn test_extract_cards_finds_one_occlusion_card_per_region() {
+        let cards = extract_cards(OCCLUSION_NOTE);
+        assert_eq!(cards.len(), 2);
+        assert!(cards.iter().all(|c| c.kind == CardKind::Occlusion));
+        assert_eq!(cards[0].position, 2);
+        assert_eq!(cards[1].position, 4);
+        assert_eq!(
+            cards[0].front,
+            "![Pipeline](Lecture%207.assets/p.png \"occlude=0.1,0.2,0.3,0.1\")"
+        );
+        assert_eq!(
+            cards[0].back,
+            "![Pipeline](Lecture%207.assets/p.png \"reveal=0.1,0.2,0.3,0.1\")"
+        );
+        assert_eq!(cards[0].due.as_deref(), Some("2026-08-21"));
+        assert_eq!(cards[1].due, None);
+    }
+
+    #[test]
+    fn test_extract_cards_occlusion_alt_text_cannot_make_it_another_kind() {
+        let cards = extract_cards("![a :: b {{c}}](x.png \"occlude=0,0,0.5,0.5\")\n");
+        assert_eq!(cards.len(), 1);
+        assert_eq!(cards[0].kind, CardKind::Occlusion);
+    }
+
+    #[test]
+    fn test_extract_cards_ignores_images_that_are_not_valid_occlusions() {
+        let content = [
+            "![a](x.png)",
+            "![a](x.png \"a title\")",
+            "![a](x.png \"occlude=0.8,0.1,0.4,0.1\")",
+            "![a](x.png \"occlude=0.1,0.1,0,0.1\")",
+            "![a](x.png \"occlude=-0.1,0.1,0.2,0.1\")",
+            "![a](x.png \"occlude=0.1,0.1,0.2\")",
+            "![a](x.png \"occlude=a,b,c,d\")",
+            "text ![a](x.png \"occlude=0.1,0.1,0.2,0.1\")",
+        ]
+        .join("\n");
+        assert!(extract_cards(&content).is_empty());
+    }
+
+    #[test]
+    fn test_grade_card_line_schedules_each_occlusion_region_independently() {
+        let result = grade_card_line(OCCLUSION_NOTE, 4, sm2::Grade::Good, grade_today()).unwrap();
+        let cards = extract_cards(&result);
+        assert_eq!(cards[0].due.as_deref(), Some("2026-08-21"));
+        assert_eq!(cards[0].reps, Some(2));
+        assert_eq!(cards[1].due.as_deref(), Some("2026-08-21"));
+        assert_eq!(cards[1].reps, Some(1));
+        assert_eq!(result.matches("<!-- sr ").count(), 2);
+    }
+
+    #[test]
+    fn test_occlusion_schedules_follow_their_lines_when_reordered() {
+        let graded = grade_card_line(OCCLUSION_NOTE, 4, sm2::Grade::Good, grade_today()).unwrap();
+        let lines: Vec<&str> = graded.lines().collect();
+        let reordered = format!("{}\n{}\n{}\n{}\n", lines[4], lines[5], lines[2], lines[3]);
+        let cards = extract_cards(&reordered);
+        assert_eq!(cards[0].reps, Some(1));
+        assert!(cards[0].front.contains("0.5,0.5,0.25,0.25"));
+        assert_eq!(cards[1].reps, Some(2));
+        assert!(cards[1].front.contains("0.1,0.2,0.3,0.1"));
     }
 
     #[test]
