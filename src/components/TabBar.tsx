@@ -1,6 +1,5 @@
 import { useState, type KeyboardEvent } from 'react'
 import { ChevronLeft, ChevronRight, Pin, RefreshCw, X } from 'lucide-react'
-import { ViewModeToggle } from './ViewModeToggle'
 import { useWorkspaceStore } from '../store/workspace'
 import { useNotesStore, noteTitle } from '../store/notes'
 import { requestCloseTab } from '../lib/requestCloseTab'
@@ -174,7 +173,13 @@ export function TabBar({
               Auto-commit off
             </span>
           )}
-          <ViewModeToggle viewMode={viewMode} onToggle={onToggleView} />
+          <button
+            className={`view-toggle${viewMode === 'raw' ? ' active' : ''}`}
+            onClick={onToggleView}
+            title={viewMode === 'wysiwyg' ? 'View source' : 'View preview'}
+          >
+            {viewMode === 'wysiwyg' ? 'Source' : 'Preview'}
+          </button>
         </div>
       )}
     </div>

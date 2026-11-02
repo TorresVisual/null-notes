@@ -7,7 +7,6 @@ import { RawEditor } from '../editor/RawEditor'
 import { BacklinksPanel } from './BacklinksPanel'
 import { NoteHistoryPanel } from './NoteHistoryPanel'
 import { ConflictBar } from './ConflictBar'
-import { ViewModeToggle } from './ViewModeToggle'
 import { PropertiesBlock } from './PropertiesBlock'
 import { LoadingStatus } from './LoadingStatus'
 import { WorkspacePicker } from './WorkspacePicker'
@@ -90,10 +89,13 @@ export const EditorPane = forwardRef<HTMLDivElement, EditorPaneProps>(function E
       {conflict && <ConflictBar noteName={currentNote?.title} onKeepMine={onKeepMine} onReloadTheirs={onReloadTheirs} />}
       {onClose && (
         <div className="editor-pane-header">
-          <ViewModeToggle
-            viewMode={viewMode}
-            onToggle={() => onViewModeChange(viewMode === 'wysiwyg' ? 'raw' : 'wysiwyg')}
-          />
+          <button
+            className={`view-toggle${viewMode === 'raw' ? ' active' : ''}`}
+            onClick={() => onViewModeChange(viewMode === 'wysiwyg' ? 'raw' : 'wysiwyg')}
+            title={viewMode === 'wysiwyg' ? 'View source' : 'View preview'}
+          >
+            {viewMode === 'wysiwyg' ? 'Source' : 'Preview'}
+          </button>
           <button className="pane-close" onClick={onClose} aria-label="Close split pane">
             <X size={12} />
           </button>
