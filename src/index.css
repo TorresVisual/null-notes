@@ -2661,7 +2661,6 @@ li .fold-toggle { left: -2.4em; }
   gap: 14px;
   margin-top: auto;
   padding: 10px 0 2px;
-  border-top: 1px solid var(--border);
   color: var(--text-tertiary);
   font-family: var(--font-mono);
   font-size: 11px;
