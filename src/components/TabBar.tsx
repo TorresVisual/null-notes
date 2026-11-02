@@ -3,7 +3,7 @@ import { ChevronLeft, ChevronRight, Pin, RefreshCw, X } from 'lucide-react'
 import { useWorkspaceStore } from '../store/workspace'
 import { useNotesStore, noteTitle } from '../store/notes'
 import { requestCloseTab } from '../lib/requestCloseTab'
-import { noteFolderSegments } from '../lib/pathPrefix'
+import { folderName, isUnderPath, noteFolderSegments } from '../lib/pathPrefix'
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuTrigger } from './ui/context-menu'
 import { NoteContextMenuItems } from './NoteContextMenuItems'
 import { SaveStatus } from './SaveStatus'
@@ -60,7 +60,10 @@ export function TabBar({
   const { canGoBack, canGoForward } = useNavigationHistoryStore()
   const [draggedPath, setDraggedPath] = useState<string | null>(null)
   if (openTabs.length === 0) return null
-  const folders = activeTab ? noteFolderSegments(activeTab, workspacePath) : []
+  const trail =
+    activeTab && workspacePath && isUnderPath(activeTab, workspacePath)
+      ? [folderName(workspacePath), ...noteFolderSegments(activeTab, workspacePath)]
+      : []
   return (
     <>
     <div className="tab-bar">
@@ -135,9 +138,9 @@ export function TabBar({
           <ChevronRight size={16} />
         </button>
       </div>
-      {folders.length > 0 && (
+      {trail.length > 0 && (
         <nav className="breadcrumb" aria-label="Note location">
-          {folders.map((segment, i) => (
+          {trail.map((segment, i) => (
             <span key={i}>
               {i > 0 && <span className="breadcrumb-sep" aria-hidden>/</span>}
               {segment}

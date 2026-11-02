@@ -3556,9 +3556,12 @@ li .fold-toggle { left: -2.4em; }
 .tree-note .tree-label { padding-left: 4px; }
 .tree-folder .tree-label { font-weight: 600; }
 
+/* Note rows reach 32px through their action buttons; folders have none. */
+@media (hover: hover) { .tree-folder { min-height: 32px; } }
+
 /* Traces a folder's nesting down through its children, offset to sit under
    that folder's own chevron rather than the tree's left edge. */
-.tree-guide { border-left: 1px solid var(--border); }
+.tree-guide { border-left: 1px solid var(--border); margin-top: 0; }
 
 /* A folder's children arrive as a short drop from the row that opened them —
    direction says where they came from. Entrance only, like surface-in: the
