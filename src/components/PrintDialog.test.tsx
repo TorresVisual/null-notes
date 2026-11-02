@@ -80,7 +80,7 @@ describe('PrintDialog', () => {
     await screen.findByRole('combobox')
     await user.click(screen.getByRole('button', { name: 'Print' }))
 
-    await waitFor(() => expect(showToast).toHaveBeenCalledWith('printer offline'))
+    await waitFor(() => expect(showToast).toHaveBeenCalledWith("Couldn't print: printer offline"))
   })
 
   it('disables Print while the preview is rendering, even with a printer selected', async () => {

@@ -71,7 +71,7 @@ export function useBase(path: string) {
       .catch((e: unknown) => {
         if (cancelled) return
         blocked.current = true
-        setError(`Could not open base: ${String(e)}`)
+        setError(`Couldn't open base: ${String(e)}`)
       })
     return () => {
       cancelled = true

@@ -8,6 +8,7 @@ import { CloneWorkspaceDialog } from './CloneWorkspaceDialog'
 import { isMobile } from '../lib/platform'
 import { setStoredGitToken } from '../lib/gitCredentials'
 import { api } from '../lib/tauri'
+import { failure } from '../lib/failure'
 import { showToast } from '../store/toast'
 
 export function WorkspacePicker() {
@@ -29,7 +30,7 @@ export function WorkspacePicker() {
       const clonedPath = await api.git.cloneRepo(onboardUrl, parentDir)
       await openWorkspaceAt(clonedPath)
     } catch (err) {
-      showToast(err instanceof Error ? err.message : String(err))
+      showToast(failure('clone the repository', err))
       setOnboarding(false)
     }
   }

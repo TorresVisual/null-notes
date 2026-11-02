@@ -106,7 +106,7 @@ export function useCanvas(path: string) {
         setBuffer(parsed.canvas)
       })
       .catch((e: unknown) => {
-        if (!cancelled) blockWith(`Could not open canvas: ${String(e)}`)
+        if (!cancelled) blockWith(`Couldn't open canvas: ${String(e)}`)
       })
     return () => {
       cancelled = true

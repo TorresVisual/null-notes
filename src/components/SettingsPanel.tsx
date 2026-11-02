@@ -5,6 +5,7 @@ import { useSettingsStore, DEFAULT_SETTINGS } from '../store/settings'
 import { useWorkspaceStore } from '../store/workspace'
 import { useGitConfig } from '../hooks/useGitConfig'
 import { api } from '../lib/tauri'
+import { failure } from '../lib/failure'
 import { Dialog, DialogContent, DialogTitle } from './ui/dialog'
 import { AboutSettings } from './AboutSettings'
 import { ErrorLogDialog } from './ErrorLogDialog'
@@ -55,7 +56,7 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
       await api.settings.save(next)
       setError(null)
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
+      setError(failure('save settings', e))
     }
   }
 

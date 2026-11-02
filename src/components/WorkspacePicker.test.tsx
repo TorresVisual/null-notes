@@ -107,7 +107,7 @@ describe('WorkspacePicker on mobile', () => {
     await user.type(screen.getByLabelText('Personal access token'), 'ghp_bad')
     await user.click(screen.getByRole('button', { name: /Clone workspace/ }))
 
-    expect(showToast).toHaveBeenCalledWith('authentication failed')
+    expect(showToast).toHaveBeenCalledWith("Couldn't clone the repository: authentication failed")
   })
 })
 

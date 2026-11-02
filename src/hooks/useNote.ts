@@ -56,7 +56,7 @@ export function useNote(path: string | null) {
     api.notes
       .open(workspacePath, path)
       .then(setContentAndRef)
-      .catch((e: unknown) => setSaveError(`Could not open note: ${String(e)}`))
+      .catch((e: unknown) => setSaveError(`Couldn't open note: ${String(e)}`))
       .finally(() => setIsLoading(false))
   }, [path, workspacePath, setContentAndRef])
 

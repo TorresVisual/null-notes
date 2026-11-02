@@ -107,6 +107,6 @@ describe('ExportPdfDialog', () => {
     await user.click(screen.getByRole('button', { name: /Choose Location & Export/ }))
 
     expect(await screen.findByRole('button', { name: /Choose Location & Export/ })).not.toBeDisabled()
-    expect(showToast).toHaveBeenCalledWith('printer offline')
+    expect(showToast).toHaveBeenCalledWith("Couldn't export the PDF: printer offline")
   })
 })

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Pencil, X } from 'lucide-react'
 import { LoadingStatus } from './LoadingStatus'
 import { api } from '../lib/tauri'
+import { failure } from '../lib/failure'
 import { useWorkspaceStore } from '../store/workspace'
 import { promptText } from '../store/promptDialog'
 import { groupCardsByNote, groupCardsByStreak } from '../lib/cardGroups'
@@ -107,7 +108,7 @@ export function DeckView({ onClose, onOpenCram }: DeckViewProps) {
       const refreshed = await api.notes.listAllCards(workspacePath)
       setCards(refreshed)
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err))
+      setError(failure('rename the tag', err))
     }
   }
 
@@ -121,7 +122,7 @@ export function DeckView({ onClose, onOpenCram }: DeckViewProps) {
       const refreshed = await api.notes.listAllCards(workspacePath)
       setCards(refreshed)
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err))
+      setError(failure('update the card', err))
     }
   }
 

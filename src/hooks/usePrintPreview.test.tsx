@@ -162,7 +162,7 @@ describe('usePrintPreview', () => {
     let latest: ReturnType<typeof usePrintPreview> | undefined
     render(<Harness contentEl={makeContentEl()} noteTitle="Lecture 7" onResult={(r) => { latest = r }} />)
 
-    await waitFor(() => expect(latest?.error).toBe('paged.js exploded'))
+    await waitFor(() => expect(latest?.error).toBe("Couldn't prepare the print preview: paged.js exploded"))
     expect(latest?.isRendering).toBe(false)
   })
 })

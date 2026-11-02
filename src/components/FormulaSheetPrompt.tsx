@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { X } from 'lucide-react'
 import { api } from '../lib/tauri'
+import { failure } from '../lib/failure'
 import { useWorkspaceStore } from '../store/workspace'
 import { useNotesStore } from '../store/notes'
 import { parseSearchQuery } from '../lib/searchQuery'
@@ -33,7 +34,7 @@ export function FormulaSheetPrompt({ onClose }: FormulaSheetPromptProps) {
       openTab(meta.path)
       onClose()
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
+      setError(failure('generate the formula sheet', e))
       setIsGenerating(false)
     }
   }

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { X } from 'lucide-react'
 import { confirm } from '@tauri-apps/plugin-dialog'
 import { api } from '../lib/tauri'
+import { failure } from '../lib/failure'
 import { useWorkspaceStore } from '../store/workspace'
 import { restoreFromTrash } from '../hooks/useTrash'
 import type { TrashEntry } from '../types'
@@ -25,7 +26,7 @@ export function TrashDialog({ onClose }: TrashDialogProps) {
       await action()
       setError(null)
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err))
+      setError(failure('update the trash', err))
     }
   }
 

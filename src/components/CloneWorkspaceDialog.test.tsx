@@ -116,7 +116,7 @@ describe('CloneWorkspaceDialog', () => {
     await user.click(await screen.findByText('me/DSA-Notes'))
 
     expect(await screen.findByText('me/DSA-Notes')).toBeInTheDocument()
-    expect(showToast).toHaveBeenCalledWith('git clone failed')
+    expect(showToast).toHaveBeenCalledWith("Couldn't clone the repository: git clone failed")
     expect(onClose).not.toHaveBeenCalled()
   })
 })

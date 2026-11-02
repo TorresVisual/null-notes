@@ -1,4 +1,5 @@
 import { api } from '../lib/tauri'
+import { failure } from '../lib/failure'
 import { sidecarDir } from '../lib/pathPrefix'
 import { useWorkspaceStore } from '../store/workspace'
 import { showToast } from '../store/toast'
@@ -24,7 +25,7 @@ export function offerUndoDelete(workspace: string, entry: TrashEntry): void {
     label: 'Undo',
     onClick: () => {
       restoreFromTrash(workspace, entry).catch((err) =>
-        showToast(err instanceof Error ? err.message : String(err)),
+        showToast(failure(`restore "${entry.name}"`, err)),
       )
     },
   })

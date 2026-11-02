@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import type { RefObject } from 'react'
 import { X } from 'lucide-react'
 import { api } from '../lib/tauri'
+import { failure } from '../lib/failure'
 import { showToast } from '../store/toast'
 import { usePrintPreview } from '../hooks/usePrintPreview'
 import { Dialog, DialogContent, DialogTitle } from './ui/dialog'
@@ -49,7 +50,7 @@ export function PrintDialog({ noteTitle, contentRef, onClose }: PrintDialogProps
       showToast('Sent to printer')
       onClose()
     } catch (e) {
-      showToast(e instanceof Error ? e.message : String(e))
+      showToast(failure('print', e))
     } finally {
       setIsPrinting(false)
     }

@@ -2,6 +2,7 @@ import type { Editor } from '@tiptap/core'
 import type { Node as ProseMirrorNode } from '@tiptap/pm/model'
 import { message } from '@tauri-apps/plugin-dialog'
 import { api } from '../lib/tauri'
+import { failure } from '../lib/failure'
 import { queueGitPaths } from '../lib/noteActions'
 import { refreshTree } from '../hooks/useWorkspace'
 import { promptText } from '../store/promptDialog'
@@ -65,7 +66,7 @@ export async function extractSelection(editor: Editor, notePath: string, workspa
       api.notes
         .delete(workspace, created.path)
         .then(() => refreshTree())
-        .catch((err) => showToast(err instanceof Error ? err.message : String(err)))
+        .catch((err) => showToast(failure('undo the extract', err)))
     },
   })
 }

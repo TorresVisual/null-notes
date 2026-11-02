@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import type { RefObject } from 'react'
 import { Previewer } from 'pagedjs'
 import { buildPageCss, formatPrintDate } from '../lib/printPreviewCss'
+import { failure } from '../lib/failure'
 import { markPageBreaks, teardown, withPrintMount } from '../lib/printMount'
 
 /** Paged.js keeps a placeholder copy of the top-level node's own tag/class
@@ -149,7 +150,7 @@ export function usePrintPreview(
         .catch((e: unknown) => {
           if (cancelled) return
           setIsRendering(false)
-          setError(e instanceof Error ? e.message : String(e))
+          setError(failure('prepare the print preview', e))
         })
     }, RERENDER_DEBOUNCE_MS)
 

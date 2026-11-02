@@ -40,7 +40,7 @@ export const useBookmarksStore = create<BookmarksStore>((set, get) => {
         const sep = workspace.includes('\\') ? '\\' : '/'
         useWorkspaceStore.getState().addGitPendingPath(`${workspace}${sep}.bookmarks`)
       })
-      .catch(() => showToast('Could not save bookmarks'))
+      .catch(() => showToast("Couldn't save bookmarks"))
   }
 
   async function read() {

@@ -8,6 +8,7 @@ import { createDefaults } from '../lib/baseDefaults'
 import { runView } from '../lib/baseQuery'
 import { workspaceFilePath } from '../lib/canvasPath'
 import { api } from '../lib/tauri'
+import { failure } from '../lib/failure'
 import { promptText } from '../store/promptDialog'
 import { useBaseRowsStore } from '../store/baseRows'
 import { showToast } from '../store/toast'
@@ -62,7 +63,7 @@ export function BasePane({ path, embedded = false, thisPath }: BasePaneProps) {
       await useBaseRowsStore.getState().reload()
       openTab(note.path)
     } catch (e) {
-      showToast(e instanceof Error ? e.message : String(e))
+      showToast(failure('create the note', e))
     }
   }
 

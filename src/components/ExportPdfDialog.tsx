@@ -3,6 +3,7 @@ import type { RefObject } from 'react'
 import { X } from 'lucide-react'
 import { save } from '@tauri-apps/plugin-dialog'
 import { api } from '../lib/tauri'
+import { failure } from '../lib/failure'
 import { showToast } from '../store/toast'
 import { usePrintPreview } from '../hooks/usePrintPreview'
 import { Dialog, DialogContent, DialogTitle } from './ui/dialog'
@@ -49,7 +50,7 @@ export function ExportPdfDialog({ noteTitle, contentRef, onClose }: ExportPdfDia
       showToast(`Exported "${noteTitle}.pdf"`)
       onClose()
     } catch (e) {
-      showToast(e instanceof Error ? e.message : String(e))
+      showToast(failure('export the PDF', e))
     } finally {
       setIsExporting(false)
     }

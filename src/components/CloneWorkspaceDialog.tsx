@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { open } from '@tauri-apps/plugin-dialog'
 import { GitBranch, Lock } from 'lucide-react'
 import { api } from '../lib/tauri'
+import { failure } from '../lib/failure'
 import { useWorkspace } from '../hooks/useWorkspace'
 import { showToast } from '../store/toast'
 import type { GithubRepo } from '../types'
@@ -52,7 +53,7 @@ export function CloneWorkspaceDialog({ onClose }: CloneWorkspaceDialogProps) {
       onClose()
       await openWorkspaceAt(clonedPath)
     } catch (e) {
-      showToast(e instanceof Error ? e.message : String(e))
+      showToast(failure('clone the repository', e))
       setCloning(false)
     }
   }
