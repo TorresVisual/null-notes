@@ -9,6 +9,8 @@ import { nextTaskLabel } from '../../lib/taskScaffold'
 import { nextFootnoteLabel } from '../../lib/footnotes'
 import { splitIntoTasks, addNextTask, report, markdownOf } from '../splitIntoTasks'
 import { MERMAID_TEMPLATES } from '../../lib/mermaidTemplates'
+import { DIAGRAM_TEMPLATES } from '../../lib/diagramTemplates'
+import { insertDiagram } from '../toolbar/insertDiagram'
 import { insertInk } from '../toolbar/insertInk'
 
 interface Cmd {
@@ -116,6 +118,14 @@ const COMMANDS: Cmd[] = [
         .deleteRange(range)
         .insertContent({ type: 'mermaidBlock', attrs: { code: template.code } })
         .run(),
+  })),
+  ...DIAGRAM_TEMPLATES.map((template) => ({
+    title: template.title,
+    description: template.description,
+    run: ({ editor, range }: { editor: Editor; range: Range }) => {
+      editor.chain().focus().deleteRange(range).run()
+      void insertDiagram(editor, editor.storage.noteContext.notePath, template).catch(report)
+    },
   })),
   ...CALLOUT_TYPES.map(calloutCommand),
   {
