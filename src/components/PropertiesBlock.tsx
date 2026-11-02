@@ -59,7 +59,7 @@ export function PropertiesBlock({ content, onSave, listenForAddCommand = false }
   if (entries.length === 0 && !adding && !editError) return null
 
   return (
-    <div className="properties-block">
+    <div className={`properties-block${entries.length > 0 && !expanded && !adding ? ' collapsed' : ''}`}>
       {entries.length > 0 && (
         <button className="properties-toggle" aria-expanded={expanded} onClick={() => setOpen(!expanded)}>
           <ChevronRight size={12} className={`properties-chevron${expanded ? ' open' : ''}`} />
