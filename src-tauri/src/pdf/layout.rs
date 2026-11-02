@@ -289,6 +289,11 @@ const TABLE_MIN_FILL_RATIO: f32 = 0.5;
 // measure ~43%/50% — see
 // docs/specs/pdf-table-fraction-maths-guards-design.md.
 const TABLE_MATHS_GUARD_RATIO: f32 = 0.4;
+// A first-column cell this long and this maths-covered is an equation, not a
+// row label (labels like "(a)" or "f(x)" are well under 8 printing glyphs).
+// Ue1.pdf Beispiel 1.5's sums are 16+ glyphs and fully covered.
+const TABLE_EQUATION_CELL_MIN_CHARS: usize = 8;
+const TABLE_EQUATION_CELL_RATIO: f32 = 0.9;
 // A vertical gap this many times a row's own font size marks it as
 // detached from its neighbor — clearly more than an ordinary paragraph
 // break (`BLOCK_GAP_RATIO`, 1.5x), the way a page's margin always is.
@@ -1078,6 +1083,35 @@ fn maths_coverage_ratio(rows: &[Vec<CharBox>]) -> f32 {
     }
 }
 
+/// Whether every row's first cell is a long, wholly-maths expression — a
+/// column of stacked display equations each followed by a prose remark
+/// (Ue1.pdf Beispiel 1.5), which lines up into gutters like a table but
+/// isn't one. Table labels and row headers ("(a)", "f(x)") are short; rows
+/// with an empty first cell (wrapped continuations) are skipped.
+fn first_column_is_equations(
+    consumed_rows: &[usize],
+    rows: &[Vec<(usize, CharBox)>],
+    cut_xs: &[f32],
+) -> bool {
+    let firsts: Vec<Vec<CharBox>> = consumed_rows
+        .iter()
+        .map(|&i| {
+            split_row_into_cells(&rows[i], cut_xs)
+                .swap_remove(0)
+                .into_iter()
+                .map(|(_, c)| c)
+                .filter(|c| !c.ch.is_whitespace())
+                .collect::<Vec<_>>()
+        })
+        .filter(|cell| !cell.is_empty())
+        .collect();
+    !firsts.is_empty()
+        && firsts.iter().all(|cell| {
+            cell.len() >= TABLE_EQUATION_CELL_MIN_CHARS
+                && maths_coverage_ratio(std::slice::from_ref(cell)) >= TABLE_EQUATION_CELL_RATIO
+        })
+}
+
 /// Attempts to grow a table starting at `plain[start]`. Establishes column
 /// gutters from the first two rows, then greedily absorbs subsequent rows:
 /// a row with content in most of the established cells is a new logical
@@ -1189,6 +1223,9 @@ fn try_table_at(
     let consumed_plain: Vec<Vec<CharBox>> =
         consumed_rows.iter().map(|&i| plain[i].clone()).collect();
     if maths_coverage_ratio(&consumed_plain) >= TABLE_MATHS_GUARD_RATIO {
+        return None;
+    }
+    if first_column_is_equations(&consumed_rows, rows, &cut_xs) {
         return None;
     }
 

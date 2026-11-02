@@ -2659,6 +2659,37 @@ fn a_maths_heavy_two_by_two_grid_is_not_mistaken_for_a_table() {
     );
 }
 
+// Issue #93: two stacked display equations, each followed by a prose remark
+// (Ue1.pdf Beispiel 1.5), line up into two gutter-separated columns but are
+// an equation column with a caption, not a table. A column of long pure-maths
+// cells is the tell.
+#[test]
+fn stacked_equations_with_prose_remarks_are_not_a_table() {
+    let mut chars = set("ABCDEFGHIJ", 100.0, 700.0, maths_italic());
+    chars.extend(set(
+        "die ersten Zahlen eins",
+        300.0,
+        700.0,
+        Style::default(),
+    ));
+    chars.extend(set("KLMNOPQRSTUV", 100.0, 684.0, maths_italic()));
+    chars.extend(set(
+        "die ersten Zahlen zwei",
+        300.0,
+        684.0,
+        Style::default(),
+    ));
+
+    let lines = group_lines(&chars);
+
+    assert!(
+        lines
+            .iter()
+            .all(|l| !matches!(l.content.as_slice(), [Inline::TableRow(_, _)])),
+        "expected no TableRow lines, got {lines:?}"
+    );
+}
+
 // Issue #92: a 2x3 grid of unlabeled side-by-side formulas (Ue1.pdf
 // Beispiel 1.1's X_1/Y_1/Z_1 over X_2/Y_2/Z_2) used to flatten into one
 // run-on `Block::MathsDisplay` because `group_blocks` joins consecutive
