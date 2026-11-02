@@ -3236,3 +3236,43 @@ fn a_full_width_separator_rule_is_not_a_fraction_bar() {
 
     assert!(!markdown.contains(r"\frac"), "got: {markdown}");
 }
+
+// LaTeX right-aligns a numbered equation's "(1)" on the equation's own
+// baseline, so it arrives as a text piece on a display-maths line. Found on
+// Ue1.pdf: it came out as `$...$(1)`, glued onto the equation, and the
+// equation itself fell out of its own display block into the paragraph.
+#[test]
+fn an_equation_number_becomes_a_tag_on_the_display_equation() {
+    let mut chars = page_at(900.0, &["Beispiel 1.5. Die Formel"]);
+    chars.extend(set("n(n+1)", 300.0, 850.0, maths_italic()));
+    chars.extend(set("1+2+3+n =", 200.0, 843.0, maths_italic()));
+    chars.extend(set("(1)", 480.0, 843.0, Style::default()));
+    chars.extend(set("2", 315.0, 836.0, maths_italic()));
+    chars.extend(page_at(800.0, &["lässt sich auch nachweisen"]));
+
+    let markdown = chars_to_markdown(&chars);
+
+    assert!(markdown.contains(r"\tag{1}"), "got: {markdown}");
+    assert!(!markdown.contains("$(1)"), "got: {markdown}");
+}
+
+// Same numbered equation with a drawn fraction bar (Ue1.pdf for real): the
+// ruled-fraction pass builds its own line, which must not lose its display
+// status to the "(1)" sitting on the baseline.
+#[test]
+fn an_equation_number_beside_a_ruled_fraction_keeps_the_equation_display() {
+    let mut chars = page_at(900.0, &["Beispiel 1.5. Die Formel"]);
+    chars.extend(set("n(n+1)", 300.0, 850.0, maths_italic()));
+    chars.extend(set("1+2+3+n =", 200.0, 843.0, maths_italic()));
+    chars.extend(set("(1)", 480.0, 843.0, Style::default()));
+    chars.extend(set("2", 315.0, 836.0, maths_italic()));
+    chars.extend(page_at(800.0, &["lässt sich auch nachweisen"]));
+    let rules = [rule_at(298.0, 332.0, 845.0)];
+
+    let markdown = chars_and_rules_to_markdown(&chars, &rules);
+
+    assert!(
+        markdown.contains(r"\frac{n(n+1)}{2} \tag{1}"),
+        "got: {markdown}"
+    );
+}

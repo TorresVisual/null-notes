@@ -746,11 +746,7 @@ fn reconstruct_ruled_fractions(
             content.extend(baseline_segment(&rows[b], last, f32::INFINITY));
         }
 
-        let is_display_maths = content.iter().all(|i| match i {
-            Inline::Text(span) => span.text.trim().is_empty(),
-            Inline::Maths(_) => true,
-            Inline::TableRow(_, _) | Inline::ImageRef(_, _) => false,
-        });
+        let is_display_maths = is_mostly_maths(&content);
 
         let (num_x0, num_x1) = row_x_extent(&plain[num_i]);
         let (den_x0, den_x1) = row_x_extent(&plain[den_i]);
@@ -2614,6 +2610,14 @@ fn assign_list_numbers(blocks: &mut [Block]) {
     }
 }
 
+/// The `N` of a lone "(N)" — the number LaTeX right-aligns on a numbered
+/// display equation. Kept as `\tag{N}` so prose that cites "(1)" still has
+/// something to point at.
+fn equation_number(text: &str) -> Option<&str> {
+    let inner = text.trim().strip_prefix('(')?.strip_suffix(')')?;
+    (!inner.is_empty() && inner.chars().all(|c| c.is_ascii_digit() || c == '.')).then_some(inner)
+}
+
 fn finish_block(lines: &[&Line], kind: LineKind) -> Block {
     match kind {
         LineKind::MathsDisplay => Block::MathsDisplay {
@@ -2631,7 +2635,10 @@ fn finish_block(lines: &[&Line], kind: LineKind) -> Block {
                 .filter_map(|i| match i {
                     Inline::Maths(latex) => Some(latex.clone()),
                     Inline::Text(span) if !span.text.trim().is_empty() => {
-                        Some(format!("\\text{{{}}}", escape_text_for_maths(&span.text)))
+                        Some(match equation_number(&span.text) {
+                            Some(n) => format!("\\tag{{{n}}}"),
+                            None => format!("\\text{{{}}}", escape_text_for_maths(&span.text)),
+                        })
                     }
                     Inline::Text(_) | Inline::TableRow(_, _) | Inline::ImageRef(_, _) => None,
                 })
