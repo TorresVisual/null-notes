@@ -260,6 +260,7 @@ pub fn run() {
             commands::notes::list_due_cards,
             commands::notes::list_all_cards,
             commands::notes::list_cram_cards,
+            commands::notes::list_tag_cards,
             commands::notes::backlinks_for,
             commands::notes::backlinks_for_with_context,
             commands::notes::code_backlinks_for_with_context,

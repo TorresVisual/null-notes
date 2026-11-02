@@ -12,6 +12,7 @@ import type { CardSummary } from '../types'
 interface DeckViewProps {
   onClose: () => void
   onOpenCram: (streak: number, struggling: boolean) => void
+  onOpenTagReview: (tags: string[]) => void
 }
 
 // The conventional SRS "graduated" threshold — a display bucket only, not a
@@ -22,7 +23,7 @@ function isDueToday(due: string): boolean {
   return due <= new Date().toISOString().slice(0, 10)
 }
 
-export function DeckView({ onClose, onOpenCram }: DeckViewProps) {
+export function DeckView({ onClose, onOpenCram, onOpenTagReview }: DeckViewProps) {
   const workspacePath = useWorkspaceStore((s) => s.path)
   const openTab = useWorkspaceStore((s) => s.openTab)
   const [cards, setCards] = useState<CardSummary[]>([])
@@ -182,6 +183,14 @@ export function DeckView({ onClose, onOpenCram }: DeckViewProps) {
                     </button>
                   </label>
                 ))}
+                {activeTags.size > 0 && (
+                  <button
+                    className="deck-view-category-cram"
+                    onClick={() => onOpenTagReview(Array.from(activeTags))}
+                  >
+                    Review selected tags
+                  </button>
+                )}
               </div>
             )}
             {categories.length > 0 && (

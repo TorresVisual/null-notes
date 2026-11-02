@@ -151,6 +151,8 @@ export const api = {
       invoke<CardSummary[]>('list_all_cards', { workspace }),
     listCramCards: (workspace: string, streak: number, struggling: boolean) =>
       invoke<DueCard[]>('list_cram_cards', { workspace, streak, struggling }),
+    listTagCards: (workspace: string, tags: string[]) =>
+      invoke<DueCard[]>('list_tag_cards', { workspace, tags }),
   },
   templates: {
     list: (workspace: string) =>

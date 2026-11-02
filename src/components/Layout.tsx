@@ -20,7 +20,7 @@ import { TemplateDialog } from './TemplateDialog'
 import { GraphView } from './GraphView'
 import { TaskView } from './TaskView'
 import { DeckView } from './DeckView'
-import { ReviewSession } from './ReviewSession'
+import { ReviewSession, type ReviewMode } from './ReviewSession'
 import { HomeView } from './HomeView'
 import { MobileShell } from './MobileShell'
 import { SaveStatus } from './SaveStatus'
@@ -172,9 +172,7 @@ export function Layout() {
   const [pendingDiagramInsert, setPendingDiagramInsert] = useState<
     { editor: Editor; range: Range | null; diagrams: DiagramMetadata[] } | null
   >(null)
-  const [pendingCram, setPendingCram] = useState<{ streak: number; struggling: boolean } | null>(
-    null,
-  )
+  const [pendingCram, setPendingCram] = useState<Exclude<ReviewMode, { kind: 'due' }> | null>(null)
   const setSettings = useSettingsStore((s) => s.setSettings)
   const scrollRef = useScrollRestoration(activeTab, isLoading, primaryViewMode)
 
@@ -655,19 +653,23 @@ export function Layout() {
       {activeOverlay === 'task' && <TaskView onClose={closeOverlay} />}
       {activeOverlay === 'review' && (
         <ReviewSession
-          mode={pendingCram !== null ? { kind: 'cram', ...pendingCram } : { kind: 'due' }}
+          mode={pendingCram ?? { kind: 'due' }}
           onClose={() => {
             setPendingCram(null)
             closeOverlay()
           }}
-          onSwitchCategory={(streak, struggling) => setPendingCram({ streak, struggling })}
+          onSwitchCategory={(streak, struggling) => setPendingCram({ kind: 'cram', streak, struggling })}
         />
       )}
       {activeOverlay === 'deck' && (
         <DeckView
           onClose={closeOverlay}
           onOpenCram={(streak, struggling) => {
-            setPendingCram({ streak, struggling })
+            setPendingCram({ kind: 'cram', streak, struggling })
+            openOverlay('review')
+          }}
+          onOpenTagReview={(tags) => {
+            setPendingCram({ kind: 'tags', tags })
             openOverlay('review')
           }}
         />

@@ -1899,6 +1899,17 @@ pub async fn list_cram_cards(
 }
 
 #[tauri::command]
+pub async fn list_tag_cards(
+    workspace: String,
+    tags: Vec<String>,
+    db: State<'_, DbPool>,
+) -> Result<Vec<DueCard>, String> {
+    db::notes::list_cards_by_tags(&db, &workspace, &tags)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub async fn backlinks_for(
     workspace: String,
     title: String,

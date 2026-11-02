@@ -47,19 +47,19 @@ beforeEach(() => {
 
 describe('DeckView', () => {
   it('renders every card grouped by note', async () => {
-    render(<DeckView onClose={vi.fn()} onOpenCram={vi.fn()} />)
+    render(<DeckView onClose={vi.fn()} onOpenCram={vi.fn()} onOpenTagReview={vi.fn()} />)
     await waitFor(() => expect(screen.getByText('Q1')).toBeInTheDocument())
     expect(screen.getByText('Q2')).toBeInTheDocument()
   })
 
   it('shows total, due, and mastered counts', async () => {
-    render(<DeckView onClose={vi.fn()} onOpenCram={vi.fn()} />)
+    render(<DeckView onClose={vi.fn()} onOpenCram={vi.fn()} onOpenTagReview={vi.fn()} />)
     await waitFor(() => screen.getByText('Q1'))
     expect(screen.getByText('2')).toBeInTheDocument() // total
   })
 
   it('narrows the list by tag', async () => {
-    render(<DeckView onClose={vi.fn()} onOpenCram={vi.fn()} />)
+    render(<DeckView onClose={vi.fn()} onOpenCram={vi.fn()} onOpenTagReview={vi.fn()} />)
     await waitFor(() => screen.getByText('Q1'))
     fireEvent.click(screen.getByLabelText('cs'))
     expect(screen.getByText('Q1')).toBeInTheDocument()
@@ -67,9 +67,22 @@ describe('DeckView', () => {
   })
 })
 
+describe('DeckView — tag review', () => {
+  it('offers Review selected tags only once a tag is ticked, passing the ticked tags', async () => {
+    const onOpenTagReview = vi.fn()
+    render(<DeckView onClose={vi.fn()} onOpenCram={vi.fn()} onOpenTagReview={onOpenTagReview} />)
+    await waitFor(() => screen.getByText('Q1'))
+    expect(screen.queryByText('Review selected tags')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByLabelText('cs'))
+    fireEvent.click(screen.getByLabelText('algo'))
+    fireEvent.click(screen.getByText('Review selected tags'))
+    expect(onOpenTagReview).toHaveBeenCalledWith(['cs', 'algo'])
+  })
+})
+
 describe('DeckView — cram categories', () => {
   it('shows one chip per streak value with correct counts, labeling streak 0 as New', async () => {
-    render(<DeckView onClose={vi.fn()} onOpenCram={vi.fn()} />)
+    render(<DeckView onClose={vi.fn()} onOpenCram={vi.fn()} onOpenTagReview={vi.fn()} />)
     await waitFor(() => screen.getByText('Q1'))
     expect(screen.getByText('New (1)')).toBeInTheDocument()
     expect(screen.getByText('Category 2 (1)')).toBeInTheDocument()
@@ -77,7 +90,7 @@ describe('DeckView — cram categories', () => {
 
   it('calls onOpenCram with the chip\'s streak value when Cram is clicked', async () => {
     const onOpenCram = vi.fn()
-    render(<DeckView onClose={vi.fn()} onOpenCram={onOpenCram} />)
+    render(<DeckView onClose={vi.fn()} onOpenCram={onOpenCram} onOpenTagReview={vi.fn()} />)
     await waitFor(() => screen.getByText('Category 2 (1)'))
     const chip = screen.getByText('Category 2 (1)').closest('.deck-view-category')
     if (!chip) throw new Error('chip not found')
@@ -86,7 +99,7 @@ describe('DeckView — cram categories', () => {
   })
 
   it('respects the active tag filter', async () => {
-    render(<DeckView onClose={vi.fn()} onOpenCram={vi.fn()} />)
+    render(<DeckView onClose={vi.fn()} onOpenCram={vi.fn()} onOpenTagReview={vi.fn()} />)
     await waitFor(() => screen.getByText('Q1'))
     fireEvent.click(screen.getByLabelText('cs'))
     expect(screen.getByText('New (1)')).toBeInTheDocument()
@@ -98,7 +111,7 @@ describe('DeckView — cram categories', () => {
       ...cards,
       { ...cards[0]!, front: 'Q3', position: 1, lapses: 4 },
     ])
-    render(<DeckView onClose={vi.fn()} onOpenCram={vi.fn()} />)
+    render(<DeckView onClose={vi.fn()} onOpenCram={vi.fn()} onOpenTagReview={vi.fn()} />)
     await waitFor(() => screen.getByText('Q1'))
     expect(screen.getByText('New (1)')).toBeInTheDocument()
     expect(screen.getByText('Struggling (1)')).toBeInTheDocument()
@@ -110,7 +123,7 @@ describe('DeckView — cram categories', () => {
       { ...cards[0]!, front: 'Q3', position: 1, lapses: 4 },
     ])
     const onOpenCram = vi.fn()
-    render(<DeckView onClose={vi.fn()} onOpenCram={onOpenCram} />)
+    render(<DeckView onClose={vi.fn()} onOpenCram={onOpenCram} onOpenTagReview={vi.fn()} />)
     await waitFor(() => screen.getByText('Struggling (1)'))
     const chip = screen.getByText('Struggling (1)').closest('.deck-view-category')
     if (!chip) throw new Error('chip not found')
@@ -125,7 +138,7 @@ describe('DeckView — suspended cards', () => {
       cards[0]!,
       { ...cards[1]!, suspended: true },
     ])
-    render(<DeckView onClose={vi.fn()} onOpenCram={vi.fn()} />)
+    render(<DeckView onClose={vi.fn()} onOpenCram={vi.fn()} onOpenTagReview={vi.fn()} />)
     await waitFor(() => screen.getByText('Q1'))
     expect(screen.getByText('1 suspended')).toBeInTheDocument()
   })
@@ -135,7 +148,7 @@ describe('DeckView — suspended cards', () => {
       cards[0]!,
       { ...cards[1]!, suspended: true },
     ])
-    render(<DeckView onClose={vi.fn()} onOpenCram={vi.fn()} />)
+    render(<DeckView onClose={vi.fn()} onOpenCram={vi.fn()} onOpenTagReview={vi.fn()} />)
     await waitFor(() => screen.getByText('Q1'))
     fireEvent.click(screen.getByText('1 suspended'))
     expect(screen.queryByText('Q1')).not.toBeInTheDocument()
@@ -146,7 +159,7 @@ describe('DeckView — suspended cards', () => {
   it('toggles card suspension on button click', async () => {
     vi.mocked(api.notes.setCardSuspended).mockResolvedValue(undefined)
     vi.mocked(api.notes.listAllCards).mockResolvedValue(cards)
-    render(<DeckView onClose={vi.fn()} onOpenCram={vi.fn()} />)
+    render(<DeckView onClose={vi.fn()} onOpenCram={vi.fn()} onOpenTagReview={vi.fn()} />)
     await waitFor(() => screen.getByText('Q1'))
 
     fireEvent.click(screen.getByLabelText('Suspend card Q1'))

@@ -479,6 +479,27 @@ struct DueCardRow {
     streak: i64,
 }
 
+impl TryFrom<DueCardRow> for DueCard {
+    type Error = serde_json::Error;
+
+    fn try_from(r: DueCardRow) -> std::result::Result<Self, Self::Error> {
+        let options = match r.options {
+            Some(json) => serde_json::from_str(&json)?,
+            None => Vec::new(),
+        };
+        Ok(DueCard {
+            note_path: r.note_path,
+            note_title: r.note_title,
+            kind: r.kind,
+            front: r.front,
+            back: r.back,
+            position: r.position,
+            options,
+            streak: r.streak,
+        })
+    }
+}
+
 pub async fn due_cards(pool: &SqlitePool, workspace: &str, today: &str) -> Result<Vec<DueCard>> {
     let rows = sqlx::query_as::<_, DueCardRow>(
         "SELECT rc.note_path, n.title as note_title, rc.kind, rc.front, rc.back, rc.position, rc.options, rc.streak
@@ -492,24 +513,10 @@ pub async fn due_cards(pool: &SqlitePool, workspace: &str, today: &str) -> Resul
     .fetch_all(pool)
     .await?;
 
-    let mut cards = Vec::with_capacity(rows.len());
-    for r in rows {
-        let options = match r.options {
-            Some(json) => serde_json::from_str(&json)?,
-            None => Vec::new(),
-        };
-        cards.push(DueCard {
-            note_path: r.note_path,
-            note_title: r.note_title,
-            kind: r.kind,
-            front: r.front,
-            back: r.back,
-            position: r.position,
-            options,
-            streak: r.streak,
-        });
-    }
-    Ok(cards)
+    Ok(rows
+        .into_iter()
+        .map(DueCard::try_from)
+        .collect::<Result<_, _>>()?)
 }
 
 // `struggling` only distinguishes anything at `streak = 0`, where "New"
@@ -537,24 +544,39 @@ pub async fn list_cards_by_category(
     .fetch_all(pool)
     .await?;
 
-    let mut cards = Vec::with_capacity(rows.len());
-    for r in rows {
-        let options = match r.options {
-            Some(json) => serde_json::from_str(&json)?,
-            None => Vec::new(),
-        };
-        cards.push(DueCard {
-            note_path: r.note_path,
-            note_title: r.note_title,
-            kind: r.kind,
-            front: r.front,
-            back: r.back,
-            position: r.position,
-            options,
-            streak: r.streak,
-        });
-    }
-    Ok(cards)
+    Ok(rows
+        .into_iter()
+        .map(DueCard::try_from)
+        .collect::<Result<_, _>>()?)
+}
+
+// Every unsuspended card in a note carrying any of `tags`, due or not — a
+// tag-scoped session is exam prep, not the day's queue. `tags` is bound as one
+// JSON array so the placeholder count doesn't vary with the selection.
+pub async fn list_cards_by_tags(
+    pool: &SqlitePool,
+    workspace: &str,
+    tags: &[String],
+) -> Result<Vec<DueCard>> {
+    let rows = sqlx::query_as::<_, DueCardRow>(
+        "SELECT rc.note_path, n.title as note_title, rc.kind, rc.front, rc.back, rc.position, rc.options, rc.streak
+         FROM review_cards rc
+         JOIN notes n ON n.path = rc.note_path
+         WHERE n.workspace = ? AND COALESCE(rc.suspended, 0) = 0
+           AND EXISTS (SELECT 1 FROM note_tags nt
+                       WHERE nt.note_path = rc.note_path
+                         AND nt.tag IN (SELECT value FROM json_each(?)))
+         ORDER BY n.title COLLATE NOCASE, rc.position",
+    )
+    .bind(workspace)
+    .bind(serde_json::to_string(tags)?)
+    .fetch_all(pool)
+    .await?;
+
+    Ok(rows
+        .into_iter()
+        .map(DueCard::try_from)
+        .collect::<Result<_, _>>()?)
 }
 
 #[derive(sqlx::FromRow)]
@@ -2436,5 +2458,30 @@ mod tests {
         assert_eq!(all.len(), 2);
         assert_eq!(all[0].suspended, false);
         assert_eq!(all[1].suspended, true);
+    }
+
+    #[tokio::test]
+    async fn test_list_cards_by_tags_matches_any_tag_regardless_of_due_date() {
+        let pool = make_pool().await;
+        for (id, tag) in [("a", "algo"), ("b", "cs"), ("c", "other")] {
+            let path = format!("/ws/{id}.md");
+            index_note(&pool, &note(id, id, &path, "/ws"))
+                .await
+                .unwrap();
+            set_tags(&pool, &path, &[tag.to_string()]).await.unwrap();
+            let mut c = card(CardKind::Qa, id, "ans", 0);
+            c.due = Some("2099-01-01".into());
+            set_cards(&pool, &path, &[c]).await.unwrap();
+        }
+
+        let tags = vec!["algo".to_string(), "cs".to_string()];
+        let cards = list_cards_by_tags(&pool, "/ws", &tags).await.unwrap();
+        let fronts: Vec<_> = cards.iter().map(|c| c.front.as_str()).collect();
+        assert_eq!(fronts, vec!["a", "b"]);
+
+        assert!(list_cards_by_tags(&pool, "/ws", &[])
+            .await
+            .unwrap()
+            .is_empty());
     }
 }

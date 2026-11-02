@@ -8,7 +8,10 @@ import { CardText } from './CardText'
 import { groupCardsByStreak, type CardStreakGroup } from '../lib/cardGroups'
 import type { DueCard, Grade } from '../types'
 
-export type ReviewMode = { kind: 'due' } | { kind: 'cram'; streak: number; struggling: boolean }
+export type ReviewMode =
+  | { kind: 'due' }
+  | { kind: 'cram'; streak: number; struggling: boolean }
+  | { kind: 'tags'; tags: string[] }
 
 interface ReviewSessionProps {
   onClose: () => void
@@ -44,6 +47,9 @@ export function ReviewSession({ onClose, mode = { kind: 'due' }, onSwitchCategor
   const workspacePath = useWorkspaceStore((s) => s.path)
   const cramStreak = mode.kind === 'cram' ? mode.streak : null
   const cramStruggling = mode.kind === 'cram' && mode.struggling
+  // A string, not the array: Layout builds a fresh mode object each render, so
+  // an array in an effect's deps would refetch on every one.
+  const tagsKey = mode.kind === 'tags' ? mode.tags.join(',') : null
   const [queue, setQueue] = useState<DueCard[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -64,19 +70,27 @@ export function ReviewSession({ onClose, mode = { kind: 'due' }, onSwitchCategor
       .catch(() => {})
   }, [workspacePath, cramStreak])
 
+  // Cram and tag sessions are drills over cards that aren't necessarily due,
+  // so they're shuffled; the due queue keeps the backend's due-date order.
+  async function fetchQueue(workspace: string): Promise<DueCard[]> {
+    if (cramStreak !== null) {
+      return shuffleCards(await api.notes.listCramCards(workspace, cramStreak, cramStruggling))
+    }
+    if (tagsKey !== null) {
+      return shuffleCards(await api.notes.listTagCards(workspace, tagsKey.split(',')))
+    }
+    return api.notes.listDueCards(workspace)
+  }
+
   useEffect(() => {
     if (!workspacePath) return
     setIsLoading(true)
     setError(null)
-    const request =
-      cramStreak !== null
-        ? api.notes.listCramCards(workspacePath, cramStreak, cramStruggling)
-        : api.notes.listDueCards(workspacePath)
-    request
-      .then((fetched) => setQueue(cramStreak !== null ? shuffleCards(fetched) : fetched))
+    fetchQueue(workspacePath)
+      .then(setQueue)
       .catch((e: unknown) => setError(`Couldn't load the review queue: ${String(e)}`))
       .finally(() => setIsLoading(false))
-  }, [workspacePath, cramStreak, cramStruggling])
+  }, [workspacePath, cramStreak, cramStruggling, tagsKey])
 
   const current = queue[0]
   const optionOrder = useMemo(
@@ -94,12 +108,8 @@ export function ReviewSession({ onClose, mode = { kind: 'due' }, onSwitchCategor
 
   function refetch() {
     if (!workspacePath) return
-    const request =
-      cramStreak !== null
-        ? api.notes.listCramCards(workspacePath, cramStreak, cramStruggling)
-        : api.notes.listDueCards(workspacePath)
-    request.then((fetched) => {
-      setQueue(cramStreak !== null ? shuffleCards(fetched) : fetched)
+    void fetchQueue(workspacePath).then((fetched) => {
+      setQueue(fetched)
       setRevealed(false)
     })
   }
@@ -180,7 +190,9 @@ export function ReviewSession({ onClose, mode = { kind: 'due' }, onSwitchCategor
             <h2>
               {cramStreak !== null
                 ? `Cram — ${cramStruggling ? 'Struggling' : cramStreak === 0 ? 'New' : `Category ${cramStreak}`}${queue.length > 0 ? ` (${queue.length} left)` : ''}`
-                : `Review${queue.length > 0 ? ` (${queue.length} due)` : ''}`}
+                : tagsKey !== null
+                  ? `Review — ${tagsKey.split(',').join(', ')}${queue.length > 0 ? ` (${queue.length} left)` : ''}`
+                  : `Review${queue.length > 0 ? ` (${queue.length} due)` : ''}`}
             </h2>
           </DialogTitle>
           <button className="settings-panel-close" onClick={onClose} aria-label="Close review" title="Close review">
@@ -206,7 +218,11 @@ export function ReviewSession({ onClose, mode = { kind: 'due' }, onSwitchCategor
           <p className="empty-state">{error}</p>
         ) : !current ? (
           <p className="empty-state">
-            {cramStreak !== null ? 'No cards in this category.' : 'All done for today.'}
+            {cramStreak !== null
+              ? 'No cards in this category.'
+              : tagsKey !== null
+                ? 'No cards with these tags.'
+                : 'All done for today.'}
           </p>
         ) : (
           <div className="review-card">

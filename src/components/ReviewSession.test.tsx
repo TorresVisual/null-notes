@@ -10,6 +10,7 @@ vi.mock('../lib/tauri', () => ({
     notes: {
       listDueCards: vi.fn(),
       listCramCards: vi.fn(),
+      listTagCards: vi.fn(),
       listAllCards: vi.fn(),
       gradeCard: vi.fn(),
       gradeMcCard: vi.fn(),
@@ -294,5 +295,26 @@ describe('ReviewSession — cram mode', () => {
 
     await waitFor(() => screen.getByText('Q1'))
     expect(screen.queryByText('Category 2 (1)')).not.toBeInTheDocument()
+  })
+})
+
+describe('ReviewSession — tag mode', () => {
+  beforeEach(() => {
+    useWorkspaceStore.setState({ path: '/ws' })
+    vi.mocked(api.notes.listDueCards).mockClear()
+    vi.mocked(api.notes.listTagCards).mockResolvedValue(cards)
+  })
+
+  it('fetches from listTagCards with the selected tags, not listDueCards', async () => {
+    render(<ReviewSession onClose={vi.fn()} mode={{ kind: 'tags', tags: ['algo', 'cs'] }} />)
+    await waitFor(() => expect(api.notes.listTagCards).toHaveBeenCalledWith('/ws', ['algo', 'cs']))
+    expect(api.notes.listDueCards).not.toHaveBeenCalled()
+    expect(screen.getByText('Review — algo, cs (2 left)')).toBeInTheDocument()
+  })
+
+  it('shows a tag-specific empty state', async () => {
+    vi.mocked(api.notes.listTagCards).mockResolvedValue([])
+    render(<ReviewSession onClose={vi.fn()} mode={{ kind: 'tags', tags: ['algo'] }} />)
+    await waitFor(() => expect(screen.getByText('No cards with these tags.')).toBeInTheDocument())
   })
 })
