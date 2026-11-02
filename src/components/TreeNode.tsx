@@ -12,7 +12,7 @@ import { useCreateBase } from '../hooks/useCreateBase'
 import { useCreateCanvas } from '../hooks/useCreateCanvas'
 import { folderName, isSingleSegmentName, isUnderPath } from '../lib/pathPrefix'
 import type { TreeEntry } from '../lib/folderTree'
-import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from './ui/context-menu'
+import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuTrigger } from './ui/context-menu'
 import { NoteContextMenuItems } from './NoteContextMenuItems'
 import { BookmarkMenuItem } from './BookmarkMenuItem'
 
@@ -250,6 +250,7 @@ export function TreeNode({ entry }: TreeNodeProps) {
           <ContextMenuItem onSelect={() => void handleRenameFolder()}>
             <Pencil size={14} /> Rename
           </ContextMenuItem>
+          <ContextMenuSeparator />
           <ContextMenuItem variant="destructive" onSelect={() => void handleDeleteFolder()}>
             <Trash2 size={14} /> Delete
           </ContextMenuItem>

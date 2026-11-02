@@ -109,15 +109,15 @@
 
   /* Motion — one duration for state-change feedback (hover/press/toggle
      color swaps), one for a surface entering (menus/modals). Two curves:
-     `--ease-standard` (a real accelerate-decelerate, not linear `ease`) for
-     color/position changes, `--ease-spring` (a slight overshoot) reserved
-     for things that should feel like they have physical weight — a button
-     press, a surface popping in, a selection indicator landing — never for
-     plain color transitions, where an overshoot reads as a glitch. */
+     `--ease-standard` (accelerate-decelerate) for color/position changes,
+     `--ease-out` (a fast exponential settle, no overshoot) for things that
+     move into place — a surface popping in, a selection indicator landing,
+     a press. Overshoot is deliberately absent: Terminal Precision is not
+     bouncy. */
   --duration-fast: 120ms;
   --duration-base: 180ms;
   --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
-  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
 
   /* ── shadcn/ui token bridge ────────────────────────────────────
      Every shadcn-generated component reads these semantic variable
@@ -195,7 +195,7 @@ button, [role="button"], .tree-row, .tab, .search-result, .slash-menu-item,
     color var(--duration-fast) var(--ease-standard),
     outline-color var(--duration-fast) var(--ease-standard),
     box-shadow var(--duration-fast) var(--ease-standard),
-    transform var(--duration-fast) var(--ease-spring);
+    transform var(--duration-fast) var(--ease-out);
 }
 
 /* Press feedback — a discrete, button-shaped control visibly compresses on
@@ -233,7 +233,7 @@ button, [role="button"], .tree-row, .tab, .search-result, .slash-menu-item,
 .context-menu, .slash-menu, .math-editor, .math-snippet-menu, .block-handle-menu,
 .search-modal, .settings-panel, .import-mode-dialog, .graph-view, .task-view,
 .review-session, .formula-sheet-prompt, .toast, .error-log-dialog, .update-dialog, .trash-dialog {
-  animation: surface-in var(--duration-base) var(--ease-spring);
+  animation: surface-in var(--duration-base) var(--ease-out);
 }
 
 .toast-stack {
@@ -1990,7 +1990,7 @@ code {
   padding-right: var(--gutter-gap);
   margin-left: calc(-1 * (var(--gutter-width) + var(--gutter-gap)));
   text-align: right;
-  color: var(--text-tertiary);
+  color: var(--text-secondary);
   user-select: none;
   pointer-events: none;
 }
@@ -2833,7 +2833,7 @@ li .fold-toggle { left: -2.4em; }
    for no reason, but size/color stay distinct on purpose. */
 .sidebar-search kbd {
   font-size: 10px;
-  color: var(--text-disabled);
+  color: var(--text-tertiary);
   background: var(--bg-base);
   border: 1px solid var(--border-strong);
   border-radius: 3px;
@@ -3508,7 +3508,7 @@ li .fold-toggle { left: -2.4em; }
   width: 3px;
   border-radius: 2px;
   background: var(--accent);
-  animation: pill-in var(--duration-base) var(--ease-spring);
+  animation: pill-in var(--duration-base) var(--ease-out);
 }
 
 @keyframes pill-in {
@@ -4421,7 +4421,7 @@ input[type='checkbox']:checked::after {
   border: solid var(--accent-contrast);
   border-width: 0 2px 2px 0;
   transform: rotate(45deg) translate(-1px, -1px);
-  animation: checkmark-pop var(--duration-base) var(--ease-spring);
+  animation: checkmark-pop var(--duration-base) var(--ease-out);
 }
 
 @keyframes checkmark-pop {
@@ -4458,7 +4458,7 @@ input[type='checkbox']:focus-visible {
   background: var(--text-secondary);
   transform: none;
   animation: none;
-  transition: transform var(--duration-base) var(--ease-spring), background var(--duration-base) var(--ease-standard);
+  transition: transform var(--duration-base) var(--ease-out), background var(--duration-base) var(--ease-standard);
 }
 
 .settings-row-control input[type='checkbox']:checked::after {
@@ -5353,7 +5353,7 @@ input[type='checkbox']:focus-visible {
 .error-log-expand:hover, .error-log-copy:hover { color: var(--accent); border-color: var(--accent); }
 .error-log-copy.copied { color: var(--accent); border-color: var(--accent); }
 
-.error-log-expand-icon { transition: transform var(--duration-fast) var(--ease-spring); }
+.error-log-expand-icon { transition: transform var(--duration-fast) var(--ease-out); }
 .error-log-expand-icon.rotated { transform: rotate(90deg); }
 
 .error-log-message {
