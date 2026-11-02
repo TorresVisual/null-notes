@@ -1,76 +1,91 @@
 ---
 name: ui-preview
-description: Use when doing visual/CSS/layout design work on null-notes (auditing hierarchy, spacing, wrapping, color, states) and you need to actually see a screen rendered, not just read the CSS. Lightweight — a real browser against the Vite dev server, no Tauri build. Not a substitute for e2e-verify: screens that need real workspace/note data won't populate.
+description: Use when doing visual/CSS/layout design work on null-notes (auditing hierarchy, spacing, wrapping, color, states) and you need to actually see a screen rendered, not just read the CSS — including screens that need a workspace open (sidebar tree, tabs, editor chrome). Lightweight — a real browser against the Vite dev server, no Tauri build. Not a substitute for e2e-verify when real file I/O or the save path matters.
 ---
 
 # Previewing null-notes screens for visual/design work
 
-## When to use this vs. e2e-verify
+## Which mode
 
-- **This skill** — fast iteration on chrome/layout/CSS: the workspace
-  picker, sidebar shell, settings panel, shortcuts overlay, dialogs,
-  empty states, anything reachable without live note data. No Rust
-  rebuild, no WebdriverIO, screenshot in seconds.
-- **`e2e-verify`** — anything that needs the real save path, file I/O,
-  or actual note/workspace content on screen (editor content, sidebar
-  file tree, tabs, search results). Drives the real compiled
-  `null-notes.exe`.
-
-Design work on this app tends to start here and only reach for
-`e2e-verify` once a data-dependent screen needs checking.
+- **Bare** — navigate to the dev server, nothing injected. Enough for the
+  workspace picker, settings, shortcuts overlay, template dialog, empty states.
+- **Mocked** — inject `mock-tauri.js` (next to this file) before load. The app
+  opens a fixture workspace: folder tree with a long-title note, a canvas,
+  tags, an open tab with an editor containing a link, tag, tasks and a code
+  block. Use it for anything that needs a workspace open.
+- **`e2e-verify`** — the real save path, file I/O, search, anything whose
+  correctness depends on the Rust backend. The mock returns canned data; it
+  proves how a screen *looks*, never that it *works*.
 
 ## Why this works without Tauri
 
-The frontend calls `@tauri-apps/api/core`'s `invoke()` directly
-everywhere (`src/lib/tauri.ts`) with no mock/fallback layer. Outside a
-real Tauri webview there's no `window.__TAURI_INTERNALS__`, so every
-`invoke()` call rejects. Nothing in this app awaits that rejection
-synchronously during render — state simply stays at its initial
-loading/empty value — so the shell renders: sidebar buttons show
-correctly (disabled when they require a workspace), the workspace
-picker renders fully, panels/dialogs that don't fetch data open fine.
-Screens whose entire content *is* fetched data (recent workspaces
-list, note tree, search results) render empty instead of erroring.
+The frontend calls `invoke()` from `@tauri-apps/api/core` directly
+(`src/lib/tauri.ts`), with no mock layer. Outside a webview there is no
+`window.__TAURI_INTERNALS__`, so every `invoke()` rejects and screens whose
+content is fetched data render empty. `mock-tauri.js` installs a fake
+`__TAURI_INTERNALS__` (plus the event and OS plugin globals — without
+`__TAURI_OS_PLUGIN_INTERNALS__` the layout throws in `isMobile()`) and answers
+the startup commands.
 
 ## Launching
 
     npm run dev
 
-Vite is pinned to port **1421** with `strictPort: true`
-(`vite.config.ts`) — it will refuse to pick a different port.
-
-**If you get `Error: Port 1421 is already in use`**, that's fine, not
-a failure: it usually means a `tauri dev` session (or a previous
-preview session) is already serving. Skip starting a new one and
-navigate straight to it — the running server is what you want anyway.
+Vite is pinned to port **1421** (`strictPort`). `Port 1421 is already in use`
+is fine — a `tauri dev` or earlier preview session is serving; use it.
 
 ## Viewing
 
-Use the Playwright MCP tools:
+Playwright MCP, mocked mode — the init script must be registered *before*
+navigation:
 
-1. `browser_navigate` to `http://localhost:1421`
-2. `browser_resize` to a representative desktop window size (e.g.
-   1400x900 — the app has no responsive breakpoints of its own, it's
-   desktop-only)
-3. `browser_click` / native `prompt()`/`confirm()` dialogs won't work
-   here the way they do in the real app (no native dialog bridge) —
-   for anything gated behind a native file/folder picker or
-   `window.prompt`, you can't get past it this way. Settings, search
-   modal shell, shortcuts overlay, template dialog, and the workspace
-   picker itself are all reachable without one.
-4. `browser_take_screenshot` — then **`Read` the saved PNG yourself**
-   to actually look at it. Unlike `e2e-verify` (which tells the user
-   to open the folder because it's a pass/fail verification step),
-   design work needs you looking at the image to judge it, not just
-   confirming it exists.
+    browser_run_code_unsafe:
+    async (page) => {
+      await page.addInitScript({ path: '<repo>/.claude/skills/ui-preview/mock-tauri.js' })
+      await page.setViewportSize({ width: 1400, height: 900 })
+      await page.goto('http://localhost:1421')
+      await page.waitForTimeout(1500)
+    }
+
+Bare mode: `browser_navigate` + `browser_resize` (the app is desktop-only, no
+responsive breakpoints; use short heights like 1400x600 to test clipping).
+
+Then `browser_take_screenshot` and **`Read` the PNG yourself** — design work
+needs you to look at it, not just confirm it exists. Native `prompt()` /
+`confirm()` and file pickers don't work here; settings, search modal shell,
+shortcuts, template dialog and the picker don't need one.
+
+### If the browser MCP says "Browser is already in use"
+
+Its profile is held by another session (both Playwright MCP and chrome-devtools
+MCP hit this). Don't fight it — run a standalone script with the Chromium
+Playwright already downloaded (`~/AppData/Local/ms-playwright/chromium-*/chrome-win64/chrome.exe`):
+
+    // in an empty temp dir:  npm i playwright-core
+    const b = await chromium.launch({ executablePath: process.env.EXE })
+    const p = await b.newPage({ viewport: { width: 1400, height: 900 } })
+    await p.addInitScript({ path: '<repo>/.claude/skills/ui-preview/mock-tauri.js' })
+    await p.goto('http://localhost:1421'); await p.waitForTimeout(1500)
+    await p.screenshot({ path: 'out.png' })
+
+Use a Windows-form `EXE` path (`C:/Users/...`), not Git-Bash `/c/...`. Keep the
+script outside the repo (no new dependency).
+
+## Extending the mock
+
+- Edit `NOTES` / `FOLDERS` / `CANVASES` / `CONTENT` at the top to preview other
+  shapes: very long titles, deep trees, an empty workspace (`NOTES = []`).
+- Commands without a handler reject and are recorded in `window.__mockMisses`.
+  After driving a new screen, `page.evaluate(() => window.__mockMisses)` shows
+  what it asked for; add a handler returning the shape in `src/types/index.ts`.
+- A handler that is *missing* for a startup command can wedge the UI (e.g. an
+  unhandled `watch_workspace` leaves the sidebar on "Opening…" forever) — if a
+  screen looks stuck, check `__mockMisses` before suspecting CSS.
+- `load_settings` is deliberately unhandled, so the app runs on defaults.
 
 ## Known gaps
 
-- No workspace/note data — anything downstream of `invoke()` is
-  empty, not populated. Don't judge information density or data-heavy
-  layouts (note list, search results, tabs, editor content) from this;
-  use `e2e-verify` for those.
-- Console will show `invoke` rejection errors — expected noise, not a
-  real bug, as long as the UI itself isn't blank/broken.
-- Window chrome (title bar, native menu) isn't shown — this is
-  webview content only.
+- Canned data only: search results, backlinks, graph, tasks and flashcards are
+  empty; saves are no-ops. Don't judge information density from this.
+- Console shows `invoke` rejection noise for unhandled commands — expected.
+- Window chrome beyond the in-app title bar (native menu) isn't shown.
