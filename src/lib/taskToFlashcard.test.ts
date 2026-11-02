@@ -26,6 +26,15 @@ describe('addFlashcardForLastTask', () => {
     )
   })
 
+  it('leaves the done checkbox out of the card front', () => {
+    const md = sheet(true).replace('## Task 1\n', '## Task 1\n\n- [x] Task 1\n')
+    const out = addFlashcardForLastTask(md, NOTE_PATH)
+
+    expect(out.kind).toBe('inserted')
+    if (out.kind !== 'inserted') return
+    expect(out.markdown).toContain('\nWhat is Big-O of binary search? :: ![Task 1 solution]')
+  })
+
   it('finds a drawing written in the GitHub-renderable image form', () => {
     const md = sheet(false) + '![Drawing](Lecture%207.ink/solution-1.svg#ink=700x400)\n'
     const out = addFlashcardForLastTask(md, NOTE_PATH)

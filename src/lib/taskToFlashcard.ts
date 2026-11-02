@@ -18,6 +18,7 @@ import { decodeSrc, encodeSrc } from '../editor/extensions/NoteImage'
 import { markdownOf, notePathOf } from '../editor/splitIntoTasks'
 
 const SOLUTION_HEADING_LINE = /^###\s+Solution\s*$/
+const DONE_CHECKBOX_LINE = /^- \[[ xX]\] Task \d+(?:\.\d+)*$/
 const INK_IMAGE_LINE = /^!\[[^\]]*\]\(([^)#]*\.ink\/[^)#]*)#ink=[^)]*\)$/
 const CARD_LINE =/\s::\s.*!\[[^\]]*\]\([^)]+\)/
 
@@ -72,7 +73,7 @@ export function addFlashcardForLastTask(markdown: string, notePath: string): Fla
   const front = lines
     .slice(taskLine + 1, solutionLine)
     .map((l) => l.trim())
-    .filter(Boolean)
+    .filter((l) => l && !DONE_CHECKBOX_LINE.test(l))
     .join(' ')
   if (!front) return { kind: 'no-solution' }
 

@@ -77,6 +77,8 @@ pub fn split_into_tasks(markdown: &str) -> String {
 
         out.push_str("## Task ");
         out.push_str(&start.label);
+        out.push_str("\n\n- [ ] Task ");
+        out.push_str(&start.label);
         out.push_str("\n\n");
         out.push_str(body.trim_end());
         out.push_str("\n\n### Solution\n\n");
@@ -255,6 +257,18 @@ mod tests {
             out.contains("11. Übungsblatt"),
             "kept above the first task: {out}"
         );
+    }
+
+    #[test]
+    fn every_exercise_gets_a_checkbox_the_task_extractor_sees() {
+        let md = sheet(&["1. First exercise", "", "2. Second exercise"]);
+
+        let out = split_into_tasks(&md);
+
+        let tasks = crate::commands::notes::extract_tasks(&out);
+        let texts: Vec<&str> = tasks.iter().map(|t| t.text.as_str()).collect();
+        assert_eq!(texts, ["Task 1", "Task 2"], "got: {out}");
+        assert!(tasks.iter().all(|t| !t.done));
     }
 
     #[test]

@@ -120,6 +120,16 @@ export async function addNextTask(editor: Editor, label: string): Promise<void> 
     .chain()
     .insertContentAt(editor.state.doc.content.size, [
       { type: 'heading', attrs: { level: 2 }, content: [{ type: 'text', text: `Task ${label}` }] },
+      {
+        type: 'taskList',
+        content: [
+          {
+            type: 'taskItem',
+            attrs: { checked: false },
+            content: [{ type: 'paragraph', content: [{ type: 'text', text: `Task ${label}` }] }],
+          },
+        ],
+      },
       { type: 'heading', attrs: { level: 3 }, content: [{ type: 'text', text: 'Solution' }] },
       ...(src
         ? [{ type: 'inkBlock', attrs: { src, width: SOLUTION_INK_WIDTH, height: SOLUTION_INK_HEIGHT } }]
