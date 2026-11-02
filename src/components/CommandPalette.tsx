@@ -14,6 +14,7 @@ const NO_WORKSPACE_NEEDED = new Set(['open-workspace', 'settings', 'shortcuts-he
 const NEEDS_NOTE = new Set([
   'toggle-view',
   'insert-ink',
+  'add-property',
   'split-tasks',
   'extract-selection',
   'export-pdf',

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { ChevronRight, Plus, X } from 'lucide-react'
 import { api } from '../lib/tauri'
 import { inferType } from '../lib/propertyType'
@@ -9,16 +9,26 @@ import { PropertyValueInput } from './PropertyValueInput'
 interface PropertiesBlockProps {
   content: string
   onSave: (content: string) => void
+  listenForAddCommand?: boolean
 }
 
-export function PropertiesBlock({ content, onSave }: PropertiesBlockProps) {
+export function PropertiesBlock({ content, onSave, listenForAddCommand = false }: PropertiesBlockProps) {
   const { properties, error } = useProperties(content)
   const [open, setOpen] = useState<boolean | null>(null)
   const [adding, setAdding] = useState(false)
   const [editError, setEditError] = useState<string | null>(null)
   const entries = Object.entries(properties)
   const expanded = open ?? false
-  const showAdd = expanded || entries.length === 0
+
+  useEffect(() => {
+    if (!listenForAddCommand) return
+    const onAdd = () => {
+      setOpen(true)
+      setAdding(true)
+    }
+    window.addEventListener('command:add-property', onAdd)
+    return () => window.removeEventListener('command:add-property', onAdd)
+  }, [listenForAddCommand])
 
   const apply = async (edit: PropertyEdit) => {
     try {
@@ -45,6 +55,8 @@ export function PropertiesBlock({ content, onSave }: PropertiesBlockProps) {
       </div>
     )
   }
+
+  if (entries.length === 0 && !adding && !editError) return null
 
   return (
     <div className="properties-block">
@@ -78,7 +90,7 @@ export function PropertiesBlock({ content, onSave }: PropertiesBlockProps) {
             </button>
           </div>
         ))}
-      {!showAdd ? null : adding ? (
+      {adding ? (
         <input
           className="properties-key"
           aria-label="New property name"
@@ -89,7 +101,7 @@ export function PropertiesBlock({ content, onSave }: PropertiesBlockProps) {
             if (e.key === 'Escape') setAdding(false)
           }}
         />
-      ) : (
+      ) : expanded && (
         <button className="properties-add" onClick={() => { setOpen(true); setAdding(true) }}>
           <Plus size={12} /> Add property
         </button>

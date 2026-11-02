@@ -34,6 +34,7 @@ export const COMMANDS: CommandDef[] = [
   def('new-from-template', 'New from Template…', 'Create', 'Ctrl+Shift+T'),
   def('open-workspace', 'Open Workspace…', 'Navigate', 'Ctrl+O'),
   def('close-workspace', 'Close Workspace', 'Other'),
+  def('add-property', 'Add Property', 'Note'),
   def('split-tasks', 'Split Into Tasks', 'Note'),
   def('extract-selection', 'Extract Selection to New Note', 'Note'),
   def('generate-formula-sheet', 'Generate Formula Sheet…', 'Note'),

@@ -349,6 +349,11 @@ export function Layout() {
         case 'insert-ink':
           window.dispatchEvent(new Event('command:insert-ink'))
           break
+        case 'add-property':
+          if (!activeTab) break
+          setPrimaryViewMode('wysiwyg')
+          window.dispatchEvent(new Event('command:add-property'))
+          break
         case 'split-tasks':
           // Same shape as insert-ink: the editor instance stays in NoteEditor
           // rather than being lifted here just so a menu item can reach it.

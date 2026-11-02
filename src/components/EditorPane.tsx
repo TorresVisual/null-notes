@@ -109,7 +109,7 @@ export const EditorPane = forwardRef<HTMLDivElement, EditorPaneProps>(function E
         {isLoading && <LoadingStatus />}
         {!isLoading && notePath && viewMode === 'wysiwyg' && (
           <>
-            <PropertiesBlock content={content} onSave={onSave} />
+            <PropertiesBlock content={content} onSave={onSave} listenForAddCommand={!onClose} />
             <NoteEditor
               content={body}
               notePath={notePath}

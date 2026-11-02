@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { PropertiesBlock } from './PropertiesBlock'
 import { api } from '../lib/tauri'
@@ -43,10 +43,10 @@ describe('PropertiesBlock', () => {
     await waitFor(() => expect(onSave).toHaveBeenCalledWith('---\ndone: true\n---\nbody'))
   })
 
-  it('offers only "Add property" for a note without frontmatter, and does not parse', () => {
-    render(<PropertiesBlock content={'# Just a note'} onSave={vi.fn()} />)
+  it('renders nothing for a note without frontmatter, and does not parse', () => {
+    const { container } = render(<PropertiesBlock content={'# Just a note'} onSave={vi.fn()} />)
 
-    expect(screen.getByRole('button', { name: /add property/i })).toBeInTheDocument()
+    expect(container).toBeEmptyDOMElement()
     expect(parse).not.toHaveBeenCalled()
   })
 
@@ -65,8 +65,10 @@ describe('PropertiesBlock', () => {
     edit.mockResolvedValue('---\nstatus: ""\n---\n# Just a note')
     const onSave = vi.fn()
 
-    render(<PropertiesBlock content={'# Just a note'} onSave={onSave} />)
-    await user.click(screen.getByRole('button', { name: /add property/i }))
+    render(<PropertiesBlock content={'# Just a note'} onSave={onSave} listenForAddCommand />)
+    act(() => {
+      window.dispatchEvent(new Event('command:add-property'))
+    })
     await user.type(screen.getByRole('textbox', { name: 'New property name' }), 'status{Enter}')
 
     expect(edit).toHaveBeenCalledWith('# Just a note', { type: 'set', key: 'status', value: '' })
