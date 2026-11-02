@@ -60,6 +60,7 @@ export function TabBar({
   const { canGoBack, canGoForward } = useNavigationHistoryStore()
   const [draggedPath, setDraggedPath] = useState<string | null>(null)
   if (openTabs.length === 0) return null
+  const folders = activeTab ? noteFolderSegments(activeTab, workspacePath) : []
   return (
     <>
     <div className="tab-bar">
@@ -134,10 +135,10 @@ export function TabBar({
           <ChevronRight size={16} />
         </button>
       </div>
-      {activeTab && (
+      {folders.length > 0 && (
         <nav className="breadcrumb" aria-label="Note location">
-          {[...noteFolderSegments(activeTab, workspacePath), noteTitle(notes, activeTab)].map((segment, i, all) => (
-            <span key={i} className={i === all.length - 1 ? 'breadcrumb-current' : undefined}>
+          {folders.map((segment, i) => (
+            <span key={i}>
               {i > 0 && <span className="breadcrumb-sep" aria-hidden>/</span>}
               {segment}
             </span>

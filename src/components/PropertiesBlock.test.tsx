@@ -36,7 +36,8 @@ describe('PropertiesBlock', () => {
     const onSave = vi.fn()
 
     render(<PropertiesBlock content={content} onSave={onSave} />)
-    await user.click(await screen.findByRole('checkbox', { name: 'done' }))
+    await user.click(await screen.findByRole('button', { name: /properties \(1\)/i }))
+    await user.click(screen.getByRole('checkbox', { name: 'done' }))
 
     expect(edit).toHaveBeenCalledWith(content, { type: 'set', key: 'done', value: true })
     await waitFor(() => expect(onSave).toHaveBeenCalledWith('---\ndone: true\n---\nbody'))
@@ -47,6 +48,16 @@ describe('PropertiesBlock', () => {
 
     expect(screen.getByRole('button', { name: /add property/i })).toBeInTheDocument()
     expect(parse).not.toHaveBeenCalled()
+  })
+
+  it('starts collapsed when the note has properties', async () => {
+    parse.mockResolvedValue({ properties: { status: 'todo' }, error: null })
+
+    render(<PropertiesBlock content={'---\nstatus: todo\n---\nbody'} onSave={vi.fn()} />)
+
+    expect(await screen.findByRole('button', { name: /properties \(1\)/i })).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByRole('textbox', { name: 'status' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /add property/i })).not.toBeInTheDocument()
   })
 
   it('adds a property from the key input', async () => {
@@ -69,7 +80,8 @@ describe('PropertiesBlock', () => {
     edit.mockResolvedValue('body')
 
     render(<PropertiesBlock content={content} onSave={vi.fn()} />)
-    await user.click(await screen.findByRole('button', { name: 'Remove status' }))
+    await user.click(await screen.findByRole('button', { name: /properties \(1\)/i }))
+    await user.click(screen.getByRole('button', { name: 'Remove status' }))
 
     expect(edit).toHaveBeenCalledWith(content, { type: 'remove', key: 'status' })
   })
@@ -81,7 +93,8 @@ describe('PropertiesBlock', () => {
     edit.mockResolvedValue('---\nstatus: done\n---\nbody')
 
     render(<PropertiesBlock content={content} onSave={vi.fn()} />)
-    const input = await screen.findByRole('textbox', { name: 'status' })
+    await user.click(await screen.findByRole('button', { name: /properties \(1\)/i }))
+    const input = screen.getByRole('textbox', { name: 'status' })
     await user.click(input)
     await user.tab()
     expect(edit).not.toHaveBeenCalled()

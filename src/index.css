@@ -849,13 +849,6 @@ button, [role="button"], .tree-row, .tab, .search-result, .slash-menu-item,
 
 .breadcrumb-sep { margin: 0 6px; color: var(--text-disabled); }
 
-.breadcrumb-current {
-  color: var(--text-primary);
-  font-weight: 500;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
 /* Scrolls independently so a long tab list can never push save/git status
    off-screen — status always stays visible in .tab-bar-status. */
 .tab-bar-tabs {

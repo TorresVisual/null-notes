@@ -17,7 +17,8 @@ export function PropertiesBlock({ content, onSave }: PropertiesBlockProps) {
   const [adding, setAdding] = useState(false)
   const [editError, setEditError] = useState<string | null>(null)
   const entries = Object.entries(properties)
-  const expanded = open ?? entries.length > 0
+  const expanded = open ?? false
+  const showAdd = expanded || entries.length === 0
 
   const apply = async (edit: PropertyEdit) => {
     try {
@@ -77,7 +78,7 @@ export function PropertiesBlock({ content, onSave }: PropertiesBlockProps) {
             </button>
           </div>
         ))}
-      {adding ? (
+      {!showAdd ? null : adding ? (
         <input
           className="properties-key"
           aria-label="New property name"
