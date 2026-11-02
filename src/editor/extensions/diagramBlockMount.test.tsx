@@ -53,3 +53,26 @@ describe('a diagram block in a read-only editor', () => {
     expect(container.querySelector('.diagram-block-edit')).toBeNull()
   })
 })
+
+describe('a numbered diagram block', () => {
+  const fence =
+    '```diagram\n{"jsonSrc":"/ws/N.diagrams/d.excalidraw","svgSrc":"/ws/N.diagrams/d.svg","width":700,"height":500,"number":"2"}\n```'
+
+  it('round-trips its number through Markdown and exposes it as data-number', async () => {
+    const { container } = render(<TestEditor content={fence} />)
+
+    await waitFor(() => expect(container.querySelector('.diagram-block[data-number="2"]')).not.toBeNull())
+    const markdown = (editor?.storage as unknown as { markdown: { getMarkdown: () => string } }).markdown.getMarkdown()
+    expect(markdown).toContain('"height":500,"number":"2"}\n```')
+  })
+})
+
+describe('a numbered image', () => {
+  it('round-trips its number as an <img data-number> tag', async () => {
+    const { container } = render(<TestEditor content={'<img src="a.png" alt="x" data-number="3.1">'} />)
+
+    await waitFor(() => expect(container.querySelector('.note-image[data-number="3.1"]')).not.toBeNull())
+    const markdown = (editor?.storage as unknown as { markdown: { getMarkdown: () => string } }).markdown.getMarkdown()
+    expect(markdown).toContain('<img src="a.png" alt="x" data-number="3.1">')
+  })
+})

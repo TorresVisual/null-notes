@@ -6,6 +6,7 @@ import { ReactNodeViewRenderer, NodeViewWrapper } from '@tiptap/react'
 import type { ReactNodeViewProps } from '@tiptap/react'
 import { api } from '../../lib/tauri'
 import { useResolvedAssetSrc } from '../../hooks/useResolvedAssetSrc'
+import { FigureNumberInput } from '../../components/FigureNumberInput'
 
 interface NoteImageAttrs {
   src: string
@@ -13,6 +14,7 @@ interface NoteImageAttrs {
   title: string | null
   width: number | null
   height: number | null
+  number: string | null
 }
 
 // Sidecar directories are named after the note, so they routinely contain
@@ -38,17 +40,18 @@ export function decodeSrc(src: string): string {
   }
 }
 
-function NoteImageView({ node, editor }: ReactNodeViewProps) {
-  const { src, alt, title } = node.attrs as unknown as NoteImageAttrs
+function NoteImageView({ node, editor, updateAttributes }: ReactNodeViewProps) {
+  const { src, alt, title, number } = node.attrs as unknown as NoteImageAttrs
   const notePath = editor.storage.noteContext.notePath
   const { resolved, failed } = useResolvedAssetSrc(notePath, src)
 
   return (
-    <NodeViewWrapper as="span" className="note-image">
+    <NodeViewWrapper as="span" className="note-image" data-number={number ?? undefined}>
       {resolved && <img src={resolved} alt={alt ?? ''} title={title ?? undefined} />}
       {/* Same posture as an unresolved wiki-link: say the target is missing
           rather than rendering a broken box the user can't interpret. */}
       {failed && <span className="note-image-missing">Missing image: {src}</span>}
+      {editor.isEditable && <FigureNumberInput number={number} onCommit={(next) => updateAttributes({ number: next })} />}
     </NodeViewWrapper>
   )
 }
@@ -102,6 +105,10 @@ export const NoteImage = Node.create({
           return h ? parseInt(h, 10) : null
         },
       },
+      number: {
+        default: null,
+        parseHTML: (element: HTMLElement) => element.getAttribute('data-number'),
+      },
     }
   },
 
@@ -146,21 +153,22 @@ export const NoteImage = Node.create({
     return {
       markdown: {
         serialize(state: Record<string, unknown>, node: { attrs: NoteImageAttrs }) {
-          const { src, alt, title, width, height } = node.attrs
+          const { src, alt, title, width, height, number } = node.attrs
           const typed = state as unknown as {
             esc: (text: string) => string
             write: (text: string) => void
           }
-          // When explicit dimensions are set, emit a raw HTML <img> tag so the
-          // width/height survive the round-trip (Markdown image syntax has no
-          // dimension fields).
-          if (width !== null || height !== null) {
+          // When explicit dimensions or a figure number are set, emit a raw HTML
+          // <img> tag so they survive the round-trip (Markdown image syntax has no
+          // such fields).
+          if (width !== null || height !== null || number !== null) {
             const encodedSrc = encodeSrc(src)
             const attrs = [`src="${encodedSrc}"`]
             if (alt) attrs.push(`alt="${alt.replace(/"/g, '&quot;')}"`)
             if (title) attrs.push(`title="${title.replace(/"/g, '&quot;')}"`)
             if (width !== null) attrs.push(`width="${width}"`)
             if (height !== null) attrs.push(`height="${height}"`)
+            if (number !== null) attrs.push(`data-number="${number}"`)
             typed.write(`<img ${attrs.join(' ')}>`)
             return
           }

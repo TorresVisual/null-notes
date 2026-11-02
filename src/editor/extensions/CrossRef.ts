@@ -112,6 +112,10 @@ function scrollToBlock(calloutType: string, number: string, attempt = 0): void {
   let el: HTMLElement | null
   if (calloutType === 'equation') {
     el = document.querySelector<HTMLElement>(`.block-math[data-number="${number}"]`)
+  } else if (calloutType === 'figure') {
+    el = document.querySelector<HTMLElement>(
+      `.diagram-block[data-number="${number}"], .note-image[data-number="${number}"]`,
+    )
   } else if (calloutType === 'task') {
     el =
       Array.from(document.querySelectorAll<HTMLElement>('h2')).find(

@@ -5078,6 +5078,7 @@ input[type='checkbox']:focus-visible {
 
 /* Pasted/dropped images, stored in the note's .assets sidecar */
 .note-image {
+  position: relative;
   display: inline-block;
   max-width: 100%;
   vertical-align: bottom;
@@ -6319,6 +6320,43 @@ input[type='checkbox']:focus-visible {
 .diagram-block:hover .diagram-block-actions {
   opacity: 1;
 }
+
+/* Figure N — the optional number a diagram or image answers to. Hidden until
+   the figure is hovered or focused, unless it already carries a number. */
+.figure-number {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px;
+  background: var(--bg-raised);
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+.figure-number-input {
+  width: 3em;
+  padding: 0;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-primary);
+  background: transparent;
+  border: 0;
+  outline: none;
+}
+.note-image > .figure-number {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  opacity: 0;
+  transition: opacity var(--duration-base) var(--ease-standard);
+}
+.note-image:hover > .figure-number,
+.note-image > .figure-number:focus-within,
+.note-image > .figure-number.has-value {
+  opacity: 1;
+}
+.diagram-block-actions .figure-number:not(:focus-within):not(.has-value) { opacity: 0.7; }
 
 .diagram-block-edit,
 .diagram-block-copy {

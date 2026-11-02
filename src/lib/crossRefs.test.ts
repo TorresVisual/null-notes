@@ -53,4 +53,10 @@ describe('findCrossRefs', () => {
       { calloutType: 'task', number: '3', from: 4, to: 10 },
     ])
   })
+
+  it('recognises a Figure mention', () => {
+    expect(findCrossRefs('as shown in Figure 2.1')).toEqual([
+      { calloutType: 'figure', number: '2.1', from: 12, to: 22 },
+    ])
+  })
 })

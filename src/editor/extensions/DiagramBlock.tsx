@@ -6,6 +6,7 @@ import { diagramApi } from '../../lib/diagram'
 import { sanitizeNoteHtml } from '../../lib/sanitizeHtml'
 import { writeToClipboard } from '../../lib/clipboard'
 import { encodeSrc } from './NoteImage'
+import { FigureNumberInput } from '../../components/FigureNumberInput'
 
 // Dynamically imported so @excalidraw/excalidraw (a multi-MB bundle) only
 // loads once a diagram is actually opened for editing — a note that never
@@ -20,6 +21,7 @@ interface DiagramBlockAttrs {
   svgSrc: string
   width: number
   height: number
+  number: string | null
 }
 
 // A card's front/back is a plain text line (see extract_cards, notes.rs),
@@ -37,14 +39,14 @@ export function relativeToNoteDir(notePath: string, absolutePath: string): strin
   return absolutePath.slice(prefix.length).split('\\').join('/')
 }
 
-function DiagramBlockView({ node, editor }: ReactNodeViewProps) {
+function DiagramBlockView({ node, editor, updateAttributes }: ReactNodeViewProps) {
   // width/height are stored (see DiagramBlockAttrs below) but intentionally
   // not applied here — the preview sizes itself to the actual exported SVG's
   // own dimensions (see .diagram-block-preview svg's max-width/height:auto
   // in index.css), the same way MermaidBlock's rendered SVG does. A diagram
   // whose drawn content is much smaller than the block's nominal box used to
   // force a large empty region below the visible shapes.
-  const { jsonSrc, svgSrc } = node.attrs as unknown as DiagramBlockAttrs
+  const { jsonSrc, svgSrc, number } = node.attrs as unknown as DiagramBlockAttrs
   const notePath = editor.storage.noteContext.notePath
   const [svg, setSvg] = useState('')
   const [editing, setEditing] = useState(false)
@@ -81,7 +83,7 @@ function DiagramBlockView({ node, editor }: ReactNodeViewProps) {
   if (!jsonSrc) return <NodeViewWrapper className="diagram-block" />
 
   return (
-    <NodeViewWrapper className="diagram-block">
+    <NodeViewWrapper className="diagram-block" data-number={number ?? undefined}>
       {/* The .diagrams/*.svg sidecar is normally only ever written by
           exportToSvg below, but it's still a file on disk inside a workspace
           that can be shared/synced — same trust boundary as a note's own
@@ -108,6 +110,7 @@ function DiagramBlockView({ node, editor }: ReactNodeViewProps) {
             {copied ? 'Copied' : 'Copy for card'}
           </button>
         )}
+        {editor.isEditable && <FigureNumberInput number={number} onCommit={(next) => updateAttributes({ number: next })} />}
         {editor.isEditable && (
           <button type="button" className="diagram-block-edit" aria-label="Edit diagram" onClick={() => setEditing(true)}>
             Edit
@@ -141,6 +144,7 @@ export const DiagramBlock = Node.create({
       svgSrc: { default: null },
       width: { default: 700 },
       height: { default: 500 },
+      number: { default: null },
     }
   },
 
@@ -153,6 +157,7 @@ export const DiagramBlock = Node.create({
           svgSrc: (el as HTMLElement).getAttribute('data-svg-src'),
           width: parseInt((el as HTMLElement).getAttribute('data-width') ?? '700', 10),
           height: parseInt((el as HTMLElement).getAttribute('data-height') ?? '500', 10),
+          number: (el as HTMLElement).getAttribute('data-number') || null,
         }),
       },
     ]
@@ -170,14 +175,14 @@ export const DiagramBlock = Node.create({
     return {
       markdown: {
         serialize(state: Record<string, unknown>, node: { attrs: DiagramBlockAttrs }) {
-          const { jsonSrc, svgSrc, width, height } = node.attrs
+          const { jsonSrc, svgSrc, width, height, number } = node.attrs
           const s = state as {
             write: (str: string) => void
             ensureNewLine: () => void
             closeBlock: (n: unknown) => void
           }
           s.write('```diagram\n')
-          s.write(JSON.stringify({ jsonSrc, svgSrc, width, height }))
+          s.write(JSON.stringify({ jsonSrc, svgSrc, width, height, ...(number ? { number } : {}) }))
           s.ensureNewLine()
           s.write('```')
           s.closeBlock(node)
@@ -195,6 +200,7 @@ export const DiagramBlock = Node.create({
                 div.setAttribute('data-svg-src', data.svgSrc ?? '')
                 div.setAttribute('data-width', String(data.width ?? 700))
                 div.setAttribute('data-height', String(data.height ?? 500))
+                if (data.number) div.setAttribute('data-number', data.number)
                 pre.replaceWith(div)
               } catch {
                 // invalid JSON — leave as-is

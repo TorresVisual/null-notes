@@ -701,6 +701,18 @@ pub fn task_marker_like_pattern(number: &str) -> String {
     format!("%## Task {}\n%", escape_like(number))
 }
 
+/// The LIKE patterns for a numbered figure: a diagram's fence line carries its
+/// number as the last JSON field (`"number":"2"}`), a numbered image is a raw
+/// `<img ... data-number="2">` tag (see `DiagramBlock.tsx` / `NoteImage.tsx`).
+/// The closing quote plus `}` / `>` disambiguates figure 2 from figure 24.
+pub fn figure_marker_like_patterns(number: &str) -> [String; 2] {
+    let number = escape_like(number);
+    [
+        format!("%\"number\":\"{number}\"}}\n```%"),
+        format!("%<img %data-number=\"{number}\">%"),
+    ]
+}
+
 /// The path of a note in `workspace` whose raw content matches
 /// `like_pattern` (built by [`marker_like_pattern`]), or `None` if no note
 /// defines it.
@@ -1805,6 +1817,53 @@ mod tests {
             .unwrap();
 
         assert_eq!(found, None);
+    }
+
+    #[tokio::test]
+    async fn test_figure_markers_match_diagram_and_image_but_not_a_longer_number() {
+        let pool = make_pool().await;
+        index_note(&pool, &note("a", "A", "/ws/a.md", "/ws"))
+            .await
+            .unwrap();
+        index_note_content(
+            &pool,
+            "/ws/a.md",
+            "A",
+            "```diagram\n{\"jsonSrc\":\"a.json\",\"svgSrc\":\"a.svg\",\"width\":700,\"height\":500,\"number\":\"2\"}\n```\n",
+        )
+        .await
+        .unwrap();
+        index_note(&pool, &note("b", "B", "/ws/b.md", "/ws"))
+            .await
+            .unwrap();
+        index_note_content(
+            &pool,
+            "/ws/b.md",
+            "B",
+            "<img src=\"b.png\" alt=\"x\" data-number=\"3.1\">\n",
+        )
+        .await
+        .unwrap();
+
+        let find = |number: &'static str| {
+            let pool = pool.clone();
+            async move {
+                for pattern in figure_marker_like_patterns(number) {
+                    if let Some(p) = note_containing_marker(&pool, "/ws", &pattern)
+                        .await
+                        .unwrap()
+                    {
+                        return Some(p);
+                    }
+                }
+                None
+            }
+        };
+
+        assert_eq!(find("2").await, Some("/ws/a.md".to_string()));
+        assert_eq!(find("3.1").await, Some("/ws/b.md".to_string()));
+        assert_eq!(find("3").await, None);
+        assert_eq!(find("22").await, None);
     }
 
     #[tokio::test]

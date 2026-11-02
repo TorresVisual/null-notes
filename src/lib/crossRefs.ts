@@ -1,6 +1,6 @@
 /**
  * Recognising a cross-reference in prose: `Theorem 3.2`, `Lemma 5`,
- * `Definition 1.1`, `Equation (3)` — a P6-1 block-type keyword (or P12-2's
+ * `Definition 1.1`, `Equation (3)`, `Figure 2` — a P6-1 block-type keyword (or P12-2's
  * `Equation`) plus its own number, optionally parenthesized.
  *
  * Deliberately keyed to the exact keyword set P6-1/P12-2 gave numbering to,
@@ -21,7 +21,7 @@ export interface CrossRef {
   to: number
 }
 
-const KEYWORDS = ['Theorem', 'Lemma', 'Corollary', 'Proof', 'Definition', 'Example', 'Algorithm', 'Equation', 'Task']
+const KEYWORDS = ['Theorem', 'Lemma', 'Corollary', 'Proof', 'Definition', 'Example', 'Algorithm', 'Equation', 'Task', 'Figure']
 
 // A number is digits, optionally dotted ("3", "3.2", "3.2.1") — the same
 // shape `> [!THEOREM 3.2]` accepts as its own `number` attribute. Parens are
