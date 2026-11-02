@@ -6,8 +6,8 @@ import {
   Network,
   Search,
   Settings,
-  Sigma,
   SquareTerminal,
+  SquareFunction,
   type LucideIcon,
 } from 'lucide-react'
 import { useWorkspaceStore } from '../store/workspace'
@@ -93,7 +93,7 @@ export function SidebarRail({
     { label: 'Tasks', icon: ListChecks, shortcut: 'Ctrl Shift K', onClick: onTaskOpen, disabled: noWorkspace },
     { label: 'Graph view', icon: Network, shortcut: 'Ctrl G', onClick: onGraphOpen, disabled: noWorkspace },
     { label: 'Review', icon: GraduationCap, shortcut: 'Ctrl Shift R', onClick: onReviewOpen, disabled: noWorkspace },
-    { label: 'Generate formula sheet', icon: Sigma, onClick: onFormulaSheetOpen, disabled: noWorkspace },
+    { label: 'Generate formula sheet', icon: SquareFunction, onClick: onFormulaSheetOpen, disabled: noWorkspace },
   ]
   const terminal: RailItem = {
     label: 'Terminal',

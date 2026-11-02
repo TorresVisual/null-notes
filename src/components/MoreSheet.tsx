@@ -1,4 +1,4 @@
-import { ListChecks, Network, RefreshCw, Settings, Sigma, type LucideIcon } from 'lucide-react'
+import { ListChecks, Network, RefreshCw, Settings, SquareFunction, type LucideIcon } from 'lucide-react'
 import type { OverlayKind } from '../hooks/useOverlayManager'
 
 interface Item {
@@ -10,7 +10,7 @@ interface Item {
 const ITEMS: Item[] = [
   { kind: 'task', label: 'Tasks', icon: ListChecks },
   { kind: 'graph', label: 'Graph view', icon: Network },
-  { kind: 'formulaSheet', label: 'Formula sheet', icon: Sigma },
+  { kind: 'formulaSheet', label: 'Formula sheet', icon: SquareFunction },
   { kind: 'settings', label: 'Settings', icon: Settings },
 ]
 
