@@ -50,7 +50,7 @@ export function MapView({ result, view, onOpen }: LayoutProps) {
 
   return (
     <div className="base-map-wrap">
-      {tilesFailed && <p className="base-banner" role="status">Couldn't load map tiles. Pins are shown without a map.</p>}
+      {tilesFailed && <p className="base-banner" role="status">Couldn&apos;t load map tiles. Pins are shown without a map.</p>}
       {pins.length === 0 && <p className="base-banner" role="status">No note has a valid latitude and longitude in “{property}”.</p>}
       <div ref={container} className="base-map" />
     </div>

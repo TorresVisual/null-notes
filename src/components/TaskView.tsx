@@ -81,7 +81,7 @@ export function TaskView({ onClose }: TaskViewProps) {
           <LoadingStatus />
         ) : loadError ? (
           <p className="empty-state">
-            Couldn't load tasks.
+            Couldn&apos;t load tasks.
             <span className="empty-state-detail">{loadError}</span>
           </p>
         ) : groups.length === 0 ? (

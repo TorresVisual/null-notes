@@ -128,7 +128,7 @@ export function GraphView({ onClose }: GraphViewProps) {
           <LoadingStatus />
         ) : loadError ? (
           <p className="empty-state">
-            Couldn't load the graph.
+            Couldn&apos;t load the graph.
             <span className="empty-state-detail">{loadError}</span>
           </p>
         ) : notes.length === 0 ? (

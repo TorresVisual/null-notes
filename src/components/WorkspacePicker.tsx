@@ -61,7 +61,7 @@ export function WorkspacePicker() {
 
       {folderError && (
         <p className="workspace-picker-error" role="alert">
-          Couldn't open that folder — {folderError}
+          Couldn&apos;t open that folder — {folderError}
         </p>
       )}
 
