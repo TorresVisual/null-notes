@@ -2378,9 +2378,11 @@ li .fold-toggle { left: -2.4em; }
 
 /* View source/preview toggle button */
 .view-toggle {
-  padding: 4px var(--space-sm);
+  display: inline-flex;
+  padding: 2px;
+  gap: 2px;
   background: none;
-  border: none;
+  border: 1px solid var(--border);
   border-radius: 4px;
   color: var(--text-secondary);
   cursor: pointer;
@@ -2389,8 +2391,9 @@ li .fold-toggle { left: -2.4em; }
   flex-shrink: 0;
 }
 
-.view-toggle:hover { color: var(--text-primary); background: var(--bg-hover); }
-.view-toggle.active { color: var(--accent); }
+.view-toggle > span { padding: 2px var(--space-sm); border-radius: 2px; }
+.view-toggle > span.is-current { color: var(--accent); background: var(--bg-hover); }
+.view-toggle:hover { color: var(--text-primary); }
 
 /* Save state chip — sits at the right end of the tab bar */
 .save-status {
