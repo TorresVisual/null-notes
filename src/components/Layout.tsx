@@ -397,6 +397,9 @@ export function Layout() {
         case 'generate-formula-sheet':
           if (workspacePath) openOverlay('formulaSheet')
           break
+        case 'generate-solutions-sheet':
+          if (workspacePath) openOverlay('solutionsSheet')
+          break
         case 'toggle-terminal':
           if (!workspacePath || mobile || isWeb()) break
           setTerminalMounted(true)
@@ -675,6 +678,7 @@ export function Layout() {
         />
       )}
       {activeOverlay === 'formulaSheet' && <FormulaSheetPrompt onClose={closeOverlay} />}
+      {activeOverlay === 'solutionsSheet' && <FormulaSheetPrompt kind="solutions" onClose={closeOverlay} />}
       <Suspense fallback={null}>
         {activeOverlay === 'exportPdf' && currentNote && (
           <ExportPdfDialog noteTitle={currentNote.title} contentRef={editorPaneRef} onClose={closeOverlay} />

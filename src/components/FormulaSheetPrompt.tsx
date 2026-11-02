@@ -8,14 +8,17 @@ import { parseSearchQuery } from '../lib/searchQuery'
 import { Dialog, DialogContent, DialogTitle } from './ui/dialog'
 
 interface FormulaSheetPromptProps {
+  kind?: 'formula' | 'solutions'
   onClose: () => void
 }
 
 // A single input reusing P6-5's folder:/tag: syntax (`parseSearchQuery`)
 // rather than a dedicated scope picker — blank means the whole workspace.
 // `type:` and free text are accepted but ignored; only folder/tag narrow
-// what a formula sheet collects from.
-export function FormulaSheetPrompt({ onClose }: FormulaSheetPromptProps) {
+// what a sheet collects from. `kind="solutions"` reuses the same prompt to
+// compile `### Solution` bodies instead of formulas.
+export function FormulaSheetPrompt({ kind = 'formula', onClose }: FormulaSheetPromptProps) {
+  const noun = kind === 'solutions' ? 'Solutions Sheet' : 'Formula Sheet'
   const workspacePath = useWorkspaceStore((s) => s.path)
   const openTab = useWorkspaceStore((s) => s.openTab)
   const addNote = useNotesStore((s) => s.addNote)
@@ -29,12 +32,14 @@ export function FormulaSheetPrompt({ onClose }: FormulaSheetPromptProps) {
     setIsGenerating(true)
     setError(null)
     try {
-      const meta = await api.notes.generateFormulaSheet(workspacePath, folder, tag)
+      const generateSheet =
+        kind === 'solutions' ? api.notes.generateSolutionsSheet : api.notes.generateFormulaSheet
+      const meta = await generateSheet(workspacePath, folder, tag)
       addNote(meta)
       openTab(meta.path)
       onClose()
     } catch (e) {
-      setError(failure('generate the formula sheet', e))
+      setError(failure(`generate the ${noun.toLowerCase()}`, e))
       setIsGenerating(false)
     }
   }
@@ -44,7 +49,7 @@ export function FormulaSheetPrompt({ onClose }: FormulaSheetPromptProps) {
       <DialogContent className="formula-sheet-prompt" showCloseButton={false}>
         <div className="settings-panel-header">
           <DialogTitle asChild>
-            <h2>Generate Formula Sheet</h2>
+            <h2>Generate {noun}</h2>
           </DialogTitle>
           <button className="settings-panel-close" onClick={onClose} aria-label="Close">
             <X size={16} />

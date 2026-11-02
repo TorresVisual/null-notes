@@ -12,6 +12,7 @@ export type OverlayKind =
   | 'task'
   | 'review'
   | 'formulaSheet'
+  | 'solutionsSheet'
   | 'exportPdf'
   | 'print'
   | 'flashcard'

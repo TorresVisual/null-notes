@@ -38,6 +38,7 @@ export const COMMANDS: CommandDef[] = [
   def('split-tasks', 'Split Into Tasks', 'Note'),
   def('extract-selection', 'Extract Selection to New Note', 'Note'),
   def('generate-formula-sheet', 'Generate Formula Sheet…', 'Note'),
+  def('generate-solutions-sheet', 'Generate Solutions Sheet…', 'Note'),
   def('export-pdf', 'Export to PDF…', 'Note'),
   def('print', 'Print…', 'Note'),
   def('trash', 'Trash…', 'Other'),

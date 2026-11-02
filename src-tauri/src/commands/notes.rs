@@ -430,6 +430,76 @@ pub fn extract_formulas(content: &str) -> Vec<ExtractedFormula> {
     formulas
 }
 
+// Each `### Solution` body (the shape `exercises.rs` scaffolds) paired with the
+// `## Task N` heading above it, running until the next heading of level 1-3 —
+// `####` and deeper belong to the solution. Standalone image lines (ink and
+// other sidecar embeds) and ```diagram fences are dropped: their paths are
+// relative to the source note and would dangle in a compiled one. A solution
+// left empty by that, or never filled in, yields nothing.
+pub fn extract_solutions(content: &str) -> Vec<(Option<String>, String)> {
+    let (Ok(heading_re), Ok(image_re)) = (
+        Regex::new(r"^(#{1,6})\s+(.+?)\s*$"),
+        Regex::new(r"^!\[[^\]]*\]\([^)]*\)$"),
+    ) else {
+        return Vec::new();
+    };
+
+    let mut solutions = Vec::new();
+    let mut task: Option<String> = None;
+    let mut body: Option<Vec<&str>> = None;
+    let mut in_fence = false;
+    let mut drop_fence = false;
+
+    let mut finish = |body: &mut Option<Vec<&str>>, task: &Option<String>| {
+        if let Some(lines) = body.take() {
+            let text = lines.join("\n").trim().to_string();
+            if !text.is_empty() {
+                solutions.push((task.clone(), text));
+            }
+        }
+    };
+
+    for line in content.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with("```") {
+            if in_fence {
+                in_fence = false;
+                if std::mem::take(&mut drop_fence) {
+                    continue;
+                }
+            } else {
+                in_fence = true;
+                drop_fence = trimmed.trim_start_matches('`').trim() == "diagram";
+                if drop_fence {
+                    continue;
+                }
+            }
+        } else if in_fence {
+            if drop_fence {
+                continue;
+            }
+        } else if let Some(caps) = heading_re.captures(trimmed) {
+            let level = caps[1].len();
+            if level <= 3 {
+                finish(&mut body, &task);
+                if level == 2 {
+                    task = Some(caps[2].to_string());
+                } else if level == 3 && caps[2].eq_ignore_ascii_case("solution") {
+                    body = Some(Vec::new());
+                }
+                continue;
+            }
+        } else if image_re.is_match(trimmed) {
+            continue;
+        }
+        if let Some(lines) = body.as_mut() {
+            lines.push(line);
+        }
+    }
+    finish(&mut body, &task);
+    solutions
+}
+
 // Same heading-tracking, fence-skipping shape as `extract_formulas` — the
 // two are meant to run side by side over the same content for #35 — but
 // looks for a Callout's `> [!TYPE NUM] Title` marker line (the on-disk form
@@ -2327,12 +2397,12 @@ pub async fn create_note_from_template(
     Ok(meta)
 }
 
-fn formula_sheet_title(folder: Option<&str>, tag: Option<&str>) -> String {
+fn sheet_title(base: &str, folder: Option<&str>, tag: Option<&str>) -> String {
     match (folder, tag) {
-        (None, None) => "Formula Sheet".to_string(),
-        (Some(f), None) => format!("Formula Sheet - {f}"),
-        (None, Some(t)) => format!("Formula Sheet - {t}"),
-        (Some(f), Some(t)) => format!("Formula Sheet - {f} - {t}"),
+        (None, None) => base.to_string(),
+        (Some(f), None) => format!("{base} - {f}"),
+        (None, Some(t)) => format!("{base} - {t}"),
+        (Some(f), Some(t)) => format!("{base} - {f} - {t}"),
     }
 }
 
@@ -2453,9 +2523,18 @@ async fn generate_formula_sheet_at(
         }
     }
 
-    let title = formula_sheet_title(folder, tag);
+    let title = sheet_title("Formula Sheet", folder, tag);
     let body = render_formula_sheet(&title, &entries, &callout_entries);
-    let path = create_note_file_with_content(workspace, &title, &body).await?;
+    write_generated_note(workspace, title, &body, db).await
+}
+
+async fn write_generated_note(
+    workspace: &str,
+    title: String,
+    body: &str,
+    db: &DbPool,
+) -> anyhow::Result<NoteMetadata> {
+    let path = create_note_file_with_content(workspace, &title, body).await?;
 
     let meta = NoteMetadata {
         id: Uuid::new_v4().to_string(),
@@ -2464,8 +2543,37 @@ async fn generate_formula_sheet_at(
         workspace: workspace.to_string(),
         updated_at: now_ms(),
     };
-    index_note_at(&meta.path, &meta.workspace, &body, db).await?;
+    index_note_at(&meta.path, &meta.workspace, body, db).await?;
     Ok(meta)
+}
+
+/// Every `### Solution` body across a scope, grouped by note and Task heading
+/// into a new plain note — the exam-review sibling of the formula sheet.
+async fn generate_solutions_sheet_at(
+    workspace: &str,
+    folder: Option<&str>,
+    tag: Option<&str>,
+    db: &DbPool,
+) -> anyhow::Result<NoteMetadata> {
+    let scoped = db::notes::notes_in_scope(db, workspace, folder, tag).await?;
+
+    let mut entries = Vec::new();
+    for note in &scoped {
+        let Ok(content) = tokio::fs::read_to_string(&note.path).await else {
+            continue;
+        };
+        for (task, solution) in extract_solutions(&content) {
+            entries.push((note.title.clone(), task, solution));
+        }
+    }
+
+    let title = sheet_title("Solutions", folder, tag);
+    let mut body = format!(
+        "# {title}
+"
+    );
+    render_grouped_entries(&mut body, &entries, "##", "###");
+    write_generated_note(workspace, title, &body, db).await
 }
 
 #[tauri::command]
@@ -2476,6 +2584,18 @@ pub async fn generate_formula_sheet(
     db: State<'_, DbPool>,
 ) -> Result<NoteMetadata, String> {
     generate_formula_sheet_at(&workspace, folder.as_deref(), tag.as_deref(), &db)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn generate_solutions_sheet(
+    workspace: String,
+    folder: Option<String>,
+    tag: Option<String>,
+    db: State<'_, DbPool>,
+) -> Result<NoteMetadata, String> {
+    generate_solutions_sheet_at(&workspace, folder.as_deref(), tag.as_deref(), &db)
         .await
         .map_err(|e| e.to_string())
 }
@@ -5122,6 +5242,70 @@ mod save_tests {
         let body = std::fs::read_to_string(&meta.path).unwrap();
         assert!(!body.contains("stale"));
         assert!(body.contains("Av = \\lambda v"));
+    }
+
+    #[test]
+    fn test_extract_solutions_pairs_each_solution_with_its_task() {
+        let content = "# Sheet 3\n\n## Task 1\n\nProve it.\n\n### Solution\n\nBy induction.\n\n#### Step\n\nBase case.\n\n## Task 2\n\n### Solution\n\nTrivial.\n";
+        assert_eq!(
+            extract_solutions(content),
+            vec![
+                (
+                    Some("Task 1".to_string()),
+                    "By induction.\n\n#### Step\n\nBase case.".to_string()
+                ),
+                (Some("Task 2".to_string()), "Trivial.".to_string()),
+            ]
+        );
+    }
+
+    #[test]
+    fn test_extract_solutions_skips_empty_and_ink_or_diagram_only_solutions() {
+        let content = "## Task 1\n\n### Solution\n\n## Task 2\n\n### Solution\n\n![Drawing](N.ink/a.svg#ink=700x400)\n\n```diagram\n{\"svgSrc\":\"N.diagrams/d.svg\"}\n```\n\n## Task 3\n\n### Solution\n\nText.\n\n![Drawing](N.ink/b.svg#ink=700x400)\n";
+        assert_eq!(
+            extract_solutions(content),
+            vec![(Some("Task 3".to_string()), "Text.".to_string())]
+        );
+    }
+
+    #[test]
+    fn test_extract_solutions_ignores_headings_inside_code_fences() {
+        let content = "## Task 1\n\n### Solution\n\n```md\n## not a heading\n```\n\nDone.\n";
+        assert_eq!(
+            extract_solutions(content),
+            vec![(
+                Some("Task 1".to_string()),
+                "```md\n## not a heading\n```\n\nDone.".to_string()
+            )]
+        );
+    }
+
+    #[tokio::test]
+    async fn test_generate_solutions_sheet_at_groups_by_note_and_task() {
+        let tmp = tempdir().unwrap();
+        let ws = tmp.path().to_string_lossy().into_owned();
+        let pool = sqlx::sqlite::SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect("sqlite::memory:")
+            .await
+            .unwrap();
+        run_migrations(&pool).await.unwrap();
+        let note = tmp.path().join("sheet.md");
+        let content = "# Sheet 1\n\n## Task 1\n\nQ\n\n### Solution\n\nA1\n\n## Task 2\n\n### Solution\n\nA2\n";
+        std::fs::write(&note, content).unwrap();
+        index_note_at(&note.to_string_lossy(), &ws, content, &pool)
+            .await
+            .unwrap();
+
+        let meta = generate_solutions_sheet_at(&ws, None, None, &pool)
+            .await
+            .unwrap();
+
+        assert_eq!(meta.title, "Solutions");
+        assert_eq!(
+            std::fs::read_to_string(&meta.path).unwrap(),
+            "# Solutions\n\n## Sheet 1\n\n### Task 1\n\nA1\n\n### Task 2\n\nA2\n"
+        );
     }
 }
 

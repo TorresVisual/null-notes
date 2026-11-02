@@ -274,6 +274,7 @@ pub fn run() {
             commands::notes::seed_default_templates,
             commands::notes::create_note_from_template,
             commands::notes::generate_formula_sheet,
+            commands::notes::generate_solutions_sheet,
             commands::editor_launch::open_in_editor,
             commands::editor_launch::resolve_code_links,
             commands::crossref::resolve_cross_refs,
