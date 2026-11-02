@@ -178,9 +178,12 @@ pub async fn remove_from_fts(pool: &SqlitePool, path: &str) -> Result<()> {
 /// explicit opt-in (issue #53) to search every indexed workspace at once,
 /// for the sibling-course-folders shape `NotesMonorepo` supports.
 ///
+/// `task` keeps notes with a task line containing that text (any state).
+///
 /// Built as one dynamic SQL string rather than `? IS NULL OR …` placeholders
 /// throughout: `rank` is only a meaningful ORDER BY when a `MATCH` clause is
 /// actually present, and a fixed query can't conditionally drop a JOIN.
+#[allow(clippy::too_many_arguments)]
 pub async fn search_notes(
     pool: &SqlitePool,
     workspace: Option<&str>,
@@ -188,9 +191,10 @@ pub async fn search_notes(
     folder: Option<&str>,
     tag: Option<&str>,
     block_type: Option<&str>,
+    task: Option<&str>,
     paging: SearchPaging,
 ) -> Result<Vec<SearchResult>> {
-    let (from_where, binds) = search_scope(workspace, fts_query, folder, tag, block_type);
+    let (from_where, binds) = search_scope(workspace, fts_query, folder, tag, block_type, task);
     let order = match (paging.sort, fts_query.is_some()) {
         (SearchSort::Relevance, true) => "rank, n.path",
         (SearchSort::Name, _) => "notes_fts.title COLLATE NOCASE, n.path",
@@ -219,8 +223,9 @@ pub async fn count_search_notes(
     folder: Option<&str>,
     tag: Option<&str>,
     block_type: Option<&str>,
+    task: Option<&str>,
 ) -> Result<i64> {
-    let (from_where, binds) = search_scope(workspace, fts_query, folder, tag, block_type);
+    let (from_where, binds) = search_scope(workspace, fts_query, folder, tag, block_type, task);
     let sql = format!("SELECT COUNT(*) {from_where}");
     let mut q = sqlx::query_scalar::<_, i64>(&sql);
     for bind in binds {
@@ -237,6 +242,7 @@ fn search_scope(
     folder: Option<&str>,
     tag: Option<&str>,
     block_type: Option<&str>,
+    task: Option<&str>,
 ) -> (String, Vec<String>) {
     let mut sql = String::from("FROM notes_fts JOIN notes n ON n.path = notes_fts.path");
     let mut binds = Vec::new();
@@ -262,6 +268,13 @@ fn search_scope(
     if let Some(block_type) = block_type {
         conditions.push("notes_fts.body LIKE ? ESCAPE '\\'");
         binds.push(format!("%[!{}%", escape_like(&block_type.to_uppercase())));
+    }
+    if let Some(task) = task {
+        conditions.push(
+            "EXISTS (SELECT 1 FROM note_tasks t WHERE t.note_path = notes_fts.path \
+             AND t.text LIKE ? ESCAPE '\\')",
+        );
+        binds.push(format!("%{}%", escape_like(task)));
     }
     if !conditions.is_empty() {
         sql.push_str(" WHERE ");
@@ -965,9 +978,18 @@ mod tests {
             limit: 20,
             offset: 0,
         };
-        let hits = search_notes(pool, Some("/ws"), fts.as_deref(), None, None, None, paging)
-            .await
-            .unwrap();
+        let hits = search_notes(
+            pool,
+            Some("/ws"),
+            fts.as_deref(),
+            None,
+            None,
+            None,
+            None,
+            paging,
+        )
+        .await
+        .unwrap();
         hits.into_iter().map(|h| h.title).collect()
     }
 
@@ -1008,12 +1030,13 @@ mod tests {
             hits.into_iter().map(|h| h.title).collect()
         };
 
-        let count = count_search_notes(&pool, Some("/ws"), Some("\"the\"*"), None, None, None)
-            .await
-            .unwrap();
+        let count =
+            count_search_notes(&pool, Some("/ws"), Some("\"the\"*"), None, None, None, None)
+                .await
+                .unwrap();
         assert_eq!(count, 2);
         assert_eq!(
-            count_search_notes(&pool, Some("/ws"), None, None, None, None)
+            count_search_notes(&pool, Some("/ws"), None, None, None, None, None)
                 .await
                 .unwrap(),
             4
@@ -1022,6 +1045,7 @@ mod tests {
         let by_modified = search_notes(
             &pool,
             Some("/ws"),
+            None,
             None,
             None,
             None,
@@ -1035,6 +1059,7 @@ mod tests {
         let by_name_page_two = search_notes(
             &pool,
             Some("/ws"),
+            None,
             None,
             None,
             None,
@@ -1055,6 +1080,7 @@ mod tests {
             &pool,
             Some("/ws"),
             Some("\"shortest\"*"),
+            None,
             None,
             None,
             None,
@@ -1083,6 +1109,7 @@ mod tests {
             Some("CS102"),
             None,
             None,
+            None,
             SearchPaging {
                 sort: SearchSort::Relevance,
                 limit: 20,
@@ -1107,6 +1134,7 @@ mod tests {
             None,
             None,
             Some("graphs"),
+            None,
             None,
             SearchPaging {
                 sort: SearchSort::Relevance,
@@ -1133,6 +1161,7 @@ mod tests {
             None,
             None,
             Some("theorem"),
+            None,
             SearchPaging {
                 sort: SearchSort::Relevance,
                 limit: 20,
@@ -1147,6 +1176,65 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_search_notes_filters_by_task_text() {
+        let pool = make_pool().await;
+        seed_search_fixture(&pool).await;
+        let task = |text: &str, position| ExtractedTask {
+            text: text.to_string(),
+            done: false,
+            position,
+        };
+        set_tasks(
+            &pool,
+            "/ws/CS101/a.md",
+            &[task("Finish Problem Set 3", 0), task("problem set 4", 1)],
+        )
+        .await
+        .unwrap();
+        let paging = SearchPaging {
+            sort: SearchSort::Relevance,
+            limit: 20,
+            offset: 0,
+        };
+
+        let hits = search_notes(
+            &pool,
+            Some("/ws"),
+            None,
+            None,
+            None,
+            None,
+            Some("problem set"),
+            paging,
+        )
+        .await
+        .unwrap();
+        let count = count_search_notes(
+            &pool,
+            Some("/ws"),
+            None,
+            None,
+            None,
+            None,
+            Some("problem set"),
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            hits.len(),
+            1,
+            "two matching tasks must not duplicate the note"
+        );
+        assert_eq!(hits[0].path, "/ws/CS101/a.md");
+        assert_eq!(count, 1);
+
+        let none = count_search_notes(&pool, Some("/ws"), None, None, None, None, Some("routing"))
+            .await
+            .unwrap();
+        assert_eq!(none, 0, "plain prose is not a task line");
+    }
+
+    #[tokio::test]
     async fn test_search_notes_combines_text_and_filters() {
         let pool = make_pool().await;
         seed_search_fixture(&pool).await;
@@ -1156,6 +1244,7 @@ mod tests {
             Some("/ws"),
             Some("\"routing\"*"),
             Some("CS101"),
+            None,
             None,
             None,
             SearchPaging {
@@ -1179,6 +1268,7 @@ mod tests {
             &pool,
             None,
             Some("\"shortest\"*"),
+            None,
             None,
             None,
             None,

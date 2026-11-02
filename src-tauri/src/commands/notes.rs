@@ -1729,6 +1729,7 @@ pub async fn search_notes(
     folder: Option<String>,
     tag: Option<String>,
     block_type: Option<String>,
+    task: Option<String>,
     all_workspaces: bool,
     sort: Option<SearchSort>,
     offset: Option<i64>,
@@ -1738,7 +1739,12 @@ pub async fn search_notes(
 
     // A bare `folder:` or `tag:` with no free text is a real, useful search
     // ("everything in this folder") — only truly empty input short-circuits.
-    if fts_query.is_none() && folder.is_none() && tag.is_none() && block_type.is_none() {
+    if fts_query.is_none()
+        && folder.is_none()
+        && tag.is_none()
+        && block_type.is_none()
+        && task.is_none()
+    {
         return Ok(SearchPage {
             results: vec![],
             total: 0,
@@ -1762,6 +1768,7 @@ pub async fn search_notes(
         folder.as_deref(),
         tag.as_deref(),
         block_type.as_deref(),
+        task.as_deref(),
         paging,
     )
     .await
@@ -1773,6 +1780,7 @@ pub async fn search_notes(
         folder.as_deref(),
         tag.as_deref(),
         block_type.as_deref(),
+        task.as_deref(),
     )
     .await
     .map_err(|e| e.to_string())?;
@@ -3996,6 +4004,7 @@ mod save_tests {
             None,
             None,
             None,
+            None,
             SearchPaging {
                 sort: SearchSort::Relevance,
                 limit: 20,
@@ -4494,6 +4503,7 @@ mod save_tests {
             None,
             None,
             None,
+            None,
             SearchPaging {
                 sort: SearchSort::Relevance,
                 limit: 20,
@@ -4543,6 +4553,7 @@ mod save_tests {
             &pool,
             Some(&ws),
             Some("automaton"),
+            None,
             None,
             None,
             None,
@@ -5103,14 +5114,16 @@ mod folder_tests {
             None,
             None,
             None,
+            None,
             paging(),
         )
         .await
         .unwrap();
         assert_eq!(by_value.len(), 1);
-        let by_key = db::notes::search_notes(&pool, ws, Some("status"), None, None, None, paging())
-            .await
-            .unwrap();
+        let by_key =
+            db::notes::search_notes(&pool, ws, Some("status"), None, None, None, None, paging())
+                .await
+                .unwrap();
         assert!(by_key.is_empty());
     }
 

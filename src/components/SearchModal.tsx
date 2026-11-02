@@ -40,8 +40,8 @@ export function SearchModal({ onClose }: SearchModalProps) {
 
   useEffect(() => {
     if (!workspacePath) return
-    const { text, folder, tag, type } = parseSearchQuery(query)
-    if (!text && !folder && !tag && !type) {
+    const { text, folder, tag, type, task } = parseSearchQuery(query)
+    if (!text && !folder && !tag && !type && !task) {
       setResults([])
       setTotal(0)
       return
@@ -49,7 +49,7 @@ export function SearchModal({ onClose }: SearchModalProps) {
     let stale = false
     const timer = setTimeout(() => {
       api.notes
-        .search(workspacePath, text, folder, tag, type, allWorkspaces, sort)
+        .search(workspacePath, text, folder, tag, type, task, allWorkspaces, sort)
         .then((page) => {
           if (stale) return
           setResults(page.results)
@@ -69,9 +69,9 @@ export function SearchModal({ onClose }: SearchModalProps) {
 
   async function showMore() {
     if (!workspacePath) return
-    const { text, folder, tag, type } = parseSearchQuery(query)
+    const { text, folder, tag, type, task } = parseSearchQuery(query)
     const page = await api.notes.search(
-      workspacePath, text, folder, tag, type, allWorkspaces, sort, results.length,
+      workspacePath, text, folder, tag, type, task, allWorkspaces, sort, results.length,
     )
     setResults((current) => [...current, ...page.results])
     setTotal(page.total)

@@ -263,6 +263,7 @@ impl<R: Runtime> Ctx<'_, R> {
                         folder,
                         a.tag,
                         a.block_type,
+                        None,
                         a.all_workspaces,
                         None,
                         a.offset,

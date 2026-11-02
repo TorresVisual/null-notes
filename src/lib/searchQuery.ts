@@ -1,10 +1,7 @@
 /**
- * P6-5: `folder:`/`tag:`/`type:` narrow a search without leaving the
+ * P6-5: `folder:`/`tag:`/`type:`/`task:` narrow a search without leaving the
  * keyboard — a fixed, small key list, not a query language (the bounded
  * version of "Dataview-lite" the roadmap otherwise rejects).
- *
- * `task:` is named in the roadmap too but deliberately not implemented here:
- * it needs P9-1's `note_tasks` table, which doesn't exist yet.
  */
 
 export interface ParsedSearchQuery {
@@ -13,16 +10,18 @@ export interface ParsedSearchQuery {
   folder: string | null
   tag: string | null
   type: string | null
+  task: string | null
 }
 
 // A value is one token, no spaces — deliberately no quoting syntax. This is
 // meant to stay a fixed, small key list, not a query language.
-const KEY_PATTERN = /\b(folder|tag|type):(\S+)/gi
+const KEY_PATTERN = /\b(folder|tag|type|task):(\S+)/gi
 
 export function parseSearchQuery(query: string): ParsedSearchQuery {
   let folder: string | null = null
   let tag: string | null = null
   let type: string | null = null
+  let task: string | null = null
 
   const text = query
     .replace(KEY_PATTERN, (_match, key: string, value: string) => {
@@ -36,13 +35,16 @@ export function parseSearchQuery(query: string): ParsedSearchQuery {
         case 'type':
           type = value
           break
+        case 'task':
+          task = value
+          break
       }
       return ' '
     })
     .replace(/\s+/g, ' ')
     .trim()
 
-  return { text, folder, tag, type }
+  return { text, folder, tag, type, task }
 }
 
 const TERM_PATTERN = /(-?)(?:"([^"]*)"|([^\s()"]+))/g

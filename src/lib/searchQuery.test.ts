@@ -7,7 +7,7 @@ describe('parseSearchQuery', () => {
       text: 'shortest path',
       folder: null,
       tag: null,
-      type: null,
+      type: null, task: null
     })
   })
 
@@ -16,16 +16,16 @@ describe('parseSearchQuery', () => {
       text: 'shortest path',
       folder: 'CS101',
       tag: null,
-      type: null,
+      type: null, task: null
     })
   })
 
   it('extracts a tag key', () => {
-    expect(parseSearchQuery('tag:graphs')).toEqual({ text: '', folder: null, tag: 'graphs', type: null })
+    expect(parseSearchQuery('tag:graphs')).toEqual({ text: '', folder: null, tag: 'graphs', type: null, task: null })
   })
 
   it('extracts a type key', () => {
-    expect(parseSearchQuery('type:theorem')).toEqual({ text: '', folder: null, tag: null, type: 'theorem' })
+    expect(parseSearchQuery('type:theorem')).toEqual({ text: '', folder: null, tag: null, type: 'theorem', task: null })
   })
 
   it('combines several keys with free text, in any order', () => {
@@ -33,12 +33,12 @@ describe('parseSearchQuery', () => {
       text: 'shortest path',
       folder: 'CS101',
       tag: 'graphs',
-      type: null,
+      type: null, task: null
     })
   })
 
   it('is case-insensitive on the key name', () => {
-    expect(parseSearchQuery('TAG:graphs')).toEqual({ text: '', folder: null, tag: 'graphs', type: null })
+    expect(parseSearchQuery('TAG:graphs')).toEqual({ text: '', folder: null, tag: 'graphs', type: null, task: null })
   })
 
   it('the last occurrence of a repeated key wins', () => {
@@ -46,7 +46,7 @@ describe('parseSearchQuery', () => {
       text: '',
       folder: 'CS102',
       tag: null,
-      type: null,
+      type: null, task: null
     })
   })
 
@@ -55,7 +55,7 @@ describe('parseSearchQuery', () => {
       text: 'shortest',
       folder: null,
       tag: 'graphs',
-      type: null,
+      type: null, task: null
     })
   })
 
@@ -64,8 +64,18 @@ describe('parseSearchQuery', () => {
       text: 'author:knuth shortest',
       folder: null,
       tag: null,
-      type: null,
+      type: null, task: null
     })
+  })
+})
+
+it('extracts task: as its own key', () => {
+  expect(parseSearchQuery('task:problem shortest')).toEqual({
+    text: 'shortest',
+    folder: null,
+    tag: null,
+    type: null,
+    task: 'problem',
   })
 })
 
@@ -75,7 +85,7 @@ describe('parseSearchQuery with operators', () => {
       text: '"master theorem" OR (a -b)',
       folder: 'CS101',
       tag: 'x',
-      type: null,
+      type: null, task: null
     })
   })
 })
