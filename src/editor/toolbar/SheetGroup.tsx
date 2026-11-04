@@ -5,12 +5,19 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { splitIntoTasks, addNextTask, report, markdownOf } from '../splitIntoTasks'
 import { nextTaskLabel } from '../../lib/taskScaffold'
 import { insertFlashcardFromLastTask } from '../../lib/taskToFlashcard'
+import { insertFlashcardFromLastCallout } from '../../lib/calloutToFlashcard'
 
 const FLASHCARD_OUTCOME_MESSAGE: Record<string, string> = {
   'no-task': 'No Task section found in this note.',
   'no-solution': 'That task has no worked Solution yet.',
   'no-drawing': "That task's Solution has no hand-drawn ink yet.",
   'already-exists': 'That task already has a flashcard.',
+}
+
+const CALLOUT_OUTCOME_MESSAGE: Record<string, string> = {
+  'no-callout': 'No numbered Definition, Theorem, Lemma, Corollary, Example or Algorithm found in this note.',
+  empty: 'That block has no body text to put on a card.',
+  'already-exists': 'That block already has a flashcard.',
 }
 
 interface SheetGroupProps {
@@ -71,6 +78,19 @@ export function SheetGroup({ editor }: SheetGroupProps) {
             }}
           >
             <Layers size={14} /> Flashcard from last task
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            title="Turn the last numbered Definition, Theorem, Lemma, Corollary, Example or Algorithm into a review flashcard"
+            onSelect={() => {
+              try {
+                const detail = CALLOUT_OUTCOME_MESSAGE[insertFlashcardFromLastCallout(editor)]
+                if (detail) void message(detail)
+              } catch (error) {
+                report(error)
+              }
+            }}
+          >
+            <Layers size={14} /> Flashcard from last definition/theorem
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
