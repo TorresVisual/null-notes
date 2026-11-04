@@ -17,6 +17,7 @@ pub mod jumplist;
 pub mod notes;
 pub mod pdf;
 pub mod printing;
+pub mod scheduler;
 pub mod settings;
 pub mod terminal;
 pub mod trash;

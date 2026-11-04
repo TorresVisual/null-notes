@@ -134,6 +134,7 @@ Consistently honored by the code but never written down until now (2026-07-29), 
 | `NoteName.pdf/` page sidecars (`pdf.rs`) | `recent-workspaces.json` (`workspace.rs`) |
 | `NoteName.assets/` pasted images (`assets.rs`) |  |
 | `.bookmarks` — sidebar bookmarks (#159), one JSON object per line, workspace-relative paths (`bookmarks.rs`) |  |
+| `.scheduler.json` — flashcard scheduler (SM-2 or FSRS + desired retention, #137), so every machine grades a card the same way (`commands/scheduler.rs`) |  |
 | `Name.base` — a Bases definition (2026-11-01), YAML in Obsidian's syntax; a file of its own, not a sidecar (`commands/bases.rs`) |  |
 | `.workspace.json` — UI state, gitignored |  |
 |  | `trash/` — deleted notes, folders and their sidecars (`trash.rs`) |

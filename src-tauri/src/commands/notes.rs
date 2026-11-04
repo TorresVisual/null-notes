@@ -1,4 +1,6 @@
+use super::scheduler::{read_scheduler_at, Scheduler};
 use crate::db::{self, DbPool};
+use crate::fsrs;
 use crate::link_resolve::resolve;
 use crate::models::{
     BacklinkEntry, CardKind, CardSummary, CodeLinkEntry, DueCard, ExtractedCallout, ExtractedCard,
@@ -595,12 +597,34 @@ type SrComment = (
     bool,
 );
 
+// Present only on cards graded under FSRS; SM-2 never reads or writes it, so
+// switching schedulers back and forth loses nothing.
+fn parse_fsrs_state(line: &str) -> Option<fsrs::FsrsState> {
+    let re = Regex::new(r"\sstability=(\S+)\s+difficulty=(\S+)\s+-->$").ok()?;
+    let caps = re.captures(line.trim())?;
+    Some(fsrs::FsrsState {
+        stability: caps[1].parse().ok()?,
+        difficulty: caps[2].parse().ok()?,
+    })
+}
+
+fn fsrs_suffix(state: Option<fsrs::FsrsState>) -> String {
+    state
+        .map(|s| {
+            format!(
+                " stability={:.4} difficulty={:.4}",
+                s.stability, s.difficulty
+            )
+        })
+        .unwrap_or_default()
+}
+
 // A schedule comment is never itself a card, even though it starts a fresh
 // line right after one — checked first so the loop below never has to
 // special-case it.
 fn parse_sr_comment(line: &str) -> Option<SrComment> {
     let re = match Regex::new(
-        r"^<!--\s+sr\s+due=(\S+)\s+ease=(\S+)\s+interval=(\S+)\s+reps=(\S+)(?:\s+grade=(\S+))?(?:\s+streak=(\S+))?(?:\s+lapses=(\S+))?(?:\s+suspended=(\S+))?\s+-->$",
+        r"^<!--\s+sr\s+due=(\S+)\s+ease=(\S+)\s+interval=(\S+)\s+reps=(\S+)(?:\s+grade=(\S+))?(?:\s+streak=(\S+))?(?:\s+lapses=(\S+))?(?:\s+suspended=(\S+))?(?:\s+stability=\S+\s+difficulty=\S+)?\s+-->$",
     ) {
         Ok(re) => re,
         Err(_) => return None,
@@ -1321,6 +1345,7 @@ pub fn grade_card_line(
     position: i64,
     grade: sm2::Grade,
     today: chrono::NaiveDate,
+    scheduler: Scheduler,
 ) -> Option<String> {
     let mut lines: Vec<String> = content.lines().map(str::to_string).collect();
     let idx = usize::try_from(position).ok()?;
@@ -1338,24 +1363,57 @@ pub fn grade_card_line(
         sr_comment_idx(&borrowed, idx + 1)
     };
 
-    let (current, current_streak, current_lapses, current_suspended) = lines
-        .get(comment_idx)
-        .and_then(|l| parse_sr_comment(l))
-        .map(|(_, ease, interval, reps, _, streak, lapses, suspended)| {
-            (
-                sm2::CardState {
-                    ease,
-                    interval,
-                    reps,
-                },
-                streak.unwrap_or(0),
-                lapses.unwrap_or(0),
-                suspended,
-            )
-        })
-        .unwrap_or((sm2::CardState::default(), 0, 0, false));
+    let existing = lines.get(comment_idx).and_then(|l| parse_sr_comment(l));
+    let (current, current_streak, current_lapses, current_suspended, due) = existing
+        .as_ref()
+        .map(
+            |(due, ease, interval, reps, _, streak, lapses, suspended)| {
+                (
+                    sm2::CardState {
+                        ease: *ease,
+                        interval: *interval,
+                        reps: *reps,
+                    },
+                    streak.unwrap_or(0),
+                    lapses.unwrap_or(0),
+                    *suspended,
+                    Some(due.clone()),
+                )
+            },
+        )
+        .unwrap_or((sm2::CardState::default(), 0, 0, false, None));
 
-    let next = sm2::next_state(current, grade, today);
+    let (next, fsrs_state) = match scheduler {
+        Scheduler::Sm2 => (sm2::next_state(current, grade, today), None),
+        Scheduler::Fsrs { retention } => {
+            let previous = lines
+                .get(comment_idx)
+                .and_then(|l| parse_fsrs_state(l))
+                .or_else(|| {
+                    existing
+                        .as_ref()
+                        .map(|_| fsrs::from_sm2(current.ease, current.interval))
+                });
+            let elapsed = due
+                .and_then(|d| chrono::NaiveDate::parse_from_str(&d, "%Y-%m-%d").ok())
+                .map(|d| (today - (d - chrono::Duration::days(current.interval))).num_days())
+                .unwrap_or(0);
+            let (state, scheduled) = fsrs::next_state(previous, elapsed, grade, retention, today);
+            let reps = if grade == sm2::Grade::Again {
+                0
+            } else {
+                current.reps + 1
+            };
+            (
+                sm2::Scheduled {
+                    ease: current.ease,
+                    reps,
+                    ..scheduled
+                },
+                Some(state),
+            )
+        }
+    };
     let next_streak = sm2::next_streak(current_streak, grade);
     let next_lapses = sm2::next_lapses(current_lapses, current.reps, grade);
     let suspended_part = if current_suspended {
@@ -1364,7 +1422,7 @@ pub fn grade_card_line(
         ""
     };
     let comment = format!(
-        "<!-- sr due={} ease={:.2} interval={} reps={} grade={} streak={} lapses={}{} -->",
+        "<!-- sr due={} ease={:.2} interval={} reps={} grade={} streak={} lapses={}{}{} -->",
         next.due,
         next.ease,
         next.interval,
@@ -1372,7 +1430,8 @@ pub fn grade_card_line(
         grade.as_str(),
         next_streak,
         next_lapses,
-        suspended_part
+        suspended_part,
+        fsrs_suffix(fsrs_state)
     );
 
     let has_comment_line = lines
@@ -1420,8 +1479,9 @@ pub fn set_card_suspended_line(content: &str, position: i64, suspended: bool) ->
     let streak_part = streak.map(|s| format!(" streak={s}")).unwrap_or_default();
     let lapses_part = lapses.map(|l| format!(" lapses={l}")).unwrap_or_default();
     let suspended_part = if suspended { " suspended=true" } else { "" };
+    let fsrs_part = fsrs_suffix(lines.get(comment_idx).and_then(|l| parse_fsrs_state(l)));
     let comment = format!(
-        "<!-- sr due={due} ease={ease:.2} interval={interval} reps={reps}{grade_part}{streak_part}{lapses_part}{suspended_part} -->"
+        "<!-- sr due={due} ease={ease:.2} interval={interval} reps={reps}{grade_part}{streak_part}{lapses_part}{suspended_part}{fsrs_part} -->"
     );
 
     let has_comment_line = lines
@@ -1564,7 +1624,8 @@ async fn grade_card_at(
 ) -> anyhow::Result<()> {
     let content = read_note_or_forget(path, db).await?;
     let today = chrono::Utc::now().date_naive();
-    let new_content = grade_card_line(&content, position, grade, today)
+    let scheduler = read_scheduler_at(workspace).await;
+    let new_content = grade_card_line(&content, position, grade, today, scheduler)
         .ok_or_else(|| anyhow::anyhow!("no card at line {position} in {path}"))?;
     write_atomic(Path::new(path), &new_content).await?;
     index_note_at(path, workspace, &new_content, db).await?;
@@ -3535,7 +3596,14 @@ mod tests {
 
     #[test]
     fn test_grade_card_line_schedules_each_occlusion_region_independently() {
-        let result = grade_card_line(OCCLUSION_NOTE, 4, sm2::Grade::Good, grade_today()).unwrap();
+        let result = grade_card_line(
+            OCCLUSION_NOTE,
+            4,
+            sm2::Grade::Good,
+            grade_today(),
+            Scheduler::Sm2,
+        )
+        .unwrap();
         let cards = extract_cards(&result);
         assert_eq!(cards[0].due.as_deref(), Some("2026-08-21"));
         assert_eq!(cards[0].reps, Some(2));
@@ -3546,7 +3614,14 @@ mod tests {
 
     #[test]
     fn test_occlusion_schedules_follow_their_lines_when_reordered() {
-        let graded = grade_card_line(OCCLUSION_NOTE, 4, sm2::Grade::Good, grade_today()).unwrap();
+        let graded = grade_card_line(
+            OCCLUSION_NOTE,
+            4,
+            sm2::Grade::Good,
+            grade_today(),
+            Scheduler::Sm2,
+        )
+        .unwrap();
         let lines: Vec<&str> = graded.lines().collect();
         let reordered = format!("{}\n{}\n{}\n{}\n", lines[4], lines[5], lines[2], lines[3]);
         let cards = extract_cards(&reordered);
@@ -3865,7 +3940,14 @@ mod tests {
 
     #[test]
     fn test_grade_card_line_inserts_a_new_schedule_comment() {
-        let result = grade_card_line("Q :: A\n", 0, sm2::Grade::Good, grade_today()).unwrap();
+        let result = grade_card_line(
+            "Q :: A\n",
+            0,
+            sm2::Grade::Good,
+            grade_today(),
+            Scheduler::Sm2,
+        )
+        .unwrap();
         assert_eq!(
             result,
             "Q :: A\n<!-- sr due=2026-08-21 ease=2.50 interval=1 reps=1 grade=good streak=1 lapses=0 -->\n"
@@ -3875,7 +3957,8 @@ mod tests {
     #[test]
     fn test_grade_card_line_replaces_an_existing_schedule_comment() {
         let content = "Q :: A\n<!-- sr due=2026-08-20 ease=2.50 interval=6 reps=2 -->\n";
-        let result = grade_card_line(content, 0, sm2::Grade::Good, grade_today()).unwrap();
+        let result =
+            grade_card_line(content, 0, sm2::Grade::Good, grade_today(), Scheduler::Sm2).unwrap();
         assert_eq!(
             result,
             "Q :: A\n<!-- sr due=2026-09-04 ease=2.50 interval=15 reps=3 grade=good streak=1 lapses=0 -->\n"
@@ -3883,9 +3966,51 @@ mod tests {
     }
 
     #[test]
+    fn test_fsrs_grading_writes_state_and_regrade_reads_it_back() {
+        let fsrs = Scheduler::Fsrs { retention: 0.9 };
+        let first = grade_card_line(
+            "Q :: A
+",
+            0,
+            sm2::Grade::Good,
+            grade_today(),
+            fsrs,
+        )
+        .unwrap();
+        assert!(first.contains("stability=3.1730 difficulty="));
+        let later = grade_today() + chrono::Duration::days(3);
+        let second = grade_card_line(&first, 0, sm2::Grade::Good, later, fsrs).unwrap();
+        assert_eq!(second.matches("<!-- sr").count(), 1);
+        assert!(!second.contains("stability=3.1730"));
+        let suspended = set_card_suspended_line(&second, 0, true).unwrap();
+        assert!(suspended.contains("suspended=true stability="));
+    }
+
+    #[test]
+    fn test_fsrs_switch_keeps_due_until_graded_and_migrates_from_sm2() {
+        let content = "Q :: A
+<!-- sr due=2026-09-01 ease=2.50 interval=15 reps=3 -->
+";
+        assert_eq!(
+            parse_sr_comment(content.lines().nth(1).unwrap()).unwrap().0,
+            "2026-09-01"
+        );
+        let out = grade_card_line(
+            content,
+            0,
+            sm2::Grade::Good,
+            chrono::NaiveDate::from_ymd_opt(2026, 9, 16).unwrap(),
+            Scheduler::Fsrs { retention: 0.9 },
+        )
+        .unwrap();
+        assert!(out.contains("stability=") && out.contains("reps=4"));
+    }
+
+    #[test]
     fn test_grade_card_line_again_resets_progress() {
         let content = "Q :: A\n<!-- sr due=2026-08-20 ease=2.50 interval=6 reps=2 -->\n";
-        let result = grade_card_line(content, 0, sm2::Grade::Again, grade_today()).unwrap();
+        let result =
+            grade_card_line(content, 0, sm2::Grade::Again, grade_today(), Scheduler::Sm2).unwrap();
         assert!(result.contains("interval=1 reps=0"));
     }
 
@@ -3893,7 +4018,8 @@ mod tests {
     fn test_grade_card_line_streak_increments_on_consecutive_good_grades() {
         let content =
             "Q :: A\n<!-- sr due=2026-08-20 ease=2.50 interval=6 reps=2 grade=good streak=2 -->\n";
-        let result = grade_card_line(content, 0, sm2::Grade::Good, grade_today()).unwrap();
+        let result =
+            grade_card_line(content, 0, sm2::Grade::Good, grade_today(), Scheduler::Sm2).unwrap();
         assert!(result.contains("streak=3"));
     }
 
@@ -3901,7 +4027,8 @@ mod tests {
     fn test_grade_card_line_streak_resets_to_zero_on_again() {
         let content =
             "Q :: A\n<!-- sr due=2026-08-20 ease=2.50 interval=6 reps=2 grade=good streak=3 -->\n";
-        let result = grade_card_line(content, 0, sm2::Grade::Again, grade_today()).unwrap();
+        let result =
+            grade_card_line(content, 0, sm2::Grade::Again, grade_today(), Scheduler::Sm2).unwrap();
         assert!(result.contains("streak=0"));
     }
 
@@ -3909,7 +4036,8 @@ mod tests {
     fn test_grade_card_line_streak_unchanged_on_hard() {
         let content =
             "Q :: A\n<!-- sr due=2026-08-20 ease=2.50 interval=6 reps=2 grade=good streak=2 -->\n";
-        let result = grade_card_line(content, 0, sm2::Grade::Hard, grade_today()).unwrap();
+        let result =
+            grade_card_line(content, 0, sm2::Grade::Hard, grade_today(), Scheduler::Sm2).unwrap();
         assert!(result.contains("streak=2"));
     }
 
@@ -3918,7 +4046,8 @@ mod tests {
         // Graded before this field existed — no `streak=` at all, not even
         // `streak=0`. Must default the same way a never-graded card does.
         let content = "Q :: A\n<!-- sr due=2026-08-20 ease=2.50 interval=1 reps=1 grade=good -->\n";
-        let result = grade_card_line(content, 0, sm2::Grade::Good, grade_today()).unwrap();
+        let result =
+            grade_card_line(content, 0, sm2::Grade::Good, grade_today(), Scheduler::Sm2).unwrap();
         assert!(result.contains("streak=1"));
     }
 
@@ -3926,13 +4055,21 @@ mod tests {
     fn test_grade_card_line_again_on_a_reviewed_card_increments_lapses() {
         let content =
             "Q :: A\n<!-- sr due=2026-08-20 ease=2.50 interval=6 reps=2 grade=good streak=3 lapses=1 -->\n";
-        let result = grade_card_line(content, 0, sm2::Grade::Again, grade_today()).unwrap();
+        let result =
+            grade_card_line(content, 0, sm2::Grade::Again, grade_today(), Scheduler::Sm2).unwrap();
         assert!(result.contains("lapses=2"));
     }
 
     #[test]
     fn test_grade_card_line_again_on_a_never_reviewed_card_leaves_lapses_at_zero() {
-        let result = grade_card_line("Q :: A\n", 0, sm2::Grade::Again, grade_today()).unwrap();
+        let result = grade_card_line(
+            "Q :: A\n",
+            0,
+            sm2::Grade::Again,
+            grade_today(),
+            Scheduler::Sm2,
+        )
+        .unwrap();
         assert!(result.contains("lapses=0"));
     }
 
@@ -3940,19 +4077,28 @@ mod tests {
     fn test_grade_card_line_good_leaves_lapses_unchanged() {
         let content =
             "Q :: A\n<!-- sr due=2026-08-20 ease=2.50 interval=6 reps=2 grade=good streak=2 lapses=1 -->\n";
-        let result = grade_card_line(content, 0, sm2::Grade::Good, grade_today()).unwrap();
+        let result =
+            grade_card_line(content, 0, sm2::Grade::Good, grade_today(), Scheduler::Sm2).unwrap();
         assert!(result.contains("lapses=1"));
     }
 
     #[test]
     fn test_grade_card_line_none_when_position_is_no_longer_a_card() {
-        assert!(grade_card_line("just prose now\n", 0, sm2::Grade::Good, grade_today()).is_none());
+        assert!(grade_card_line(
+            "just prose now\n",
+            0,
+            sm2::Grade::Good,
+            grade_today(),
+            Scheduler::Sm2
+        )
+        .is_none());
     }
 
     #[test]
     fn test_grade_card_line_preserves_a_second_card_below() {
         let content = "Q1 :: A1\nQ2 :: A2\n";
-        let result = grade_card_line(content, 0, sm2::Grade::Good, grade_today()).unwrap();
+        let result =
+            grade_card_line(content, 0, sm2::Grade::Good, grade_today(), Scheduler::Sm2).unwrap();
         assert!(result.contains("Q2 :: A2"));
         assert!(result.contains("Q1 :: A1\n<!-- sr"));
     }
@@ -3965,6 +4111,7 @@ mod tests {
             0,
             sm2::Grade::Good,
             chrono::NaiveDate::from_ymd_opt(2026, 8, 20).unwrap(),
+            Scheduler::Sm2,
         )
         .unwrap();
         let lines: Vec<&str> = out.lines().collect();
@@ -3981,6 +4128,7 @@ mod tests {
             0,
             sm2::Grade::Easy,
             chrono::NaiveDate::from_ymd_opt(2026, 8, 21).unwrap(),
+            Scheduler::Sm2,
         )
         .unwrap();
         assert_eq!(out.lines().count(), 4);
@@ -3995,6 +4143,7 @@ mod tests {
             0,
             sm2::Grade::Hard,
             chrono::NaiveDate::from_ymd_opt(2026, 8, 20).unwrap(),
+            Scheduler::Sm2,
         )
         .unwrap();
         assert!(out.contains("grade=hard"));
@@ -4012,6 +4161,7 @@ mod tests {
             0,
             sm2::Grade::Easy,
             chrono::NaiveDate::from_ymd_opt(2026, 8, 21).unwrap(),
+            Scheduler::Sm2,
         )
         .unwrap();
         assert_eq!(out.matches("<!-- sr ").count(), 1);
@@ -4027,6 +4177,7 @@ mod tests {
             0,
             sm2::Grade::Easy,
             chrono::NaiveDate::from_ymd_opt(2026, 8, 21).unwrap(),
+            Scheduler::Sm2,
         )
         .unwrap();
         assert_eq!(out.matches("<!-- sr ").count(), 1);
@@ -4040,7 +4191,8 @@ mod tests {
             content,
             0,
             sm2::Grade::Good,
-            chrono::NaiveDate::from_ymd_opt(2026, 8, 20).unwrap()
+            chrono::NaiveDate::from_ymd_opt(2026, 8, 20).unwrap(),
+            Scheduler::Sm2
         )
         .is_none());
     }
@@ -6158,7 +6310,7 @@ Lecture.ink/1.svg
     fn test_grade_card_line_preserves_suspended_status() {
         let note = "What is 2+2? :: 4\n<!-- sr due=2026-01-01 ease=2.50 interval=0 reps=0 suspended=true -->\n";
         let today = chrono::NaiveDate::from_ymd_opt(2026, 1, 1).unwrap();
-        let graded = grade_card_line(note, 0, sm2::Grade::Good, today).unwrap();
+        let graded = grade_card_line(note, 0, sm2::Grade::Good, today, Scheduler::Sm2).unwrap();
         assert!(graded.contains("suspended=true"));
     }
 }

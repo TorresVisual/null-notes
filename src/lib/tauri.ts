@@ -180,6 +180,12 @@ export const api = {
     write: (workspace: string, content: string) =>
       invoke<void>('write_bookmarks', { workspace, content }),
   },
+  scheduler: {
+    get: (workspace: string) =>
+      invoke<{ scheduler: 'sm2' } | { scheduler: 'fsrs'; retention: number }>('get_scheduler', { workspace }),
+    set: (workspace: string, fsrs: boolean, retention?: number) =>
+      invoke<void>('set_scheduler', { workspace, fsrs, retention }),
+  },
   workspace: {
     watch: (workspace: string) =>
       invoke<void>('watch_workspace', { workspace }),

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { GitBranch, Info, Keyboard, SpellCheck, SquarePen, Wrench, X, type LucideIcon } from 'lucide-react'
 import { confirm, message } from '@tauri-apps/plugin-dialog'
 import { useSettingsStore, DEFAULT_SETTINGS } from '../store/settings'
@@ -45,6 +45,16 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
   const [error, setError] = useState<string | null>(null)
   const [showErrorLog, setShowErrorLog] = useState(false)
   const [section, setSection] = useState<SectionId>('editor')
+  const [fsrsRetention, setFsrsRetention] = useState<number | null>(null)
+  useEffect(() => {
+    if (!workspacePath) return
+    void api.scheduler.get(workspacePath).then((s) => setFsrsRetention(s.scheduler === 'fsrs' ? s.retention : null))
+  }, [workspacePath])
+  const updateScheduler = (fsrs: boolean, retention: number) => {
+    if (!workspacePath) return
+    setFsrsRetention(fsrs ? retention : null)
+    void api.scheduler.set(workspacePath, fsrs, retention)
+  }
   const hasGit = Boolean(workspacePath && repoMode === null) || Boolean(repoMode)
   const sections = SECTIONS.filter((s) => s.id !== 'git' || hasGit)
   const currentId: SectionId = sections.some((s) => s.id === section) ? section : 'editor'
@@ -361,6 +371,50 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
             </label>
 
           </div>
+
+          {workspacePath && (
+            <>
+              <h4 className="settings-group-title">Flashcards</h4>
+              <div className="settings-card">
+                <label className="settings-row">
+                  <span>
+                    Scheduler
+                    <small>
+                      Applies to this workspace and syncs with it. Switching keeps every card's due date; the new
+                      scheduler takes over when a card is next graded.
+                    </small>
+                  </span>
+                  <span className="settings-row-control">
+                    <select
+                      value={fsrsRetention === null ? 'sm2' : 'fsrs'}
+                      onChange={(e) => updateScheduler(e.target.value === 'fsrs', fsrsRetention ?? 0.9)}
+                    >
+                      <option value="sm2">SM-2</option>
+                      <option value="fsrs">FSRS</option>
+                    </select>
+                  </span>
+                </label>
+                {fsrsRetention !== null && (
+                  <label className="settings-row">
+                    <span>
+                      Desired retention
+                      <small>Chance of recalling a card when it comes due. Higher means more reviews.</small>
+                    </span>
+                    <span className="settings-row-control">
+                      <input
+                        type="number"
+                        min={0.7}
+                        max={0.97}
+                        step={0.01}
+                        value={fsrsRetention}
+                        onChange={(e) => updateScheduler(true, clampNumber(e.target.valueAsNumber, 0.7, 0.97))}
+                      />
+                    </span>
+                  </label>
+                )}
+              </div>
+            </>
+          )}
 
           <h4 className="settings-group-title">Command line</h4>
           <div className="settings-card">

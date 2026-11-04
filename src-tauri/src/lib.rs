@@ -3,6 +3,7 @@ pub mod cli_server;
 pub mod commands;
 pub mod db;
 pub mod exercises;
+pub mod fsrs;
 pub mod link_resolve;
 pub mod models;
 pub mod pdf;
@@ -241,6 +242,8 @@ pub fn run() {
             cli_server::report_dirty_paths,
             commands::bookmarks::read_bookmarks,
             commands::bookmarks::write_bookmarks,
+            commands::scheduler::get_scheduler,
+            commands::scheduler::set_scheduler,
             commands::notes::create_note,
             commands::notes::create_canvas,
             commands::notes::rename_canvas,

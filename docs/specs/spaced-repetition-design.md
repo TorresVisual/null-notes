@@ -140,4 +140,4 @@ Easy:  reps += 1
 - **Theorem/Proof-block auto-cards.** The roadmap notes these could become cards "for free" — deferred: pairing a Theorem block with a following Proof block into synthetic question/answer text is real matching logic with no line in this task's DoD, and a user can already hand-author a Q::A card from a theorem in seconds once cards exist.
 - **Per-cloze sub-cards** (Anki's `c1`/`c2` model). One line is one card, full stop.
 - **Frontmatter.** Not needed — Option A's per-note inline state was the whole point of avoiding it (per ROADMAP.md §5).
-- **Custom scheduling parameters** (per-deck ease presets, configurable intervals). One global SM-2 variant, no settings surface for it.
+- **Custom scheduling parameters** (per-deck ease presets, configurable intervals). SM-2 is the default; FSRS (default parameters, no optimizer) is an opt-in per-workspace scheduler in `.scheduler.json` (#137). FSRS state rides the same comment line as `stability=` / `difficulty=`; last review is `due − interval`, so no review log exists. A parameter optimizer would need one — decide where it lives (ROADMAP §1) first.
