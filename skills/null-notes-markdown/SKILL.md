@@ -25,7 +25,7 @@ Change a property of an existing note with `nullnotes property set` (it preserve
 
 ## Links and embeds
 
-- `[[Note]]`, `[[Note#Heading]]`, `[[Note|label]]`, `[[Note#Heading|label]]` — the title is the text before the first `#` or `|`. Links resolve by note title.
+- `[[Note]]`, `[[Note#Heading]]`, `[[Note|label]]`, `[[Note#Heading|label]]` — the title is the text before the first `#` or `|`. Links resolve by note title; when several notes share a title, write a path suffix (`[[Course/Sheet 01]]`) to pick one.
 - `![[Note]]` embeds a whole note (its leading `# ` title line is dropped); `![[Note#Section]]` embeds one section; `![[Name.base]]` embeds a Bases view. An embed must be **alone in its paragraph** (blank lines around it).
 - Images and files are ordinary Markdown: `![alt](Lecture%207.assets/fig.png)`. `![[image.png]]` is not an image embed. To make an image cross-referenceable as `Figure 2`, write it as `<img src="Lecture%207.assets/fig.png" data-number="2">`.
 - `src/main.cpp:58` in prose becomes a clickable code link; `Theorem 3.2` becomes a cross-reference to the matching numbered callout. Both are plain text on disk.

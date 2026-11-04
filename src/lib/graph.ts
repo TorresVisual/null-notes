@@ -1,5 +1,6 @@
 import type { NoteMetadata, GraphLink, GraphTag } from '../types'
 import { parseSearchQuery } from './searchQuery'
+import { resolveWikiLink } from './wikiLinkResolve'
 
 export interface GraphNode {
   id: string
@@ -14,7 +15,7 @@ export interface GraphEdge {
 
 // Resolves raw link/tag rows from the backend into a deduplicated node/edge
 // graph. Link resolution matches how [[links]] resolve elsewhere in the app
-// (backlinks_for, WikiLink): case-insensitive title match, unresolved links
+// (backlinks_for, WikiLink): the shared `resolveWikiLink`, unresolved links
 // dropped rather than shown as dangling nodes. Notes sharing a tag get a
 // pairwise edge between every pair — fine at personal-notebook tag sizes,
 // but a tag shared by very many notes would generate a lot of edges.
@@ -24,7 +25,6 @@ export function buildGraph(
   tags: GraphTag[],
 ): { nodes: GraphNode[]; edges: GraphEdge[] } {
   const nodes = notes.map((n) => ({ id: n.path, title: n.title }))
-  const titleToPath = new Map(notes.map((n) => [n.title.toLowerCase(), n.path]))
 
   const seen = new Set<string>()
   const edges: GraphEdge[] = []
@@ -38,8 +38,8 @@ export function buildGraph(
   }
 
   for (const link of links) {
-    const targetPath = titleToPath.get(link.targetTitle.toLowerCase())
-    if (targetPath) addEdge(link.sourcePath, targetPath, 'link')
+    const target = resolveWikiLink(link.targetTitle, notes)
+    if (target) addEdge(link.sourcePath, target.path, 'link')
   }
 
   const notesByTag = new Map<string, string[]>()

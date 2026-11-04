@@ -193,7 +193,7 @@ pub(super) async fn merge_note_at(
 
     let mut snapshots = vec![rewrite_note(dest, dest_content, merged, workspace, db).await?];
     if retarget {
-        for backlinker in db::notes::backlinks_for(db, workspace, &source_title).await? {
+        for backlinker in db::notes::backlinks_for(db, workspace, source).await? {
             if backlinker.path == source || backlinker.path == dest {
                 continue;
             }

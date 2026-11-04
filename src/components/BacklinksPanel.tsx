@@ -20,7 +20,7 @@ export function BacklinksPanel({ notePath, noteTitle }: BacklinksPanelProps) {
 
   useEffect(() => {
     if (!workspacePath) return
-    api.notes.backlinksForWithContext(workspacePath, noteTitle).then(setBacklinks)
+    api.notes.backlinksForWithContext(workspacePath, notePath).then(setBacklinks)
     api.notes
       .unlinkedMentionsForWithContext(workspacePath, noteTitle, notePath)
       .then(setUnlinkedMentions)

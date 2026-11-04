@@ -279,7 +279,10 @@ impl<R: Runtime> Ctx<'_, R> {
             }
             "backlinks" => {
                 let a: TitleArg = self.args()?;
-                json(notes::backlinks_for_with_context(self.ws().await?, a.title, db()).await?)
+                json(
+                    notes::backlinks_for_target_with_context(self.ws().await?, a.title, db())
+                        .await?,
+                )
             }
             "backlinks.code" => {
                 let a: TargetArg = self.args()?;

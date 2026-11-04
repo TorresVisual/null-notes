@@ -3,6 +3,7 @@ pub mod cli_server;
 pub mod commands;
 pub mod db;
 pub mod exercises;
+pub mod link_resolve;
 pub mod models;
 pub mod pdf;
 pub mod properties;

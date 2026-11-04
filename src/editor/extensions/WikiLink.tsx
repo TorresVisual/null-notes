@@ -14,6 +14,7 @@ import { api } from '../../lib/tauri'
 import { encodeAttr } from '../../lib/htmlAttr'
 import { setPendingHighlight } from '../../lib/pendingHighlight'
 import { parseHeadings } from '../../lib/outlineHeadings'
+import { resolveWikiLink, wikiLinkTargetFor } from '../../lib/wikiLinkResolve'
 import { formatWikiLink, parseWikiLink, wikiLinkText } from '../../lib/wikiLinkSyntax'
 import type { WikiLinkParts } from '../../lib/wikiLinkSyntax'
 import { Tooltip, TooltipContent, TooltipTrigger } from '../../components/ui/tooltip'
@@ -31,7 +32,7 @@ function WikiLinkView({ node }: ReactNodeViewProps) {
   // every link on mount — most links on screen are never hovered.
   const [preview, setPreview] = useState<string | null>(null)
 
-  const target = notes.find((n) => n.title.toLowerCase() === title.toLowerCase())
+  const target = resolveWikiLink(title, notes)
 
   // Creating the missing note is what resolves the link: the new note lands in
   // the store, this view re-renders, and `target` is found on the next pass.
@@ -102,7 +103,7 @@ async function wikiLinkItems({ query }: { query: string }): Promise<WikiLinkItem
   const typed = parseWikiLink(query)
   const q = typed.title.toLowerCase()
   const notes = useNotesStore.getState().notes
-  const exactNote = notes.find((n) => n.title.toLowerCase() === q)
+  const exactNote = q ? resolveWikiLink(typed.title, notes) : undefined
 
   if (query.slice(0, query.indexOf('|') < 0 ? undefined : query.indexOf('|')).includes('#')) {
     if (!exactNote) return []
@@ -111,13 +112,15 @@ async function wikiLinkItems({ query }: { query: string }): Promise<WikiLinkItem
     return headings
       .filter((h) => h.text.toLowerCase().includes(wanted))
       .slice(0, 10)
-      .map((h) => ({ title: exactNote.title, heading: h.text, label: typed.label, isNew: false }))
+      .map((h) => ({ title: typed.title, heading: h.text, label: typed.label, isNew: false }))
   }
 
   const matches = notes
-    .filter((n) => n.title.toLowerCase().includes(q))
+    .filter((n) =>
+      q.includes('/') ? n.path.replace(/\\/g, '/').toLowerCase().includes(q) : n.title.toLowerCase().includes(q),
+    )
     .slice(0, 10)
-    .map((n) => ({ title: n.title, heading: '', label: typed.label, isNew: false }))
+    .map((n) => ({ title: wikiLinkTargetFor(n, notes), heading: '', label: typed.label, isNew: false }))
   if (typed.title && !exactNote) {
     matches.push({ title: typed.title, heading: '', label: typed.label, isNew: true })
   }

@@ -1,4 +1,5 @@
 use crate::db::{self, DbPool};
+use crate::link_resolve::resolve;
 use crate::models::{
     BacklinkEntry, CardKind, CardSummary, CodeLinkEntry, DueCard, ExtractedCallout, ExtractedCard,
     ExtractedFormula, ExtractedTask, GraphLink, GraphTag, McGradeResult, NoteMetadata, OpenTask,
@@ -276,13 +277,15 @@ fn finalize_snippet_line(line: &str) -> String {
 /// truncated — or `None` if no such line exists. A line-based, not
 /// character-offset-based, snippet: the whole surrounding sentence reads
 /// more usefully than a fixed window of characters centered on the link.
-pub fn extract_backlink_snippet(content: &str, title: &str) -> Option<String> {
-    let pattern = format!(
-        r"(?i)\[\[\s*{}\s*(?:[#|][^\]\n]*)?\]\]",
-        regex::escape(title)
-    );
-    let re = Regex::new(&pattern).ok()?;
-    let line = content.lines().find(|line| re.is_match(line))?;
+pub fn extract_backlink_snippet(
+    content: &str,
+    points_at_note: impl Fn(&str) -> bool,
+) -> Option<String> {
+    let line = content.lines().find(|line| {
+        wiki_link_regex()
+            .captures_iter(line)
+            .any(|caps| points_at_note(link_target(&caps[1])))
+    })?;
     Some(finalize_snippet_line(line))
 }
 
@@ -1525,6 +1528,36 @@ async fn grade_mc_card_at(
     Ok(McGradeResult { correct })
 }
 
+fn wiki_link_regex() -> &'static Regex {
+    static RE: std::sync::OnceLock<Regex> = std::sync::OnceLock::new();
+    RE.get_or_init(|| Regex::new(r"\[\[([^\]\n]+)\]\]").expect("static wiki-link pattern"))
+}
+
+/// The note-naming part of a `[[Note#Heading|label]]` body, trimmed.
+fn link_target(body: &str) -> &str {
+    body.split(['#', '|']).next().unwrap_or(body).trim()
+}
+
+/// Rewrites the target of every link for which `points_at_note` holds,
+/// carrying any `#heading` / `|label` suffix over untouched.
+pub(super) fn retarget_links(
+    content: &str,
+    points_at_note: impl Fn(&str) -> bool,
+    new_target: impl Fn(&str) -> String,
+) -> String {
+    wiki_link_regex()
+        .replace_all(content, |caps: &regex::Captures| {
+            let body = &caps[1];
+            let target = link_target(body);
+            if !points_at_note(target) {
+                return caps[0].to_string();
+            }
+            let suffix = body.find(['#', '|']).map_or("", |i| &body[i..]);
+            format!("[[{}{suffix}]]", new_target(target))
+        })
+        .into_owned()
+}
+
 // Wiki-links resolve by title case-insensitively (`backlinks_for`), and
 // `extract_links` trims whitespace inside the brackets, so the rewrite must
 // tolerate both rather than only matching an exact `[[Old]]`. A `#heading`
@@ -1602,16 +1635,37 @@ async fn rename_note_at(
     let old_content = tokio::fs::read_to_string(path).await?;
     let old_title = title_from_content(&old_content);
 
-    let mut new_content = rewrite_title(&old_content, new_title);
-    if old_title != new_title {
-        new_content = rewrite_links(&new_content, &old_title, new_title)?;
-    }
-
     let parent = Path::new(path)
         .parent()
         .ok_or_else(|| anyhow::anyhow!("note path has no parent folder: {path}"))?;
     let desired_path = parent.join(note_filename(new_title));
     let desired_path_str = desired_path.to_string_lossy().into_owned();
+
+    // Resolved against the workspace as it is now: only links that currently
+    // reach this note are rewritten, never ones meant for a same-titled note
+    // elsewhere. A bare link takes the new title, a qualified one keeps its
+    // folder prefix and takes the new filename stem.
+    let refs = workspace_refs(db, workspace).await?;
+    let points_at_me = |t: &str| resolve(t, &refs).as_deref() == Some(path);
+    let new_stem = desired_path
+        .file_stem()
+        .unwrap_or_default()
+        .to_string_lossy()
+        .into_owned();
+    let new_target = |t: &str| match t.rfind(['/', '\\']) {
+        Some(i) => format!("{}{new_stem}", &t[..=i]),
+        None => new_title.to_string(),
+    };
+    let backlinkers = if old_title != new_title {
+        db::notes::backlinks_for(db, workspace, path).await?
+    } else {
+        Vec::new()
+    };
+
+    let mut new_content = rewrite_title(&old_content, new_title);
+    if old_title != new_title {
+        new_content = retarget_links(&new_content, points_at_me, new_target);
+    }
 
     let new_path = if desired_path_str != path {
         // Same silent-overwrite hazard as `move_note_at`: a same-named note
@@ -1651,17 +1705,15 @@ async fn rename_note_at(
     write_atomic(Path::new(&new_path), &new_content).await?;
     index_note_at(&new_path, workspace, &new_content, db).await?;
 
-    if old_title != new_title {
-        for backlinker in db::notes::backlinks_for(db, workspace, &old_title).await? {
-            if backlinker.path == new_path {
-                continue;
-            }
-            let content = tokio::fs::read_to_string(&backlinker.path).await?;
-            let rewritten = rewrite_links(&content, &old_title, new_title)?;
-            if rewritten != content {
-                write_atomic(Path::new(&backlinker.path), &rewritten).await?;
-                index_note_at(&backlinker.path, workspace, &rewritten, db).await?;
-            }
+    for backlinker in backlinkers {
+        if backlinker.path == path {
+            continue;
+        }
+        let content = tokio::fs::read_to_string(&backlinker.path).await?;
+        let rewritten = retarget_links(&content, points_at_me, new_target);
+        if rewritten != content {
+            write_atomic(Path::new(&backlinker.path), &rewritten).await?;
+            index_note_at(&backlinker.path, workspace, &rewritten, db).await?;
         }
     }
 
@@ -2021,10 +2073,10 @@ pub async fn list_tag_cards(
 #[tauri::command]
 pub async fn backlinks_for(
     workspace: String,
-    title: String,
+    path: String,
     db: State<'_, DbPool>,
 ) -> Result<Vec<NoteMetadata>, String> {
-    db::notes::backlinks_for(&db, &workspace, &title)
+    db::notes::backlinks_for(&db, &workspace, &path)
         .await
         .map_err(|e| e.to_string())
 }
@@ -2035,18 +2087,29 @@ pub async fn backlinks_for(
 /// still contributes its note with `snippet: None`, rather than dropping
 /// the whole entry or failing the request — the same "prefer a miss" call
 /// as everywhere else that resolves note-derived content against disk.
+async fn workspace_refs(pool: &DbPool, workspace: &str) -> anyhow::Result<Vec<(String, String)>> {
+    Ok(db::notes::list_by_workspace(pool, workspace)
+        .await?
+        .into_iter()
+        .map(|n| (n.path, n.title))
+        .collect())
+}
+
 async fn backlinks_with_context(
     pool: &DbPool,
     workspace: &str,
-    title: &str,
+    path: &str,
 ) -> anyhow::Result<Vec<BacklinkEntry>> {
-    let notes = db::notes::backlinks_for(pool, workspace, title).await?;
+    let notes = db::notes::backlinks_for(pool, workspace, path).await?;
+    let refs = workspace_refs(pool, workspace).await?;
     let mut entries = Vec::with_capacity(notes.len());
     for note in notes {
         let snippet = tokio::fs::read_to_string(&note.path)
             .await
             .ok()
-            .and_then(|content| extract_backlink_snippet(&content, title));
+            .and_then(|content| {
+                extract_backlink_snippet(&content, |t| resolve(t, &refs).as_deref() == Some(path))
+            });
         entries.push(BacklinkEntry { note, snippet });
     }
     Ok(entries)
@@ -2055,10 +2118,28 @@ async fn backlinks_with_context(
 #[tauri::command]
 pub async fn backlinks_for_with_context(
     workspace: String,
-    title: String,
+    path: String,
     db: State<'_, DbPool>,
 ) -> Result<Vec<BacklinkEntry>, String> {
-    backlinks_with_context(&db, &workspace, &title)
+    backlinks_with_context(&db, &workspace, &path)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// CLI entry: the caller only has a title (or `Folder/Title`), so resolve it
+/// to the note it names first. An unknown target has no backlinks.
+pub async fn backlinks_for_target_with_context(
+    workspace: String,
+    target: String,
+    db: State<'_, DbPool>,
+) -> Result<Vec<BacklinkEntry>, String> {
+    let Some(path) = db::notes::resolve_link(&db, &workspace, &target)
+        .await
+        .map_err(|e| e.to_string())?
+    else {
+        return Ok(Vec::new());
+    };
+    backlinks_with_context(&db, &workspace, &path)
         .await
         .map_err(|e| e.to_string())
 }
@@ -3127,7 +3208,7 @@ mod tests {
 
     #[test]
     fn test_extract_backlink_snippet_finds_embed_line() {
-        let snippet = extract_backlink_snippet("intro\n![[Sorting]]\n", "Sorting");
+        let snippet = extract_backlink_snippet("intro\n![[Sorting]]\n", |t| t == "Sorting");
         assert_eq!(snippet, Some("![[Sorting]]".to_string()));
     }
 
@@ -4264,7 +4345,16 @@ mod save_tests {
             .unwrap();
         assert_eq!(tagged.len(), 1);
 
-        let backlinks = db::notes::backlinks_for(&pool, "/ws", "Big O Notation")
+        index_note_at(
+            "/ws/big.md",
+            "/ws",
+            "# Big O Notation
+",
+            &pool,
+        )
+        .await
+        .unwrap();
+        let backlinks = db::notes::backlinks_for(&pool, "/ws", "/ws/big.md")
             .await
             .unwrap();
         assert_eq!(backlinks.len(), 1);
@@ -4274,7 +4364,7 @@ mod save_tests {
     fn test_extract_backlink_snippet_finds_the_linking_line() {
         let content = "# Dijkstra\nShortest paths with [[Big O Notation]] bounds.\nMore text.";
         assert_eq!(
-            extract_backlink_snippet(content, "Big O Notation"),
+            extract_backlink_snippet(content, |t| t.eq_ignore_ascii_case("Big O Notation")),
             Some("Shortest paths with [[Big O Notation]] bounds.".to_string())
         );
     }
@@ -4283,7 +4373,7 @@ mod save_tests {
     fn test_extract_backlink_snippet_matches_case_insensitively() {
         let content = "See [[big o notation]] here.";
         assert_eq!(
-            extract_backlink_snippet(content, "Big O Notation"),
+            extract_backlink_snippet(content, |t| t.eq_ignore_ascii_case("Big O Notation")),
             Some("See [[big o notation]] here.".to_string())
         );
     }
@@ -4291,14 +4381,19 @@ mod save_tests {
     #[test]
     fn test_extract_backlink_snippet_is_none_when_the_link_is_absent() {
         let content = "No link here at all.";
-        assert_eq!(extract_backlink_snippet(content, "Big O Notation"), None);
+        assert_eq!(
+            extract_backlink_snippet(content, |t| t.eq_ignore_ascii_case("Big O Notation")),
+            None
+        );
     }
 
     #[test]
     fn test_extract_backlink_snippet_truncates_a_long_line() {
         let padding = "x".repeat(200);
         let content = format!("{padding} [[Big O Notation]] {padding}");
-        let snippet = extract_backlink_snippet(&content, "Big O Notation").unwrap();
+        let snippet =
+            extract_backlink_snippet(&content, |t| t.eq_ignore_ascii_case("Big O Notation"))
+                .unwrap();
         assert!(
             snippet.chars().count() <= 161,
             "got {} chars",
@@ -4378,9 +4473,18 @@ mod save_tests {
             .await
             .unwrap();
 
-        let entries = backlinks_with_context(&pool, &ws, "Big O Notation")
-            .await
-            .unwrap();
+        let big_o = tmp.path().join("big.md").to_string_lossy().into_owned();
+        index_note_at(
+            &big_o,
+            &ws,
+            "# Big O Notation
+",
+            &pool,
+        )
+        .await
+        .unwrap();
+
+        let entries = backlinks_with_context(&pool, &ws, &big_o).await.unwrap();
 
         assert_eq!(entries.len(), 1);
         assert_eq!(entries[0].note.title, "Dijkstra");
@@ -4413,9 +4517,18 @@ mod save_tests {
         .unwrap();
         std::fs::remove_file(&missing_path).unwrap();
 
-        let entries = backlinks_with_context(&pool, &ws, "Big O Notation")
-            .await
-            .unwrap();
+        let big_o = tmp.path().join("big.md").to_string_lossy().into_owned();
+        index_note_at(
+            &big_o,
+            &ws,
+            "# Big O Notation
+",
+            &pool,
+        )
+        .await
+        .unwrap();
+
+        let entries = backlinks_with_context(&pool, &ws, &big_o).await.unwrap();
 
         assert_eq!(entries.len(), 1);
         assert_eq!(entries[0].snippet, None);
@@ -4865,15 +4978,68 @@ mod save_tests {
             "# Source\nSee [[Asymptotic Notation]] for details.\n"
         );
 
-        let old_backlinks = db::notes::backlinks_for(&pool, &ws, "Big O Notation")
+        let old_backlinks = db::notes::backlinks_for(&pool, &ws, &target.to_string_lossy())
             .await
             .unwrap();
         assert!(old_backlinks.is_empty());
-        let new_backlinks = db::notes::backlinks_for(&pool, &ws, "Asymptotic Notation")
+        let new_backlinks = db::notes::backlinks_for(&pool, &ws, &meta.path)
             .await
             .unwrap();
         assert_eq!(new_backlinks.len(), 1);
         assert_eq!(new_backlinks[0].path, source.to_string_lossy());
+    }
+
+    #[tokio::test]
+    async fn test_rename_note_at_leaves_a_same_titled_notes_inbound_links_alone() {
+        let tmp = tempdir().unwrap();
+        let ws = tmp.path().to_string_lossy().into_owned();
+        let pool = sqlx::sqlite::SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect("sqlite::memory:")
+            .await
+            .unwrap();
+        run_migrations(&pool).await.unwrap();
+        for dir in ["A", "B"] {
+            std::fs::create_dir(tmp.path().join(dir)).unwrap();
+        }
+        let sheet_a = tmp.path().join("A").join("Sheet 01.md");
+        let sheet_b = tmp.path().join("B").join("Sheet 01.md");
+        let source = tmp.path().join("source.md");
+        let notes = [
+            (
+                &sheet_a,
+                "# Sheet 01
+",
+            ),
+            (
+                &sheet_b,
+                "# Sheet 01
+",
+            ),
+            (
+                &source,
+                "# Source
+[[A/Sheet 01#Q1|first]] and [[B/Sheet 01]]
+",
+            ),
+        ];
+        for (path, content) in notes {
+            std::fs::write(path, content).unwrap();
+            index_note_at(&path.to_string_lossy(), &ws, content, &pool)
+                .await
+                .unwrap();
+        }
+
+        rename_note_at(&sheet_b.to_string_lossy(), "Sheet 02", &ws, &pool)
+            .await
+            .unwrap();
+
+        assert_eq!(
+            std::fs::read_to_string(&source).unwrap(),
+            "# Source
+[[A/Sheet 01#Q1|first]] and [[B/Sheet 02]]
+"
+        );
     }
 
     #[tokio::test]
@@ -5392,14 +5558,31 @@ mod folder_tests {
         index_note_at("/ws/s.md", "/ws", content, &pool)
             .await
             .unwrap();
+        for title in ["Target", "Other", "Comment Link"] {
+            index_note_at(
+                &format!("/ws/{title}.md"),
+                "/ws",
+                &format!(
+                    "# {title}
+"
+                ),
+                &pool,
+            )
+            .await
+            .unwrap();
+        }
         for title in ["Target", "Other"] {
-            let back = db::notes::backlinks_for(&pool, "/ws", title).await.unwrap();
+            let back = db::notes::backlinks_for(&pool, "/ws", &format!("/ws/{title}.md"))
+                .await
+                .unwrap();
             assert_eq!(back.len(), 1, "{title}");
         }
-        assert!(db::notes::backlinks_for(&pool, "/ws", "Comment Link")
-            .await
-            .unwrap()
-            .is_empty());
+        assert!(
+            db::notes::backlinks_for(&pool, "/ws", "/ws/Comment Link.md")
+                .await
+                .unwrap()
+                .is_empty()
+        );
     }
 
     #[tokio::test]

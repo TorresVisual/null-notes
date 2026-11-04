@@ -90,10 +90,10 @@ export const api = {
       invoke<NoteMetadata[]>('notes_with_tag', { workspace, tag }),
     renameTag: (oldTag: string, newTag: string, workspace: string) =>
       invoke<number>('rename_tag', { oldTag, newTag, workspace }),
-    backlinksFor: (workspace: string, title: string) =>
-      invoke<NoteMetadata[]>('backlinks_for', { workspace, title }),
-    backlinksForWithContext: (workspace: string, title: string) =>
-      invoke<BacklinkEntry[]>('backlinks_for_with_context', { workspace, title }),
+    backlinksFor: (workspace: string, path: string) =>
+      invoke<NoteMetadata[]>('backlinks_for', { workspace, path }),
+    backlinksForWithContext: (workspace: string, path: string) =>
+      invoke<BacklinkEntry[]>('backlinks_for_with_context', { workspace, path }),
     codeBacklinksForWithContext: (workspace: string, target: string) =>
       invoke<BacklinkEntry[]>('code_backlinks_for_with_context', { workspace, target }),
     unlinkedMentionsForWithContext: (workspace: string, title: string, notePath: string) =>

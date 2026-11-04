@@ -1,3 +1,4 @@
+use crate::link_resolve::resolve;
 use crate::models::{
     CardKind, CardSummary, CodeLinkEntry, DueCard, ExtractedCard, ExtractedTask, NoteMetadata,
     OpenTask, SearchPaging, SearchResult, SearchSort,
@@ -5,6 +6,10 @@ use crate::models::{
 use crate::sm2;
 use anyhow::Result;
 use sqlx::SqlitePool;
+use std::cmp::Ordering;
+use std::collections::HashSet;
+use std::iter::Peekable;
+use std::str::Chars;
 
 pub async fn index_note(pool: &SqlitePool, note: &NoteMetadata) -> Result<()> {
     sqlx::query(
@@ -405,8 +410,42 @@ pub async fn set_tasks(pool: &SqlitePool, note_path: &str, tasks: &[ExtractedTas
     Ok(())
 }
 
+/// Case-insensitive compare where digit runs order by value ("Blatt5" < "Blatt10").
+pub fn natural_cmp(a: &str, b: &str) -> Ordering {
+    fn digits(it: &mut Peekable<Chars>) -> String {
+        let mut run = String::new();
+        while let Some(c) = it.next_if(char::is_ascii_digit) {
+            run.push(c);
+        }
+        run.trim_start_matches('0').to_string()
+    }
+    let (mut a, mut b) = (a.chars().peekable(), b.chars().peekable());
+    loop {
+        match (a.peek().copied(), b.peek().copied()) {
+            (None, None) => return Ordering::Equal,
+            (None, _) => return Ordering::Less,
+            (_, None) => return Ordering::Greater,
+            (Some(x), Some(y)) if x.is_ascii_digit() && y.is_ascii_digit() => {
+                let (x, y) = (digits(&mut a), digits(&mut b));
+                let ord = x.len().cmp(&y.len()).then_with(|| x.cmp(&y));
+                if ord != Ordering::Equal {
+                    return ord;
+                }
+            }
+            (Some(x), Some(y)) => {
+                a.next();
+                b.next();
+                let ord = x.to_lowercase().cmp(y.to_lowercase());
+                if ord != Ordering::Equal {
+                    return ord;
+                }
+            }
+        }
+    }
+}
+
 pub async fn open_tasks(pool: &SqlitePool, workspace: &str) -> Result<Vec<OpenTask>> {
-    let rows = sqlx::query_as::<_, OpenTask>(
+    let mut rows = sqlx::query_as::<_, OpenTask>(
         "SELECT nt.note_path, n.title as note_title, nt.text, nt.position
          FROM note_tasks nt
          JOIN notes n ON n.path = nt.note_path
@@ -416,6 +455,7 @@ pub async fn open_tasks(pool: &SqlitePool, workspace: &str) -> Result<Vec<OpenTa
     .bind(workspace)
     .fetch_all(pool)
     .await?;
+    rows.sort_by(|a, b| natural_cmp(&a.note_title, &b.note_title));
     Ok(rows)
 }
 
@@ -554,10 +594,12 @@ pub async fn list_cards_by_category(
     .fetch_all(pool)
     .await?;
 
-    Ok(rows
+    let mut cards = rows
         .into_iter()
         .map(DueCard::try_from)
-        .collect::<Result<_, _>>()?)
+        .collect::<Result<Vec<_>, _>>()?;
+    cards.sort_by(|a, b| natural_cmp(&a.note_title, &b.note_title));
+    Ok(cards)
 }
 
 // Every unsuspended card in a note carrying any of `tags`, due or not — a
@@ -583,10 +625,12 @@ pub async fn list_cards_by_tags(
     .fetch_all(pool)
     .await?;
 
-    Ok(rows
+    let mut cards = rows
         .into_iter()
         .map(DueCard::try_from)
-        .collect::<Result<_, _>>()?)
+        .collect::<Result<Vec<_>, _>>()?;
+    cards.sort_by(|a, b| natural_cmp(&a.note_title, &b.note_title));
+    Ok(cards)
 }
 
 #[derive(sqlx::FromRow)]
@@ -622,7 +666,7 @@ pub async fn list_all_cards(pool: &SqlitePool, workspace: &str) -> Result<Vec<Ca
     .fetch_all(pool)
     .await?;
 
-    Ok(rows
+    let mut cards: Vec<CardSummary> = rows
         .into_iter()
         .map(|r| CardSummary {
             note_path: r.note_path,
@@ -641,7 +685,9 @@ pub async fn list_all_cards(pool: &SqlitePool, workspace: &str) -> Result<Vec<Ca
                 .map(|t| t.split(',').map(String::from).collect())
                 .unwrap_or_default(),
         })
-        .collect())
+        .collect();
+    cards.sort_by(|a, b| natural_cmp(&a.note_title, &b.note_title));
+    Ok(cards)
 }
 
 pub async fn list_tags(pool: &SqlitePool, workspace: &str) -> Result<Vec<String>> {
@@ -745,23 +791,43 @@ pub async fn note_containing_marker(
     Ok(row.map(|(p,)| p))
 }
 
+/// Notes with a link that resolves to `target_path`. Resolution happens here,
+/// not in SQL, because a target can be a title or a path suffix and two notes
+/// may share a title (`link_resolve`).
 pub async fn backlinks_for(
     pool: &SqlitePool,
     workspace: &str,
-    title: &str,
+    target_path: &str,
 ) -> Result<Vec<NoteMetadata>> {
-    let rows = sqlx::query_as::<_, NoteMetadata>(
-        "SELECT n.id, n.title, n.path, n.workspace, n.updated_at
-         FROM notes n
-         JOIN note_links nl ON nl.source_path = n.path
-         WHERE n.workspace = ? AND nl.target_title = ? COLLATE NOCASE
-         ORDER BY n.updated_at DESC",
-    )
-    .bind(workspace)
-    .bind(title)
-    .fetch_all(pool)
-    .await?;
-    Ok(rows)
+    let notes = list_by_workspace(pool, workspace).await?;
+    let refs: Vec<(String, String)> = notes
+        .iter()
+        .map(|n| (n.path.clone(), n.title.clone()))
+        .collect();
+    let sources: HashSet<String> = all_links(pool, workspace)
+        .await?
+        .into_iter()
+        .filter(|(_, target)| resolve(target, &refs).as_deref() == Some(target_path))
+        .map(|(source, _)| source)
+        .collect();
+    Ok(notes
+        .into_iter()
+        .filter(|n| sources.contains(&n.path))
+        .collect())
+}
+
+/// The note a bare title or qualified `Folder/Title` target names, if any.
+pub async fn resolve_link(
+    pool: &SqlitePool,
+    workspace: &str,
+    target: &str,
+) -> Result<Option<String>> {
+    let refs: Vec<(String, String)> = list_by_workspace(pool, workspace)
+        .await?
+        .into_iter()
+        .map(|n| (n.path, n.title))
+        .collect();
+    Ok(resolve(target, &refs))
 }
 
 // ponytail: plain substring match, not word-boundary — a short title like
@@ -1517,7 +1583,7 @@ mod tests {
             .await
             .unwrap();
 
-        let backlinks = backlinks_for(&pool, "/ws", "B").await.unwrap();
+        let backlinks = backlinks_for(&pool, "/ws", "/ws/b.md").await.unwrap();
         assert_eq!(backlinks.len(), 1);
         assert_eq!(backlinks[0].id, "a");
     }
@@ -1528,12 +1594,58 @@ mod tests {
         index_note(&pool, &note("a", "A", "/ws/a.md", "/ws"))
             .await
             .unwrap();
+        index_note(&pool, &note("t", "Big O Notation", "/ws/t.md", "/ws"))
+            .await
+            .unwrap();
         set_links(&pool, "/ws/a.md", &["big o notation".to_string()])
             .await
             .unwrap();
 
-        let backlinks = backlinks_for(&pool, "/ws", "Big O Notation").await.unwrap();
+        let backlinks = backlinks_for(&pool, "/ws", "/ws/t.md").await.unwrap();
         assert_eq!(backlinks.len(), 1);
+    }
+
+    #[test]
+    fn natural_cmp_orders_numbers_by_value() {
+        let mut v = vec!["Blatt10", "blatt5", "Blatt2", "Blatt05b", "Blatt12"];
+        v.sort_by(|a, b| natural_cmp(a, b));
+        assert_eq!(v, ["Blatt2", "blatt5", "Blatt05b", "Blatt10", "Blatt12"]);
+    }
+
+    #[tokio::test]
+    async fn test_backlinks_for_separates_same_titled_notes() {
+        let pool = make_pool().await;
+        for (id, title, path) in [
+            ("a", "Sheet 01", "/ws/A/Sheet 01.md"),
+            ("b", "Sheet 01", "/ws/B/Sheet 01.md"),
+            ("x", "X", "/ws/x.md"),
+            ("y", "Y", "/ws/y.md"),
+        ] {
+            index_note(&pool, &note(id, title, path, "/ws"))
+                .await
+                .unwrap();
+        }
+        set_links(&pool, "/ws/x.md", &["A/Sheet 01".to_string()])
+            .await
+            .unwrap();
+        set_links(&pool, "/ws/y.md", &["B/Sheet 01".to_string()])
+            .await
+            .unwrap();
+
+        let to_a = backlinks_for(&pool, "/ws", "/ws/A/Sheet 01.md")
+            .await
+            .unwrap();
+        let to_b = backlinks_for(&pool, "/ws", "/ws/B/Sheet 01.md")
+            .await
+            .unwrap();
+        assert_eq!(
+            to_a.iter().map(|n| n.id.as_str()).collect::<Vec<_>>(),
+            ["x"]
+        );
+        assert_eq!(
+            to_b.iter().map(|n| n.id.as_str()).collect::<Vec<_>>(),
+            ["y"]
+        );
     }
 
     #[tokio::test]
@@ -1882,6 +1994,9 @@ mod tests {
         index_note(&pool, &note("a", "A", "/ws/old.md", "/ws"))
             .await
             .unwrap();
+        index_note(&pool, &note("t", "Target", "/ws/Target.md", "/ws"))
+            .await
+            .unwrap();
         set_tags(&pool, "/ws/old.md", &["cs101".to_string()])
             .await
             .unwrap();
@@ -1907,7 +2022,7 @@ mod tests {
         let notes = notes_with_tag(&pool, "/ws", "cs101").await.unwrap();
         assert_eq!(notes[0].path, "/ws/Folder/old.md");
 
-        let backlinks = backlinks_for(&pool, "/ws", "Target").await.unwrap();
+        let backlinks = backlinks_for(&pool, "/ws", "/ws/Target.md").await.unwrap();
         assert_eq!(backlinks[0].path, "/ws/Folder/old.md");
 
         let code_backlinks = code_backlinks_for(&pool, "/ws", "src/main.rs")
@@ -1939,7 +2054,7 @@ mod tests {
 
         let all_tags = list_tags(&pool, "/ws").await.unwrap();
         assert_eq!(all_tags, vec!["cs102".to_string()]);
-        let backlinks = backlinks_for(&pool, "/ws", "Target").await.unwrap();
+        let backlinks = backlinks_for(&pool, "/ws", "/ws/Target.md").await.unwrap();
         assert!(backlinks.is_empty());
     }
 

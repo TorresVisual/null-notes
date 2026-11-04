@@ -10,6 +10,7 @@ import { useEmbedSource } from '../../hooks/useEmbedSource'
 import { embedBody } from '../../lib/embedSyntax'
 import { setPendingHighlight } from '../../lib/pendingHighlight'
 import { wikiLinkText } from '../../lib/wikiLinkSyntax'
+import { resolveWikiLink } from '../../lib/wikiLinkResolve'
 import { extensionsFor } from './index'
 import { EmbedChainContext, MAX_EMBED_DEPTH } from './EmbedChainContext'
 
@@ -100,7 +101,7 @@ export function NoteEmbedView({ node, editor }: ReactNodeViewProps) {
   const chain = [...useContext(EmbedChainContext), editor.storage.noteContext.notePath]
 
   const isBase = /\.base$/i.test(title)
-  const target = isBase ? undefined : notes.find((n) => n.title.toLowerCase() === title.toLowerCase())
+  const target = isBase ? undefined : resolveWikiLink(title, notes)
   const circular = target !== undefined && chain.includes(target.path)
   const tooDeep = chain.length > MAX_EMBED_DEPTH
   const content = useEmbedSource(circular || tooDeep ? undefined : target)
