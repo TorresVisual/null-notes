@@ -7120,3 +7120,25 @@ input[type='checkbox']:focus-visible {
   30% { box-shadow: 0 0 0 6px color-mix(in srgb, var(--card-accent, var(--accent)) 45%, transparent); }
 }
 
+
+/* Windows High Contrast: the UA drops box-shadow and background colours, so the
+   box-shadow focus ring and background-only selected states vanish. Restore both
+   with real outlines/borders in system colours. */
+@media (forced-colors: active) {
+  :focus-visible {
+    outline: 2px solid Highlight !important;
+    outline-offset: 2px;
+  }
+  .tree-row.active,
+  .tree-row.multi-selected,
+  .tab.active,
+  .settings-nav-item.active,
+  [aria-selected='true'],
+  [aria-current='true'],
+  [aria-pressed='true'] {
+    outline: 2px solid Highlight;
+    outline-offset: -2px;
+  }
+  .tree-row.selected { outline: 1px solid GrayText; outline-offset: -1px; }
+  .canvas-legend-swatch { forced-color-adjust: none; }
+}
