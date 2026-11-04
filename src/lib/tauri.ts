@@ -310,6 +310,8 @@ export const api = {
       invoke<void>('send_input', { runId, text }),
     stop: (runId: string) =>
       invoke<void>('stop_run', { runId }),
+    installPackage: (pkg: string) =>
+      invoke<string>('install_python_package', { package: pkg }),
   },
   printing: {
     listPrinters: () =>

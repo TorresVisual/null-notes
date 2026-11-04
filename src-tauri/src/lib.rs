@@ -299,6 +299,7 @@ pub fn run() {
             commands::code_run::run_code,
             commands::code_run::send_input,
             commands::code_run::stop_run,
+            commands::code_run::install_python_package,
             commands::notes::rename_folder,
             commands::trash::delete_folder,
             commands::notes::move_note,

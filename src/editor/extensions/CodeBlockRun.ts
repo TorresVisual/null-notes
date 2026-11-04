@@ -5,6 +5,7 @@ import type { EditorState } from '@tiptap/pm/state'
 import type { Node as ProseMirrorNode } from '@tiptap/pm/model'
 import type { EditorView } from '@tiptap/pm/view'
 import { listen } from '@tauri-apps/api/event'
+import { confirm } from '@tauri-apps/plugin-dialog'
 import { api } from '../../lib/tauri'
 import { useCodeRunConfirmStore } from '../../store/codeRunConfirm'
 import { useSettingsStore } from '../../store/settings'
@@ -182,6 +183,16 @@ export function applyCodeRunMeta(entries: Map<number, RunEntry>, meta: CodeRunMe
   return next
 }
 
+/** Top-level module a finished Python run could not import, from its `ModuleNotFoundError` traceback. */
+export function missingModule(entry: RunEntry): string | null {
+  if (entry.status !== 'exited' || entry.exitCode === 0) return null
+  const stderr = entry.output
+    .filter((c) => c.stream === 'stderr')
+    .map((c) => c.text)
+    .join('')
+  return /ModuleNotFoundError: No module named '(\w+)/.exec(stderr)?.[1] ?? null
+}
+
 /** Base64 (as emitted by `commands::code_run::emit_output`) to a UTF-8 string. */
 export function decodeBase64Text(base64: string): string {
   const binary = atob(base64)
@@ -214,6 +225,7 @@ function runPanel(pos: number): HTMLElement {
     <div class="code-run-bar">
       <button type="button" class="code-run-run" data-action="run">Run</button>
       <button type="button" class="code-run-stop" data-action="stop" hidden>Stop</button>
+      <button type="button" class="code-run-install" data-action="install" hidden></button>
       <button type="button" class="code-run-expect" data-action="expect">Add expected</button>
       <button type="button" class="code-run-pin" data-action="pin" hidden>Pin output</button>
       <button type="button" class="code-run-close" data-action="close" hidden>Dismiss</button>
@@ -294,6 +306,7 @@ function syncRunPanelUi(view: EditorView) {
     const run = el.querySelector('.code-run-run')
     const stop = el.querySelector('.code-run-stop')
     const expectBtn = el.querySelector('.code-run-expect')
+    const install = el.querySelector('.code-run-install')
     const pin = el.querySelector('.code-run-pin')
     const close = el.querySelector('.code-run-close')
     const assertion = el.querySelector('.code-run-assertion')
@@ -303,6 +316,7 @@ function syncRunPanelUi(view: EditorView) {
       !(run instanceof HTMLElement) ||
       !(stop instanceof HTMLElement) ||
       !(expectBtn instanceof HTMLElement) ||
+      !(install instanceof HTMLElement) ||
       !(pin instanceof HTMLElement) ||
       !(close instanceof HTMLElement) ||
       !(assertion instanceof HTMLElement) ||
@@ -320,6 +334,7 @@ function syncRunPanelUi(view: EditorView) {
       expectBtn.hidden = hasExpect
       expectBtn.textContent = 'Add expected'
       expectBtn.title = 'Add an expected output block below'
+      install.hidden = true
       pin.hidden = true
       close.hidden = true
       assertion.hidden = true
@@ -345,6 +360,10 @@ function syncRunPanelUi(view: EditorView) {
     } else {
       expectBtn.hidden = true
     }
+
+    const missing = missingModule(entry)
+    install.hidden = missing === null
+    if (missing) install.textContent = `Install ${missing} and re-run`
 
     const assertRes = assertionStatus(entry)
     if (assertRes.result === 'pass') {
@@ -440,6 +459,30 @@ export const CodeBlockRun = Extension.create({
             return listening
           }
 
+          function startRun(pos: number) {
+            const node = view.state.doc.nodeAt(pos)
+            if (!node) return
+            const language = String(node.attrs['language'] ?? '')
+            const source = node.textContent
+            const notePath = useWorkspaceStore.getState().activeTab
+            if (!notePath) return
+
+            void useCodeRunConfirmStore
+              .getState()
+              .confirmNote(notePath)
+              .then((allowed) => {
+                if (!allowed) return
+                return ensureListening().then(() => {
+                  const runId = crypto.randomUUID()
+                  const expected = findExpectedOutput(view.state.doc, pos)
+                  const expectedOutput = expected ? expected.text : null
+                  view.dispatch(view.state.tr.setMeta(codeRunKey, { type: 'start', pos, runId, expectedOutput }))
+                  const settings = useSettingsStore.getState().settings
+                  void api.codeRun.run(runId, language, source, settings.codeRunTimeoutSecs)
+                })
+              })
+          }
+
           const onClick = (event: MouseEvent) => {
             const target = event.target as HTMLElement | null
             const panelEl = target?.closest?.('.code-run-panel')
@@ -451,32 +494,38 @@ export const CodeBlockRun = Extension.create({
             event.preventDefault()
 
             if (action === 'run') {
-              const node = view.state.doc.nodeAt(pos)
-              if (!node) return
-              const language = String(node.attrs['language'] ?? '')
-              const source = node.textContent
-              const notePath = useWorkspaceStore.getState().activeTab
-              if (!notePath) return
-
-              void useCodeRunConfirmStore
-                .getState()
-                .confirmNote(notePath)
-                .then((allowed) => {
-                  if (!allowed) return
-                  return ensureListening().then(() => {
-                    const runId = crypto.randomUUID()
-                    const expected = findExpectedOutput(view.state.doc, pos)
-                    const expectedOutput = expected ? expected.text : null
-                    view.dispatch(view.state.tr.setMeta(codeRunKey, { type: 'start', pos, runId, expectedOutput }))
-                    const settings = useSettingsStore.getState().settings
-                    void api.codeRun.run(runId, language, source, settings.codeRunTimeoutSecs)
-                  })
-                })
+              startRun(pos)
               return
             }
 
             const entries = codeRunKey.getState(view.state) ?? new Map<number, RunEntry>()
             const entry = entries.get(pos)
+
+            if (action === 'install') {
+              const module = entry ? missingModule(entry) : null
+              if (!entry || !module) return
+              void (async () => {
+                const ok = await confirm(
+                  `Run "pip install ${module}" on your machine? It downloads and runs code from PyPI with no sandbox.`,
+                )
+                if (!ok) return
+                try {
+                  await api.codeRun.installPackage(module)
+                } catch (e) {
+                  view.dispatch(
+                    view.state.tr.setMeta(codeRunKey, {
+                      type: 'output',
+                      runId: entry.runId,
+                      stream: 'stderr',
+                      text: `\n[pip install ${module} failed]\n${String(e)}\n`,
+                    }),
+                  )
+                  return
+                }
+                startRun(pos)
+              })()
+              return
+            }
 
             if (action === 'expect') {
               const node = view.state.doc.nodeAt(pos)

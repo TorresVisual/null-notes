@@ -2132,7 +2132,7 @@ code {
   gap: 6px;
   flex-wrap: wrap;
 }
-.code-run-run, .code-run-stop, .code-run-expect, .code-run-pin, .code-run-close {
+.code-run-run, .code-run-stop, .code-run-expect, .code-run-install, .code-run-pin, .code-run-close {
   padding: 3px 10px;
   background: var(--bg-hover);
   border: 1px solid var(--border);
@@ -2142,7 +2142,7 @@ code {
   font-family: inherit;
   font-size: inherit;
 }
-.code-run-run:hover, .code-run-stop:hover, .code-run-expect:hover, .code-run-pin:hover, .code-run-close:hover { color: var(--accent); border-color: var(--accent); }
+.code-run-run:hover, .code-run-stop:hover, .code-run-expect:hover, .code-run-install:hover, .code-run-pin:hover, .code-run-close:hover { color: var(--accent); border-color: var(--accent); }
 .code-run-stop { color: var(--danger); border-color: var(--danger); }
 .code-run-stop:hover { color: var(--danger); border-color: var(--danger); background: color-mix(in srgb, var(--danger) 15%, transparent); }
 

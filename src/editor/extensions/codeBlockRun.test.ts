@@ -6,6 +6,7 @@ import {
   normalizeOutput,
   findExpectedOutput,
   assertionStatus,
+  missingModule,
 } from './CodeBlockRun'
 import type { RunEntry } from './CodeBlockRun'
 import { api } from '../../lib/tauri'
@@ -448,3 +449,22 @@ describe('applyCodeRunMeta', () => {
   })
 })
 
+
+describe('missingModule', () => {
+  const failed = (text: string, exitCode = 1): RunEntry => ({
+    runId: 'r1',
+    status: 'exited',
+    exitCode,
+    output: [{ stream: 'stderr', text }],
+  })
+
+  it('names the top-level module from a ModuleNotFoundError', () => {
+    const tb = "Traceback...\nModuleNotFoundError: No module named 'numpy.linalg'\n"
+    expect(missingModule(failed(tb))).toBe('numpy')
+  })
+
+  it('is null for a clean exit or an unrelated failure', () => {
+    expect(missingModule(failed("No module named 'x'", 0))).toBeNull()
+    expect(missingModule(failed('ZeroDivisionError'))).toBeNull()
+  })
+})

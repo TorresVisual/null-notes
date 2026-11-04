@@ -395,6 +395,56 @@ pub fn python_argv(python_command: &str, script_path: &str) -> (String, Vec<Stri
     (program, tokens)
 }
 
+/// Program and args for `python -m pip install <package>` on the configured
+/// interpreter. The package name comes from a run's stderr, which a note's
+/// code controls, so it must be a plain identifier (no leading `-`, no
+/// separators) and follows `--` so pip can never read it as an option.
+pub fn pip_install_argv(
+    python_command: &str,
+    package: &str,
+) -> Result<(String, Vec<String>), String> {
+    let valid = package
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || c == '_')
+        && !package.is_empty();
+    if !valid {
+        return Err(format!("not a valid module name: {package}"));
+    }
+    let mut tokens = tokenize(python_command);
+    if tokens.is_empty() {
+        tokens.push("python3".to_string());
+    }
+    let program = tokens.remove(0);
+    tokens.extend(["-m", "pip", "install", "--", package].map(String::from));
+    Ok((program, tokens))
+}
+
+/// Installs a missing module with pip for the interpreter runs use. Only the
+/// frontend's explicit, confirmed click reaches this — never a run itself.
+#[tauri::command]
+pub async fn install_python_package(package: String, app: AppHandle) -> Result<String, String> {
+    let settings = super::settings::resolve_settings(&app).await?;
+    let (program, args) = pip_install_argv(&settings.python_command, &package)?;
+    tokio::task::spawn_blocking(move || {
+        let output = no_window_command(&program)
+            .args(&args)
+            .output()
+            .map_err(|e| format!("could not run {program}: {e}"))?;
+        let text = format!(
+            "{}{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+        if output.status.success() {
+            Ok(text)
+        } else {
+            Err(text)
+        }
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
 /// Program and args for compiling `source_path` into `cpp_binary_name()`.
 pub fn cpp_compile_argv(cpp_compiler_command: &str, source_path: &str) -> (String, Vec<String>) {
     let mut tokens = tokenize(cpp_compiler_command);
@@ -432,6 +482,20 @@ mod tests {
         let (program, args) = python_argv("python3.11 -B", "main.py");
         assert_eq!(program, "python3.11");
         assert_eq!(args, ["-B", "main.py"]);
+    }
+
+    #[test]
+    fn pip_install_argv_puts_the_package_after_the_option_terminator() {
+        let (program, args) = pip_install_argv("python3 -B", "numpy").unwrap();
+        assert_eq!(program, "python3");
+        assert_eq!(args, ["-B", "-m", "pip", "install", "--", "numpy"]);
+    }
+
+    #[test]
+    fn pip_install_argv_refuses_anything_but_a_plain_identifier() {
+        for bad in ["", "--index-url=http://x", "-r", "a b", "a/b", "a.b", "a;b"] {
+            assert!(pip_install_argv("python3", bad).is_err(), "{bad}");
+        }
     }
 
     #[test]

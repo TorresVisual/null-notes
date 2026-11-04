@@ -14,6 +14,8 @@ Anything that resolves must also exist; an unresolvable link renders inert rathe
 
 ## Formatting code blocks
 
+A run that dies on `ModuleNotFoundError` offers "Install X and re-run": `install_python_package` runs `python -m pip install -- <name>` only after its own native confirm, and `pip_install_argv` accepts nothing but a plain identifier, because the name comes from stderr that note code controls.
+
 `code_format.rs` runs `clang-format` (C/C++/Java) or `black` (Python) on a block's text. The program is a fixed table keyed by language — never a frontend or note-supplied string — and the note's text goes in on **stdin only**, never argv. A new language is a new row in `format_argv`, not a configurable command. JSON is formatted in the frontend (`src/lib/codeFormat.ts`). See `docs/specs/code-formatter-design.md`.
 
 ## The CLI pipe
