@@ -97,25 +97,34 @@ pub async fn read_note_asset(note_path: String, relative: String) -> Result<Stri
     Ok(base64::engine::general_purpose::STANDARD.encode(bytes))
 }
 
-/// Deletes any file in the note's `.assets` sidecar whose name no longer
-/// appears in `content`. Called when a note tab closes (after its final
-/// save), never on keystroke — deleting on every edit would out-race
+/// Deletes any file in the note's `.assets`, `.ink` and `.pdf` sidecars whose
+/// name no longer appears in `content`. Called when a note tab closes (after
+/// its final save), never on keystroke — deleting on every edit would out-race
 /// ProseMirror's undo stack and turn a ctrl+z into a broken image. Matching
 /// on the generated file name alone (not the full encoded path) sidesteps
 /// needing to know how the caller encoded the directory prefix.
+///
+/// `.diagrams` is left alone: a diagram can be embedded from another note, and
+/// this note's content says nothing about who else references the file.
 #[tauri::command]
 pub async fn gc_note_assets(note_path: String, content: String) -> Result<(), String> {
-    let dir = PathBuf::from(assets_dir_for(&note_path));
-    let mut entries = match tokio::fs::read_dir(&dir).await {
-        Ok(entries) => entries,
-        Err(_) => return Ok(()),
-    };
+    for suffix in ["assets", "ink", "pdf"] {
+        let dir = PathBuf::from(super::sidecar_dir_for(&note_path, suffix));
+        let mut entries = match tokio::fs::read_dir(&dir).await {
+            Ok(entries) => entries,
+            Err(_) => continue,
+        };
 
-    while let Some(entry) = entries.next_entry().await.map_err(|e| e.to_string())? {
-        let file_name = entry.file_name();
-        let file_name = file_name.to_string_lossy();
-        if !content.contains(file_name.as_ref()) {
-            let _ = tokio::fs::remove_file(entry.path()).await;
+        while let Some(entry) = entries.next_entry().await.map_err(|e| e.to_string())? {
+            let file_name = entry.file_name();
+            let file_name = file_name.to_string_lossy();
+            // Read at reindex time, never linked from the note.
+            if suffix == "pdf" && file_name == super::pdf::PDF_SEARCH_TEXT_FILE {
+                continue;
+            }
+            if !content.contains(file_name.as_ref()) {
+                let _ = tokio::fs::remove_file(entry.path()).await;
+            }
         }
     }
 
@@ -189,6 +198,38 @@ mod tests {
 
         assert!(resolve_relative(&note, &kept).unwrap().exists());
         assert!(!resolve_relative(&note, &orphaned).unwrap().exists());
+    }
+
+    #[tokio::test]
+    async fn test_gc_reaps_unreferenced_ink_and_pdf_files_but_keeps_search_text() {
+        let tmp = tempdir().unwrap();
+        let note = tmp.path().join("Note.md").to_string_lossy().into_owned();
+        let ink = tmp.path().join("Note.ink");
+        let pdf = tmp.path().join("Note.pdf");
+        let diagrams = tmp.path().join("Note.diagrams");
+        for d in [&ink, &pdf, &diagrams] {
+            std::fs::create_dir_all(d).unwrap();
+        }
+        for f in [
+            ink.join("a-1.svg"),
+            ink.join("a-2.svg"),
+            pdf.join("page-0.png"),
+            pdf.join("page-1.png"),
+            pdf.join("text.txt"),
+            diagrams.join("d.svg"),
+        ] {
+            std::fs::write(f, "x").unwrap();
+        }
+
+        let content = r#"{"src":"Note.ink/a-1.svg"} ![](Note.pdf/page-0.png)"#;
+        gc_note_assets(note, content.into()).await.unwrap();
+
+        assert!(ink.join("a-1.svg").exists());
+        assert!(!ink.join("a-2.svg").exists());
+        assert!(pdf.join("page-0.png").exists());
+        assert!(!pdf.join("page-1.png").exists());
+        assert!(pdf.join("text.txt").exists());
+        assert!(diagrams.join("d.svg").exists());
     }
 
     #[tokio::test]
