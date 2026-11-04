@@ -1457,7 +1457,7 @@ Per the mandate to remove work that doesn't earn its keep:
 | **~~Web app (no local .md files, fully git-backed)~~** | ~~Reconsidered (2026-09-09)~~ → **Scoped as Phase 17** | Maintainer reopened this alongside mobile — see `TorresVisual/null-notes#24`. Scoping pass is `docs/specs/web-app-design.md`; client-only architecture (isomorphic-git, CORS proxy, sql.js index) decided, none of P17-1…P17-9 started. See Phase 17. |
 | **Collaboration / multiplayer** | **Cut** | Single-user tool; enormous complexity for zero personal value. |
 | **Segment-level eraser, hold-to-snap shape recognition** | **Defer indefinitely** | Ink is already a daily-usable subsystem; these are diminishing-returns polish. Only revisit if real use demands it. |
-| **Distribution: installers, auto-update, code-signing, cross-platform** | **Out of scope now** | Personal tool. Revisit only if the audience decision changes to "ship to students." |
+| **Distribution: installers, auto-update (shipped), code-signing, cross-platform** | **Auto-update shipped; the rest out of scope now** | The updater is live in release builds (`useUpdateCheck`, endpoint in `tauri.conf.json`). Code-signing is still open (#60). Cross-platform and wider distribution: revisit only if the audience decision changes to "ship to students." |
 | **Stable note** `id` **scheme** | **Defer** | `path` is the working key; don't invest until something actually needs stable IDs (e.g. an external integration). |
 | **Multi-window / split-pane editing** | **Defer — reconsider at P4** | Not blocking daily use. But the brief wants the workspace to remember split panes, and P4's "sheet on one side, solution on the other" is the first case with a concrete argument for it. Decide during P4 rather than in the abstract. |
 | **Workspace remembers AI conversations** | **Cut** | A brief workspace-memory item that presumes the in-app assistant. With P8 (terminal), conversation history belongs to the CLI tool, not to this app. |
@@ -1552,7 +1552,7 @@ The following are **intentionally not on this roadmap**. Adding any of them is a
 
 - Cloud sync / accounts / a backend server.
 - Real-time collaboration or sharing.
-- Public distribution: signed installers, auto-update, app-store presence, marketing site.
+- Public distribution: signed installers (auto-update itself has shipped), app-store presence, marketing site.
 - Cross-platform support beyond the current Windows-primary target (macOS/Linux are a happy accident, not a commitment).
 - Plugin system / third-party extension API.
 - Encryption-at-rest / DRM (plain `.md` is the point).
