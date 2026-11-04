@@ -1,4 +1,4 @@
-import { confirm, open } from '@tauri-apps/plugin-dialog'
+import { confirm, open, save } from '@tauri-apps/plugin-dialog'
 import { api } from './tauri'
 import { writeToClipboard } from './clipboard'
 import { isBasePath } from './canvasPath'
@@ -227,6 +227,20 @@ export async function moveNoteViaPicker(path: string): Promise<void> {
     await refreshTree()
   } catch (err) {
     reportError(err)
+  }
+}
+
+export async function exportZip(path: string): Promise<void> {
+  const workspace = workspaceOf(path)
+  if (!workspace) return
+  const name = folderName(path).replace(/\.md$/, '')
+  const dest = await save({ defaultPath: `${name}.zip`, filters: [{ name: 'Zip archive', extensions: ['zip'] }] })
+  if (!dest) return
+  try {
+    await api.notes.exportZip(workspace, path, dest)
+    showToast(`Exported "${name}.zip"`)
+  } catch (e) {
+    showToast(failure('export the zip', e))
   }
 }
 

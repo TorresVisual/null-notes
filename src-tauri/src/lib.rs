@@ -355,6 +355,7 @@ pub fn run() {
             commands::window::is_release_build,
             commands::printing::list_printers,
             commands::printing::export_pdf,
+            commands::export::export_zip,
             commands::printing::print_document,
         ])
         .run(tauri::generate_context!())

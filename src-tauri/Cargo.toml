@@ -37,6 +37,7 @@ tempfile = "3"
 pdfium-render = { version = "0.9", optional = true, default-features = false, features = ["pdfium_7763", "image_latest", "thread_safe"] }
 notify = "8.2.0"
 base64 = "0.22"
+zip = { version = "4", default-features = false, features = ["deflate"] }
 unicode-normalization = "0.1.25"
 random_word = { version = "0.5", features = ["de", "en"] }
 portable-pty = "0.9.0"

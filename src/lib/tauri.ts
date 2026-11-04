@@ -123,6 +123,8 @@ export const api = {
       invoke<string>('undo_merge', { workspace, trashId, snapshots }),
     duplicate: (path: string, workspace: string) =>
       invoke<NoteMetadata>('duplicate_note', { path, workspace }),
+    exportZip: (workspace: string, source: string, dest: string) =>
+      invoke<void>('export_zip', { workspace, source, dest }),
     reveal: (workspace: string, path: string) =>
       invoke<void>('reveal_note', { workspace, path }),
     openExternally: (workspace: string, path: string) =>

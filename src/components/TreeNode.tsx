@@ -1,12 +1,12 @@
 import { useState } from 'react'
-import { ChevronRight, Pencil, Plus, Trash2 } from 'lucide-react'
+import { Archive, ChevronRight, Pencil, Plus, Trash2 } from 'lucide-react'
 import { confirm } from '@tauri-apps/plugin-dialog'
 import { offerUndoDelete } from '../hooks/useTrash'
 import { useWorkspaceStore } from '../store/workspace'
 import { useNotesStore } from '../store/notes'
 import { promptText } from '../store/promptDialog'
 import { api } from '../lib/tauri'
-import { deleteNote, moveNoteInto, moveSelectionInto, renameCanvas, renameNote } from '../lib/noteActions'
+import { deleteNote, exportZip, moveNoteInto, moveSelectionInto, renameCanvas, renameNote } from '../lib/noteActions'
 import { rangeSelection, toggleSelection } from '../lib/treeSelection'
 import { refreshTree } from '../hooks/useWorkspace'
 import { useCreateBase } from '../hooks/useCreateBase'
@@ -287,6 +287,9 @@ export function TreeNode({ entry, visiblePaths = [] }: TreeNodeProps) {
           </ContextMenuItem>
           <ContextMenuItem onSelect={() => void createBase(entry.path)}>
             <Plus size={14} /> New base
+          </ContextMenuItem>
+          <ContextMenuItem onSelect={() => void exportZip(entry.path)}>
+            <Archive size={14} /> Export as zip…
           </ContextMenuItem>
           <ContextMenuItem onSelect={() => void handleRenameFolder()}>
             <Pencil size={14} /> Rename

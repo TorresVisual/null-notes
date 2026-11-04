@@ -10,7 +10,7 @@ use std::path::{Path, PathBuf};
 use tauri::{AppHandle, State};
 use uuid::Uuid;
 
-const SIDECAR_SUFFIXES: [&str; 4] = ["ink", "pdf", "diagrams", "assets"];
+pub(super) const SIDECAR_SUFFIXES: [&str; 4] = ["ink", "pdf", "diagrams", "assets"];
 
 // What a merge wrote into an already-existing note, kept so the undo can put
 // it back — but only while the file still holds exactly `after`, so an edit

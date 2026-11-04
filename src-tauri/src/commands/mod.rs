@@ -8,6 +8,7 @@ pub mod crossref;
 pub mod diagrams;
 pub mod editor_launch;
 pub mod error_log;
+pub mod export;
 pub mod git;
 pub mod git_credentials;
 pub mod git_mobile;

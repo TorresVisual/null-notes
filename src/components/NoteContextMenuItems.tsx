@@ -1,9 +1,10 @@
-import { Copy, ExternalLink, FolderInput, Merge, FolderOpen, Link, Pencil, Trash2 } from 'lucide-react'
+import { Archive, Copy, ExternalLink, FolderInput, Merge, FolderOpen, Link, Pencil, Trash2 } from 'lucide-react'
 import {
   copyNotePath,
   deleteNote,
   renameCanvas,
   duplicateNote,
+  exportZip,
   moveNoteViaPicker,
   openNoteExternally,
   renameNote,
@@ -51,6 +52,9 @@ export function NoteContextMenuItems({ path }: NoteContextMenuItemsProps) {
         <Merge size={14} /> Merge into…
       </ContextMenuItem>
       <ContextMenuSeparator />
+      <ContextMenuItem onSelect={() => void exportZip(path)}>
+        <Archive size={14} /> Export as zip…
+      </ContextMenuItem>
       <ContextMenuItem onSelect={() => void revealNote(path)}>
         <FolderOpen size={14} /> Show in File Explorer
       </ContextMenuItem>
