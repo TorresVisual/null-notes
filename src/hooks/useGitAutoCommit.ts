@@ -46,9 +46,12 @@ export function useGitAutoCommit() {
         setGitCommitStatus,
         setGitCommitDetail,
       } = useWorkspaceStore.getState()
-      if (!path || !repoMode || (!git.autoCommit && !force) || gitPendingPaths.length === 0) return
+      if (!path || !repoMode || (!git.autoCommit && !force)) return
+      // The in-memory list is empty after a relaunch, so a manual sync falls
+      // back to the whole workspace and lets git decide what is dirty (#129).
+      if (gitPendingPaths.length === 0 && !force) return
 
-      const paths = gitPendingPaths
+      const paths = gitPendingPaths.length > 0 ? gitPendingPaths : ['.']
       setGitCommitStatus('committing')
       setGitCommitDetail(null)
       try {

@@ -286,6 +286,9 @@ pub(crate) fn build_commit_message(paths: &[String]) -> String {
     let names: Vec<String> = paths
         .iter()
         .map(|p| {
+            if p == "." {
+                return "workspace".to_string();
+            }
             Path::new(p)
                 .file_stem()
                 .map(|s| s.to_string_lossy().into_owned())

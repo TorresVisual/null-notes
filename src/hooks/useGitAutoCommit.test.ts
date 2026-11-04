@@ -82,6 +82,18 @@ describe('useGitAutoCommit', () => {
     expect(git.autoCommit).toHaveBeenCalledWith('/ws', 'notesOnly', ['/ws/a.md'], false)
   })
 
+  it('a forced flush with no pending paths (after relaunch) commits the whole workspace', async () => {
+    git.autoCommit.mockResolvedValue({ kind: 'committed' })
+    const { result } = renderHook(() => useGitAutoCommit())
+
+    await act(() => result.current.flushGitCommit(true))
+    expect(git.autoCommit).toHaveBeenCalledWith('/ws', 'notesOnly', ['.'], false)
+
+    git.autoCommit.mockClear()
+    await act(() => result.current.flushGitCommit())
+    expect(git.autoCommit).not.toHaveBeenCalled()
+  })
+
   it('a non-committed outcome leaves the batch pending for the next trigger, carrying the reason as detail', async () => {
     git.autoCommit.mockResolvedValue({ kind: 'skipped', reason: 'a rebase is in progress' })
     renderHook(() => useGitAutoCommit())
