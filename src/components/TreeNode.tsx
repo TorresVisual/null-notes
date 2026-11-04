@@ -6,7 +6,8 @@ import { useWorkspaceStore } from '../store/workspace'
 import { useNotesStore } from '../store/notes'
 import { promptText } from '../store/promptDialog'
 import { api } from '../lib/tauri'
-import { deleteNote, moveNoteInto, renameCanvas, renameNote } from '../lib/noteActions'
+import { deleteNote, moveNoteInto, moveSelectionInto, renameCanvas, renameNote } from '../lib/noteActions'
+import { rangeSelection, toggleSelection } from '../lib/treeSelection'
 import { refreshTree } from '../hooks/useWorkspace'
 import { useCreateBase } from '../hooks/useCreateBase'
 import { useCreateCanvas } from '../hooks/useCreateCanvas'
@@ -23,12 +24,39 @@ function activateOnKey(e: React.KeyboardEvent, activate: () => void) {
   activate()
 }
 
+const SELECTION_MIME = 'text/selection-paths'
+
 interface TreeNodeProps {
   entry: TreeEntry
+  visiblePaths?: string[]
 }
 
-export function TreeNode({ entry }: TreeNodeProps) {
+export function TreeNode({ entry, visiblePaths = [] }: TreeNodeProps) {
   const [dragOver, setDragOver] = useState(false)
+  const selectedPaths = useWorkspaceStore((s) => s.selectedPaths)
+  const inSelection = selectedPaths.includes(entry.path)
+
+  // Returns true when the click was a selection gesture and the row should not
+  // also open/toggle.
+  function handleSelectionClick(e: React.MouseEvent): boolean {
+    const { selectionAnchor, setSelection } = useWorkspaceStore.getState()
+    if (e.shiftKey) {
+      setSelection(rangeSelection(visiblePaths, selectionAnchor, entry.path), selectionAnchor ?? entry.path)
+    } else if (e.ctrlKey || e.metaKey) {
+      setSelection(toggleSelection(selectedPaths, entry.path), entry.path)
+    } else {
+      useWorkspaceStore.getState().clearSelection()
+      return false
+    }
+    return true
+  }
+
+  function startDrag(e: React.DragEvent, mime: string) {
+    e.dataTransfer.setData(mime, entry.path)
+    if (inSelection && selectedPaths.length > 1) {
+      e.dataTransfer.setData(SELECTION_MIME, JSON.stringify(selectedPaths))
+    }
+  }
   const expandedFolders = useWorkspaceStore((s) => s.expandedFolders)
   const workspacePath = useWorkspaceStore((s) => s.path)
   const selectedFolder = useWorkspaceStore((s) => s.selectedFolder)
@@ -92,12 +120,15 @@ export function TreeNode({ entry }: TreeNodeProps) {
         <ContextMenu>
           <ContextMenuTrigger asChild>
             <div
-              className={`tree-row tree-note${isActive ? ' active' : ''}`}
+              className={`tree-row tree-note${isActive ? ' active' : ''}${inSelection ? ' multi-selected' : ''}`}
               draggable
               tabIndex={0}
               aria-current={isActive || undefined}
-              onDragStart={(e) => e.dataTransfer.setData('text/note-path', entry.path)}
-              onClick={() => openTab(entry.path)}
+              aria-selected={inSelection || undefined}
+              onDragStart={(e) => startDrag(e, 'text/note-path')}
+              onClick={(e) => {
+                if (!handleSelectionClick(e)) openTab(entry.path)
+              }}
               onKeyDown={(e) => activateOnKey(e, () => openTab(entry.path))}
             >
               <span className="tree-label" title={entry.name}>{entry.name}</span>
@@ -148,7 +179,14 @@ export function TreeNode({ entry }: TreeNodeProps) {
     setDragOver(false)
     const notePath = e.dataTransfer.getData('text/note-path')
     const draggedFolderPath = e.dataTransfer.getData('text/folder-path')
+    const selection = e.dataTransfer.getData(SELECTION_MIME)
     try {
+      if (selection) {
+        if (!workspacePath) return
+        await moveSelectionInto(JSON.parse(selection) as string[], entry.path, workspacePath)
+        expandFolder(entry.path)
+        return
+      }
       if (notePath) {
         if (!workspacePath) return
         await moveNoteInto(notePath, entry.path, workspacePath)
@@ -218,13 +256,16 @@ export function TreeNode({ entry }: TreeNodeProps) {
       <ContextMenu>
         <ContextMenuTrigger asChild>
           <div
-            className={`tree-row tree-folder${isSelected ? ' selected' : ''}${dragOver ? ' drag-over' : ''}`}
+            className={`tree-row tree-folder${isSelected ? ' selected' : ''}${inSelection ? ' multi-selected' : ''}${dragOver ? ' drag-over' : ''}`}
             draggable
             role="button"
             tabIndex={0}
             aria-expanded={isExpanded}
-            onDragStart={(e) => e.dataTransfer.setData('text/folder-path', entry.path)}
-            onClick={selectFolder}
+            aria-selected={inSelection || undefined}
+            onDragStart={(e) => startDrag(e, 'text/folder-path')}
+            onClick={(e) => {
+              if (!handleSelectionClick(e)) selectFolder()
+            }}
             onKeyDown={(e) => activateOnKey(e, selectFolder)}
             onDragOver={(e) => {
               e.preventDefault()
@@ -259,7 +300,7 @@ export function TreeNode({ entry }: TreeNodeProps) {
       {isExpanded && (
         <ul className="folder-tree tree-guide" style={{ marginLeft: 14 }}>
           {entry.children.map((child) => (
-            <TreeNode key={child.path} entry={child} />
+            <TreeNode key={child.path} entry={child} visiblePaths={visiblePaths} />
           ))}
         </ul>
       )}

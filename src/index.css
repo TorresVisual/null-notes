@@ -3531,6 +3531,7 @@ li .fold-toggle { left: -2.4em; }
   to { transform: scaleY(1); opacity: 1; }
 }
 .tree-row.selected { background: var(--bg-hover); }
+.tree-row.multi-selected { background: var(--accent-bg); }
 .tree-row.is-disabled { opacity: var(--disabled-opacity); pointer-events: none; }
 .tree-row.is-loading { opacity: var(--loading-opacity); pointer-events: none; }
 .tree-row.is-error { color: var(--danger); }

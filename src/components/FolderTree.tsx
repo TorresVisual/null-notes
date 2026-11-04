@@ -1,10 +1,11 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { TreeNode } from './TreeNode'
 import { useWorkspaceStore } from '../store/workspace'
 import { refreshTree } from '../hooks/useWorkspace'
 import { folderName, isUnderPath } from '../lib/pathPrefix'
 import { api } from '../lib/tauri'
-import { moveNoteInto } from '../lib/noteActions'
+import { deleteSelection, moveNoteInto, moveSelectionInto } from '../lib/noteActions'
+import { visibleTreePaths } from '../lib/treeSelection'
 import type { TreeEntry } from '../lib/folderTree'
 
 interface FolderTreeProps {
@@ -25,6 +26,8 @@ export function FolderTree({ entries }: FolderTreeProps) {
   const replaceOpenPath = useWorkspaceStore((s) => s.replaceOpenPath)
   const setFolderError = useWorkspaceStore((s) => s.setFolderError)
   const setSelectedFolder = useWorkspaceStore((s) => s.setSelectedFolder)
+  const expandedFolders = useWorkspaceStore((s) => s.expandedFolders)
+  const visiblePaths = useMemo(() => visibleTreePaths(entries, expandedFolders), [entries, expandedFolders])
 
   async function handleDropAtRoot(e: React.DragEvent) {
     e.preventDefault()
@@ -32,7 +35,12 @@ export function FolderTree({ entries }: FolderTreeProps) {
     if (!workspacePath) return
     const notePath = e.dataTransfer.getData('text/note-path')
     const draggedFolderPath = e.dataTransfer.getData('text/folder-path')
+    const selection = e.dataTransfer.getData('text/selection-paths')
     try {
+      if (selection) {
+        await moveSelectionInto(JSON.parse(selection) as string[], workspacePath, workspacePath)
+        return
+      }
       if (notePath) {
         await moveNoteInto(notePath, workspacePath, workspacePath)
       } else if (draggedFolderPath && !isUnderPath(workspacePath, draggedFolderPath)) {
@@ -61,6 +69,15 @@ export function FolderTree({ entries }: FolderTreeProps) {
       }}
       onDragLeave={() => setDragOver(false)}
       onDrop={(e) => void handleDropAtRoot(e)}
+      onKeyDown={(e) => {
+        const { selectedPaths, clearSelection } = useWorkspaceStore.getState()
+        if (selectedPaths.length === 0) return
+        if (e.key === 'Escape') clearSelection()
+        else if (e.key === 'Delete') {
+          e.preventDefault()
+          void deleteSelection(selectedPaths)
+        }
+      }}
       // Row clicks bubble up here too, but their target is the row, not this
       // <ul> — only a click that lands directly on the list's own empty
       // background (below the last item, since this fills the sidebar's
@@ -79,7 +96,7 @@ export function FolderTree({ entries }: FolderTreeProps) {
       onDragEnd={() => setDragOver(false)}
     >
       {entries.map((entry) => (
-        <TreeNode key={entry.path} entry={entry} />
+        <TreeNode key={entry.path} entry={entry} visiblePaths={visiblePaths} />
       ))}
     </ul>
   )

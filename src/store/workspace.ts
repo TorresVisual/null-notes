@@ -67,6 +67,11 @@ interface WorkspaceStore {
   expandFolder: (folderPath: string) => void
   setExpandedFolders: (paths: string[]) => void
   setSelectedFolder: (path: string | null) => void
+  // Ephemeral multi-select in the sidebar tree: never persisted.
+  selectedPaths: string[]
+  selectionAnchor: string | null
+  setSelection: (paths: string[], anchor: string | null) => void
+  clearSelection: () => void
   replaceOpenPath: (oldPrefix: string, newPrefix: string) => void
   closeTabsUnder: (prefix: string) => void
   folderError: string | null
@@ -152,6 +157,8 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   closedTabs: [],
   expandedFolders: [],
   selectedFolder: null,
+  selectedPaths: [],
+  selectionAnchor: null,
   folderError: null,
   folderLoading: false,
   tagFilter: null,
@@ -272,6 +279,8 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   setCanvasViewports: (viewports) => set({ canvasViewports: viewports }),
   setExpandedFolders: (paths) => set({ expandedFolders: paths }),
   setSelectedFolder: (path) => set({ selectedFolder: path }),
+  setSelection: (paths, anchor) => set({ selectedPaths: paths, selectionAnchor: anchor }),
+  clearSelection: () => set({ selectedPaths: [], selectionAnchor: null }),
 
   replaceOpenPath: (oldPrefix, newPrefix) => {
     useBookmarksStore.getState().rewritePrefix(oldPrefix, newPrefix)
@@ -345,6 +354,8 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
       closedTabs: [],
       expandedFolders: [],
       selectedFolder: null,
+      selectedPaths: [],
+      selectionAnchor: null,
       folderError: null,
       tagFilter: null,
       recentSearches: [],

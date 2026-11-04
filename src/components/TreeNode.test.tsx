@@ -278,4 +278,46 @@ describe('TreeNode drop (folder)', () => {
       expect(useWorkspaceStore.getState().expandedFolders).toContain('/ws/Target')
     })
   })
+
+  it('moves every selected note and rejects only the one that collides', async () => {
+    const paths = ['/ws/a.md', '/ws/b.md', '/ws/c.md']
+    useNotesStore.setState({
+      notes: paths.map((path) => ({ id: path, title: path, path, workspace: '/ws', updatedAt: 0 })),
+    })
+    notesApi.moveNote.mockImplementation(async (path) => {
+      if (path === '/ws/b.md') throw new Error('a note named "b.md" already exists here')
+      return path.replace('/ws/', '/ws/Target/')
+    })
+    render(<TreeNode entry={folderEntry} />)
+
+    dropWithPaths(screen.getByText('Target').closest('.tree-folder')!, {
+      'text/selection-paths': JSON.stringify(paths),
+    })
+
+    await waitFor(() => expect(notesApi.moveNote).toHaveBeenCalledTimes(3))
+    await waitFor(() => expect(useWorkspaceStore.getState().folderError).toContain('b.md'))
+    expect(useWorkspaceStore.getState().selectedPaths).toEqual([])
+  })
+})
+
+describe('TreeNode multi-select', () => {
+  it('ctrl-click toggles a note into the selection without opening it', async () => {
+    useWorkspaceStore.setState({ openTabs: [], activeTab: null })
+    render(<TreeNode entry={noteEntry} />)
+
+    fireEvent.click(screen.getByText('Lecture 7'), { ctrlKey: true })
+
+    expect(useWorkspaceStore.getState().selectedPaths).toEqual([noteEntry.path])
+    expect(useWorkspaceStore.getState().openTabs).toEqual([])
+  })
+
+  it('a plain click clears the selection and opens the note', async () => {
+    useWorkspaceStore.setState({ openTabs: [], activeTab: null, selectedPaths: ['/ws/other.md'] })
+    render(<TreeNode entry={noteEntry} />)
+
+    await userEvent.click(screen.getByText('Lecture 7'))
+
+    expect(useWorkspaceStore.getState().selectedPaths).toEqual([])
+    expect(useWorkspaceStore.getState().activeTab).toBe(noteEntry.path)
+  })
 })

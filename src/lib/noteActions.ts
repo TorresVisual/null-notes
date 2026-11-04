@@ -1,10 +1,13 @@
-import { open } from '@tauri-apps/plugin-dialog'
+import { confirm, open } from '@tauri-apps/plugin-dialog'
 import { api } from './tauri'
 import { writeToClipboard } from './clipboard'
 import { isBasePath } from './canvasPath'
+import { failure } from './failure'
 import { folderName, isUnderPath, sidecarDir } from './pathPrefix'
+import { topLevelPaths } from './treeSelection'
+import type { TrashEntry } from '../types'
 import { refreshTree } from '../hooks/useWorkspace'
-import { offerUndoDelete } from '../hooks/useTrash'
+import { offerUndoDelete, restoreFromTrash } from '../hooks/useTrash'
 import { promptText } from '../store/promptDialog'
 import { showToast } from '../store/toast'
 import { useNotesStore } from '../store/notes'
@@ -95,6 +98,72 @@ export async function deleteNote(path: string): Promise<void> {
   // pending list and `git rm` never runs.
   queueGitPaths(path)
   offerUndoDelete(workspace, trashed)
+}
+
+async function moveFolderInto(folderPath: string, destFolder: string): Promise<void> {
+  const separator = destFolder.includes('\\') ? '\\' : '/'
+  const newPath = `${destFolder}${separator}${folderName(folderPath)}`
+  await api.notes.renameFolder(folderPath, newPath)
+  useWorkspaceStore.getState().replaceOpenPath(folderPath, newPath)
+  useWorkspaceStore.getState().addGitPendingPath(folderPath)
+  useWorkspaceStore.getState().addGitPendingPath(newPath)
+}
+
+function describeFailure(path: string, err: unknown): string {
+  return `${folderName(path)}: ${err instanceof Error ? err.message : String(err)}`
+}
+
+// Each item succeeds or fails alone: a name collision on one rejects only that
+// item and the rest still move.
+export async function moveSelectionInto(selected: string[], destFolder: string, workspace: string): Promise<void> {
+  const noteDirectory = new Set(useNotesStore.getState().notes.map((n) => n.path))
+  const failures: string[] = []
+  for (const path of topLevelPaths(selected)) {
+    if (isUnderPath(destFolder, path)) continue
+    try {
+      if (noteDirectory.has(path)) await moveNoteInto(path, destFolder, workspace)
+      else await moveFolderInto(path, destFolder)
+    } catch (err) {
+      failures.push(describeFailure(path, err))
+    }
+  }
+  useWorkspaceStore.getState().setFolderError(failures.length > 0 ? failures.join('\n') : null)
+  useWorkspaceStore.getState().clearSelection()
+  await refreshTree()
+}
+
+export async function deleteSelection(selected: string[]): Promise<void> {
+  const workspace = useWorkspaceStore.getState().path
+  const paths = topLevelPaths(selected)
+  if (!workspace || paths.length === 0) return
+  const noun = paths.length === 1 ? 'item' : 'items'
+  if (!(await confirm(`Delete ${paths.length} ${noun}? You can restore them from Trash.`))) return
+  const noteDirectory = new Set(useNotesStore.getState().notes.map((n) => n.path))
+  const trashed: TrashEntry[] = []
+  const failures: string[] = []
+  for (const path of paths) {
+    try {
+      const isNote = noteDirectory.has(path)
+      trashed.push(isNote ? await api.notes.delete(workspace, path) : await api.notes.deleteFolder(workspace, path))
+      useWorkspaceStore.getState().closeTabsUnder(path)
+      if (isNote) queueGitPaths(path)
+      else useWorkspaceStore.getState().addGitPendingPath(path)
+    } catch (err) {
+      failures.push(describeFailure(path, err))
+    }
+  }
+  useWorkspaceStore.getState().setFolderError(failures.length > 0 ? failures.join('\n') : null)
+  useWorkspaceStore.getState().clearSelection()
+  await refreshTree()
+  if (trashed.length === 0) return
+  showToast(`Deleted ${trashed.length} ${trashed.length === 1 ? 'item' : 'items'}`, {
+    label: 'Undo',
+    onClick: () => {
+      Promise.all(trashed.map((entry) => restoreFromTrash(workspace, entry))).catch((err) =>
+        showToast(failure('restore the deleted items', err)),
+      )
+    },
+  })
 }
 
 export async function mergeNotes(source: string, dest: string): Promise<void> {
