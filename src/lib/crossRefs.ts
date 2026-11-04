@@ -23,11 +23,16 @@ export interface CrossRef {
 
 const KEYWORDS = ['Theorem', 'Lemma', 'Corollary', 'Proof', 'Definition', 'Example', 'Algorithm', 'Equation', 'Task', 'Figure']
 
+// The exercise splitter's own opener spellings (`keyword_pattern()` in
+// exercises.rs); it renames them all to `## Task N`, so they all resolve there.
+const TASK_SYNONYMS = ['Aufgabe', 'Beispiel', 'Exercise', 'Problem']
+const PATTERN_KEYWORDS = [...KEYWORDS, ...TASK_SYNONYMS]
+
 // A number is digits, optionally dotted ("3", "3.2", "3.2.1") — the same
 // shape `> [!THEOREM 3.2]` accepts as its own `number` attribute. Parens are
 // optional so both "Theorem 3.2" and "Equation (3)" — the conventional way
 // to write an equation reference — match the one pattern.
-const PATTERN = new RegExp(`\\b(${KEYWORDS.join('|')})\\s+\\(?(\\d+(?:\\.\\d+)*)\\)?\\b`, 'gi')
+const PATTERN = new RegExp(`\\b(${PATTERN_KEYWORDS.join('|')})\\s+\\(?(\\d+(?:\\.\\d+)*)\\)?\\b`, 'gi')
 
 export function findCrossRefs(text: string): CrossRef[] {
   const found: CrossRef[] = []
@@ -37,8 +42,9 @@ export function findCrossRefs(text: string): CrossRef[] {
     const keyword = match[1]
     const number = match[2]
     if (!keyword || !number) continue
+    const lower = keyword.toLowerCase()
     found.push({
-      calloutType: keyword.toLowerCase(),
+      calloutType: TASK_SYNONYMS.some((s) => s.toLowerCase() === lower) ? 'task' : lower,
       number,
       from: index,
       to: index + whole.length,
