@@ -70,6 +70,11 @@ describe('CodeBlockRun panel visibility', () => {
     expect(editor?.view.dom.querySelector('.code-run-run')).not.toBeNull()
   })
 
+  it('shows a Run button on a java code block', () => {
+    mount(codeBlock('java', 'class Main { public static void main(String[] a) {} }'))
+    expect(editor?.view.dom.querySelector('.code-run-run')).not.toBeNull()
+  })
+
   it('does not show a Run button on an unsupported language', () => {
     mount(codeBlock('rust', 'fn main() {}'))
     expect(editor?.view.dom.querySelector('.code-run-run')).toBeNull()

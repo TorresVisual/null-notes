@@ -10,7 +10,7 @@ Anything that resolves must also exist; an unresolvable link renders inert rathe
 
 ## Running code from notes
 
-`code_run.rs` runs a code block's contents (Python, C/C++) as a real subprocess — no shell, no sandbox, reusing `editor_launch.rs`'s `tokenize`/`is_on_path`. Since the P8 terminal already gives the user unsandboxed execution, the mitigation is **friction and visibility, not containment**: never auto-run (not on note open, sync, or PDF import — only an explicit Run click), a per-note-per-session confirmation gate (in-memory Zustand state, never persisted), and streamed output. See `docs/specs/code-execution-design.md` for the full posture and why a global on/off toggle was rejected in favor of per-note confirmation.
+`code_run.rs` runs a code block's contents (Python, C/C++, Java) as a real subprocess — no shell, no sandbox, reusing `editor_launch.rs`'s `tokenize`/`is_on_path`. Since the P8 terminal already gives the user unsandboxed execution, the mitigation is **friction and visibility, not containment**: never auto-run (not on note open, sync, or PDF import — only an explicit Run click), a per-note-per-session confirmation gate (in-memory Zustand state, never persisted), and streamed output. See `docs/specs/code-execution-design.md` for the full posture and why a global on/off toggle was rejected in favor of per-note confirmation.
 
 ## Formatting code blocks
 

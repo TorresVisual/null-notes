@@ -27,7 +27,7 @@ import { isMobile, isWeb } from '../../lib/platform'
  * the expected output, showing a pass/fail indicator and comparison diff.
  */
 
-export const RUNNABLE_LANGUAGES = new Set(['python', 'cpp', 'c++', 'c'])
+export const RUNNABLE_LANGUAGES = new Set(['python', 'cpp', 'c++', 'c', 'java'])
 
 export interface RunEntry {
   runId: string

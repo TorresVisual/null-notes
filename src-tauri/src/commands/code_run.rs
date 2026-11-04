@@ -254,6 +254,18 @@ pub async fn run_code(
             return Ok(());
         }
         python_argv(&python_command, "main.py")
+    } else if language == "java" {
+        // Source-file mode (JDK 11+): `java Main.java` compiles in memory and
+        // runs the first class, so the file need not be named after its class.
+        if let Err(e) = std::fs::write(dir_path.join("Main.java"), &source) {
+            fail(
+                &app,
+                &run_id,
+                &format!("could not write the source file: {e}"),
+            );
+            return Ok(());
+        }
+        ("java".to_string(), vec!["Main.java".to_string()])
     } else {
         fail(&app, &run_id, &format!("unsupported language: {language}"));
         return Ok(());
