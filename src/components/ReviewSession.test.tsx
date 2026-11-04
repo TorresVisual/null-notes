@@ -13,6 +13,8 @@ vi.mock('../lib/tauri', () => ({
       listTagCards: vi.fn(),
       listAllCards: vi.fn(),
       gradeCard: vi.fn(),
+      getCardSchedule: vi.fn(),
+      restoreCardSchedule: vi.fn(),
       gradeMcCard: vi.fn(),
       setCardSuspended: vi.fn(),
     },
@@ -40,6 +42,8 @@ beforeEach(() => {
   useWorkspaceStore.setState({ path: '/ws', gitPendingPaths: [] })
   vi.mocked(api.notes.listDueCards).mockResolvedValue(cards)
   vi.mocked(api.notes.gradeCard).mockResolvedValue(undefined)
+  vi.mocked(api.notes.getCardSchedule).mockResolvedValue(null)
+  vi.mocked(api.notes.restoreCardSchedule).mockResolvedValue(undefined)
 })
 
 afterEach(() => {
@@ -107,9 +111,39 @@ describe('ReviewSession', () => {
     fireEvent.click(screen.getByText('Reveal answer'))
     fireEvent.click(screen.getByText('Good'))
 
-    expect(api.notes.gradeCard).toHaveBeenCalledWith('/ws/a.md', 0, 'good', '/ws')
+    await waitFor(() => expect(api.notes.gradeCard).toHaveBeenCalledWith('/ws/a.md', 0, 'good', '/ws'))
     await waitFor(() => expect(screen.getByText('Q2 [...]')).toBeInTheDocument())
     expect(screen.queryByText('Reveal answer')).toBeInTheDocument()
+  })
+
+  it('runs a session from the keyboard and Ctrl+Z restores the previous schedule and card', async () => {
+    let graded = false
+    vi.mocked(api.notes.listDueCards).mockImplementation(async () => (graded ? [cards[1]!] : cards))
+    vi.mocked(api.notes.gradeCard).mockImplementation(async () => {
+      graded = true
+    })
+    vi.mocked(api.notes.getCardSchedule).mockResolvedValue('<!-- sr due=2026-01-01 ease=2.50 interval=1 reps=1 -->')
+    vi.mocked(api.notes.restoreCardSchedule).mockImplementation(async () => {
+      graded = false
+    })
+
+    render(<ReviewSession onClose={vi.fn()} />)
+    await waitFor(() => screen.getByText('Q1'))
+    fireEvent.keyDown(window, { key: ' ' })
+    expect(screen.getByText('A1')).toBeInTheDocument()
+    fireEvent.keyDown(window, { key: '4' })
+    expect(await screen.findByText('Q2 [...]')).toBeInTheDocument()
+    expect(api.notes.gradeCard).toHaveBeenCalledWith('/ws/a.md', 0, 'easy', '/ws')
+
+    fireEvent.keyDown(window, { key: 'z', ctrlKey: true })
+    await waitFor(() => expect(screen.getByText('Q1')).toBeInTheDocument())
+    expect(api.notes.restoreCardSchedule).toHaveBeenCalledWith(
+      '/ws/a.md',
+      0,
+      '<!-- sr due=2026-01-01 ease=2.50 interval=1 reps=1 -->',
+      '/ws',
+    )
+    expect(screen.queryByText('Undo')).not.toBeInTheDocument()
   })
 
   it('with "Review all workspaces" on, fetches across workspaces and grades against its own workspace', async () => {
@@ -125,7 +159,7 @@ describe('ReviewSession', () => {
 
     fireEvent.click(screen.getByText('Reveal answer'))
     fireEvent.click(screen.getByText('Good'))
-    expect(api.notes.gradeCard).toHaveBeenCalledWith('/other/z.md', 0, 'good', '/other')
+    await waitFor(() => expect(api.notes.gradeCard).toHaveBeenCalledWith('/other/z.md', 0, 'good', '/other'))
   })
 
   it('queues the graded note for auto-commit, like a normal save does', async () => {

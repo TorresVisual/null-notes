@@ -145,6 +145,10 @@ export const api = {
       invoke<DueCard[]>('list_due_cards', { workspace, allWorkspaces }),
     gradeCard: (path: string, position: number, grade: Grade, workspace: string) =>
       invoke<void>('grade_card', { path, position, grade, workspace }),
+    getCardSchedule: (path: string, position: number) =>
+      invoke<string | null>('get_card_schedule', { path, position }),
+    restoreCardSchedule: (path: string, position: number, previous: string | null, workspace: string) =>
+      invoke<void>('restore_card_schedule', { path, position, previous, workspace }),
     gradeMcCard: (path: string, position: number, picked: number[], workspace: string) =>
       invoke<McGradeResult>('grade_mc_card', { path, position, picked, workspace }),
     setCardSuspended: (path: string, position: number, suspended: boolean, workspace: string) =>

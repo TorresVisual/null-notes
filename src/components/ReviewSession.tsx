@@ -19,6 +19,13 @@ interface ReviewSessionProps {
   onSwitchCategory?: (streak: number, struggling: boolean) => void
 }
 
+interface UndoableGrade {
+  notePath: string
+  position: number
+  workspace: string
+  previous: string | null
+}
+
 const GRADES: Array<{ grade: Grade; label: string }> = [
   { grade: 'again', label: 'Again' },
   { grade: 'hard', label: 'Hard' },
@@ -59,6 +66,7 @@ export function ReviewSession({ onClose, mode = { kind: 'due' }, onSwitchCategor
   const [mcSubmitting, setMcSubmitting] = useState(false)
   const [categories, setCategories] = useState<CardStreakGroup[]>([])
   const [allWorkspaces, setAllWorkspaces] = useState(false)
+  const [lastGrade, setLastGrade] = useState<UndoableGrade | null>(null)
 
   // Lets the header offer a one-click switch to another category without
   // leaving the review overlay — Deck View computes the same buckets, but
@@ -107,12 +115,42 @@ export function ReviewSession({ onClose, mode = { kind: 'due' }, onSwitchCategor
     setMcResult(null)
   }, [current?.notePath, current?.position])
 
-  function refetch() {
+  // `front` pulls the undone card back to the head of a shuffled queue.
+  function refetch(front?: UndoableGrade) {
     if (!workspacePath) return
     void fetchQueue(workspacePath).then((fetched) => {
-      setQueue(fetched)
+      const at = front
+        ? fetched.findIndex(
+            (c) => c.notePath === front.notePath && c.position === front.position && c.workspace === front.workspace,
+          )
+        : -1
+      setQueue(at > 0 ? [fetched[at]!, ...fetched.slice(0, at), ...fetched.slice(at + 1)] : fetched)
       setRevealed(false)
+      setPicked(new Set())
+      setMcResult(null)
     })
+  }
+
+  // Captures the card's schedule line before `run` rewrites it. A failed read
+  // (note deleted outside the app) just forgoes undo — `run` still has to fail
+  // on its own so the backend can drop the ghost card.
+  async function withUndo<T>(card: DueCard, run: () => Promise<T>): Promise<T> {
+    const { notePath, position, workspace } = card
+    const previous = await api.notes.getCardSchedule(notePath, position).catch(() => undefined)
+    const result = await run()
+    if (previous !== undefined) setLastGrade({ notePath, position, workspace, previous })
+    return result
+  }
+
+  function undo() {
+    if (!lastGrade) return
+    const undone = lastGrade
+    setLastGrade(null)
+    void api.notes
+      .restoreCardSchedule(undone.notePath, undone.position, undone.previous, undone.workspace)
+      .then(() => useWorkspaceStore.getState().addGitPendingPath(undone.notePath))
+      .catch(() => {})
+      .finally(() => refetch(undone))
   }
 
   // Grades the front card, then re-fetches the whole due queue — unlike
@@ -127,11 +165,10 @@ export function ReviewSession({ onClose, mode = { kind: 'due' }, onSwitchCategor
     // Grading can fail if the note was deleted outside the app (the backend
     // then drops its stale queue entry on its own) — refetch regardless so a
     // ghost card can't get stuck un-gradeable forever.
-    void api.notes
-      .gradeCard(notePath, current.position, g, current.workspace)
+    void withUndo(current, () => api.notes.gradeCard(notePath, current.position, g, current.workspace))
       .then(() => useWorkspaceStore.getState().addGitPendingPath(notePath))
       .catch(() => {})
-      .finally(refetch)
+      .finally(() => refetch())
   }
 
   function suspend() {
@@ -141,7 +178,7 @@ export function ReviewSession({ onClose, mode = { kind: 'due' }, onSwitchCategor
       .setCardSuspended(notePath, current.position, true, current.workspace)
       .then(() => useWorkspaceStore.getState().addGitPendingPath(notePath))
       .catch(() => {})
-      .finally(refetch)
+      .finally(() => refetch())
   }
 
   function togglePick(i: number) {
@@ -157,8 +194,9 @@ export function ReviewSession({ onClose, mode = { kind: 'due' }, onSwitchCategor
     if (!workspacePath || !current) return
     const notePath = current.notePath
     setMcSubmitting(true)
-    void api.notes
-      .gradeMcCard(notePath, current.position, Array.from(picked), current.workspace)
+    void withUndo(current, () =>
+      api.notes.gradeMcCard(notePath, current.position, Array.from(picked), current.workspace),
+    )
       .then((result) => {
         useWorkspaceStore.getState().addGitPendingPath(notePath)
         setMcResult(result.correct)
@@ -173,6 +211,52 @@ export function ReviewSession({ onClose, mode = { kind: 'due' }, onSwitchCategor
       .finally(() => setMcSubmitting(false))
   }
 
+  // Runs on every render so it always sees the current card and handlers.
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.altKey || e.metaKey || e.repeat) return
+      if (e.ctrlKey && !e.shiftKey && e.key.toLowerCase() === 'z') {
+        if (!lastGrade) return
+        e.preventDefault()
+        undo()
+        return
+      }
+      if (e.ctrlKey || e.shiftKey || !current || isLoading) return
+      const target = e.target
+      const activates = e.key === ' ' || e.key === 'Enter'
+      // A focused button or checkbox keeps its own Space/Enter behaviour.
+      if (activates && target instanceof HTMLButtonElement) return
+      if (e.key === ' ' && target instanceof HTMLInputElement) return
+
+      if (current.kind === 'mc') {
+        if (mcResult !== null) {
+          if (activates) {
+            e.preventDefault()
+            refetch()
+          }
+        } else if (activates) {
+          e.preventDefault()
+          if (picked.size > 0 && !mcSubmitting) submitMc()
+        } else if (/^[1-9]$/.test(e.key)) {
+          const optionIndex = optionOrder[Number(e.key) - 1]
+          if (optionIndex !== undefined) togglePick(optionIndex)
+        }
+        return
+      }
+      if (!revealed) {
+        if (activates) {
+          e.preventDefault()
+          setRevealed(true)
+        }
+        return
+      }
+      const chosen = GRADES[Number(e.key) - 1]
+      if (/^[1-4]$/.test(e.key) && chosen) grade(chosen.grade)
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  })
+
   function optionClass(i: number): string {
     if (!mcResult) return ''
     const isPicked = picked.has(i)
@@ -185,7 +269,16 @@ export function ReviewSession({ onClose, mode = { kind: 'due' }, onSwitchCategor
 
   return (
     <Dialog open onOpenChange={(next) => !next && onClose()}>
-      <DialogContent className="review-session" showCloseButton={false} aria-describedby={undefined}>
+      <DialogContent
+        className="review-session"
+        showCloseButton={false}
+        aria-describedby={undefined}
+        onOpenAutoFocus={(e) => {
+          // Focus on the close button would make Space/Enter close the review.
+          e.preventDefault()
+          ;(e.currentTarget as HTMLElement | null)?.focus()
+        }}
+      >
         <div className="settings-panel-header">
           <DialogTitle asChild>
             <h2>
@@ -196,9 +289,16 @@ export function ReviewSession({ onClose, mode = { kind: 'due' }, onSwitchCategor
                   : `Review${queue.length > 0 ? ` (${queue.length} due)` : ''}`}
             </h2>
           </DialogTitle>
-          <button className="settings-panel-close" onClick={onClose} aria-label="Close review" title="Close review">
-            <X size={16} />
-          </button>
+          <div className="review-header-actions">
+            {lastGrade && (
+              <button className="review-card-suspend" onClick={undo} title="Undo last grade (Ctrl+Z)">
+                Undo
+              </button>
+            )}
+            <button className="settings-panel-close" onClick={onClose} aria-label="Close review" title="Close review">
+              <X size={16} />
+            </button>
+          </div>
         </div>
         {cramStreak !== null && categories.length > 1 && onSwitchCategory && (
           <div className="review-cram-categories">
@@ -290,7 +390,7 @@ export function ReviewSession({ onClose, mode = { kind: 'due' }, onSwitchCategor
                     Submit
                   </button>
                 ) : (
-                  <button className="review-card-reveal" onClick={refetch}>
+                  <button className="review-card-reveal" onClick={() => refetch()}>
                     Next
                   </button>
                 )}

@@ -10,7 +10,12 @@ interface ShortcutsOverlayProps {
 const GROUPS: CommandGroup[] = ['Create', 'Navigate', 'View', 'Study', 'Note', 'Other']
 
 // Find lives in the editor itself, so it is shown here but not rebindable.
-const FIXED_SHORTCUTS = [{ keys: 'Ctrl+F', label: 'Find (and replace) in this note', group: 'Navigate' }]
+const FIXED_SHORTCUTS = [
+  { keys: 'Ctrl+F', label: 'Find (and replace) in this note', group: 'Navigate' },
+  { keys: 'Space / Enter', label: 'Review: reveal answer, submit, next card', group: 'Study' },
+  { keys: '1 – 4', label: 'Review: grade Again / Hard / Good / Easy (multiple choice: toggle option)', group: 'Study' },
+  { keys: 'Ctrl+Z', label: 'Review: undo last grade', group: 'Study' },
+]
 
 export function ShortcutsOverlay({ onClose }: ShortcutsOverlayProps) {
   const keymap = useKeymap()

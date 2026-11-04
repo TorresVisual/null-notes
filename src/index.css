@@ -5432,6 +5432,12 @@ input[type='checkbox']:focus-visible {
   margin: 0;
 }
 
+.review-header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
 .review-card-suspend {
   background: none;
   border: 1px solid var(--border);

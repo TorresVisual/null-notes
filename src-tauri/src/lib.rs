@@ -257,6 +257,8 @@ pub fn run() {
             commands::notes::toggle_task,
             commands::notes::grade_card,
             commands::notes::grade_mc_card,
+            commands::notes::get_card_schedule,
+            commands::notes::restore_card_schedule,
             commands::notes::set_card_suspended,
             commands::notes::list_due_cards,
             commands::notes::list_all_cards,

@@ -1474,6 +1474,87 @@ async fn read_note_or_forget(path: &str, db: &DbPool) -> anyhow::Result<String> 
     }
 }
 
+fn card_comment_idx(lines: &[&str], position: i64) -> Option<usize> {
+    let idx = usize::try_from(position).ok()?;
+    let trimmed = lines.get(idx)?.trim();
+    if is_mc_question_line(trimmed) {
+        let option_count = mc_block_option_count(lines, idx);
+        if option_count == 0 {
+            return None;
+        }
+        Some(sr_comment_idx(lines, idx + 1 + option_count))
+    } else {
+        classify_card_line(trimmed)?;
+        Some(sr_comment_idx(lines, idx + 1))
+    }
+}
+
+/// The card's current schedule comment, so a grade can be undone exactly.
+/// Outer `None`: no card at `position`; inner `None`: the card has no comment yet.
+pub fn card_schedule_line(content: &str, position: i64) -> Option<Option<String>> {
+    let lines: Vec<&str> = content.lines().collect();
+    let comment_idx = card_comment_idx(&lines, position)?;
+    Some(
+        lines
+            .get(comment_idx)
+            .filter(|l| parse_sr_comment(l).is_some())
+            .map(|l| l.to_string()),
+    )
+}
+
+/// Puts `previous` (from `card_schedule_line`) back as the card's schedule
+/// comment, removing the comment when the card had none. Refuses a `previous`
+/// that is not a schedule comment, since it is written into the note verbatim.
+pub fn restore_card_schedule_line(
+    content: &str,
+    position: i64,
+    previous: Option<&str>,
+) -> Option<String> {
+    if previous.is_some_and(|p| parse_sr_comment(p).is_none()) {
+        return None;
+    }
+    let borrowed: Vec<&str> = content.lines().collect();
+    let comment_idx = card_comment_idx(&borrowed, position)?;
+    let mut lines: Vec<String> = borrowed.iter().map(|l| l.to_string()).collect();
+    let has_comment = lines
+        .get(comment_idx)
+        .is_some_and(|l| parse_sr_comment(l).is_some());
+    match (previous, has_comment) {
+        (Some(p), true) => lines[comment_idx] = p.to_string(),
+        (Some(p), false) => lines.insert(comment_idx, p.to_string()),
+        (None, true) => {
+            lines.remove(comment_idx);
+        }
+        (None, false) => {}
+    }
+    let mut rewritten = lines.join("\n");
+    if content.ends_with('\n') {
+        rewritten.push('\n');
+    }
+    Some(rewritten)
+}
+
+async fn get_card_schedule_at(path: &str, position: i64) -> anyhow::Result<Option<String>> {
+    let content = tokio::fs::read_to_string(path).await?;
+    card_schedule_line(&content, position)
+        .ok_or_else(|| anyhow::anyhow!("no card at line {position} in {path}"))
+}
+
+async fn restore_card_schedule_at(
+    path: &str,
+    position: i64,
+    previous: Option<&str>,
+    workspace: &str,
+    db: &DbPool,
+) -> anyhow::Result<()> {
+    let content = read_note_or_forget(path, db).await?;
+    let new_content = restore_card_schedule_line(&content, position, previous)
+        .ok_or_else(|| anyhow::anyhow!("no card at line {position} in {path}"))?;
+    write_atomic(Path::new(path), &new_content).await?;
+    index_note_at(path, workspace, &new_content, db).await?;
+    Ok(())
+}
+
 async fn grade_card_at(
     path: &str,
     position: i64,
@@ -1988,6 +2069,26 @@ pub async fn grade_card(
     db: State<'_, DbPool>,
 ) -> Result<(), String> {
     grade_card_at(&path, position, grade, &workspace, &db)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn get_card_schedule(path: String, position: i64) -> Result<Option<String>, String> {
+    get_card_schedule_at(&path, position)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn restore_card_schedule(
+    path: String,
+    position: i64,
+    previous: Option<String>,
+    workspace: String,
+    db: State<'_, DbPool>,
+) -> Result<(), String> {
+    restore_card_schedule_at(&path, position, previous.as_deref(), &workspace, &db)
         .await
         .map_err(|e| e.to_string())
 }
@@ -4596,6 +4697,61 @@ mod save_tests {
             .await
             .unwrap();
         assert!(due.is_empty());
+    }
+
+    async fn grade_then_undo(initial: &str) -> (String, String) {
+        let pool = sqlx::sqlite::SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect("sqlite::memory:")
+            .await
+            .unwrap();
+        run_migrations(&pool).await.unwrap();
+        let tmp = tempdir().unwrap();
+        let path = tmp.path().join("a.md");
+        std::fs::write(&path, initial).unwrap();
+        let path_str = path.to_string_lossy().into_owned();
+        let ws = tmp.path().to_string_lossy().into_owned();
+        index_note_at(&path_str, &ws, initial, &pool).await.unwrap();
+
+        let previous = get_card_schedule_at(&path_str, 0).await.unwrap();
+        grade_card_at(&path_str, 0, sm2::Grade::Easy, &ws, &pool)
+            .await
+            .unwrap();
+        let graded = std::fs::read_to_string(&path).unwrap();
+        assert_ne!(graded, initial);
+        restore_card_schedule_at(&path_str, 0, previous.as_deref(), &ws, &pool)
+            .await
+            .unwrap();
+        let restored = std::fs::read_to_string(&path).unwrap();
+
+        let row: (i64, i64, i64) =
+            sqlx::query_as("SELECT reps, streak, lapses FROM review_cards WHERE note_path = ?")
+                .bind(&path_str)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        (restored, format!("{row:?}"))
+    }
+
+    #[tokio::test]
+    async fn test_undo_grade_restores_the_exact_prior_comment_and_db_row() {
+        let initial =
+            "Q :: A\n<!-- sr due=2026-01-01 ease=2.10 interval=6 reps=3 grade=good streak=4 lapses=2 -->\n";
+        let (restored, row) = grade_then_undo(initial).await;
+        assert_eq!(restored, initial);
+        assert_eq!(row, "(3, 4, 2)");
+    }
+
+    #[tokio::test]
+    async fn test_undo_grade_of_a_new_card_removes_the_comment() {
+        let (restored, row) = grade_then_undo("Q :: A\n").await;
+        assert_eq!(restored, "Q :: A\n");
+        assert_eq!(row, "(0, 0, 0)");
+    }
+
+    #[test]
+    fn test_restore_card_schedule_line_refuses_a_non_schedule_line() {
+        assert!(restore_card_schedule_line("Q :: A\n", 0, Some("# injected")).is_none());
     }
 
     #[tokio::test]
