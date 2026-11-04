@@ -105,11 +105,13 @@ export function MobileShell({
       ) : (
         <>
           <main className="mobile-screen">{screen}</main>
-          <MobileTabBar
-            active={highlightedTab(tab, moreOpen, activeOverlay)}
-            hasWorkspace={hasWorkspace}
-            onSelect={selectTab}
-          />
+          {hasWorkspace && (
+            <MobileTabBar
+              active={highlightedTab(tab, moreOpen, activeOverlay)}
+              hasWorkspace
+              onSelect={selectTab}
+            />
+          )}
         </>
       )}
       {moreOpen && (

@@ -584,6 +584,15 @@ button, [role="button"], .tree-row, .tab, .search-result, .slash-menu-item,
 
 .mobile-screen > .home-view { padding: var(--space-xl) var(--space-lg); }
 
+/* Name over path: a long path squeezed beside the name is unreadable at 393pt. */
+[data-shell='mobile'] .workspace-picker-recents button {
+  grid-template-columns: minmax(0, 1fr) 14px;
+  gap: 2px var(--space-md);
+}
+[data-shell='mobile'] .workspace-picker-recents .workspace-picker-path { grid-column: 1; }
+[data-shell='mobile'] .workspace-picker-recents .workspace-picker-enter { grid-column: 2; grid-row: 1 / span 2; opacity: 1; transform: none; }
+[data-shell='mobile'] .workspace-picker-bar { padding-top: var(--space-lg); }
+
 @media (hover: none) {
   .tree-row { min-height: 44px; }
   .home-section-item { min-height: 44px; }

@@ -136,13 +136,9 @@ describe('MobileShell system Back', () => {
 })
 
 describe('MobileShell without a workspace', () => {
-  it('shows the picker slot, disables Search/Review, keeps More reachable', async () => {
-    const { props } = setup({ hasWorkspace: false })
+  it('shows the picker slot and no tab bar', () => {
+    setup({ hasWorkspace: false })
     expect(screen.getByText('editor-screen')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Search' })).toBeDisabled()
-    expect(screen.getByRole('button', { name: 'Review' })).toBeDisabled()
-    await userEvent.click(screen.getByRole('button', { name: 'More' }))
-    await userEvent.click(screen.getByRole('button', { name: 'Settings' }))
-    expect(props.openOverlay).toHaveBeenCalledWith('settings')
+    expect(screen.queryByRole('button', { name: 'More' })).not.toBeInTheDocument()
   })
 })
