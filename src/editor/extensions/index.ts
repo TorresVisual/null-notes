@@ -20,6 +20,7 @@ import { PdfPageBlock } from './PdfPageBlock'
 import { InlineMath } from './InlineMath'
 import { BlockMath } from './BlockMath'
 import { MermaidBlock } from './MermaidBlock'
+import { PlotBlock } from './PlotBlock'
 import { DiagramBlock } from './DiagramBlock'
 import { Callout } from './Callout'
 import { FootnoteReference } from './FootnoteReference'
@@ -199,6 +200,7 @@ export const coreExtensions = [
   InlineMath,
   BlockMath,
   MermaidBlock,
+  PlotBlock,
   DiagramBlock,
   Callout,
   FootnoteReference,

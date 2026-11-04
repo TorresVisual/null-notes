@@ -119,6 +119,18 @@ const COMMANDS: Cmd[] = [
         .insertContent({ type: 'mermaidBlock', attrs: { code: template.code } })
         .run(),
   })),
+  {
+    title: 'Plot',
+    description: 'Graph a function of x',
+    aliases: ['graph', 'function'],
+    run: ({ editor, range }) =>
+      editor
+        .chain()
+        .focus()
+        .deleteRange(range)
+        .insertContent({ type: 'plotBlock', attrs: { code: 'x^2\nx: -5..5' } })
+        .run(),
+  },
   ...DIAGRAM_TEMPLATES.map((template) => ({
     title: template.title,
     description: template.description,

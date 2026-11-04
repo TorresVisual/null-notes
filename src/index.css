@@ -2670,7 +2670,8 @@ li .fold-toggle { left: -2.4em; }
 }
 
 /* Mermaid diagram blocks — kept light regardless of theme; diagrams render best on a white canvas */
-.mermaid-block {
+.mermaid-block,
+.plot-block {
   background: #f5f5f5;
   border-radius: 6px;
   padding: 16px;
@@ -2679,7 +2680,10 @@ li .fold-toggle { left: -2.4em; }
   text-align: center;
 }
 
-.mermaid-block svg { max-width: 100%; height: auto; }
+.mermaid-block svg,
+.plot-block svg { max-width: 100%; height: auto; }
+.plot-axis { stroke: #888; stroke-width: 1; }
+.plot-label { fill: #666; font: 11px var(--font-mono); }
 .mermaid-error { color: var(--danger); font-family: var(--font-mono); font-size: 13px; }
 
 .mermaid-block-preview {
@@ -6050,6 +6054,7 @@ input[type='checkbox']:focus-visible {
 :is(.print-preview-pages, #print-root) .details-wrapper,
 :is(.print-preview-pages, #print-root) .block-math,
 :is(.print-preview-pages, #print-root) .mermaid-block,
+:is(.print-preview-pages, #print-root) .plot-block,
 :is(.print-preview-pages, #print-root) .diagram-block-preview {
   break-inside: avoid;
 }
@@ -6248,13 +6253,13 @@ input[type='checkbox']:focus-visible {
    a box inside a box, so the selection shows on that frame instead. React node
    views get the selection class on TipTap's outer element, not on the
    `NodeViewWrapper` inside it, hence `:has`. */
-.note-editor :is(.ProseMirror-selectednode, .ProseMirror-selectednoderange):has(> :is(.ink-block, .diagram-block, .mermaid-block, .block-math)) {
+.note-editor :is(.ProseMirror-selectednode, .ProseMirror-selectednoderange):has(> :is(.ink-block, .diagram-block, .mermaid-block, .plot-block, .block-math)) {
   background: transparent;
 }
 :is(.ProseMirror-selectednode, .ProseMirror-selectednoderange) :is(.ink-preview, .diagram-block-preview) {
   border-color: var(--selected-frame);
 }
-:is(.ProseMirror-selectednode, .ProseMirror-selectednoderange) > .mermaid-block {
+:is(.ProseMirror-selectednode, .ProseMirror-selectednoderange) > :is(.mermaid-block, .plot-block) {
   box-shadow: 0 0 0 1px var(--selected-frame);
 }
 

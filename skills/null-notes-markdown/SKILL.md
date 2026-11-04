@@ -48,6 +48,7 @@ Encode only when writing the Markdown; the file on disk keeps its real name. Wra
 - **Callouts**: `> [!note]`, `> [!warning] Title`, with a fold marker `> [!tip]- Title` (closed) or `> [!tip]+ Title` (open). Types include note, tip, warning, danger, info, important, abstract, todo, success, question, failure, bug, quote, example, plus theorem, lemma, corollary, proof, definition, algorithm; Obsidian aliases (`summary`, `hint`, `error`, …) work. A number after the type (`> [!theorem 3.2]`) makes it cross-referenceable.
 - **Maths**: inline `$x^2$`; block with `$$` on its own line above and below the LaTeX. A number after the opening fence (`$$3`) numbers the equation.
 - **Mermaid**: a fenced block with language `mermaid`.
+- **Plots**: a fenced block with language `plot` — one expression of `x` (or `n`) per line, e.g. `x^2 * ln(x)`, plus an optional `x: -5..5` range line.
 - **Footnotes**: `text[^1]` and a line `[^1]: the note`.
 - **Tasks**: `- [ ] todo`, `- [x] done`.
 - **Details**: `<details><summary>Title</summary> … </details>`.
