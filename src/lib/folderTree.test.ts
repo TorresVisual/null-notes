@@ -94,4 +94,12 @@ describe('buildFolderTree', () => {
       expect(folder.path).toBe('D:\\Workspace\\Course101')
     }
   })
+
+  it('orders numbered names by value, not lexicographically', () => {
+    const tree = buildFolderTree('/ws', [], [
+      note('Blatt10', '/ws/Blatt10.md'),
+      note('Blatt2', '/ws/Blatt2.md'),
+    ])
+    expect(tree.map((e) => e.name)).toEqual(['Blatt2', 'Blatt10'])
+  })
 })

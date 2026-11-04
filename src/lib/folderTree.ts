@@ -31,6 +31,8 @@ interface MutableFolder {
   canvases: string[]
 }
 
+const naturalCompare = (a: string, b: string) => a.localeCompare(b, undefined, { numeric: true })
+
 function relativeSegments(root: string, path: string): string[] {
   const normalizedRoot = root.replace(/[\\/]+$/, '')
   const rest = path.slice(normalizedRoot.length).replace(/^[\\/]+/, '')
@@ -54,16 +56,16 @@ function ensureFolder(root: MutableFolder, segments: string[], separator: string
 
 function toTreeEntries(folder: MutableFolder): TreeEntry[] {
   const folderEntries: FolderTreeNode[] = [...folder.folders.values()]
-    .sort((a, b) => a.name.localeCompare(b.name))
+    .sort((a, b) => naturalCompare(a.name, b.name))
     .map((f) => ({ type: 'folder', name: f.name, path: f.path, children: toTreeEntries(f) }))
 
   const noteEntries: NoteTreeNode[] = [...folder.notes]
-    .sort((a, b) => a.title.localeCompare(b.title))
+    .sort((a, b) => naturalCompare(a.title, b.title))
     .map((n) => ({ type: 'note', name: n.title, path: n.path, note: n }))
 
   const canvasEntries: CanvasTreeNode[] = folder.canvases
     .map((path) => ({ type: 'canvas' as const, name: folderName(path).replace(/\.(canvas|base)$/, ''), path }))
-    .sort((a, b) => a.name.localeCompare(b.name))
+    .sort((a, b) => naturalCompare(a.name, b.name))
 
   return [...folderEntries, ...noteEntries, ...canvasEntries]
 }
