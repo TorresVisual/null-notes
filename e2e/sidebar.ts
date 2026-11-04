@@ -16,6 +16,17 @@ import { browser } from '@wdio/globals'
  * already exists by the time it is resolved, which is sufficient readiness.
  */
 export async function clickNewMenuItem(label: 'Note' | 'Folder' | 'Canvas' | 'From template'): Promise<void> {
+  // The app opens the --workspace folder asynchronously after launch, and the
+  // create handlers close over the workspace path from the render the menu was
+  // clicked in — a click before it finishes silently creates nothing.
+  await browser.waitUntil(
+    async () =>
+      browser.execute(() => {
+        const name = document.querySelector('.sidebar-workspace-name')?.textContent
+        return !!name && name !== 'Open Workspace' && name !== 'Opening…'
+      }),
+    { timeout: 15000, timeoutMsg: 'the fixture workspace never finished opening' },
+  )
   await browser.execute(() => {
     const trigger = document.querySelector('.sidebar-new')
     if (!(trigger instanceof HTMLElement)) throw new Error('sidebar "+" button not found')

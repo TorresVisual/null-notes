@@ -47,10 +47,13 @@ describe('scroll position sync between rendered and raw view (#31)', () => {
 
     await clickNewMenuItem('Note')
     await fillPromptDialog('Scroll Sync Toggle')
-    await browser.waitUntil(async () => browser.execute(() => !!document.querySelector('.ProseMirror')), {
-      timeout: 5000,
-      timeoutMsg: 'editor never mounted for the new note',
-    })
+    // The fixture workspace restores its last-open note, so a bare
+    // `.ProseMirror` can match that editor before the new note has loaded.
+    await browser.waitUntil(
+      async () =>
+        browser.execute(() => document.querySelector('.ProseMirror h1')?.textContent === 'Scroll Sync Toggle'),
+      { timeout: 5000, timeoutMsg: 'editor never mounted for the new note' },
+    )
 
     // The viewport's own clientHeight sets a floor below which a pane isn't
     // scrollable at all — deriving both fake heights from it (rather than
@@ -87,11 +90,18 @@ describe('scroll position sync between rendered and raw view (#31)', () => {
     })
     expect(wysiwyg.scrollable).toBeGreaterThan(0)
 
-    // Shrink the pane before switching — .editor-pane is not remounted by
-    // the view toggle, so this simulates "the raw view lays the note out
-    // much shorter" without racing an async resize/clamp event.
-    await setPaneMinHeight(shortPx)
-    await clickInPage('.view-toggle')
+    // Shrink the pane and toggle in one synchronous step — .editor-pane is
+    // not remounted by the view toggle, so this simulates "the raw view lays
+    // the note out much shorter". Shrinking in a separate WebDriver command
+    // lets the browser clamp scrollTop to the new maximum and fire a real
+    // scroll event first, which records fraction 1.0 over the 0.5 under test.
+    await browser.execute((height) => {
+      const pane = document.querySelector('.editor-pane')
+      const toggle = document.querySelector('.view-toggle')
+      if (!(pane instanceof HTMLElement) || !(toggle instanceof HTMLElement)) throw new Error('no .editor-pane or .view-toggle')
+      pane.style.minHeight = `${height}px`
+      toggle.click()
+    }, shortPx)
     await browser.waitUntil(async () => browser.execute(() => !!document.querySelector('.raw-editor')), {
       timeout: 5000,
       timeoutMsg: 'view toggle never switched to raw view',
