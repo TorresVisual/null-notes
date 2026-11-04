@@ -22,14 +22,23 @@ static ERROR_LOG_DIR: OnceLock<PathBuf> = OnceLock::new();
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let initial_workspace =
-        commands::workspace::initial_workspace_from_args(std::env::args().skip(1)).or_else(|| {
-            commands::workspace::open_file_from_args(std::env::args().skip(1))
-                .and_then(|file| commands::workspace::temp_workspace_for_file(&file).ok())
+    let open_file = commands::workspace::open_file_from_args(std::env::args().skip(1));
+    let workspace_arg = commands::workspace::initial_workspace_from_args(std::env::args().skip(1));
+    let single_note = open_file
+        .as_deref()
+        .filter(|_| workspace_arg.is_none())
+        .and_then(commands::workspace::single_note_target);
+    let initial_workspace = workspace_arg
+        .or_else(|| single_note.as_ref().map(|(dir, _)| dir.clone()))
+        .or_else(|| {
+            open_file.and_then(|file| commands::workspace::temp_workspace_for_file(&file).ok())
         });
-    // Only meaningful alongside a real `--workspace=` (the `--open-file=`
-    // fallback above already lands on its one file via the temp workspace).
-    let initial_select_file = commands::workspace::select_file_from_args(std::env::args().skip(1));
+    // Only meaningful alongside a real `--workspace=`; a lone `.md` lands on
+    // its file through the single-note target, other files through the temp
+    // workspace copy.
+    let initial_select_file = commands::workspace::select_file_from_args(std::env::args().skip(1))
+        .or_else(|| single_note.as_ref().map(|(_, file)| file.clone()));
+    let is_single_note = single_note.is_some();
     let headless = commands::workspace::headless_from_args(std::env::args().skip(1));
 
     #[cfg(windows)]
@@ -190,6 +199,7 @@ pub fn run() {
             }
             app.manage(commands::workspace::InitialWorkspace(initial_workspace));
             app.manage(commands::workspace::InitialSelectFile(initial_select_file));
+            app.manage(commands::workspace::InitialSingleNote(is_single_note));
 
             // WebView2 claims some of our menu accelerators for its own browser-chrome
             // shortcuts before our menu ever sees the keystroke: Ctrl+P prints,
@@ -315,6 +325,7 @@ pub fn run() {
             commands::workspace::remember_workspace,
             commands::workspace::initial_workspace,
             commands::workspace::initial_select_file,
+            commands::workspace::initial_single_note,
             commands::settings::load_settings,
             commands::settings::save_settings,
             commands::error_log::record_error,

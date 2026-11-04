@@ -125,6 +125,32 @@ pub fn initial_workspace(state: tauri::State<InitialWorkspace>) -> Option<String
     state.0.clone()
 }
 
+// A lone `.md` opens in place: its folder is the workspace root (sidecars land
+// beside it) but the frontend runs a single-note session over it. Other file
+// types keep the temp-copy path.
+pub fn single_note_target(file_path: &str) -> Option<(String, String)> {
+    let path = Path::new(file_path);
+    let is_markdown = path
+        .extension()
+        .is_some_and(|ext| ext.eq_ignore_ascii_case("md"));
+    if !is_markdown || !path.is_file() {
+        return None;
+    }
+    let dir = path.parent()?;
+    Some((
+        dir.to_string_lossy().into_owned(),
+        path.to_string_lossy().into_owned(),
+    ))
+}
+
+#[derive(Debug)]
+pub struct InitialSingleNote(pub bool);
+
+#[tauri::command]
+pub fn initial_single_note(state: tauri::State<InitialSingleNote>) -> bool {
+    state.0
+}
+
 pub struct InitialSelectFile(pub Option<String>);
 
 #[tauri::command]
@@ -172,6 +198,25 @@ pub async fn save_workspace(path: String, state: WorkspaceState) -> Result<(), S
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn single_note_target_takes_an_existing_md_file_in_place() {
+        let dir = tempfile::tempdir().unwrap();
+        let note = dir.path().join("Lecture.MD");
+        std::fs::write(&note, "x").unwrap();
+        let (root, file) = single_note_target(&note.to_string_lossy()).unwrap();
+        assert_eq!(root, dir.path().to_string_lossy());
+        assert_eq!(file, note.to_string_lossy());
+    }
+
+    #[test]
+    fn single_note_target_rejects_other_types_and_missing_files() {
+        let dir = tempfile::tempdir().unwrap();
+        let pdf = dir.path().join("a.pdf");
+        std::fs::write(&pdf, "x").unwrap();
+        assert!(single_note_target(&pdf.to_string_lossy()).is_none());
+        assert!(single_note_target(&dir.path().join("gone.md").to_string_lossy()).is_none());
+    }
+
     #[test]
     fn headless_is_only_the_literal_flag() {
         assert!(headless_from_args(["--headless".to_string()]));

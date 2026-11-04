@@ -48,7 +48,7 @@ export function useWorkspace() {
       recentSearches,
       git,
     } = useWorkspaceStore.getState()
-    if (!path) return
+    if (!path || useWorkspaceStore.getState().singleNote) return
     await api.workspace.save(path, {
       openTabs,
       activeTab,
@@ -179,11 +179,29 @@ export function useWorkspace() {
     ],
   )
 
+  // The file's folder is the root so sidecars land beside it, but nothing
+  // else of that folder is touched: no scan, watcher, session file or git.
+  const openSingleNote = useCallback(
+    async (dir: string, file: string) => {
+      await saveSession()
+      await flushGitCommit()
+      resetForNewWorkspace()
+      clearNavigationHistory()
+      setPath(dir)
+      useWorkspaceStore.getState().setSingleNote(true)
+      setNotes([])
+      setFolders([])
+      setCanvases([])
+      openTab(file)
+    },
+    [setPath, setNotes, setFolders, setCanvases, openTab, resetForNewWorkspace, saveSession, flushGitCommit],
+  )
+
   const openWorkspace = useCallback(async () => {
     const selected = await open({ directory: true, multiple: false })
     if (!selected || Array.isArray(selected)) return
     await openWorkspaceAt(selected)
   }, [openWorkspaceAt])
 
-  return { openWorkspace, openWorkspaceAt, saveSession, closeWorkspace }
+  return { openWorkspace, openWorkspaceAt, openSingleNote, saveSession, closeWorkspace }
 }

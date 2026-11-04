@@ -33,6 +33,7 @@ function setup() {
   vi.mocked(useWorkspace).mockReturnValue({
     openWorkspace: vi.fn(),
     openWorkspaceAt,
+    openSingleNote: vi.fn(),
     saveSession: vi.fn(),
     closeWorkspace: vi.fn(),
   })

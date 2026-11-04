@@ -25,6 +25,7 @@ beforeEach(() => {
   mockWorkspace = {
     openWorkspace: vi.fn(),
     openWorkspaceAt: vi.fn().mockResolvedValue(undefined),
+    openSingleNote: vi.fn().mockResolvedValue(undefined),
     saveSession: vi.fn(),
     closeWorkspace: vi.fn(),
   }

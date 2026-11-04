@@ -101,7 +101,9 @@ interface WorkspaceStore {
   // and the per-workspace, machine-local config that P5-1's one-time prompt
   // and its Settings toggle both read and write.
   repoMode: RepoMode | null
+  singleNote: boolean
   setRepoMode: (mode: RepoMode | null) => void
+  setSingleNote: (singleNote: boolean) => void
   git: GitWorkspaceConfig
   setGit: (git: GitWorkspaceConfig) => void
   // #78: whether this workspace already has auto-commit history (remote +
@@ -166,6 +168,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   recentSearches: [],
   searchSort: 'relevance',
   repoMode: null,
+  singleNote: false,
   git: DEFAULT_GIT_CONFIG,
   gitPriorAutomation: false,
   gitPendingPaths: [],
@@ -325,6 +328,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
     set({ recentSearches: [trimmed, ...deduped].slice(0, RECENT_SEARCHES_CAP) })
   },
   setRepoMode: (mode) => set({ repoMode: mode }),
+  setSingleNote: (singleNote) => set({ singleNote }),
   setGit: (git) => set({ git }),
   setGitPriorAutomation: (detected) => set({ gitPriorAutomation: detected }),
 
@@ -360,6 +364,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
       tagFilter: null,
       recentSearches: [],
       repoMode: null,
+      singleNote: false,
       git: DEFAULT_GIT_CONFIG,
       gitPriorAutomation: false,
       gitPendingPaths: [],

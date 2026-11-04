@@ -123,12 +123,13 @@ export function Layout() {
     reloadTheirs,
   } = useNote(canvasTab ? null : activeTab)
   const windowTitle = useWindowTitle(workspacePath, activeTab)
-  const { saveSession, openWorkspace, openWorkspaceAt, closeWorkspace } = useWorkspace()
+  const { saveSession, openWorkspace, openWorkspaceAt, openSingleNote, closeWorkspace } = useWorkspace()
   const { updateGit } = useGitConfig()
   const { flushGitCommit } = useGitAutoCommit()
   useReportDirtyPaths()
   const { checkForUpdates } = useGitAutoPull()
   const repoMode = useWorkspaceStore((s) => s.repoMode)
+  const singleNote = useWorkspaceStore((s) => s.singleNote)
   const gitPrompted = useWorkspaceStore((s) => s.git.prompted)
   const gitPriorAutomation = useWorkspaceStore((s) => s.gitPriorAutomation)
   const gitCommitStatus = useWorkspaceStore((s) => s.gitCommitStatus)
@@ -608,8 +609,13 @@ export function Layout() {
   }, [keymap, runCommand])
 
   useEffect(() => {
-    void api.workspace.initialWorkspace().then((path) => {
+    void api.workspace.initialWorkspace().then(async (path) => {
       if (!path) return
+      if (await api.workspace.initialSingleNote()) {
+        const file = await api.workspace.initialSelectFile()
+        if (file) void openSingleNote(path, file)
+        return
+      }
       void openWorkspaceAt(path, { remember: false }).then(() => {
         void api.workspace.initialSelectFile().then((file) => {
           if (file) useWorkspaceStore.getState().openTab(file)
@@ -618,7 +624,7 @@ export function Layout() {
     })
     void refreshRecents()
     void api.settings.load().then(setSettings)
-  }, [setSettings, openWorkspaceAt])
+  }, [setSettings, openWorkspaceAt, openSingleNote])
 
   useEffect(() => {
     setPrimaryViewMode('wysiwyg')
@@ -849,7 +855,7 @@ export function Layout() {
     <Titlebar title={windowTitle} onCommand={runCommand} recentWorkspaces={recentWorkspaces} />
     <div className="layout">
       {overlays}
-      {!focusMode && (
+      {!focusMode && !singleNote && (
         <Sidebar
           onSearchOpen={() => openOverlay('search')}
           onSettingsOpen={() => openOverlay('settings')}

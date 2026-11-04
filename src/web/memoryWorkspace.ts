@@ -55,6 +55,7 @@ const tree = (): WorkspaceTree => ({ notes: [...files.keys()].map(metadata), fol
 export const commands: Record<string, Command> = {
   initial_workspace: () => WORKSPACE,
   initial_select_file: () => null,
+  initial_single_note: () => false,
   recent_workspaces: () => recents,
   remember_workspace: ({ path }) => (recents = [String(path), ...recents.filter((p) => p !== path)]),
   load_workspace: () => state,

@@ -195,6 +195,8 @@ export const api = {
       invoke<string | null>('initial_workspace'),
     initialSelectFile: () =>
       invoke<string | null>('initial_select_file'),
+    initialSingleNote: () =>
+      invoke<boolean>('initial_single_note'),
   },
   git: {
     detectRepo: (workspace: string) =>
