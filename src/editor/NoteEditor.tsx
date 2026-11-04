@@ -7,7 +7,7 @@ import { confirm, message } from '@tauri-apps/plugin-dialog'
 import { extensionsFor } from './extensions'
 import { rememberPosition, recallPosition } from '../lib/notePositions'
 import { takePendingHighlight } from '../lib/pendingHighlight'
-import { highlightHeading, highlightPdfPage, highlightSearchMatch } from './extensions/SearchJumpHighlight'
+import { highlightHeading, highlightImage, highlightPdfPage, highlightSearchMatch } from './extensions/SearchJumpHighlight'
 import { handleEditorKeyDown, handleEditorTextInput } from './extensions/CodeBlockEditor'
 import { splitIntoTasks, report, markdownOf } from './splitIntoTasks'
 import { extractSelection } from './extractSelection'
@@ -49,6 +49,7 @@ function jumpToPending(editor: Editor, notePath: string) {
   const pending = takePendingHighlight(notePath)
   if (!pending) return
   if (pending.page !== undefined) highlightPdfPage(editor, pending.page)
+  else if (pending.image) highlightImage(editor, pending.image)
   else if (pending.heading) highlightHeading(editor, pending.text)
   else highlightSearchMatch(editor, pending.text)
 }

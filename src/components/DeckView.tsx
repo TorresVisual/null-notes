@@ -6,6 +6,7 @@ import { failure } from '../lib/failure'
 import { useWorkspaceStore } from '../store/workspace'
 import { promptText } from '../store/promptDialog'
 import { groupCardsByNote, groupCardsByStreak } from '../lib/cardGroups'
+import { requestCardHighlight } from '../lib/cardJump'
 import { CardText } from './CardText'
 import { DueForecast } from './DueForecast'
 import type { CardSummary } from '../types'
@@ -128,8 +129,9 @@ export function DeckView({ onClose, onOpenCram, onOpenTagReview }: DeckViewProps
     }
   }
 
-  function openNote(path: string) {
+  function openNote(path: string, card?: CardSummary) {
     openTab(path)
+    if (card) requestCardHighlight(path, card.front)
     onClose()
   }
 
@@ -221,7 +223,7 @@ export function DeckView({ onClose, onOpenCram, onOpenTagReview }: DeckViewProps
                   <ul>
                     {group.cards.map((c) => (
                       <li key={c.position} className="task-view-item deck-view-item">
-                        <button className="task-view-item-text" onClick={() => openNote(group.notePath)}>
+                        <button className="task-view-item-text" onClick={() => openNote(group.notePath, c)}>
                           <CardText text={c.front} notePath={group.notePath} />
                         </button>
                         {c.suspended && <span className="deck-view-suspended-badge">Suspended</span>}

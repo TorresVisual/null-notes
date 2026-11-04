@@ -12,6 +12,9 @@ export interface PendingHighlight {
   text: string
   heading: boolean
   page?: number
+  // `image` marks an image-only flashcard line, which has no text to find: the
+  // (decoded) `src` of the image to jump to instead.
+  image?: string
 }
 
 let pending: (PendingHighlight & { path: string }) | null = null
@@ -21,13 +24,14 @@ export function setPendingHighlight(
   text: string,
   heading = false,
   page?: number,
+  image?: string,
 ): void {
-  pending = { path, text, heading, page }
+  pending = { path, text, heading, page, image }
 }
 
 export function takePendingHighlight(path: string): PendingHighlight | undefined {
   if (!pending || pending.path !== path) return undefined
-  const { text, heading, page } = pending
+  const { text, heading, page, image } = pending
   pending = null
-  return { text, heading, page }
+  return { text, heading, page, image }
 }

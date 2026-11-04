@@ -105,6 +105,20 @@ export function highlightPdfPage(editor: Editor, index: number): void {
   }
 }
 
+/** Scrolls to and briefly highlights the first image whose `src` is `src`. */
+export function highlightImage(editor: Editor, src: string): void {
+  let hit: number | undefined
+  editor.state.doc.descendants((node, pos) => {
+    if (hit !== undefined) return false
+    if (node.type.name === 'image' && node.attrs.src === src) hit = pos
+    return true
+  })
+  if (hit !== undefined) {
+    revealPos(editor.view, hit)
+    flashRange(editor, hit, hit + 1)
+  }
+}
+
 function flashRange(editor: Editor, from: number, to: number): void {
   editor.view.dispatch(editor.state.tr.setMeta(searchJumpKey, { from, to }).scrollIntoView())
   setTimeout(() => {

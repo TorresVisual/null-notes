@@ -4,6 +4,7 @@ import { LoadingStatus } from './LoadingStatus'
 import { Dialog, DialogContent, DialogTitle } from './ui/dialog'
 import { api } from '../lib/tauri'
 import { useWorkspaceStore } from '../store/workspace'
+import { requestCardHighlight } from '../lib/cardJump'
 import { CardText } from './CardText'
 import { groupCardsByStreak, type CardStreakGroup } from '../lib/cardGroups'
 import type { DueCard, Grade } from '../types'
@@ -181,6 +182,14 @@ export function ReviewSession({ onClose, mode = { kind: 'due' }, onSwitchCategor
       .finally(() => refetch())
   }
 
+  // Grades are written per card, so closing the session loses no progress.
+  function openCardNote() {
+    if (!current) return
+    useWorkspaceStore.getState().openTab(current.notePath)
+    requestCardHighlight(current.notePath, current.front)
+    onClose()
+  }
+
   function togglePick(i: number) {
     setPicked((prev) => {
       const next = new Set(prev)
@@ -344,6 +353,15 @@ export function ReviewSession({ onClose, mode = { kind: 'due' }, onSwitchCategor
                   <span className="search-result-workspace">{current.workspace.split(/[/\\]/).pop()}</span>
                 )}
               </p>
+              {current.workspace === workspacePath && (
+                <button
+                  className="review-card-suspend"
+                  onClick={openCardNote}
+                  title="Close the review and open this card in its note"
+                >
+                  Open note
+                </button>
+              )}
               <button
                 className="review-card-suspend"
                 onClick={suspend}
