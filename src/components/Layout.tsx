@@ -34,6 +34,7 @@ import { useWorkspaceStore } from '../store/workspace'
 import { useNotesStore } from '../store/notes'
 import { useSettingsStore } from '../store/settings'
 import { useNote } from '../hooks/useNote'
+import { useResetPageScroll } from '../hooks/useResetPageScroll'
 import { useCreateCanvas } from '../hooks/useCreateCanvas'
 import { isBasePath, isCanvasPath } from '../lib/canvasPath'
 import { flushAllCanvases } from '../lib/canvasFlush'
@@ -103,6 +104,7 @@ export function Layout() {
   const toggleFocusMode = useFocusModeStore((s) => s.toggle)
   const toggleSidebar = useWorkspaceStore((s) => s.toggleSidebar)
   const mobile = isMobile()
+  useResetPageScroll()
   const workspacePath = useWorkspaceStore((s) => s.path)
   const recentWorkspaces = useWorkspaceStore((s) => s.recentWorkspaces)
   const notes = useNotesStore((s) => s.notes)
