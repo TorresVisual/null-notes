@@ -120,6 +120,9 @@ mod tests {
             keymap: [("search".to_string(), "Ctrl+Shift+S".to_string())].into(),
             map_tile_url: "https://tiles.example/{z}/{x}/{y}.png".to_string(),
             cli_access: false,
+            prose_font_size_px: 18,
+            prose_line_height: 1.8,
+            ui_zoom_pct: 125,
         };
         save_settings_to_dir(dir.path(), &original).await.unwrap();
         let loaded = load_settings_from_dir(dir.path()).await.unwrap();
@@ -139,6 +142,9 @@ mod tests {
         assert_eq!(loaded.code_indent_char, crate::models::CodeIndentChar::Tab);
         assert_eq!(loaded.code_theme, crate::models::CodeTheme::OneDark);
         assert_eq!(loaded.code_font_size_px, 16);
+        assert_eq!(loaded.prose_font_size_px, 18);
+        assert_eq!(loaded.prose_line_height, 1.8);
+        assert_eq!(loaded.ui_zoom_pct, 125);
         assert_eq!(loaded.python_command, "python3.11");
         assert_eq!(loaded.cpp_compiler_command, "clang++");
         assert_eq!(loaded.code_run_timeout_secs, 30);

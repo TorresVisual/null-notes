@@ -154,6 +154,64 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
               </span>
             </label>
 
+            <label className="settings-row">
+              <span>
+                Text size
+                <small>Base size of note text; headings, lists and tables scale with it.</small>
+              </span>
+              <span className="settings-row-control">
+                <input
+                  type="number"
+                  min={12}
+                  max={28}
+                  step={1}
+                  value={settings.proseFontSizePx}
+                  onChange={(e) =>
+                    void update({ proseFontSizePx: clampNumber(Number(e.target.value), 12, 28) })
+                  }
+                />
+                <span className="settings-unit">px</span>
+              </span>
+            </label>
+
+            <label className="settings-row">
+              <span>
+                Line spacing
+                <small>Line height of note text, as a multiple of its size.</small>
+              </span>
+              <span className="settings-row-control">
+                <input
+                  type="number"
+                  min={1.0}
+                  max={2.4}
+                  step={0.1}
+                  value={settings.proseLineHeight}
+                  onChange={(e) =>
+                    void update({ proseLineHeight: clampNumber(Number(e.target.value), 1.0, 2.4) })
+                  }
+                />
+              </span>
+            </label>
+
+            <label className="settings-row">
+              <span>
+                Zoom
+                <small>Scales the whole app. Ctrl+= / Ctrl+- / Ctrl+0 to zoom in, out or reset.</small>
+              </span>
+              <span className="settings-row-control">
+                <input
+                  type="number"
+                  min={50}
+                  max={200}
+                  step={10}
+                  value={settings.uiZoomPct}
+                  onChange={(e) =>
+                    void update({ uiZoomPct: clampNumber(Number(e.target.value), 50, 200) })
+                  }
+                />
+                <span className="settings-unit">%</span>
+              </span>
+            </label>
           </div>
 
           <h4 className="settings-group-title">Code blocks</h4>

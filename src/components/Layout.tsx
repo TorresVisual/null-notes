@@ -33,6 +33,7 @@ import { TrashDialog } from './TrashDialog'
 import { useWorkspaceStore } from '../store/workspace'
 import { useNotesStore } from '../store/notes'
 import { useSettingsStore } from '../store/settings'
+import { clampZoom } from '../lib/zoom'
 import { useNote } from '../hooks/useNote'
 import { useResetPageScroll } from '../hooks/useResetPageScroll'
 import { useCreateCanvas } from '../hooks/useCreateCanvas'
@@ -177,6 +178,10 @@ export function Layout() {
   >(null)
   const [pendingCram, setPendingCram] = useState<Exclude<ReviewMode, { kind: 'due' }> | null>(null)
   const setSettings = useSettingsStore((s) => s.setSettings)
+  const uiZoomPct = useSettingsStore((s) => s.settings.uiZoomPct)
+  useEffect(() => {
+    document.documentElement.style.zoom = String(uiZoomPct / 100)
+  }, [uiZoomPct])
   const scrollRef = useScrollRestoration(activeTab, isLoading, primaryViewMode)
 
   // The backend vetoes the close and hands control here so a pending edit
@@ -469,6 +474,16 @@ export function Layout() {
         case 'toggle-sidebar':
           toggleSidebar()
           break
+        case 'zoom-in':
+        case 'zoom-out':
+        case 'zoom-reset': {
+          const current = useSettingsStore.getState().settings
+          const uiZoomPct = id === 'zoom-reset' ? 100 : clampZoom(current.uiZoomPct + (id === 'zoom-in' ? 10 : -10))
+          const next = { ...current, uiZoomPct }
+          setSettings(next)
+          void api.settings.save(next)
+          break
+        }
         case 'next-tab':
         case 'prev-tab': {
           if (openTabs.length < 2 || !activeTab) break

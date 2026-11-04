@@ -1142,7 +1142,12 @@ button, [role="button"], .tree-row, .tab, .search-result, .slash-menu-item,
   pointer-events: none;
 }
 
-.note-editor { outline: none; flex: 1; }
+.note-editor {
+  outline: none;
+  flex: 1;
+  font-size: var(--prose-font-size, 15px);
+  line-height: var(--prose-line-height, 1.6);
+}
 
 .note-editor .ProseMirror { outline: none; }
 .note-editor .ProseMirror p { white-space: pre-wrap; }

@@ -31,6 +31,9 @@ describe('useSettingsStore', () => {
       mapTileUrl: 'https://tiles.example/{z}/{x}/{y}.png',
       codeRunTimeoutSecs: 30,
       cliAccess: false,
+      proseFontSizePx: 18,
+      proseLineHeight: 1.8,
+      uiZoomPct: 125,
     })
     expect(useSettingsStore.getState().settings).toEqual({
       autosaveDebounceMs: 1200,
@@ -50,6 +53,9 @@ describe('useSettingsStore', () => {
       mapTileUrl: 'https://tiles.example/{z}/{x}/{y}.png',
       codeRunTimeoutSecs: 30,
       cliAccess: false,
+      proseFontSizePx: 18,
+      proseLineHeight: 1.8,
+      uiZoomPct: 125,
     })
   })
 })

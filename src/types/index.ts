@@ -209,6 +209,11 @@ export interface AppSettings {
   mapTileUrl: string
   /** Whether the `nullnotes` CLI may reach the app. Applies on next launch. */
   cliAccess: boolean
+  /** Base size of note prose; headings, lists and tables are `em` and follow it. */
+  proseFontSizePx: number
+  proseLineHeight: number
+  /** Whole-app zoom, in percent. */
+  uiZoomPct: number
 }
 
 export interface ErrorLogEntry {

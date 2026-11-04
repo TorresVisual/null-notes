@@ -22,6 +22,9 @@ const DEFAULT_SETTINGS: AppSettings = {
   keymap: {},
   mapTileUrl: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
   cliAccess: true,
+  proseFontSizePx: 15,
+  proseLineHeight: 1.6,
+  uiZoomPct: 100,
 }
 
 const EMPTY_STATE: WorkspaceState = {

@@ -67,6 +67,8 @@ export function NoteEditor({
   const [, setEditorVersion] = useState(0)
   const codeTheme = useSettingsStore((s) => s.settings.codeTheme)
   const codeFontSizePx = useSettingsStore((s) => s.settings.codeFontSizePx)
+  const proseFontSizePx = useSettingsStore((s) => s.settings.proseFontSizePx)
+  const proseLineHeight = useSettingsStore((s) => s.settings.proseLineHeight)
   // Set alongside every onChange, so the content-sync effect below can tell
   // "this update came back from our own typing" from "content changed out
   // from under us" with a === check instead of re-serializing the whole
@@ -269,7 +271,13 @@ export function NoteEditor({
         editor={editor}
         className="note-editor"
         data-code-theme={codeTheme}
-        style={{ '--code-font-size': `${codeFontSizePx}px` } as CSSProperties}
+        style={
+          {
+            '--code-font-size': `${codeFontSizePx}px`,
+            '--prose-font-size': `${proseFontSizePx}px`,
+            '--prose-line-height': proseLineHeight,
+          } as CSSProperties
+        }
       />
       {editor && <BlockHandle editor={editor} />}
       {editor && <EditorStatusBar editor={editor} />}

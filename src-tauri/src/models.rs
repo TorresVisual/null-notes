@@ -565,6 +565,26 @@ pub struct AppSettings {
     /// Read at launch (and by the CLI itself), so a change applies next launch.
     #[serde(default = "default_cli_access")]
     pub cli_access: bool,
+    /// Base size of note prose; headings, lists and tables are `em` and follow it.
+    #[serde(default = "default_prose_font_size_px")]
+    pub prose_font_size_px: u32,
+    #[serde(default = "default_prose_line_height")]
+    pub prose_line_height: f32,
+    /// Whole-app zoom, in percent.
+    #[serde(default = "default_ui_zoom_pct")]
+    pub ui_zoom_pct: u32,
+}
+
+fn default_prose_font_size_px() -> u32 {
+    15
+}
+
+fn default_prose_line_height() -> f32 {
+    1.6
+}
+
+fn default_ui_zoom_pct() -> u32 {
+    100
 }
 
 fn default_cli_access() -> bool {
@@ -611,6 +631,9 @@ impl Default for AppSettings {
             keymap: Default::default(),
             map_tile_url: default_map_tile_url(),
             cli_access: default_cli_access(),
+            prose_font_size_px: default_prose_font_size_px(),
+            prose_line_height: default_prose_line_height(),
+            ui_zoom_pct: default_ui_zoom_pct(),
         }
     }
 }
