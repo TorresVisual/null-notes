@@ -117,3 +117,14 @@ describe('entity-like literal text (#173)', () => {
     expect(roundTrip('A & B &c')).toBe('A & B &c')
   })
 })
+
+describe('format note (#134)', () => {
+  it('normalises list markers, blank lines and trailing whitespace', () => {
+    expect(roundTrip('* a  \n* b\n\n\n\ntext   ')).toBe('- a\n- b\n\ntext')
+  })
+
+  it('leaves fenced code untouched', () => {
+    const src = '```py\nx  = 1   \n```'
+    expect(roundTrip(src)).toBe(src)
+  })
+})

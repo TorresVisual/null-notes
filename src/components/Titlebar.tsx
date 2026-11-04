@@ -44,6 +44,7 @@ export function buildFileMenu(recentWorkspaces: string[]): MenuItemSpec[] {
     ...entries([
       '-',
       'split-tasks',
+      'format-note',
       'generate-formula-sheet',
       'generate-solutions-sheet',
       '-',

@@ -359,6 +359,9 @@ export function Layout() {
           // rather than being lifted here just so a menu item can reach it.
           window.dispatchEvent(new Event('command:split-tasks'))
           break
+        case 'format-note':
+          window.dispatchEvent(new Event('command:format-note'))
+          break
         case 'export-pdf':
           if (!activeTab) break
           // The print stylesheet only styles the rendered view — switch

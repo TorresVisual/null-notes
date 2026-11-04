@@ -214,6 +214,20 @@ export function NoteEditor({
     return () => window.removeEventListener('command:split-tasks', handler)
   }, [editor, onChange])
 
+  // Only on this explicit command, never on save: a hand-edited or synced note
+  // is not rewritten until the user asks. The editor's own serializer is the
+  // canonical shape, and onChange carries it down the normal save path.
+  useEffect(() => {
+    const handler = () => {
+      if (!editor || !editor.isFocused) return
+      const markdown = markdownOf(editor)
+      lastEmitted.current = markdown
+      onChange(markdown)
+    }
+    window.addEventListener('command:format-note', handler)
+    return () => window.removeEventListener('command:format-note', handler)
+  }, [editor, onChange])
+
   useEffect(() => {
     const handler = () => {
       const workspace = useWorkspaceStore.getState().path

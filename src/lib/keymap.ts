@@ -36,6 +36,7 @@ export const COMMANDS: CommandDef[] = [
   def('close-workspace', 'Close Workspace', 'Other'),
   def('add-property', 'Add Property', 'Note'),
   def('split-tasks', 'Split Into Tasks', 'Note'),
+  def('format-note', 'Format Note', 'Note'),
   def('extract-selection', 'Extract Selection to New Note', 'Note'),
   def('generate-formula-sheet', 'Generate Formula Sheet…', 'Note'),
   def('generate-solutions-sheet', 'Generate Solutions Sheet…', 'Note'),
