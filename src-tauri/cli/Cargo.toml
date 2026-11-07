@@ -2,6 +2,7 @@
 name = "nullnotes-cli"
 version = "0.1.0"
 edition = "2021"
+publish = false
 description = "Command-line client for a running (or auto-started) Null Notes"
 
 [[bin]]
