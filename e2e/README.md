@@ -34,3 +34,10 @@ opens the folder after a run. See `.claude/skills/e2e-verify/SKILL.md`'s
 flakiness in this environment unrelated to app behavior (see
 `mochaOpts.retries` in `wdio.conf.ts`). A test failing once and passing on
 retry is that; a test failing consistently is a real bug.
+
+## In CI
+
+`release.yml`'s `smoke-e2e` job runs three specs (`create-note`, `csp-verify`,
+`cli`) against the debug build on every `v*` tag, and the `release` job waits
+on it. The other specs are a local pre-release run — add to the CI list only
+what guards packaging or the save path.
