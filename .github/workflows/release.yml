@@ -9,8 +9,62 @@ jobs:
   checks:
     uses: ./.github/workflows/ci.yml
 
-  release:
+  smoke-e2e:
     needs: checks
+    runs-on: windows-latest
+
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generate CI signing cert
+        run: ./scripts/windows/dev-cert.ps1
+
+      - name: Package identity .msix
+        run: ./scripts/windows/package-identity.ps1
+
+      - name: Download pdfium.dll
+        run: ./scripts/download-pdfium.ps1
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            src-tauri
+            src-tauri/context-menu-handler
+            src-tauri/cli
+
+      - name: Build context-menu-handler DLL
+        working-directory: src-tauri/context-menu-handler
+        run: cargo build --release
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # Three specs, not the whole suite: create/save a note, CSP, CLI. The rest
+      # stay a local pre-release run. pretest:e2e does the CLI + debug app build.
+      - name: Smoke e2e
+        run: >
+          npm run test:e2e --
+          --spec e2e/specs/create-note.e2e.ts
+          --spec e2e/specs/csp-verify.e2e.ts
+          --spec e2e/specs/cli.e2e.ts
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: e2e-artifacts
+          path: e2e/.artifacts/
+
+  release:
+    needs: [checks, smoke-e2e]
     runs-on: windows-latest
 
     permissions:
