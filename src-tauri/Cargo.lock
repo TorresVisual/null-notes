@@ -1810,7 +1810,7 @@ dependencies = [
  "gix-date",
  "gix-diff",
  "gix-discover",
- "gix-error",
+ "gix-error 0.3.2",
  "gix-features",
  "gix-filter",
  "gix-fs",
@@ -1848,7 +1848,7 @@ dependencies = [
  "gix-worktree",
  "gix-worktree-state",
  "gix-worktree-stream",
- "gix-zlib",
+ "gix-zlib 0.1.0",
  "nonempty",
  "smallvec",
  "thiserror 2.0.18",
@@ -1862,7 +1862,7 @@ checksum = "e37efa99929ac62f980fb1a7dcd09dea85b3aa6ead6ba0498362add3f4e698de"
 dependencies = [
  "bstr",
  "gix-date",
- "gix-error",
+ "gix-error 0.3.2",
 ]
 
 [[package]]
@@ -1888,7 +1888,7 @@ version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f17013c7ef5cb95ebb4bf4978201e6a8a42ffea9d666fd5388f1b7e742307d80"
 dependencies = [
- "gix-error",
+ "gix-error 0.3.2",
 ]
 
 [[package]]
@@ -1897,7 +1897,7 @@ version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "00e32f938b3745ac93d73bc7490b6a15a661b2fc81973bfe90e275cc53c908e1"
 dependencies = [
- "gix-error",
+ "gix-error 0.3.2",
 ]
 
 [[package]]
@@ -1920,7 +1920,7 @@ checksum = "6b93c9fb1f5be01bba54a7a3b7455d359efc68555539c75ef74b8021bb6db497"
 dependencies = [
  "bstr",
  "gix-chunk",
- "gix-error",
+ "gix-error 0.3.2",
  "gix-hash",
  "memmap2",
  "nonempty",
@@ -1984,7 +1984,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e63d9aa18f29facd571c8953e66224ee0075b9e16622024794555ed4acceea85"
 dependencies = [
  "bstr",
- "gix-error",
+ "gix-error 0.3.2",
  "itoa",
  "jiff",
 ]
@@ -2033,6 +2033,12 @@ checksum = "4a1ba536602db507119eb5f3cdf80bef3ca5a5ec0dfc6e9c7f46dc70ade7c112"
 dependencies = [
  "bstr",
 ]
+
+[[package]]
+name = "gix-error"
+version = "0.5.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d87ff4b3f3daf01234d38d176b0ec00e92de514cc0e3fb8a8898c5cb7ccd22bb"
 
 [[package]]
 name = "gix-features"
@@ -2241,7 +2247,7 @@ version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9af6bbdb3f3c62b4920407c479af1cc0beb27fd75a762782d48baed53d330958"
 dependencies = [
- "gix-error",
+ "gix-error 0.3.2",
  "gix-hash",
  "gix-hashtable",
  "gix-object",
@@ -2283,7 +2289,7 @@ dependencies = [
  "gix-pack",
  "gix-path",
  "gix-quote",
- "gix-zlib",
+ "gix-zlib 0.1.0",
  "memmap2",
  "parking_lot",
  "tempfile",
@@ -2299,7 +2305,7 @@ dependencies = [
  "clru",
  "gix-chunk",
  "gix-diff",
- "gix-error",
+ "gix-error 0.3.2",
  "gix-features",
  "gix-hash",
  "gix-hashtable",
@@ -2307,7 +2313,7 @@ dependencies = [
  "gix-path",
  "gix-tempfile",
  "gix-traverse",
- "gix-zlib",
+ "gix-zlib 0.1.0",
  "memmap2",
  "parking_lot",
  "smallvec",
@@ -2399,7 +2405,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f74795eb76eab8313063849f9cbd2bbcdc6e4692f71c1d7d0244ab11cd777329"
 dependencies = [
  "bstr",
- "gix-error",
+ "gix-error 0.3.2",
  "gix-utils",
 ]
 
@@ -2446,7 +2452,7 @@ dependencies = [
  "bstr",
  "gix-commitgraph",
  "gix-date",
- "gix-error",
+ "gix-error 0.3.2",
  "gix-hash",
  "gix-hashtable",
  "gix-object",
@@ -2463,7 +2469,7 @@ checksum = "248823eefe405e2c0754b74f6f43ab6faab68670cdbf2d6e114cb0471f766450"
 dependencies = [
  "gix-commitgraph",
  "gix-date",
- "gix-error",
+ "gix-error 0.3.2",
  "gix-hash",
  "gix-hashtable",
  "gix-object",
@@ -2645,7 +2651,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "de5ec0ccbab39c9994656ea031ded8ffd90b370a3cc8e360fbe3c4ebe7c64964"
 dependencies = [
  "gix-attributes",
- "gix-error",
+ "gix-error 0.3.2",
  "gix-features",
  "gix-filter",
  "gix-fs",
@@ -2663,6 +2669,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3e8813f5579b3075ff9c90f7c59cd2b62b4ebb639361f0911648b22d7446cc7c"
 dependencies = [
  "thiserror 2.0.18",
+ "zlib-rs",
+]
+
+[[package]]
+name = "gix-zlib"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7c5b29808570149d86f417184605111ede9dda5aa06015e9ea6da07f0c3ca41e"
+dependencies = [
+ "gix-error 0.5.2",
  "zlib-rs",
 ]
 
@@ -3942,7 +3958,7 @@ dependencies = [
  "gix-pack",
  "gix-protocol",
  "gix-transport",
- "gix-zlib",
+ "gix-zlib 0.4.0",
  "image 0.24.9",
  "keyring-core",
  "notify",
