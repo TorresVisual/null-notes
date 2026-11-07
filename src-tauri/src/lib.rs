@@ -8,6 +8,7 @@ pub mod db;
 pub mod exercises;
 pub mod fsrs;
 pub mod link_resolve;
+pub mod logging;
 pub mod models;
 pub mod pdf;
 pub mod properties;
@@ -194,6 +195,9 @@ pub fn run() {
                     );
                 }
             }));
+            if let Some(guard) = logging::init(&data_dir) {
+                app.manage(guard);
+            }
             let pool = tauri::async_runtime::block_on(db::init_db(&data_dir))
                 .expect("failed to initialise database");
             app.manage(pool);

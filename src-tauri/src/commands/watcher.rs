@@ -59,11 +59,18 @@ pub fn watch_workspace(
             }
         }
     })
-    .map_err(|e| e.to_string())?;
+    .map_err(|e| {
+        tracing::error!(error = %e, "creating file watcher failed");
+        e.to_string()
+    })?;
 
     watcher
         .watch(Path::new(&workspace), RecursiveMode::Recursive)
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| {
+            tracing::error!(error = %e, workspace, "watching workspace failed");
+            e.to_string()
+        })?;
+    tracing::info!(workspace, "watching workspace");
 
     std::thread::spawn(move || {
         while let Ok(first) = rx.recv() {
@@ -80,6 +87,12 @@ pub fn watch_workspace(
             // disk, and a .canvas is JSON, not a note.
             let (canvases, notes): (Vec<PathBuf>, Vec<PathBuf>) =
                 rest.into_iter().partition(|p| is_canvas_path(p));
+            tracing::debug!(
+                bookmarks = bookmarks.len(),
+                canvases = canvases.len(),
+                notes = notes.len(),
+                "watcher batch"
+            );
             if !canvases.is_empty() {
                 let paths: Vec<String> = canvases
                     .into_iter()

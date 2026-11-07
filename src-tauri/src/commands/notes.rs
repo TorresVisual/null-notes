@@ -1229,14 +1229,21 @@ pub(super) async fn index_note_at(
 // Deliberately does no database work: typing latency must not depend on
 // FTS/tag/link reindexing. The caller drives `reindex_note` separately.
 #[tauri::command]
+#[tracing::instrument(skip(workspace, content), fields(bytes = content.len()))]
 pub async fn save_note(workspace: String, path: String, content: String) -> Result<(), String> {
     require_within_workspace(&workspace, &path)?;
     write_atomic(Path::new(&path), &content)
         .await
-        .map_err(|e| e.to_string())
+        .map_err(|e| {
+            tracing::error!(error = %e, "save failed");
+            e.to_string()
+        })?;
+    tracing::debug!("saved");
+    Ok(())
 }
 
 #[tauri::command]
+#[tracing::instrument(skip(app, workspace, content, db), fields(bytes = content.len()))]
 pub async fn reindex_note<R: Runtime>(
     app: AppHandle<R>,
     path: String,
@@ -1249,24 +1256,40 @@ pub async fn reindex_note<R: Runtime>(
     }
     index_note_at(&path, &workspace, &content, &db)
         .await
-        .map_err(|e| e.to_string())
+        .map_err(|e| {
+            tracing::error!(error = %e, "reindex failed");
+            e.to_string()
+        })?;
+    tracing::info!("reindexed");
+    Ok(())
 }
 
 // Used when a file changes underneath us: the index follows the disk, and a
 // note deleted externally drops out of search, tags and links.
 #[tauri::command]
+#[tracing::instrument(skip(workspace, db))]
 pub async fn reindex_from_disk(
     path: String,
     workspace: String,
     db: State<'_, DbPool>,
 ) -> Result<bool, String> {
     match tokio::fs::read_to_string(&path).await {
-        Ok(content) => index_note_at(&path, &workspace, &content, &db)
-            .await
-            .map(|()| true)
-            .map_err(|e| e.to_string()),
+        Ok(content) => {
+            index_note_at(&path, &workspace, &content, &db)
+                .await
+                .map_err(|e| {
+                    tracing::error!(error = %e, "reindex from disk failed");
+                    e.to_string()
+                })?;
+            tracing::info!("reindexed from disk");
+            Ok(true)
+        }
         Err(_) => {
-            forget_note(&path, &db).await.map_err(|e| e.to_string())?;
+            forget_note(&path, &db).await.map_err(|e| {
+                tracing::error!(error = %e, "forgetting deleted note failed");
+                e.to_string()
+            })?;
+            tracing::info!("note gone from disk, dropped from index");
             Ok(false)
         }
     }

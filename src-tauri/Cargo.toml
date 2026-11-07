@@ -36,6 +36,9 @@ chrono = { version = "0.4", default-features = false, features = ["clock"] }
 image = "0.24"
 tempfile = "3"
 pdfium-render = { version = "0.9", optional = true, default-features = false, features = ["pdfium_7763", "image_latest", "thread_safe"] }
+tracing = "0.1"
+tracing-appender = "0.2"
+tracing-subscriber = { version = "0.3", default-features = false, features = ["fmt", "registry", "std", "env-filter"] }
 notify = "8.2.0"
 base64 = "0.22"
 zip = { version = "9", default-features = false, features = ["deflate"] }
