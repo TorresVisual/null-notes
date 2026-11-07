@@ -1,0 +1,50 @@
+use null_notes_lib::commands::notes::{reindex_from_disk, scan_workspace};
+use null_notes_lib::db;
+use tauri::test::mock_app;
+use tauri::Manager;
+
+fn copy_dir(from: &std::path::Path, to: &std::path::Path) {
+    std::fs::create_dir_all(to).unwrap();
+    for e in std::fs::read_dir(from).unwrap() {
+        let e = e.unwrap();
+        let dest = to.join(e.file_name());
+        if e.file_type().unwrap().is_dir() {
+            copy_dir(&e.path(), &dest);
+        } else {
+            std::fs::copy(e.path(), dest).unwrap();
+        }
+    }
+}
+
+fn md_files(dir: &std::path::Path, out: &mut Vec<String>) {
+    for e in std::fs::read_dir(dir).unwrap() {
+        let p = e.unwrap().path();
+        if p.is_dir() {
+            md_files(&p, out);
+        } else if p.extension().is_some_and(|x| x == "md") {
+            out.push(p.to_string_lossy().into_owned());
+        }
+    }
+}
+
+#[tokio::test]
+async fn mkgolden() {
+    let src = std::env::var("GOLDEN_SRC").unwrap();
+    let out = std::env::var("GOLDEN_OUT").unwrap();
+    let ws_dir = tempfile::tempdir().unwrap();
+    copy_dir(std::path::Path::new(&src), ws_dir.path());
+    let ws = ws_dir.path().to_string_lossy().into_owned();
+    let data = tempfile::tempdir().unwrap();
+    let pool = db::init_db(data.path()).await.unwrap();
+    let app = mock_app();
+    app.manage(pool.clone());
+    scan_workspace(ws.clone(), app.state()).await.unwrap();
+    let mut files = Vec::new();
+    md_files(ws_dir.path(), &mut files);
+    for f in files {
+        assert!(reindex_from_disk(f, ws.clone(), app.state()).await.unwrap());
+    }
+    sqlx::query("PRAGMA wal_checkpoint(TRUNCATE)").execute(&pool).await.unwrap();
+    pool.close().await;
+    std::fs::copy(data.path().join("index.db"), out).unwrap();
+}
