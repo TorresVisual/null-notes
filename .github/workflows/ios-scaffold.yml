@@ -235,7 +235,7 @@ jobs:
           idb ui describe-all --udid "$UDID" > ax-sidebar.json || true
       - name: Upload clone screenshots
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: mobile-editor-sync-clone
           path: |
@@ -246,7 +246,7 @@ jobs:
             ax-sidebar.json
       - name: Upload onboarding screenshots
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: mobile-onboarding-screenshots
           path: |
@@ -254,7 +254,7 @@ jobs:
             onboarding-after.png
       - name: Upload screenshots
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ios-smoke-test
           path: |
@@ -264,7 +264,7 @@ jobs:
             ax-tree.json
       - name: Upload rendered page PNG
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: pdfium-render-smoke
           path: |
