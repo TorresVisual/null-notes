@@ -12,3 +12,11 @@ updates:
     directory: /
     schedule:
       interval: weekly
+  - package-ecosystem: cargo
+    directory: /src-tauri/cli
+    schedule:
+      interval: weekly
+  - package-ecosystem: cargo
+    directory: /src-tauri/context-menu-handler
+    schedule:
+      interval: weekly
