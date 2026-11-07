@@ -6,7 +6,7 @@ jobs:
   ipa:
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - run: rustup toolchain install
       - run: rustup target add aarch64-apple-ios
       - uses: actions/setup-node@v7
