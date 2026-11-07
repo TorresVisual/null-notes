@@ -173,3 +173,26 @@ Only the ones not already explained in the first report.
 
 - If you intend to distribute beyond yourself, items 3 and 5 move to the front. If not, 1, 2, 4 and 6 still pay for themselves, because they are what stand between a hidden regression and your own notes.
 - I did not inspect: the NSIS hooks and MSIX scripts in `scripts/windows/`, `download-pdfium.ps1`'s verification, the Android/iOS build paths, or multi-instance behaviour. Gaps in those areas are probably larger than shown here, not smaller.
+
+## 14. Learning path (free only)
+
+The goal of this project includes learning professional practice (ROADMAP §1: "enjoyment and learning are legitimate terms"), and nothing here needs a paid licence. Item 5 of §11 (a purchased signing certificate) is therefore **study-only**: read how Authenticode, SmartScreen reputation and `signtool` work, and sign a throwaway binary with a self-signed cert to see the mechanics. Do not buy anything for a tool with one user. The self-signed trust-store behaviour stays as is, documented as a known limitation.
+
+Order chosen so each step teaches a concept the next one uses. Every tool named is free for a private repo unless stated.
+
+| # | Do | Concept it teaches | Tool / cost |
+|---|---|---|---|
+| 1 | CI on push (#176), then a repository ruleset requiring the `check` job | Trunk-based development, required status checks | GitHub, free |
+| 2 | `dependabot.yml`, triage the 30 alerts into "ships / build-only / dismissed with reason" | Vulnerability triage, reachability | Dependabot, free |
+| 3 | `gitleaks`, `cargo-deny`, `npm audit` in CI | Secret scanning, licence and source policy | OSS CLIs, free |
+| 4 | Build attestation, `SHA256SUMS`, CycloneDX SBOM on each release | Supply-chain provenance (SLSA), SBOMs | `actions/attest-build-provenance`, `cargo-cyclonedx`, free |
+| 5 | Corpus round-trip test, then `fast-check` properties (#178) | Property-based testing | `fast-check`, free |
+| 6 | `PRAGMA user_version` migrations, self-healing index, downgrade guard (#180) | Schema migration, forward/backward compatibility | SQLite, free |
+| 7 | One "golden workspace" per released version opened by CI | Compatibility matrix | none |
+| 8 | `tracing` with rotating logs and an Export-diagnostics bundle (#184) | Structured logging, supportability | `tracing`, free |
+| 9 | `cargo-fuzz` on `db/fts_query.rs` and `properties.rs` | Fuzzing | `cargo-fuzz`, free (nightly Rust) |
+| 10 | Coverage trend, `axe-core` in an e2e spec, one screenshot-diff spec | Coverage gating, automated a11y, visual regression | `vitest` coverage, `axe-core`, Playwright, free |
+| 11 | A beta updater endpoint (second `latest.json`) | Release rings / channels | GitHub releases, free |
+| 12 | ADRs for the next two real decisions; release and rollback runbook | Decision records, operational docs | markdown |
+
+Skip until there is a reason: opt-in crash reporting (a hosted service or self-hosted Sentry), staged rollout percentages, localisation, an HSM or KMS for the updater key, enterprise MSI/Group Policy controls. Each is worth *reading about* once; building them for one user teaches little the items above do not.
