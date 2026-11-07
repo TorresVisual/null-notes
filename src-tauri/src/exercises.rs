@@ -21,6 +21,7 @@ use regex::Regex;
 /// information here, whereas an indented `1.` genuinely is a sub-part. Ue6's
 /// `Beispiel 6.3.` arrives indented eight spaces and is an exercise like every
 /// other one on the sheet.
+#[allow(clippy::expect_used)]
 fn keyword_pattern() -> Regex {
     Regex::new(r"^(\s*)(?:Aufgabe|Beispiel|Exercise|Task|Problem)\s+(\d+(?:\.\d+)*)\.?(?:\s|$)")
         .expect("static pattern")
@@ -28,6 +29,7 @@ fn keyword_pattern() -> Regex {
 
 /// A top-level ordered list marker: `1. `, at column zero. An indented marker
 /// is a sub-part, and `layout.rs` has already decided which is which.
+#[allow(clippy::expect_used)]
 fn ordered_pattern() -> Regex {
     Regex::new(r"^(\d+)\.\s+\S").expect("static pattern")
 }

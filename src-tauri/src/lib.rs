@@ -1,3 +1,6 @@
+#![warn(clippy::unwrap_used, clippy::expect_used)]
+#![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used))]
+
 #[cfg(windows)]
 pub mod cli_server;
 pub mod commands;
@@ -22,6 +25,7 @@ use commands::git_mobile as git_impl;
 static ERROR_LOG_DIR: OnceLock<PathBuf> = OnceLock::new();
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
+#[allow(clippy::expect_used, clippy::unwrap_used)]
 pub fn run() {
     let open_file = commands::workspace::open_file_from_args(std::env::args().skip(1));
     let workspace_arg = commands::workspace::initial_workspace_from_args(std::env::args().skip(1));

@@ -675,6 +675,7 @@ fn sr_comment_idx(lines: &[&str], after: usize) -> usize {
     after
 }
 
+#[allow(clippy::expect_used)]
 fn checkbox_re() -> Regex {
     Regex::new(r"^\s*-\s\[([ xX])\]\s+(.+)$").expect("static checkbox regex")
 }
@@ -682,6 +683,7 @@ fn checkbox_re() -> Regex {
 // A bare "Question ::" with nothing after the "::" is the MC marker. Q::A
 // always has content after it (`qa_re` in classify_card_line requires
 // `\s(.+)$`), so this can never misfire on a real Q::A line.
+#[allow(clippy::expect_used)]
 fn is_mc_question_line(trimmed: &str) -> bool {
     Regex::new(r"^.+\s::$")
         .expect("static MC question regex")
@@ -1674,6 +1676,7 @@ async fn grade_mc_card_at(
     Ok(McGradeResult { correct })
 }
 
+#[allow(clippy::expect_used)]
 fn wiki_link_regex() -> &'static Regex {
     static RE: std::sync::OnceLock<Regex> = std::sync::OnceLock::new();
     RE.get_or_init(|| Regex::new(r"\[\[([^\]\n]+)\]\]").expect("static wiki-link pattern"))
@@ -1912,6 +1915,7 @@ fn mask_code(content: &str) -> String {
 // replacement. Matched against `mask_code(content)` so a tag name that also
 // appears inside a fenced or inline code span (`#include`, `#define`) is left
 // alone, consistent with `extract_tags` never counting those as tags either.
+#[allow(clippy::expect_used)]
 fn rewrite_tag(content: &str, old_tag: &str, new_tag: &str) -> anyhow::Result<String> {
     let masked = mask_code(content);
     let re = Regex::new(r"(?:^|\s)#([A-Za-z][\w-]*)")?;
