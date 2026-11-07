@@ -83,9 +83,8 @@ export const NoteLink = Link.extend({
           const paths = useNotesStore.getState().notes.map((n) => n.path)
           if (!workspace || !resolveNoteLink(name, notePath(), workspace, paths)) return null
 
-          state.tr
-            .insertText(' ', range.to)
-            .addMark(range.to - name.length, range.to, type.create({ href: name }))
+          const nameEnd = range.to - 1
+          state.tr.addMark(nameEnd - name.length, nameEnd, type.create({ href: name }))
           return undefined
         },
       }),
