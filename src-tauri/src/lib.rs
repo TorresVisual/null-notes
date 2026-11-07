@@ -10,6 +10,7 @@ pub mod fsrs;
 pub mod link_resolve;
 pub mod logging;
 pub mod models;
+pub mod note_text;
 pub mod pdf;
 pub mod properties;
 pub mod sm2;
