@@ -8,6 +8,12 @@
 
 That's the whole process — the installer replaces any previous version in place.
 
+## Verifying a download
+
+Each release also carries `SHA256SUMS` (installers plus SBOMs) and CycloneDX SBOMs for the app's npm and Rust dependencies. Check an installer with `sha256sum -c --ignore-missing SHA256SUMS`.
+
+The release workflow also attests build provenance (`actions/attest-build-provenance`), verified with `gh attestation verify <installer> --repo TorresVisual/null-notes`. GitHub only offers artifact attestations for public repos (or Enterprise Cloud), so the step is skipped while this repo is private and starts working the day it goes public.
+
 ## Updating
 
 Installed copies check for a new release once at startup and offer to install it. Updater traffic goes through the public binaries-only mirror `TorresVisual/null-notes-releases`, because the updater can't fetch assets from a private repo. Releases there are copied from this repo when a release is published; drafts are never visible to the updater.

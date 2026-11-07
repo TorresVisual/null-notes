@@ -69,6 +69,8 @@ jobs:
 
     permissions:
       contents: write
+      id-token: write
+      attestations: write
 
     steps:
       - uses: actions/checkout@v7
@@ -131,7 +133,8 @@ jobs:
 
       - run: npm ci
 
-      - uses: tauri-apps/tauri-action@1deb371b0cd8bd54025b384f1cd735e725c4060f # v1.0.0
+      - id: tauri
+        uses: tauri-apps/tauri-action@1deb371b0cd8bd54025b384f1cd735e725c4060f # v1.0.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
@@ -142,3 +145,36 @@ jobs:
           releaseBody: ${{ steps.notes.outputs.body }}
           releaseDraft: true
           args: --config src-tauri/tauri.release.conf.json
+
+      - uses: taiki-e/install-action@cargo-cyclonedx
+
+      # npm sbom rejects the tree over peer-dep ranges (radix wants React <=18), so --legacy-peer-deps.
+      - name: SBOMs and checksums
+        shell: bash
+        run: |
+          mkdir provenance
+          npm sbom --sbom-format cyclonedx --omit dev --legacy-peer-deps > provenance/null-notes-npm.cdx.json
+          for dir in src-tauri src-tauri/cli src-tauri/context-menu-handler; do
+            cargo cyclonedx --manifest-path "$dir/Cargo.toml" --format json
+            cp "$dir"/*.cdx.json provenance/
+          done
+          cp src-tauri/target/release/bundle/nsis/*.exe src-tauri/target/release/bundle/msi/*.msi provenance/
+          (cd provenance && sha256sum *.exe *.msi *.cdx.json > SHA256SUMS)
+
+      # Artifact attestations need a public repo (or Enterprise Cloud); on a private one the step would fail the release.
+      - uses: actions/attest-build-provenance@v4
+        if: ${{ !github.event.repository.private }}
+        with:
+          subject-path: |
+            provenance/*.exe
+            provenance/*.msi
+
+      - name: Attach SBOMs and SHA256SUMS to the draft release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_ID: ${{ steps.tauri.outputs.releaseId }}
+        run: |
+          for f in provenance/*.cdx.json provenance/SHA256SUMS; do
+            gh api --method POST -H 'Content-Type: application/octet-stream'               "https://uploads.github.com/repos/$GITHUB_REPOSITORY/releases/$RELEASE_ID/assets?name=$(basename "$f")"               --input "$f"
+          done
