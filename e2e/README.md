@@ -30,6 +30,14 @@ Screenshots land in `e2e/.artifacts/` (gitignored); `start e2e\.artifacts`
 opens the folder after a run. See `.claude/skills/e2e-verify/SKILL.md`'s
 "Visual verification" section.
 
+`accessibility.e2e.ts` runs axe-core (`axe.ts`) on the editor, sidebar and
+settings dialog and diffs the settings dialog against `e2e/baselines/` with
+`pixelmatch` (`visualBaseline.ts`). Fix a known serious/critical rule and
+delete it from `KNOWN` in the spec; never add one to silence a regression.
+Baselines are per display setup (Windows, WebView2, 100% scale, ≤1% pixels
+differ): regenerate with `UPDATE_BASELINE=1` after an intended visual change.
+Not in the CI smoke set.
+
 `@wdio/tauri-service`'s official driver has occasional per-command timing
 flakiness in this environment unrelated to app behavior (see
 `mochaOpts.retries` in `wdio.conf.ts`). A test failing once and passing on
