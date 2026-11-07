@@ -13,4 +13,6 @@ mod columns_tests;
 #[cfg(test)]
 mod dump;
 #[cfg(test)]
+mod golden;
+#[cfg(test)]
 mod layout_tests;
