@@ -16,7 +16,19 @@ Versions before the first updater-enabled release (v1.0.4 and earlier) have no u
 
 ## Cutting a release (maintainer)
 
-`npm run release -- patch|minor|major` bumps, tags and pushes. CI builds a **draft** release with notes taken from commit subjects; review it and publish it (`gh release edit <tag> --draft=false`), which triggers `publish-mirror.yml`. To re-mirror a tag, run that workflow manually with the tag.
+`npm run release -- patch|minor|major` refuses to start unless the `CI` run for the pushed `HEAD` on `main` has finished green (needs `gh`), then bumps, tags and pushes. CI builds a **draft** release with notes taken from commit subjects; review it and publish it (`gh release edit <tag> --draft=false`), which triggers `publish-mirror.yml`. To re-mirror a tag, run that workflow manually with the tag.
+
+### Before pressing Publish
+
+Publishing means every installed copy updates, and there is no rollback. Nothing automated runs the installer, so do this on the draft's installer first:
+
+1. Download the draft's `.msi`/`.exe` and install it over the previous version.
+2. Launch it; the version in Settings → About matches the tag.
+3. Open an existing workspace; the sidebar tree and search load.
+4. Create a note, type, close and reopen it; the text is still there.
+5. For an updater check, install the *previous* release, then confirm it offers this one once published (or skip if the release only touches the updater-neutral parts).
+
+If any step fails, don't publish — fix forward and cut a new version.
 
 If a release fails, `npm run release -- retag` moves the existing tag to `HEAD` and re-runs the pipeline at the same version (refused once that version is published). For a transient CI failure, "Re-run failed jobs" is enough.
 

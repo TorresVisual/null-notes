@@ -14,6 +14,14 @@ export function assertRetaggable(release, tag) {
   }
 }
 
+export function assertGreenMain(runs, sha) {
+  const short = sha.slice(0, 7)
+  const run = runs[0]
+  if (!run) throw new Error(`No CI run found for ${short} on main — push it and wait for CI before releasing.`)
+  if (run.status !== 'completed') throw new Error(`CI for ${short} is still ${run.status} — wait for it to finish.`)
+  if (run.conclusion !== 'success') throw new Error(`CI for ${short} concluded ${run.conclusion} — fix main before releasing.`)
+}
+
 // --- CLI entry point (below the Task 1 exports) ---
 import { execSync, execFileSync } from 'node:child_process'
 import { readFileSync, writeFileSync } from 'node:fs'
@@ -48,6 +56,16 @@ function retag() {
   console.log(`Retagged ${tag} at HEAD`)
 }
 
+function checkMainIsGreen() {
+  const sha = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim()
+  const out = execFileSync(
+    'gh',
+    ['run', 'list', '--workflow', 'CI', '--branch', 'main', '--commit', sha, '--limit', '1', '--json', 'status,conclusion'],
+    { encoding: 'utf8' },
+  )
+  assertGreenMain(JSON.parse(out), sha)
+}
+
 function main() {
   const bump = process.argv[2]
   if (bump === 'retag') return retag()
@@ -55,6 +73,8 @@ function main() {
     console.error('Usage: npm run release -- patch|minor|major|retag')
     process.exit(1)
   }
+
+  checkMainIsGreen()
 
   // Bumps package.json only — no commit/tag, this script controls that.
   run(`npm version ${bump} --no-git-tag-version`)
