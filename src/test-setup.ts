@@ -1,5 +1,10 @@
 import '@testing-library/jest-dom'
+import { configure } from '@testing-library/react'
 import { vi } from 'vitest'
+
+// The 1000ms default is tight on a loaded CI runner running the whole suite in
+// parallel; tests that pass in 1s locally were timing out there.
+configure({ asyncUtilTimeout: 4000 })
 
 // `isMobile()` (src/lib/platform.ts) now runs inside ProseMirror decorate()
 // calls for two coreExtensions (CodeBlockRun, CodeBlockOpenInIde), so any

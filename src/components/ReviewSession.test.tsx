@@ -239,10 +239,10 @@ describe('ReviewSession — multiple choice', () => {
     fireEvent.click(screen.getByLabelText('3'))
     fireEvent.click(screen.getByText('Submit'))
 
-    await waitFor(() => expect(api.notes.gradeMcCard).toHaveBeenCalledWith('/ws/c.md', 0, [0], '/ws'))
+    expect(await screen.findByText('Next')).toBeInTheDocument()
+    expect(api.notes.gradeMcCard).toHaveBeenCalledWith('/ws/c.md', 0, [0], '/ws')
     expect(screen.getByLabelText('3').closest('li')).toHaveClass('review-card-option-incorrect')
     expect(screen.getByLabelText('4').closest('li')).toHaveClass('review-card-option-missed')
-    expect(screen.getByText('Next')).toBeInTheDocument()
     expect(screen.getByLabelText('3')).toBeDisabled()
   })
 

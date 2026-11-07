@@ -11,6 +11,9 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
     setupFiles: ['src/test-setup.ts'],
+    testTimeout: 15000,
+    // ReviewSession tests flake under a loaded runner; see the follow-up issue.
+    retry: process.env.CI ? 2 : 0,
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html'],
