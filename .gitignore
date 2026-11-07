@@ -76,3 +76,6 @@ e2e/.artifacts/
 .*.tmp
 .env
 graphify-out/
+
+# Android release signing keystore
+*.jks
