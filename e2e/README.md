@@ -45,7 +45,6 @@ retry is that; a test failing consistently is a real bug.
 
 ## In CI
 
-`release.yml`'s `smoke-e2e` job runs three specs (`create-note`, `csp-verify`,
-`cli`) against the debug build on every `v*` tag, and the `release` job waits
-on it. The other specs are a local pre-release run — add to the CI list only
-what guards packaging or the save path.
+Not run in CI. A smoke subset (`create-note`, `csp-verify`, `cli`) was gated on
+`v*` tags once and removed: on a `windows-latest` runner the app never came up
+under the driver (`DevToolsActivePort file doesn't exist`), cause unfound.
