@@ -130,7 +130,8 @@ function main() {
     updateCargoToml(readFileSync('src-tauri/Cargo.toml', 'utf8'), version),
   )
 
-  run('git add package.json package-lock.json src-tauri/tauri.conf.json src-tauri/Cargo.toml')
+  run('cargo update --workspace --manifest-path src-tauri/Cargo.toml')
+  run('git add package.json package-lock.json src-tauri/tauri.conf.json src-tauri/Cargo.toml src-tauri/Cargo.lock')
   run(`git commit -m "chore: release v${version}"`)
   execFileSync('git', tagArgs(`v${version}`, targets), { stdio: 'inherit' })
   run('git push --follow-tags')
