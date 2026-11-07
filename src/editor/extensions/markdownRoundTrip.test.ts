@@ -1,21 +1,5 @@
-import { describe, it, expect, afterEach } from 'vitest'
-import { Editor } from '@tiptap/core'
-import { coreExtensions } from './index'
-
-let editor: Editor | null = null
-
-function roundTrip(markdown: string): string {
-  const element = document.createElement('div')
-  document.body.appendChild(element)
-  editor = new Editor({ element, extensions: coreExtensions, content: markdown })
-  const storage = editor.storage as unknown as { markdown: { getMarkdown: () => string } }
-  return storage.markdown.getMarkdown()
-}
-
-afterEach(() => {
-  editor?.destroy()
-  editor = null
-})
+import { describe, it, expect } from 'vitest'
+import { roundTrip } from './roundTripHarness'
 
 describe('code fences (#167)', () => {
   it('keeps a longer fence around a block that contains a ``` fence', () => {

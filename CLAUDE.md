@@ -241,7 +241,7 @@ cargo llvm-cov --summary-only  # coverage report (from src-tauri/); no enforced 
 npm run dev                  # Vite dev server
 npm run build                # production build
 npm run typecheck            # tsc --noEmit
-npm test                     # vitest run
+npm test                     # vitest run (NULL_NOTES_MD_CORPUS=<dir> adds a .md round-trip idempotence check)
 npm run test:coverage        # vitest run --coverage; no enforced threshold
 npm audit                    # scan npm deps for known vulnerabilities
 
