@@ -3,7 +3,7 @@
 //! The corpus PDFs are not committed (they are coursework, and `/notes/` is
 //! gitignored), but the Markdown they must convert to is, in
 //! `src-tauri/tests/pdf_golden/`. With `NULL_NOTES_PDF_DIR` unset the test
-//! does nothing, so CI (no pdfium, no corpus) stays green:
+//! does nothing, so CI (no corpus) stays green:
 //!
 //! ```text
 //! NULL_NOTES_PDF_DIR=../notes/exercise_sheets cargo test pdf_corpus_matches_golden -- --nocapture
