@@ -4,9 +4,19 @@ use tauri::{AppHandle, Manager};
 use tokio::io::AsyncWriteExt;
 
 const ERROR_LOG_FILE: &str = "errors.log";
+const ROTATED_LOG_FILE: &str = "errors.log.1";
+const MAX_LOG_BYTES: u64 = 1024 * 1024;
+
+fn rotate_if_oversized(dir: &Path) {
+    let log = dir.join(ERROR_LOG_FILE);
+    if std::fs::metadata(&log).is_ok_and(|m| m.len() >= MAX_LOG_BYTES) {
+        let _ = std::fs::rename(&log, dir.join(ROTATED_LOG_FILE));
+    }
+}
 
 async fn append_entry_to_dir(dir: &Path, entry: &ErrorEntry) -> anyhow::Result<()> {
     tokio::fs::create_dir_all(dir).await?;
+    rotate_if_oversized(dir);
     let mut line = serde_json::to_string(entry)?;
     line.push('\n');
     let mut file = tokio::fs::OpenOptions::new()
@@ -56,6 +66,7 @@ pub fn append_entry_sync(dir: &Path, source: &str, message: &str, context: Optio
     };
     line.push('\n');
     let _ = std::fs::create_dir_all(dir);
+    rotate_if_oversized(dir);
     if let Ok(mut file) = std::fs::OpenOptions::new()
         .create(true)
         .append(true)
@@ -172,5 +183,19 @@ mod tests {
         let content = std::fs::read_to_string(dir.path().join(ERROR_LOG_FILE)).unwrap();
         assert!(content.contains("index out of bounds"));
         assert!(content.contains("\"source\":\"panic\""));
+    }
+
+    #[test]
+    fn test_oversized_log_rotates_instead_of_growing() {
+        let dir = tempdir().unwrap();
+        let big = "x".repeat(MAX_LOG_BYTES as usize);
+        std::fs::write(dir.path().join(ERROR_LOG_FILE), big).unwrap();
+
+        append_entry_sync(dir.path(), "panic", "fresh", None);
+
+        let rotated = std::fs::metadata(dir.path().join(ROTATED_LOG_FILE)).unwrap();
+        assert_eq!(rotated.len(), MAX_LOG_BYTES);
+        let current = std::fs::read_to_string(dir.path().join(ERROR_LOG_FILE)).unwrap();
+        assert!(current.contains("fresh") && current.lines().count() == 1);
     }
 }

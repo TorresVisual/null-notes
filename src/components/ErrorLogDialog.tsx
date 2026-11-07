@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
 import { ChevronRight, X } from 'lucide-react'
+import { getVersion } from '@tauri-apps/api/app'
+import { platform } from '@tauri-apps/plugin-os'
 import { api } from '../lib/tauri'
 import { writeToClipboard } from '../lib/clipboard'
 import type { ErrorLogEntry } from '../types'
@@ -12,6 +14,11 @@ interface ErrorLogDialogProps {
 function entryText(entry: ErrorLogEntry): string {
   const header = `[${entry.timestamp}] ${entry.source}: ${entry.message}`
   return entry.context ? `${header}\n${entry.context}` : header
+}
+
+async function environmentLine(): Promise<string> {
+  const version = await getVersion().catch(() => 'unknown version')
+  return `Null Notes ${version} on ${platform()}`
 }
 
 function ErrorLogRow({ entry }: { entry: ErrorLogEntry }) {
@@ -42,10 +49,12 @@ function ErrorLogRow({ entry }: { entry: ErrorLogEntry }) {
             type="button"
             className={`error-log-copy${copied ? ' copied' : ''}`}
             onClick={() => {
-              void writeToClipboard(entryText(entry)).then(() => {
-                setCopied(true)
-                setTimeout(() => setCopied(false), 1200)
-              })
+              void environmentLine()
+                .then((env) => writeToClipboard(`${env}\n${entryText(entry)}`))
+                .then(() => {
+                  setCopied(true)
+                  setTimeout(() => setCopied(false), 1200)
+                })
             }}
           >
             {copied ? 'Copied' : 'Copy'}

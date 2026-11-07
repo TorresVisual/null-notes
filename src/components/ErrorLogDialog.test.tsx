@@ -9,6 +9,8 @@ vi.mock('../lib/tauri', () => ({
   api: { errorLog: { list: vi.fn(), clear: vi.fn() } },
 }))
 
+vi.mock('@tauri-apps/api/app', () => ({ getVersion: vi.fn().mockResolvedValue('1.2.3') }))
+
 vi.mock('../lib/clipboard', () => ({ writeToClipboard: vi.fn().mockResolvedValue(undefined) }))
 
 const list = vi.mocked(api.errorLog.list)
@@ -91,7 +93,7 @@ describe('ErrorLogDialog', () => {
 
     await user.click(screen.getByRole('button', { name: /^copy$/i }))
     expect(writeToClipboard).toHaveBeenCalledWith(
-      '[2026-09-05T00:00:00Z] react-boundary: boom\nat Foo\nat Bar',
+      'Null Notes 1.2.3 on windows\n[2026-09-05T00:00:00Z] react-boundary: boom\nat Foo\nat Bar',
     )
     expect(await screen.findByRole('button', { name: /^copied$/i })).toBeInTheDocument()
   })

@@ -175,7 +175,19 @@ pub fn run() {
             let _ = ERROR_LOG_DIR.set(data_dir.clone());
             std::panic::set_hook(Box::new(|info| {
                 if let Some(dir) = ERROR_LOG_DIR.get() {
-                    commands::error_log::append_entry_sync(dir, "panic", &info.to_string(), None);
+                    let context = format!(
+                        "Null Notes {} on {}
+{}",
+                        env!("CARGO_PKG_VERSION"),
+                        std::env::consts::OS,
+                        std::backtrace::Backtrace::force_capture()
+                    );
+                    commands::error_log::append_entry_sync(
+                        dir,
+                        "panic",
+                        &info.to_string(),
+                        Some(&context),
+                    );
                 }
             }));
             let pool = tauri::async_runtime::block_on(db::init_db(&data_dir))
