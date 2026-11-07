@@ -65,6 +65,7 @@ vi.mock('../lib/tauri', () => ({
     git: {
       listNoteHistory: vi.fn().mockResolvedValue([]),
     },
+    pdf: { findPage: vi.fn().mockResolvedValue(null) },
   },
 }))
 vi.mock('../hooks/useNote', () => ({
