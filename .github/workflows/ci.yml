@@ -56,6 +56,10 @@ jobs:
       - run: npm run lint
       - run: npm test
 
+      - name: npm audit
+        continue-on-error: true
+        run: npm audit --omit=dev --audit-level=high
+
       - name: Check formatting
         working-directory: src-tauri
         run: cargo fmt -- --check
