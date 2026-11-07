@@ -236,6 +236,7 @@ cargo clippy -- -D warnings  # lint (must pass clean)
 cargo fmt --check            # formatting gate (must pass clean); cargo fmt to apply
 cargo audit                  # scan Rust deps for known vulnerabilities (from src-tauri/)
 cargo llvm-cov --summary-only  # coverage report (from src-tauri/); no enforced threshold
+cargo test --release perf_bench -- --ignored --nocapture  # 2,000-note reindex/search timings (src-tauri/); run before releases, no thresholds
 
 # Frontend
 npm run dev                  # Vite dev server

@@ -17,6 +17,8 @@ pub mod ink;
 pub mod jumplist;
 pub mod notes;
 pub mod pdf;
+#[cfg(test)]
+mod perf_bench;
 pub mod printing;
 pub mod scheduler;
 pub mod settings;
