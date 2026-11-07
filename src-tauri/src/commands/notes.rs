@@ -15,7 +15,7 @@ use regex::Regex;
 use std::collections::HashSet;
 use std::path::{Component, Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
-use tauri::State;
+use tauri::{AppHandle, Manager, Runtime, State};
 use tokio::io::AsyncWriteExt;
 use uuid::Uuid;
 
@@ -1235,12 +1235,16 @@ pub async fn save_note(workspace: String, path: String, content: String) -> Resu
 }
 
 #[tauri::command]
-pub async fn reindex_note(
+pub async fn reindex_note<R: Runtime>(
+    app: AppHandle<R>,
     path: String,
     workspace: String,
     content: String,
     db: State<'_, DbPool>,
 ) -> Result<(), String> {
+    if let Ok(dir) = app.path().app_data_dir() {
+        super::versions::snapshot(&dir, &path, &content).await;
+    }
     index_note_at(&path, &workspace, &content, &db)
         .await
         .map_err(|e| e.to_string())

@@ -238,7 +238,14 @@ impl<R: Runtime> Ctx<'_, R> {
     // The CLI is not a keystroke path, so it reindexes right after saving.
     async fn write_note(&self, ws: &str, abs: &str, content: String) -> Result<(), Fail> {
         notes::save_note(ws.to_string(), abs.to_string(), content.clone()).await?;
-        notes::reindex_note(abs.to_string(), ws.to_string(), content, self.db()).await?;
+        notes::reindex_note(
+            self.app.clone(),
+            abs.to_string(),
+            ws.to_string(),
+            content,
+            self.db(),
+        )
+        .await?;
         Ok(())
     }
 

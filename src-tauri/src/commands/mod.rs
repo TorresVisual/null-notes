@@ -22,6 +22,7 @@ pub mod scheduler;
 pub mod settings;
 pub mod terminal;
 pub mod trash;
+pub mod versions;
 pub mod watcher;
 pub mod window;
 pub mod workspace;
