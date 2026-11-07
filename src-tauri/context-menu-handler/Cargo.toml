@@ -8,7 +8,7 @@ name = "null_notes_context_menu"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-windows = { version = "0.61", features = [
+windows = { version = "0.62", features = [
     "Win32_Foundation",
     "Win32_System_Com",
     "Win32_System_LibraryLoader",
@@ -18,7 +18,7 @@ windows = { version = "0.61", features = [
 windows-core = "0.61"
 
 [dev-dependencies]
-windows = { version = "0.61", features = [
+windows = { version = "0.62", features = [
     "Win32_Foundation",
     "Win32_Security",
     "Win32_System_Com",
