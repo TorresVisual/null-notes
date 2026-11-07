@@ -20,9 +20,15 @@ Installed copies check for a new release once at startup and offer to install it
 
 Versions before the first updater-enabled release (v1.0.4 and earlier) have no updater: install the first updater-enabled release by hand (repeat the steps above, no uninstall needed first).
 
+## iOS (AltStore)
+
+In AltStore: Browse → Sources → **+** → `https://raw.githubusercontent.com/TorresVisual/null-notes-releases/main/altstore.json`. Then install or update Null Notes from the source like any app. AltStore signs the unsigned `.ipa` with your Apple ID on the phone (free-tier certificates expire every 7 days; AltStore refreshes them over Wi-Fi when it can).
+
+`release-ios.yml` builds the `.ipa` when a release is published, uploads it to the mirror release and prepends the version to `altstore.json` there. It runs on macOS (10x billed minutes), so only published releases build; to build one by hand, run the workflow with the tag. Windows installers are built by `release-windows.yml`; Android is built locally and has no workflow.
+
 ## Cutting a release (maintainer)
 
-`npm run release -- patch|minor|major` refuses to start unless the `CI` run for the pushed `HEAD` on `main` has finished green (needs `gh`), then bumps, tags and pushes. CI builds a **draft** release with notes taken from commit subjects; review it and publish it (`gh release edit <tag> --draft=false`), which triggers `publish-mirror.yml`. To re-mirror a tag, run that workflow manually with the tag.
+`npm run release -- patch|minor|major` refuses to start unless the `CI` run for the pushed `HEAD` on `main` has finished green (needs `gh`), then bumps, tags and pushes. CI builds a **draft** release with notes taken from commit subjects; review it and publish it (`gh release edit <tag> --draft=false`), which triggers `publish-mirror.yml` and `release-ios.yml`. To re-mirror a tag, run that workflow manually with the tag.
 
 ### Before pressing Publish
 

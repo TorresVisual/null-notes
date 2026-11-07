@@ -1,0 +1,130 @@
+name: Release (iOS)
+
+# Builds an unsigned arm64 .ipa when a release is published and adds it to the
+# AltStore source (altstore.json) in the public mirror repo. AltStore signs the
+# ipa on the phone, so nothing here needs an Apple account. macOS minutes bill
+# 10x: publishing a release is the deliberate trigger, drafts never build.
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to build the ipa for, e.g. v1.0.9
+        required: true
+
+env:
+  SOURCE_REPO: TorresVisual/null-notes
+  MIRROR_REPO: TorresVisual/null-notes-releases
+
+concurrency:
+  group: altstore-source
+  cancel-in-progress: false
+
+jobs:
+  ipa:
+    runs-on: macos-latest
+    permissions:
+      contents: read
+    env:
+      TAG: ${{ github.event.release.tag_name || inputs.tag }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.TAG }}
+      - run: rustup toolchain install
+      - run: rustup target add aarch64-apple-ios
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+      - run: npm ci
+      - name: Fetch iOS device pdfium binary
+        run: |
+          set -euo pipefail
+          curl -L -o pdfium-ios-device.tgz \
+            "https://github.com/bblanchon/pdfium-binaries/releases/download/chromium%2F7763/pdfium-ios-device-arm64.tgz"
+          echo "e43621e6e509fb9b06b94e1158192a3798558ac4f4c11e206a940440229bf03d  pdfium-ios-device.tgz" | shasum -a 256 -c
+          mkdir -p src-tauri/gen/pdfium-ios
+          tar -xzf pdfium-ios-device.tgz -C src-tauri/gen/pdfium-ios
+      - name: Copy pdfium smoke-test fixture
+        run: cp src-tauri/tests/fixtures/sample.pdf src-tauri/gen/pdfium-smoke-fixture.pdf
+      - name: Build unsigned device archive
+        run: |
+          set -euo pipefail
+          HELP=$(npx tauri ios build --help)
+          if echo "$HELP" | grep -q -e "--no-sign" && echo "$HELP" | grep -q -e "--archive-only"; then
+            npx tauri ios build --target aarch64 --archive-only --no-sign
+            ARCHIVE_PATH=$(find ~/Library/Developer/Xcode/DerivedData src-tauri/gen/apple -name "*.xcarchive" -maxdepth 6 | head -n1)
+          else
+            npx tauri ios init --ci
+            npx tauri ios build --target aarch64 --debug || true
+            xcodebuild archive \
+              -project src-tauri/gen/apple/null-notes.xcodeproj \
+              -scheme null-notes_iOS \
+              -destination "generic/platform=iOS" \
+              -archivePath "$RUNNER_TEMP/null-notes.xcarchive" \
+              CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO
+            ARCHIVE_PATH="$RUNNER_TEMP/null-notes.xcarchive"
+          fi
+          echo "ARCHIVE_PATH=$ARCHIVE_PATH" >> "$GITHUB_ENV"
+      - name: Package the archive's .app into a plain .ipa
+        run: |
+          set -euo pipefail
+          APP_PATH=$(find "$ARCHIVE_PATH/Products/Applications" -maxdepth 1 -name "*.app" | head -n1)
+          [ -n "$APP_PATH" ] || { echo "no .app under $ARCHIVE_PATH" >&2; exit 1; }
+          mkdir -p "$RUNNER_TEMP/Payload"
+          cp -R "$APP_PATH" "$RUNNER_TEMP/Payload/"
+          (cd "$RUNNER_TEMP" && zip -qr -y "NullNotes-${TAG#v}.ipa" Payload)
+          mv "$RUNNER_TEMP/NullNotes-${TAG#v}.ipa" .
+          unzip -l "NullNotes-${TAG#v}.ipa" | grep -E "Payload/[^/]+\.app/[^/]+$" | head
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ipa
+          path: NullNotes-*.ipa
+
+      - name: Upload the ipa to the mirror release
+        env:
+          GH_TOKEN: ${{ secrets.RELEASES_REPO_TOKEN }}
+        run: |
+          # publish-mirror.yml normally created this release minutes ago; fall back if it hasn't.
+          gh release view "$TAG" --repo "$MIRROR_REPO" >/dev/null 2>&1 \
+            || gh release create "$TAG" --repo "$MIRROR_REPO" --title "null-notes $TAG" --notes "iOS build"
+          gh release upload "$TAG" NullNotes-*.ipa --repo "$MIRROR_REPO" --clobber
+
+      - name: Add the version to the AltStore source
+        env:
+          GH_TOKEN: ${{ secrets.RELEASES_REPO_TOKEN }}
+        run: |
+          set -euo pipefail
+          VERSION="${TAG#v}"
+          IPA="NullNotes-$VERSION.ipa"
+          NOTES=$(GH_TOKEN="${{ github.token }}" gh release view "$TAG" --repo "$SOURCE_REPO" --json body --jq .body)
+          git clone --depth 1 "https://x-access-token:$GH_TOKEN@github.com/$MIRROR_REPO.git" mirror
+          cp src-tauri/icons/icon.png mirror/altstore-icon.png
+          RAW="https://raw.githubusercontent.com/$MIRROR_REPO/main"
+          [ -f mirror/altstore.json ] || echo '{"apps":[{"versions":[]}]}' > mirror/altstore.json
+          jq --arg raw "$RAW" --arg v "$VERSION" --arg date "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+             --arg url "https://github.com/$MIRROR_REPO/releases/download/$TAG/$IPA" \
+             --argjson size "$(stat -f%z "$IPA")" --arg notes "$NOTES" '
+            .name = "Null Notes"
+            | .identifier = "dev.nullnotes.source"
+            | .sourceURL = "\($raw)/altstore.json"
+            | .apps[0] |= (
+                .name = "Null Notes"
+                | .bundleIdentifier = "dev.nullnotes.app"
+                | .developerName = "TorresVisual"
+                | .subtitle = "Markdown notes with ink and PDF import"
+                | .localizedDescription = "A WYSIWYG Markdown note-taking app for CS students."
+                | .iconURL = "\($raw)/altstore-icon.png"
+                | .tintColor = "7EE787"
+                | .versions = ([{version: $v, date: $date, downloadURL: $url, size: $size,
+                                 minOSVersion: "14.0", localizedDescription: $notes}]
+                               + (.versions | map(select(.version != $v)))))
+          ' mirror/altstore.json > mirror/altstore.json.new
+          mv mirror/altstore.json.new mirror/altstore.json
+          cd mirror
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add altstore.json altstore-icon.png
+          git commit -m "altstore: $TAG"
+          git push
