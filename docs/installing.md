@@ -32,7 +32,7 @@ If any step fails, don't publish — fix forward and cut a new version.
 
 If a release fails, `npm run release -- retag` moves the existing tag to `HEAD` and re-runs the pipeline at the same version (refused once that version is published). For a transient CI failure, "Re-run failed jobs" is enough.
 
-One-time setup: create the public repo `TorresVisual/null-notes-releases` with an initial commit; run `npx tauri signer generate`, put the public key in `plugins.updater.pubkey` in `src-tauri/tauri.conf.json`, and store the private key and password as secrets `TAURI_SIGNING_PRIVATE_KEY` / `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`; add a fine-grained PAT (Contents: read/write on the releases repo) as `RELEASES_REPO_TOKEN`. Back the private key up outside the repo — losing it strands every installed copy.
+One-time setup: create the public repo `TorresVisual/null-notes-releases` with an initial commit; run `npx tauri signer generate`, put the public key in `plugins.updater.pubkey` in `src-tauri/tauri.conf.json`, and store the private key and password as secrets `TAURI_SIGNING_PRIVATE_KEY` / `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`; add a fine-grained PAT (Contents: read/write on the releases repo) as `RELEASES_REPO_TOKEN`. Back the private key up outside the repo — losing it strands every installed copy. The key and password are also kept in the maintainer's gitignored `.env`; `RELEASES_REPO_TOKEN` has no expiry, so nothing needs rotating on a schedule.
 
 ## Note: Explorer right-click integration
 
