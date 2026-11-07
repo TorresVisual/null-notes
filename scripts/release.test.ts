@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { updateTauriConf, updateCargoToml, assertRetaggable, assertGreenMain } from './release.mjs'
+import { updateTauriConf, updateCargoToml, assertRetaggable, assertGreenMain, resolveTargets, tagMessages, readTargets, TARGETS } from './release.mjs'
 
 describe('updateTauriConf', () => {
   it('replaces the version field and preserves formatting', () => {
@@ -50,5 +50,34 @@ describe('assertRetaggable', () => {
 
   it('refuses a published release', () => {
     expect(() => assertRetaggable({ isDraft: false }, 'v1.0.5')).toThrow(/already published/)
+  })
+})
+
+describe('resolveTargets', () => {
+  it('builds every target by default', () => {
+    expect(resolveTargets()).toEqual(TARGETS)
+  })
+  it('--skip removes targets', () => {
+    expect(resolveTargets({ skip: 'ios,android' })).toEqual(['windows', 'linux'])
+  })
+  it('--only keeps just the listed targets, in canonical order', () => {
+    expect(resolveTargets({ only: 'ios,windows' })).toEqual(['windows', 'ios'])
+  })
+  it('rejects unknown targets, both flags, and an empty result', () => {
+    expect(() => resolveTargets({ skip: 'macos' })).toThrow(/Unknown target/)
+    expect(() => resolveTargets({ only: 'ios', skip: 'linux' })).toThrow(/not both/)
+    expect(() => resolveTargets({ skip: TARGETS.join(',') })).toThrow(/No targets/)
+  })
+})
+
+describe('tag annotation round trip', () => {
+  it('writes no targets line when everything builds', () => {
+    expect(tagMessages('v1.0.0', TARGETS)).toEqual(['v1.0.0'])
+    expect(readTargets('v1.0.0')).toEqual(TARGETS)
+  })
+  it('records a partial selection and reads it back', () => {
+    const messages = tagMessages('v1.0.0', ['windows', 'ios'])
+    expect(messages).toEqual(['v1.0.0', 'targets: windows,ios'])
+    expect(readTargets(messages.join('\n\n'))).toEqual(['windows', 'ios'])
   })
 })

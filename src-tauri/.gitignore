@@ -9,3 +9,5 @@
 # Native pdfium library — downloaded locally (bblanchon/pdfium-binaries),
 # not vendored. See README for the download step.
 /pdfium.dll
+
+/vendor/libpdfium.so

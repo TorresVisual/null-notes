@@ -1,0 +1,10 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "bundle": {
+    "linux": {
+      "deb": { "files": { "/usr/lib/libpdfium.so": "vendor/libpdfium.so" } },
+      "rpm": { "files": { "/usr/lib64/libpdfium.so": "vendor/libpdfium.so" } },
+      "appimage": { "files": { "/usr/lib/libpdfium.so": "vendor/libpdfium.so" } }
+    }
+  }
+}

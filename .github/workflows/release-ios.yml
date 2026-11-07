@@ -1,37 +1,39 @@
 name: Release (iOS)
 
-# Builds an unsigned arm64 .ipa when a release is published and adds it to the
-# AltStore source (altstore.json) in the public mirror repo. AltStore signs the
-# ipa on the phone, so nothing here needs an Apple account. macOS minutes bill
-# 10x: publishing a release is the deliberate trigger, drafts never build.
+# Builds an unsigned arm64 .ipa and attaches it to the draft release. AltStore
+# signs it on the phone, so nothing here needs an Apple account. Once the
+# release is published, publish-mirror.yml copies the ipa to the public mirror
+# and adds it to the AltStore source. macOS minutes bill 10x: skip this target
+# with `npm run release -- <bump> --skip ios` when a release doesn't need it.
 on:
-  release:
-    types: [published]
+  workflow_call:
+    inputs:
+      tag:
+        required: true
+        type: string
   workflow_dispatch:
     inputs:
       tag:
-        description: Release tag to build the ipa for, e.g. v1.0.9
+        description: Tag to build, e.g. v1.0.9 (adds to its draft release, creating it if missing)
         required: true
-
-env:
-  SOURCE_REPO: TorresVisual/null-notes
-  MIRROR_REPO: TorresVisual/null-notes-releases
-
-concurrency:
-  group: altstore-source
-  cancel-in-progress: false
+        type: string
 
 jobs:
   ipa:
     runs-on: macos-latest
     permissions:
-      contents: read
+      contents: write
     env:
-      TAG: ${{ github.event.release.tag_name || inputs.tag }}
+      TAG: ${{ inputs.tag }}
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: ${{ env.TAG }}
+          ref: ${{ inputs.tag }}
+          fetch-depth: 0
+      - uses: ./.github/actions/ensure-draft
+        with:
+          tag: ${{ inputs.tag }}
+          token: ${{ secrets.GITHUB_TOKEN }}
       - run: rustup toolchain install
       - run: rustup target add aarch64-apple-ios
       - uses: actions/setup-node@v7
@@ -82,49 +84,7 @@ jobs:
           name: ipa
           path: NullNotes-*.ipa
 
-      - name: Upload the ipa to the mirror release
+      - name: Attach to the draft release
         env:
-          GH_TOKEN: ${{ secrets.RELEASES_REPO_TOKEN }}
-        run: |
-          # publish-mirror.yml normally created this release minutes ago; fall back if it hasn't.
-          gh release view "$TAG" --repo "$MIRROR_REPO" >/dev/null 2>&1 \
-            || gh release create "$TAG" --repo "$MIRROR_REPO" --title "null-notes $TAG" --notes "iOS build"
-          gh release upload "$TAG" NullNotes-*.ipa --repo "$MIRROR_REPO" --clobber
-
-      - name: Add the version to the AltStore source
-        env:
-          GH_TOKEN: ${{ secrets.RELEASES_REPO_TOKEN }}
-        run: |
-          set -euo pipefail
-          VERSION="${TAG#v}"
-          IPA="NullNotes-$VERSION.ipa"
-          NOTES=$(GH_TOKEN="${{ github.token }}" gh release view "$TAG" --repo "$SOURCE_REPO" --json body --jq .body)
-          git clone --depth 1 "https://x-access-token:$GH_TOKEN@github.com/$MIRROR_REPO.git" mirror
-          cp src-tauri/icons/icon.png mirror/altstore-icon.png
-          RAW="https://raw.githubusercontent.com/$MIRROR_REPO/main"
-          [ -f mirror/altstore.json ] || echo '{"apps":[{"versions":[]}]}' > mirror/altstore.json
-          jq --arg raw "$RAW" --arg v "$VERSION" --arg date "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-             --arg url "https://github.com/$MIRROR_REPO/releases/download/$TAG/$IPA" \
-             --argjson size "$(stat -f%z "$IPA")" --arg notes "$NOTES" '
-            .name = "Null Notes"
-            | .identifier = "dev.nullnotes.source"
-            | .sourceURL = "\($raw)/altstore.json"
-            | .apps[0] |= (
-                .name = "Null Notes"
-                | .bundleIdentifier = "dev.nullnotes.app"
-                | .developerName = "TorresVisual"
-                | .subtitle = "Markdown notes with ink and PDF import"
-                | .localizedDescription = "A WYSIWYG Markdown note-taking app for CS students."
-                | .iconURL = "\($raw)/altstore-icon.png"
-                | .tintColor = "7EE787"
-                | .versions = ([{version: $v, date: $date, downloadURL: $url, size: $size,
-                                 minOSVersion: "14.0", localizedDescription: $notes}]
-                               + (.versions | map(select(.version != $v)))))
-          ' mirror/altstore.json > mirror/altstore.json.new
-          mv mirror/altstore.json.new mirror/altstore.json
-          cd mirror
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add altstore.json altstore-icon.png
-          git commit -m "altstore: $TAG"
-          git push
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "$TAG" NullNotes-*.ipa --clobber

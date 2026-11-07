@@ -1,16 +1,20 @@
-name: Release
+name: Release (Windows)
 
 on:
-  push:
-    tags:
-      - 'v*'
+  workflow_call:
+    inputs:
+      tag:
+        required: true
+        type: string
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Tag to build, e.g. v1.0.9 (adds to its draft release, creating it if missing)
+        required: true
+        type: string
 
 jobs:
-  checks:
-    uses: ./.github/workflows/ci.yml
-
   smoke-e2e:
-    needs: checks
     runs-on: windows-latest
 
     permissions:
@@ -18,6 +22,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.tag }}
 
       - name: Generate CI signing cert
         run: ./scripts/windows/dev-cert.ps1
@@ -64,7 +70,7 @@ jobs:
           path: e2e/.artifacts/
 
   release:
-    needs: [checks, smoke-e2e]
+    needs: smoke-e2e
     runs-on: windows-latest
 
     permissions:
@@ -75,6 +81,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
+          ref: ${{ inputs.tag }}
           fetch-depth: 0
 
       - name: Refuse to build with the updater placeholder key
@@ -85,16 +92,11 @@ jobs:
             exit 1
           fi
 
-      - name: Release notes from commits
-        id: notes
-        shell: bash
-        run: |
-          prev=$(git describe --tags --abbrev=0 --match 'v*' "${GITHUB_REF_NAME}^" 2>/dev/null || true)
-          {
-            echo 'body<<NOTES_EOF'
-            git log --no-merges --format='- %s' ${prev:+$prev..}"${GITHUB_REF_NAME}" | grep -v '^- chore: release' || true
-            echo 'NOTES_EOF'
-          } >> "$GITHUB_OUTPUT"
+      - id: draft
+        uses: ./.github/actions/ensure-draft
+        with:
+          tag: ${{ inputs.tag }}
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Restore pinned signing cert
         env:
@@ -140,10 +142,7 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
-          tagName: ${{ github.ref_name }}
-          releaseName: 'null-notes ${{ github.ref_name }}'
-          releaseBody: ${{ steps.notes.outputs.body }}
-          releaseDraft: true
+          releaseId: ${{ steps.draft.outputs.release-id }}
           args: --config src-tauri/tauri.release.conf.json
 
       - uses: taiki-e/install-action@cargo-cyclonedx
@@ -173,7 +172,7 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          RELEASE_ID: ${{ steps.tauri.outputs.releaseId }}
+          RELEASE_ID: ${{ steps.draft.outputs.release-id }}
         run: |
           for f in provenance/*.cdx.json provenance/SHA256SUMS; do
             gh api --method POST -H 'Content-Type: application/octet-stream'               "https://uploads.github.com/repos/$GITHUB_REPOSITORY/releases/$RELEASE_ID/assets?name=$(basename "$f")"               --input "$f"

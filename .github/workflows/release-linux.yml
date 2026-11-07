@@ -1,0 +1,72 @@
+name: Release (Linux)
+
+on:
+  workflow_call:
+    inputs:
+      tag:
+        required: true
+        type: string
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Tag to build, e.g. v1.0.9 (adds to its draft release, creating it if missing)
+        required: true
+        type: string
+
+jobs:
+  release:
+    # 22.04 keeps the glibc floor low enough for most distros' AppImage users.
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.tag }}
+          fetch-depth: 0
+
+      - id: draft
+        uses: ./.github/actions/ensure-draft
+        with:
+          tag: ${{ inputs.tag }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev \
+            librsvg2-dev libssl-dev libxdo-dev patchelf rpm xdg-utils
+
+      # bundle.linux.*.files in tauri.linux.conf.json installs this into the system
+      # library path, where pdfium-render's system-library fallback finds it.
+      - name: Download libpdfium.so
+        run: |
+          set -euo pipefail
+          curl -L -o pdfium-linux-x64.tgz \
+            "https://github.com/bblanchon/pdfium-binaries/releases/download/chromium%2F7763/pdfium-linux-x64.tgz"
+          echo "e3f0c66b2daad710cb6c8edd4a8c45c8902995e359dc0775917fc16e2e56349d  pdfium-linux-x64.tgz" | sha256sum -c
+          mkdir -p src-tauri/vendor
+          tar -xzf pdfium-linux-x64.tgz -C "$RUNNER_TEMP" lib/libpdfium.so
+          cp "$RUNNER_TEMP/lib/libpdfium.so" src-tauri/vendor/libpdfium.so
+
+      - run: rustup toolchain install
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+
+      - uses: tauri-apps/tauri-action@1deb371b0cd8bd54025b384f1cd735e725c4060f # v1.0.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          releaseId: ${{ steps.draft.outputs.release-id }}
+          args: --config src-tauri/tauri.release.conf.json

@@ -8,9 +8,13 @@ if ($bump -notin @("patch", "minor", "major", "retag")) {
     exit 1
 }
 
+$skip = Read-Host "Targets to skip (comma-separated from windows,linux,android,ios) [none]"
+$extra = @()
+if ($skip) { $extra = @("--skip", $skip) }
+
 Write-Host "Releasing ($bump)..." -ForegroundColor Cyan
 
-npm run release -- $bump
+npm run release -- $bump @extra
 
 if ($LASTEXITCODE -ne 0) {
     Write-Error "Release failed."

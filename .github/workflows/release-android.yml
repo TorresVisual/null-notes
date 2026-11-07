@@ -1,0 +1,116 @@
+name: Release (Android)
+
+# Builds a signed arm64 APK for sideloading. Needs four secrets from a keystore
+# you create once and keep: ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD,
+# ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD. The same key must sign every release
+# or Android refuses to update the installed app over the new one.
+on:
+  workflow_call:
+    inputs:
+      tag:
+        required: true
+        type: string
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Tag to build, e.g. v1.0.9 (adds to its draft release, creating it if missing)
+        required: true
+        type: string
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      TAG: ${{ inputs.tag }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.tag }}
+          fetch-depth: 0
+
+      - name: Refuse to build without signing secrets
+        env:
+          KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          if [ -z "$KEYSTORE" ] || [ -z "$PASSWORD" ] || [ -z "$ALIAS" ] || [ -z "$KEY_PASSWORD" ]; then
+            echo "Android signing secrets are not set - see the header of release-android.yml" >&2
+            exit 1
+          fi
+
+      - id: draft
+        uses: ./.github/actions/ensure-draft
+        with:
+          tag: ${{ inputs.tag }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Android SDK and NDK
+        run: |
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null || true
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;36.0.0"
+          echo "NDK_HOME=$ANDROID_NDK_LATEST_HOME" >> "$GITHUB_ENV"
+
+      - run: rustup toolchain install
+      - run: rustup target add aarch64-linux-android
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+
+      - name: Download libpdfium.so (arm64-v8a)
+        run: |
+          set -euo pipefail
+          curl -L -o pdfium-android-arm64.tgz \
+            "https://github.com/bblanchon/pdfium-binaries/releases/download/chromium%2F7763/pdfium-android-arm64.tgz"
+          echo "7e6a25f1a64171c174e748065a10f95edc844ee85f09fe566d5e1c50cfae14a9  pdfium-android-arm64.tgz" | sha256sum -c
+          mkdir -p src-tauri/gen/android/app/src/main/jniLibs/arm64-v8a
+          tar -xzf pdfium-android-arm64.tgz -C "$RUNNER_TEMP" lib/libpdfium.so
+          cp "$RUNNER_TEMP/lib/libpdfium.so" src-tauri/gen/android/app/src/main/jniLibs/arm64-v8a/
+
+      - name: Build release APK
+        run: npx tauri android build --apk --target aarch64
+
+      - name: Align and sign
+        env:
+          KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          unsigned=$(find src-tauri/gen/android/app/build/outputs/apk -name '*-unsigned.apk' | head -n1)
+          [ -n "$unsigned" ] || { echo "no unsigned APK found" >&2; exit 1; }
+          tools="$ANDROID_HOME/build-tools/36.0.0"
+          out="NullNotes-${TAG#v}-android-arm64.apk"
+          echo "$KEYSTORE" | base64 -d > "$RUNNER_TEMP/release.jks"
+          "$tools/zipalign" -f -p 4 "$unsigned" "$RUNNER_TEMP/aligned.apk"
+          "$tools/apksigner" sign --ks "$RUNNER_TEMP/release.jks" --ks-key-alias "$ALIAS" \
+            --ks-pass env:PASSWORD --key-pass env:KEY_PASSWORD --out "$out" "$RUNNER_TEMP/aligned.apk"
+          "$tools/apksigner" verify "$out"
+          rm "$RUNNER_TEMP/release.jks"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: apk
+          path: NullNotes-*.apk
+
+      - name: Attach to the draft release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "$TAG" NullNotes-*.apk --clobber

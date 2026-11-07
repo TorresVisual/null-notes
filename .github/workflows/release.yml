@@ -1,0 +1,84 @@
+name: Release
+
+# Orchestrates one draft release across the per-target workflows. Which targets
+# build is read from the tag annotation's `targets:` line (written by
+# `npm run release -- <bump> --skip|--only ...`); no line means all of them.
+# Each target is also runnable alone via its own workflow_dispatch.
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  checks:
+    uses: ./.github/workflows/ci.yml
+
+  plan:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      targets: ${{ steps.targets.outputs.list }}
+    steps:
+      - uses: actions/checkout@v7
+      - id: targets
+        run: |
+          git fetch --force origin "+refs/tags/$GITHUB_REF_NAME:refs/tags/$GITHUB_REF_NAME"
+          line=$(git tag -l --format='%(contents)' "$GITHUB_REF_NAME" | sed -n 's/^targets: *//p')
+          echo "list=${line:-windows,linux,android,ios}" | tee -a "$GITHUB_OUTPUT"
+
+  draft:
+    needs: [checks, plan]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/ensure-draft
+        with:
+          tag: ${{ github.ref_name }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+  windows:
+    needs: [plan, draft]
+    if: contains(needs.plan.outputs.targets, 'windows')
+    uses: ./.github/workflows/release-windows.yml
+    with:
+      tag: ${{ github.ref_name }}
+    secrets: inherit
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+
+  linux:
+    needs: [plan, draft]
+    if: contains(needs.plan.outputs.targets, 'linux')
+    uses: ./.github/workflows/release-linux.yml
+    with:
+      tag: ${{ github.ref_name }}
+    secrets: inherit
+    permissions:
+      contents: write
+
+  android:
+    needs: [plan, draft]
+    if: contains(needs.plan.outputs.targets, 'android')
+    uses: ./.github/workflows/release-android.yml
+    with:
+      tag: ${{ github.ref_name }}
+    secrets: inherit
+    permissions:
+      contents: write
+
+  ios:
+    needs: [plan, draft]
+    if: contains(needs.plan.outputs.targets, 'ios')
+    uses: ./.github/workflows/release-ios.yml
+    with:
+      tag: ${{ github.ref_name }}
+    secrets: inherit
+    permissions:
+      contents: write

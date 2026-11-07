@@ -20,15 +20,25 @@ Installed copies check for a new release once at startup and offer to install it
 
 Versions before the first updater-enabled release (v1.0.4 and earlier) have no updater: install the first updater-enabled release by hand (repeat the steps above, no uninstall needed first).
 
-## iOS (AltStore)
+## Other platforms
 
-In AltStore: Browse → Sources → **+** → `https://raw.githubusercontent.com/TorresVisual/null-notes-releases/main/altstore.json`. Then install or update Null Notes from the source like any app. AltStore signs the unsigned `.ipa` with your Apple ID on the phone (free-tier certificates expire every 7 days; AltStore refreshes them over Wi-Fi when it can).
+Each release also carries a Linux build (`.AppImage`, `.deb`, `.rpm`; only the AppImage self-updates), a signed arm64 Android `.apk` to sideload, and an unsigned iOS `.ipa`.
 
-`release-ios.yml` builds the `.ipa` when a release is published, uploads it to the mirror release and prepends the version to `altstore.json` there. It runs on macOS (10x billed minutes), so only published releases build; to build one by hand, run the workflow with the tag. Windows installers are built by `release-windows.yml`; Android is built locally and has no workflow.
+**iOS (AltStore):** in AltStore go to Browse → Sources → **+** and add `https://raw.githubusercontent.com/TorresVisual/null-notes-releases/main/altstore.json`, then install or update Null Notes from the source. AltStore signs the `.ipa` with your Apple ID on the phone (free-tier certificates expire every 7 days; AltStore refreshes them over Wi-Fi when it can). Publishing a release adds its `.ipa` to `altstore.json` (`publish-mirror.yml`).
+
+**Android:** download the `.apk` from the public mirror `https://github.com/TorresVisual/null-notes-releases/releases` (or point Obtainium at that repo for updates) and open it.
 
 ## Cutting a release (maintainer)
 
-`npm run release -- patch|minor|major` refuses to start unless the `CI` run for the pushed `HEAD` on `main` has finished green (needs `gh`), then bumps, tags and pushes. CI builds a **draft** release with notes taken from commit subjects; review it and publish it (`gh release edit <tag> --draft=false`), which triggers `publish-mirror.yml` and `release-ios.yml`. To re-mirror a tag, run that workflow manually with the tag.
+`npm run release -- patch|minor|major` refuses to start unless the `CI` run for the pushed `HEAD` on `main` has finished green (needs `gh`), then bumps, tags and pushes. CI builds a **draft** release with notes taken from commit subjects; review it and publish it (`gh release edit <tag> --draft=false`), which triggers `publish-mirror.yml`. To re-mirror a tag, run that workflow manually with the tag.
+
+### Choosing targets
+
+`release.yml` runs on the tag and calls one workflow per target: `release-windows.yml`, `release-linux.yml`, `release-android.yml`, `release-ios.yml`. All four build by default. Leave some out with `npm run release -- patch --skip ios,android` or `--only windows` (also `retag`; a retag keeps the tag's previous selection unless you pass a flag). The selection is a `targets:` line in the tag annotation. To build one target for an existing tag, run its workflow from the Actions tab with the tag; it attaches to that tag's draft release.
+
+macOS minutes bill 10x, so `--skip ios` is the cheap option for releases that don't touch the mobile build.
+
+One-time setup for Android: create a keystore (`keytool -genkeypair -v -keystore release.jks -keyalg RSA -keysize 2048 -validity 10000 -alias nullnotes`), keep it somewhere safe (a lost key strands every installed copy, like the updater key), and store these secrets: `ANDROID_KEYSTORE_BASE64` (`base64 -w0 release.jks`), `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`.
 
 ### Before pressing Publish
 

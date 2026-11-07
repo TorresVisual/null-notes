@@ -14,6 +14,30 @@ export function assertRetaggable(release, tag) {
   }
 }
 
+export const TARGETS = ['windows', 'linux', 'android', 'ios']
+
+const splitList = (v) => (v ? v.split(',').map((t) => t.trim()).filter(Boolean) : [])
+
+export function resolveTargets({ only, skip } = {}) {
+  if (only && skip) throw new Error('Use --only or --skip, not both.')
+  const listed = splitList(only ?? skip)
+  const unknown = listed.filter((t) => !TARGETS.includes(t))
+  if (unknown.length) throw new Error(`Unknown target(s): ${unknown.join(', ')} (expected: ${TARGETS.join(', ')})`)
+  const targets = TARGETS.filter((t) => (only ? listed.includes(t) : !listed.includes(t)))
+  if (!targets.length) throw new Error('No targets left to build.')
+  return targets
+}
+
+// release.yml reads the `targets:` line back out of the tag annotation; a tag without one builds everything.
+export function tagMessages(tag, targets) {
+  return targets.length === TARGETS.length ? [tag] : [tag, `targets: ${targets.join(',')}`]
+}
+
+export function readTargets(annotation) {
+  const line = annotation.match(/^targets: (.+)$/m)
+  return line ? resolveTargets({ only: line[1] }) : TARGETS
+}
+
 export function assertGreenMain(runs, sha) {
   const short = sha.slice(0, 7)
   const run = runs[0]
@@ -24,6 +48,7 @@ export function assertGreenMain(runs, sha) {
 
 // --- CLI entry point (below the Task 1 exports) ---
 import { execSync, execFileSync } from 'node:child_process'
+import { parseArgs } from 'node:util'
 import { readFileSync, writeFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 
@@ -44,16 +69,26 @@ function findRelease(tag) {
   }
 }
 
-function retag() {
+function tagArgs(tag, targets, force = false) {
+  return ['tag', ...(force ? ['-f'] : []), '-a', ...tagMessages(tag, targets).flatMap((m) => ['-m', m])]
+}
+
+function existingTargets(tag) {
+  const out = execFileSync('git', ['tag', '-l', '--format=%(contents)', tag], { encoding: 'utf8' })
+  return readTargets(out)
+}
+
+function retag(options) {
   const { version } = JSON.parse(readFileSync('package.json', 'utf8'))
   const tag = `v${version}`
   const release = findRelease(tag)
   assertRetaggable(release, tag)
   if (release) run(`gh release delete ${tag} --yes`)
-  run(`git tag -f -a ${tag} -m "${tag}"`)
+  const targets = options.only || options.skip ? resolveTargets(options) : existingTargets(tag)
+  execFileSync('git', tagArgs(tag, targets, true), { stdio: 'inherit' })
   run('git push origin main')
   run(`git push --force origin ${tag}`)
-  console.log(`Retagged ${tag} at HEAD`)
+  console.log(`Retagged ${tag} at HEAD (${targets.join(', ')})`)
 }
 
 function checkMainIsGreen() {
@@ -67,12 +102,17 @@ function checkMainIsGreen() {
 }
 
 function main() {
-  const bump = process.argv[2]
-  if (bump === 'retag') return retag()
-  if (!['patch', 'minor', 'major'].includes(bump)) {
-    console.error('Usage: npm run release -- patch|minor|major|retag')
+  const { values, positionals } = parseArgs({
+    allowPositionals: true,
+    options: { only: { type: 'string' }, skip: { type: 'string' } },
+  })
+  const bump = positionals[0]
+  if (!['patch', 'minor', 'major', 'retag'].includes(bump)) {
+    console.error(`Usage: npm run release -- patch|minor|major|retag [--only|--skip ${TARGETS.join(',')}]`)
     process.exit(1)
   }
+  if (bump === 'retag') return retag(values)
+  const targets = resolveTargets(values)
 
   checkMainIsGreen()
 
@@ -92,10 +132,10 @@ function main() {
 
   run('git add package.json package-lock.json src-tauri/tauri.conf.json src-tauri/Cargo.toml')
   run(`git commit -m "chore: release v${version}"`)
-  run(`git tag -a v${version} -m "v${version}"`)
+  execFileSync('git', tagArgs(`v${version}`, targets), { stdio: 'inherit' })
   run('git push --follow-tags')
 
-  console.log(`Released v${version}`)
+  console.log(`Released v${version} (${targets.join(', ')})`)
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {

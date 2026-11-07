@@ -1,0 +1,25 @@
+name: Ensure draft release
+description: Creates the draft release for a tag (notes from commit subjects) unless it exists, and returns its id.
+inputs:
+  tag:
+    required: true
+  token:
+    required: true
+outputs:
+  release-id:
+    value: ${{ steps.draft.outputs.id }}
+runs:
+  using: composite
+  steps:
+    - id: draft
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.token }}
+        TAG: ${{ inputs.tag }}
+      run: |
+        if ! gh release view "$TAG" >/dev/null 2>&1; then
+          prev=$(git describe --tags --abbrev=0 --match 'v*' "${TAG}^" 2>/dev/null || true)
+          git log --no-merges --format='- %s' ${prev:+$prev..}"$TAG" | grep -v '^- chore: release' > notes.md || true
+          gh release create "$TAG" --draft --verify-tag --title "null-notes $TAG" --notes-file notes.md
+        fi
+        echo "id=$(gh api "repos/$GITHUB_REPOSITORY/releases?per_page=100" --jq ".[] | select(.tag_name==\"$TAG\") | .id")" >> "$GITHUB_OUTPUT"
