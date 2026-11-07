@@ -41,7 +41,7 @@ jobs:
         working-directory: src-tauri/context-menu-handler
         run: cargo build --release
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
           cache: npm
@@ -124,7 +124,7 @@ jobs:
         working-directory: src-tauri/cli
         run: cargo build --release
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
           cache: npm
