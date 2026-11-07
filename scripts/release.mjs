@@ -69,8 +69,8 @@ function findRelease(tag) {
   }
 }
 
-function tagArgs(tag, targets, force = false) {
-  return ['tag', ...(force ? ['-f'] : []), '-a', ...tagMessages(tag, targets).flatMap((m) => ['-m', m])]
+export function tagArgs(tag, targets, force = false) {
+  return ['tag', ...(force ? ['-f'] : []), '-a', ...tagMessages(tag, targets).flatMap((m) => ['-m', m]), tag]
 }
 
 function existingTargets(tag) {

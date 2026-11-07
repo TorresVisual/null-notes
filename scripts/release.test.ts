@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { updateTauriConf, updateCargoToml, assertRetaggable, assertGreenMain, resolveTargets, tagMessages, readTargets, TARGETS } from './release.mjs'
+import { updateTauriConf, updateCargoToml, assertRetaggable, assertGreenMain, resolveTargets, tagMessages, tagArgs, readTargets, TARGETS } from './release.mjs'
 
 describe('updateTauriConf', () => {
   it('replaces the version field and preserves formatting', () => {
@@ -67,6 +67,13 @@ describe('resolveTargets', () => {
     expect(() => resolveTargets({ skip: 'macos' })).toThrow(/Unknown target/)
     expect(() => resolveTargets({ only: 'ios', skip: 'linux' })).toThrow(/not both/)
     expect(() => resolveTargets({ skip: TARGETS.join(',') })).toThrow(/No targets/)
+  })
+})
+
+describe('tagArgs', () => {
+  it('ends with the tag name', () => {
+    expect(tagArgs('v1.0.0', TARGETS)).toEqual(['tag', '-a', '-m', 'v1.0.0', 'v1.0.0'])
+    expect(tagArgs('v1.0.0', ['ios'], true)).toEqual(['tag', '-f', '-a', '-m', 'v1.0.0', '-m', 'targets: ios', 'v1.0.0'])
   })
 })
 
