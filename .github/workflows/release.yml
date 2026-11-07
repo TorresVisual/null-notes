@@ -28,7 +28,7 @@ jobs:
       - name: Download pdfium.dll
         run: ./scripts/download-pdfium.ps1
 
-      - uses: dtolnay/rust-toolchain@stable
+      - run: rustup toolchain install
 
       - uses: Swatinem/rust-cache@v2
         with:
@@ -43,7 +43,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version-file: .nvmrc
           cache: npm
 
       - run: npm ci
@@ -107,7 +107,7 @@ jobs:
       - name: Download pdfium.dll
         run: ./scripts/download-pdfium.ps1
 
-      - uses: dtolnay/rust-toolchain@stable
+      - run: rustup toolchain install
 
       - uses: Swatinem/rust-cache@v2
         with:
@@ -126,12 +126,12 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version-file: .nvmrc
           cache: npm
 
       - run: npm ci
 
-      - uses: tauri-apps/tauri-action@v0
+      - uses: tauri-apps/tauri-action@84b9d35b5fc46c1e45415bdb6144030364f7ebc5 # v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
