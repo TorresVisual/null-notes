@@ -54,11 +54,24 @@ jobs:
 
       - run: npm ci
 
+      - name: Build CLI + debug app
+        run: npm run pretest:e2e
+
+      # On a fresh runner the app registers its identity package and relaunches
+      # itself on first start (lib.rs setup), so the driver loses the process it
+      # launched ("DevToolsActivePort file doesn't exist"). Register it up front
+      # so the version check passes and the app starts in place.
+      - name: Pre-register identity package
+        run: >
+          Add-AppxPackage
+          -Path (Resolve-Path src-tauri/target/debug/null-notes-identity.msix)
+          -ExternalLocation (Resolve-Path src-tauri/target/debug/shell-integration)
+
       # Three specs, not the whole suite: create/save a note, CSP, CLI. The rest
-      # stay a local pre-release run. pretest:e2e does the CLI + debug app build.
+      # stay a local pre-release run.
       - name: Smoke e2e
         run: >
-          npm run test:e2e --
+          npx wdio run e2e/wdio.conf.ts
           --spec e2e/specs/create-note.e2e.ts
           --spec e2e/specs/csp-verify.e2e.ts
           --spec e2e/specs/cli.e2e.ts
