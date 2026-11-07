@@ -438,7 +438,7 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
                   <span>
                     Scheduler
                     <small>
-                      Applies to this workspace and syncs with it. Switching keeps every card's due date; the new
+                      Applies to this workspace and syncs with it. Switching keeps every card&apos;s due date; the new
                       scheduler takes over when a card is next graded.
                     </small>
                   </span>
