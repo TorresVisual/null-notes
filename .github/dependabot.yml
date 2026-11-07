@@ -4,19 +4,41 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    open-pull-requests-limit: 3
+    groups:
+      tiptap:
+        patterns: ["@tiptap/*"]
+      minor-and-patch:
+        update-types: [minor, patch]
   - package-ecosystem: cargo
     directory: /src-tauri
     schedule:
       interval: weekly
+    open-pull-requests-limit: 3
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
+    open-pull-requests-limit: 3
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
   - package-ecosystem: cargo
     directory: /src-tauri/cli
     schedule:
       interval: weekly
+    open-pull-requests-limit: 3
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
   - package-ecosystem: cargo
     directory: /src-tauri/context-menu-handler
     schedule:
       interval: weekly
+    open-pull-requests-limit: 3
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
