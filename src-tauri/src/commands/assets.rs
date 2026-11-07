@@ -72,12 +72,15 @@ pub async fn write_note_asset(
         .await
         .map_err(|e| e.to_string())?;
 
+    // Millis alone collide when two images land in the same millisecond (a
+    // multi-image drop), and the second write silently replaces the first.
     let file_name = format!(
-        "image-{}.{}",
+        "image-{}-{}.{}",
         std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .map_err(|e| e.to_string())?
             .as_millis(),
+        &uuid::Uuid::new_v4().simple().to_string()[..8],
         extension_for(&mime)
     );
     tokio::fs::write(dir.join(&file_name), data)
