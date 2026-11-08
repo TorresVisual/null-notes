@@ -82,11 +82,22 @@ plain `.md` files on disk, never locked into a proprietary format — see
 
 ## Installing
 
-Download the latest installer from the
-[Releases page](https://github.com/TorresVisual/null-notes/releases); the
-installed app updates itself. Linux (AppImage/deb/rpm), Android (APK) and
-iOS (AltStore) builds, checksum and provenance verification, and the
-release process are covered in [`docs/installing.md`](docs/installing.md).
+**[⬇ Download the latest release](https://github.com/TorresVisual/null-notes-releases/releases/latest)** —
+this repo is private, so downloads are published to the public
+[`null-notes-releases`](https://github.com/TorresVisual/null-notes-releases)
+mirror.
+
+| Platform | Get                                                                     |
+| -------- | ----------------------------------------------------------------------- |
+| Windows  | `Null.Notes_<version>_x64-setup.exe` or `.msi` — run it; it replaces any older version in place |
+| Linux    | `.AppImage`, `.deb` or `.rpm`                                           |
+| Android  | `.apk` (arm64, sideload)                                                |
+| iOS      | AltStore source `https://raw.githubusercontent.com/TorresVisual/null-notes-releases/main/altstore.json` |
+
+Linux and mobile builds are attached only to releases that were built
+for those targets, so check the release's asset list. Installed copies check for updates at startup and offer to install them.
+Checksums, SBOMs, AltStore setup and the release process are in
+[`docs/installing.md`](docs/installing.md).
 
 ## Getting started
 
