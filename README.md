@@ -11,37 +11,46 @@
   ![Tauri](https://img.shields.io/badge/shell-Tauri%202-24C8DB?logo=tauri&logoColor=white)
   ![React](https://img.shields.io/badge/frontend-React%2019-61DAFB?logo=react&logoColor=black)
   ![Rust](https://img.shields.io/badge/backend-Rust-000000?logo=rust&logoColor=white)
-  ![Platform](https://img.shields.io/badge/platform-Windows-0078D6?logo=windows&logoColor=white)
+  ![Platform](https://img.shields.io/badge/platform-Windows%20%C2%B7%20Linux%20%C2%B7%20Android%20%C2%B7%20iOS-0078D6)
 </div>
 
 ---
 
-Desktop-primary (Tauri + Windows), local-first, and offline. Notes are
+Desktop-primary (Tauri, Windows first), local-first, and offline. Notes are
 plain `.md` files on disk, never locked into a proprietary format — see
 [Storage model](#storage-model).
 
-> **Status:** solo-maintainer, personal daily-driver project. Not currently
-> distributed, but built and polished to a real-stranger-opening-it-cold
-> bar regardless — see [`PRODUCT.md`](PRODUCT.md).
+> **Status:** solo-maintainer, personal daily-driver project. Releases ship
+> as installers with an in-app updater (see [Installing](#installing)), and
+> the app is built and polished to a real-stranger-opening-it-cold bar —
+> see [`PRODUCT.md`](PRODUCT.md).
 
 ## Table of contents
 
 - [Features](#features)
 - [Tech stack](#tech-stack)
+- [Installing](#installing)
 - [Getting started](#getting-started)
 - [Commands](#commands)
 - [Storage model](#storage-model)
 - [Syncing a workspace](#syncing-a-workspace)
 - [Project structure](#project-structure)
+- [`nullnotes` CLI](#nullnotes-cli)
 - [Agent skills](#agent-skills)
 - [Documentation](#documentation)
 
 ## Features
 
 - **WYSIWYG Markdown editor** (TipTap/ProseMirror) — headings, code blocks
-  with syntax highlighting, tables, task lists, theorem/proof/algorithm
-  callouts, collapsible sections, inline/block LaTeX math, Mermaid diagrams,
-  cross-references, and code deep-links.
+  with syntax highlighting (runnable, and openable in your IDE), tables,
+  task lists, theorem/proof/algorithm callouts, collapsible sections,
+  inline/block LaTeX math, Mermaid diagrams, footnotes, `[[wiki-links]]`
+  and note embeds, cross-references, and code deep-links.
+- **Properties and Bases** — YAML frontmatter edited in place without
+  disturbing its formatting, plus `.base` files: database-style table, list,
+  cards and kanban views over note properties, in Obsidian's syntax.
+- **Canvases and diagrams** — standalone JSON Canvas (`.canvas`) boards and
+  Excalidraw diagrams stored beside the note.
 - **Inline ink** — stylus-first handwriting and diagrams via Canvas +
   perfect-freehand, stored as sidecar files next to the note.
 - **PDF import with no OCR** — reads a PDF's own text layer and reconstructs
@@ -49,12 +58,15 @@ plain `.md` files on disk, never locked into a proprietary format — see
   editable LaTeX.
 - **Git integration** — auto-detects notes-only vs. code-repo workspaces,
   batched auto-commit, fast-forward-only auto-pull; push is never automatic
-  in a code-repo workspace.
-- **Spaced repetition** — inline-authored SM-2 flashcards (`front :: back`,
-  cloze).
+  in a code-repo workspace. Per-note version history.
+- **Spaced repetition** — inline-authored flashcards (`front :: back`,
+  cloze) scheduled with SM-2 or FSRS.
 - **Search and organization** — full-text search with `folder:`/`tag:`/
-  `type:` filters, tags, backlinks, a workspace-wide task view, formula
-  sheet generation, templates, and a PTY-backed terminal pane.
+  `type:` filters, tags, backlinks, a graph view, bookmarks, an outline
+  panel, a workspace-wide task view, formula sheet generation, templates,
+  PDF export and printing, and a PTY-backed terminal pane.
+- **Scriptable** — a `nullnotes` CLI and agent skills; see
+  [below](#nullnotes-cli).
 
 ## Tech stack
 
@@ -68,14 +80,24 @@ plain `.md` files on disk, never locked into a proprietary format — see
 | Ink       | Canvas API + [perfect-freehand](https://github.com/steveruizok/perfect-freehand) |
 | Storage   | Plain `.md` files + SQLite index                   |
 
+## Installing
+
+Download the latest installer from the
+[Releases page](https://github.com/TorresVisual/null-notes/releases); the
+installed app updates itself. Linux (AppImage/deb/rpm), Android (APK) and
+iOS (AltStore) builds, checksum and provenance verification, and the
+release process are covered in [`docs/installing.md`](docs/installing.md).
+
 ## Getting started
 
-Requires Node 22+ and the Rust stable toolchain (see
-[`.github/workflows/ci.yml`](.github/workflows/ci.yml)).
+Requires Node 22 (see [`.nvmrc`](.nvmrc)) and the Rust toolchain pinned in
+[`rust-toolchain.toml`](rust-toolchain.toml); `rustup` installs it on first
+use.
 
 ```bash
 npm install
 npm run tauri dev     # launch the desktop app in dev mode
+npm run dev:web       # or: the frontend alone in a browser (port 1422), Tauri calls stubbed
 ```
 
 Importing a PDF needs the native `pdfium` library, which isn't committed to
@@ -93,21 +115,31 @@ import feature.
 npm run dev                  # Vite dev server (frontend only)
 npm run build                # production frontend build
 npm run typecheck            # tsc --noEmit
+npm run lint                 # eslint
 npm test                     # vitest run
+npm run test:coverage        # vitest with coverage report
 
 # Backend (from src-tauri/)
 cargo build                  # build the Tauri backend
 cargo test                   # run Rust tests
 cargo clippy -- -D warnings  # lint (must pass clean)
 cargo fmt --check            # formatting gate
+cargo audit                  # known-vulnerability scan
+cargo deny check             # licences, bans, advisories
 
 # Full app
 npm run tauri dev            # launch the desktop app in dev mode
 npm run tauri build          # package an installer
 
 # End-to-end
-npm run test:e2e             # rebuilds via `tauri build --debug`, runs e2e/specs/
+npm run test:e2e             # builds the CLI and a debug app, runs e2e/specs/
+
+# Release (maintainer)
+npm run release -- patch     # bump, tag, push; see docs/installing.md
 ```
+
+CI runs the checks above on pull requests and on manual dispatch, not on
+every push to `main` — run them locally before pushing.
 
 ## Storage model
 
@@ -151,6 +183,8 @@ src-tauri/        Rust backend
     commands/     Tauri IPC commands (one file per domain)
     pdf/          PDF pipeline (render, parse)
     db/           SQLite queries
+    cli_server/   Named-pipe server the CLI talks to
+  cli/            `nullnotes` CLI crate
 
 src/              React frontend
   components/     Shared UI components
@@ -160,7 +194,28 @@ src/              React frontend
   hooks/          Custom React hooks
   store/          Global state (Zustand)
   lib/            Pure utilities (no React)
+  web/            Browser shims for @tauri-apps/* (dev:web)
+
+skills/           Agent skills plugin
+e2e/              End-to-end specs (WebdriverIO)
+docs/             Roadmap, CLI contract, install and release notes
 ```
+
+## `nullnotes` CLI
+
+`nullnotes` reads, searches and edits a workspace from a shell or a coding
+agent through the running app (it starts a hidden instance if needed).
+Output is one JSON line per call:
+
+```bash
+nullnotes --help                                    # every command
+printf '# Idea
+
+body
+' | nullnotes note create --folder "" --title Idea --content -
+```
+
+The full contract is in [`docs/cli.md`](docs/cli.md).
 
 ## Agent skills
 
@@ -187,3 +242,8 @@ Use one of the `marketplace add` lines, not both. To try the skills without inst
   conventions
 - [`PRODUCT.md`](PRODUCT.md) — product purpose, positioning, and brand
 - [`docs/ROADMAP.md`](docs/ROADMAP.md) — what's built and what's next
+- [`docs/installing.md`](docs/installing.md) — installing, updating, and
+  cutting a release
+- [`docs/cli.md`](docs/cli.md) — the `nullnotes` CLI contract
+- [`docs/design-tokens.md`](docs/design-tokens.md) — the Terminal Precision
+  design tokens
