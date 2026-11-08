@@ -209,10 +209,7 @@ Output is one JSON line per call:
 
 ```bash
 nullnotes --help                                    # every command
-printf '# Idea
-
-body
-' | nullnotes note create --folder "" --title Idea --content -
+printf '# Idea\n\nbody\n' | nullnotes note create --folder "" --title Idea --content -
 ```
 
 The full contract is in [`docs/cli.md`](docs/cli.md).
