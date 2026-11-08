@@ -155,3 +155,56 @@ describe('EditorGroups', () => {
     expect(st().activeTab).toBe(B)
   })
 })
+
+describe('EditorGroups divider', () => {
+  function renderSplit(direction: 'row' | 'column' = 'row') {
+    st().openTab(A)
+    st().splitEditor(direction === 'row' ? 'right' : 'down')
+    renderGroups()
+    return screen.getByRole('separator')
+  }
+
+  it('exposes its range and one tab stop', () => {
+    const divider = renderSplit()
+    expect(divider).toHaveAttribute('tabindex', '0')
+    expect(divider).toHaveAttribute('aria-valuemin', '20')
+    expect(divider).toHaveAttribute('aria-valuemax', '80')
+    expect(divider).toHaveAttribute('aria-valuenow', '50')
+  })
+
+  it('resets to 50/50 on double-click', () => {
+    const divider = renderSplit()
+    act(() => st().setSplitRatio(0.3))
+    fireEvent.doubleClick(divider)
+    expect(st().layout.ratio).toBe(0.5)
+  })
+
+  it('moves 5% per arrow key along its own axis', () => {
+    const row = renderSplit()
+    fireEvent.keyDown(row, { key: 'ArrowRight' })
+    expect(st().layout.ratio).toBeCloseTo(0.55)
+    fireEvent.keyDown(row, { key: 'ArrowLeft' })
+    fireEvent.keyDown(row, { key: 'ArrowLeft' })
+    expect(st().layout.ratio).toBeCloseTo(0.45)
+  })
+
+  it('uses Up and Down in a stacked layout', () => {
+    const column = renderSplit('column')
+    fireEvent.keyDown(column, { key: 'ArrowDown' })
+    expect(st().layout.ratio).toBeCloseTo(0.55)
+    fireEvent.keyDown(column, { key: 'ArrowRight' })
+    expect(st().layout.ratio).toBeCloseTo(0.55)
+  })
+
+  it('never goes past 20% or 80%, and Home and End jump to them', () => {
+    const divider = renderSplit()
+    for (let i = 0; i < 12; i++) fireEvent.keyDown(divider, { key: 'ArrowLeft' })
+    expect(st().layout.ratio).toBeCloseTo(0.2)
+    fireEvent.keyDown(divider, { key: 'End' })
+    expect(st().layout.ratio).toBeCloseTo(0.8)
+    for (let i = 0; i < 12; i++) fireEvent.keyDown(divider, { key: 'ArrowRight' })
+    expect(st().layout.ratio).toBeCloseTo(0.8)
+    fireEvent.keyDown(divider, { key: 'Home' })
+    expect(st().layout.ratio).toBeCloseTo(0.2)
+  })
+})
