@@ -260,6 +260,7 @@ describe('EditorGroups tab drops', () => {
     expect(st().layout.groups).toHaveLength(2)
     expect(st().layout.groups[0]?.tabs).toEqual([A])
     expect(st().layout.groups[1]?.tabs).toEqual([A, B])
+    expect(st().layout.groups[1]?.active).toBe(B)
     expect(st().layout.focused).toBe(0)
   })
 

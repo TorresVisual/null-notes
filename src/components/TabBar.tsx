@@ -143,10 +143,7 @@ export function TabBar({ group, status }: TabBarProps) {
                 <ContextMenuItem
                   key={side}
                   disabled={!canSplit || isCanvasPath(path) || isBasePath(path)}
-                  onSelect={() => {
-                    activateTabIn(path, group)
-                    splitEditor(side)
-                  }}
+                  onSelect={() => splitEditor(side, path)}
                 >
                   {label}
                 </ContextMenuItem>

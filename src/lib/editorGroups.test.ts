@@ -126,6 +126,17 @@ describe('splitActive', () => {
     expect(splitActive(open(A), 'down')).toMatchObject({ focused: 1, direction: 'column' })
   })
 
+  it('splitting a named tab copies that tab and leaves the source group showing what it showed', () => {
+    const l = splitActive(open(A, B), 'right', A)
+    expect(l.groups[0]).toMatchObject({ tabs: [A, B], active: B })
+    expect(l.groups[1]).toMatchObject({ tabs: [A], active: A })
+  })
+
+  it('ignores a named tab the source group does not have', () => {
+    const l = open(A)
+    expect(splitActive(l, 'right', B)).toBe(l)
+  })
+
   it('copies the source group view mode', () => {
     const l = splitActive(setViewMode(open(A), 0, 'raw'), 'right')
     expect(l.groups[1]?.viewMode).toBe('raw')
@@ -217,6 +228,11 @@ describe('layout settings', () => {
     expect(l.direction).toBe('column')
     expect(toggleDirection(l).direction).toBe('row')
     expect(l.groups).toEqual(split(A).groups)
+  })
+
+  it('setRatio ignores a ratio that is not a number', () => {
+    expect(setRatio(initialLayout(), NaN).ratio).toBe(0.5)
+    expect(setRatio(initialLayout(), Infinity).ratio).toBe(0.5)
   })
 
   it('setRatio clamps to 0.2..0.8', () => {

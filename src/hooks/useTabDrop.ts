@@ -9,8 +9,8 @@ function dropTab(path: string, zone: DropZone, group: number, copy: boolean) {
   const store = useWorkspaceStore.getState()
   if (zone !== 'center') {
     if (isCanvasPath(path) || isBasePath(path)) return
-    store.openTab(path)
-    store.splitEditor(zone)
+    if (!store.layout.groups.some((g) => g.tabs.includes(path))) store.openTab(path)
+    store.splitEditor(zone, path)
     return
   }
   const { groups } = store.layout

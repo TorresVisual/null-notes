@@ -78,10 +78,10 @@ export function closeTabIn(l: GroupLayout, path: string, group: number): GroupLa
   return settle(l, groups, l.focused === group ? next : l.groups[l.focused])
 }
 
-export function splitActive(l: GroupLayout, side: SplitSide): GroupLayout {
+export function splitActive(l: GroupLayout, side: SplitSide, tab?: string): GroupLayout {
   const source = l.groups[l.focused]
-  const path = source?.active
-  if (!source || !path || l.groups.length > 1 || !splittable(path)) return l
+  const path = tab ?? source?.active
+  if (!source || !path || l.groups.length > 1 || !splittable(path) || !source.tabs.includes(path)) return l
   const created: EditorGroup = { tabs: [path], pinned: [], active: path, viewMode: source.viewMode }
   const first = side === 'left' || side === 'up'
   return {
@@ -123,10 +123,8 @@ export const toggleDirection = (l: GroupLayout): GroupLayout => ({
   direction: l.direction === 'row' ? 'column' : 'row',
 })
 
-export const setRatio = (l: GroupLayout, ratio: number): GroupLayout => ({
-  ...l,
-  ratio: Math.min(MAX_RATIO, Math.max(MIN_RATIO, ratio)),
-})
+export const setRatio = (l: GroupLayout, ratio: number): GroupLayout =>
+  Number.isFinite(ratio) ? { ...l, ratio: Math.min(MAX_RATIO, Math.max(MIN_RATIO, ratio)) } : l
 
 export function setViewMode(l: GroupLayout, group: number, viewMode: ViewMode): GroupLayout {
   const g = l.groups[group]

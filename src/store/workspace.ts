@@ -62,7 +62,7 @@ interface WorkspaceStore {
   path: string | null
   layout: GroupLayout
   restoreLayout: (layout: GroupLayout) => void
-  splitEditor: (side: SplitSide) => void
+  splitEditor: (side: SplitSide, notePath?: string) => void
   moveTabToGroup: (notePath: string, to: number, copy: boolean) => void
   focusGroup: (group: number) => void
   focusNextGroup: () => void
@@ -245,7 +245,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => {
 
   restoreLayout: (layout) => commit(layout),
 
-  splitEditor: (side) => commit(splitActive(get().layout, side)),
+  splitEditor: (side, notePath) => commit(splitActive(get().layout, side, notePath)),
 
   moveTabToGroup: (notePath, to, copy) =>
     commit(moveTab(get().layout, notePath, to === 0 ? 1 : 0, to, copy)),
