@@ -6,6 +6,7 @@ import { useNotesStore } from '../store/notes'
 import { useSettingsStore, DEFAULT_SETTINGS } from '../store/settings'
 import { useNote } from '../hooks/useNote'
 import { api } from '../lib/tauri'
+import { initialLayout } from '../lib/editorGroups'
 import { platform } from '@tauri-apps/plugin-os'
 import { listen } from '@tauri-apps/api/event'
 import { acquireNote, saveNote, releaseNote, useNoteBuffers } from '../store/noteBuffers'
@@ -121,7 +122,7 @@ function pressKey(key: string) {
 }
 
 beforeEach(() => {
-  useWorkspaceStore.setState({ path: null, activeTab: null, tagFilter: null })
+  useWorkspaceStore.setState({ path: null, activeTab: null, tagFilter: null, layout: initialLayout() })
   useNotesStore.setState({ notes: [], folders: [], tags: [] })
   useSettingsStore.setState({ settings: DEFAULT_SETTINGS })
   // vi.clearAllMocks() (afterEach, below) clears call history but not a
@@ -371,5 +372,56 @@ describe('Layout window close', () => {
     expect(api.window.confirmClose).toHaveBeenCalled()
     releaseNote('/ws/a.md')
     releaseNote('/ws/b.md')
+  })
+})
+
+describe('Layout view mode per group', () => {
+  const A = '/ws/a.md'
+  const B = '/ws/b.md'
+  const modes = () => useWorkspaceStore.getState().layout.groups.map((g) => g.viewMode)
+
+  beforeEach(() => {
+    useWorkspaceStore.setState({ path: '/ws', tagFilter: null, layout: initialLayout() })
+    useNotesStore.setState({
+      notes: [A, B].map((path) => ({ id: path, path, title: path, workspace: '/ws', updatedAt: 0 })),
+      folders: [],
+      tags: [],
+    })
+  })
+
+  it('keeps a group in Source mode when its active tab changes', () => {
+    const st = useWorkspaceStore.getState()
+    st.openTab(A)
+    st.openTab(B)
+    st.setGroupViewMode(0, 'raw')
+    render(<Layout />)
+
+    act(() => useWorkspaceStore.getState().activateTabIn(A, 0))
+
+    expect(modes()).toEqual(['raw'])
+  })
+
+  it('toggle-view switches only the focused group', () => {
+    const st = useWorkspaceStore.getState()
+    st.openTab(A)
+    st.splitEditor('right')
+    render(<Layout />)
+
+    act(() => runCommand('toggle-view'))
+
+    expect(modes()).toEqual(['wysiwyg', 'raw'])
+  })
+
+  it('export forces Preview on the focused group and leaves the other alone', () => {
+    const st = useWorkspaceStore.getState()
+    st.openTab(A)
+    st.splitEditor('right')
+    st.setGroupViewMode(0, 'raw')
+    st.setGroupViewMode(1, 'raw')
+    render(<Layout />)
+
+    act(() => runCommand('export-pdf'))
+
+    expect(modes()).toEqual(['raw', 'wysiwyg'])
   })
 })

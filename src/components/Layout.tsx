@@ -569,10 +569,6 @@ export function Layout() {
   }, [setSettings, openWorkspaceAt, openSingleNote])
 
   useEffect(() => {
-    setPrimaryViewMode('wysiwyg')
-  }, [activeTab, setPrimaryViewMode])
-
-  useEffect(() => {
     void refreshTags()
   }, [activeTab])
 
