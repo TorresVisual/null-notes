@@ -976,7 +976,7 @@ pub(super) async fn scan_dir_recursive(
             }
             shown.insert(dir.clone());
             let path_str = path.to_string_lossy().into_owned();
-            let title = match tokio::fs::read_to_string(&path).await {
+            let title = match read_note(&path).await {
                 Ok(content) => title_from_content(&content),
                 Err(_) => path
                     .file_stem()
@@ -1052,9 +1052,45 @@ pub async fn scan_workspace(
 #[tauri::command]
 pub async fn open_note(workspace: String, path: String) -> Result<String, String> {
     require_within_workspace(&workspace, &path)?;
-    tokio::fs::read_to_string(&path)
-        .await
-        .map_err(|e| e.to_string())
+    read_note(Path::new(&path)).await.map_err(|e| e.to_string())
+}
+
+// A PowerShell `>` redirect writes UTF-16 with a BOM, which no reader here can
+// parse. The BOM is unambiguous, so such a file is rewritten as UTF-8 in place
+// the first time it is read: the text is unchanged, so an open buffer still
+// matches the disk, and every later reader sees valid UTF-8. BOM-less UTF-16
+// is not guessed at.
+fn decode_utf16_bom(bytes: &[u8]) -> Option<String> {
+    let (rest, little_endian) = match bytes {
+        [0xFF, 0xFE, rest @ ..] => (rest, true),
+        [0xFE, 0xFF, rest @ ..] => (rest, false),
+        _ => return None,
+    };
+    let (pairs, odd_byte) = rest.as_chunks::<2>();
+    if !odd_byte.is_empty() {
+        return None;
+    }
+    let units = pairs.iter().map(|&pair| {
+        if little_endian {
+            u16::from_le_bytes(pair)
+        } else {
+            u16::from_be_bytes(pair)
+        }
+    });
+    char::decode_utf16(units)
+        .collect::<Result<String, _>>()
+        .ok()
+}
+
+pub(super) async fn read_note(path: &Path) -> anyhow::Result<String> {
+    let bytes = tokio::fs::read(path).await?;
+    match decode_utf16_bom(&bytes) {
+        Some(text) => {
+            write_atomic(path, &text).await?;
+            Ok(text)
+        }
+        None => Ok(String::from_utf8(bytes)?),
+    }
 }
 
 // A note is only ever replaced wholesale, so a partially written file is
@@ -1240,7 +1276,7 @@ pub async fn reindex_from_disk(
     workspace: String,
     db: State<'_, DbPool>,
 ) -> Result<bool, String> {
-    match tokio::fs::read_to_string(&path).await {
+    match read_note(Path::new(&path)).await {
         Ok(content) => {
             index_note_at(&path, &workspace, &content, &db)
                 .await
@@ -3034,6 +3070,44 @@ pub fn open_note_externally(workspace: String, path: String) -> Result<(), Strin
 
 #[cfg(test)]
 mod tests {
+    #[tokio::test]
+    async fn read_note_converts_a_bom_utf16_file_to_utf8_on_disk() {
+        let tmp = tempfile::tempdir().unwrap();
+        let path = tmp.path().join("Note.md");
+        let text = "# Sequent\r\n\r\np \u{22A2} q \u{1D7D8}\r\n";
+        for little_endian in [true, false] {
+            let mut bytes = if little_endian {
+                vec![0xFF, 0xFE]
+            } else {
+                vec![0xFE, 0xFF]
+            };
+            for unit in text.encode_utf16() {
+                bytes.extend(if little_endian {
+                    unit.to_le_bytes()
+                } else {
+                    unit.to_be_bytes()
+                });
+            }
+            std::fs::write(&path, bytes).unwrap();
+
+            assert_eq!(super::read_note(&path).await.unwrap(), text);
+            assert_eq!(std::fs::read(&path).unwrap(), text.as_bytes());
+        }
+    }
+
+    #[tokio::test]
+    async fn read_note_leaves_utf8_alone_and_still_rejects_other_bytes() {
+        let tmp = tempfile::tempdir().unwrap();
+        let path = tmp.path().join("Note.md");
+        std::fs::write(&path, "# Fine \u{22A2}").unwrap();
+        assert_eq!(super::read_note(&path).await.unwrap(), "# Fine \u{22A2}");
+
+        let broken = vec![0xFF, 0xFE, 0x23];
+        std::fs::write(&path, &broken).unwrap();
+        assert!(super::read_note(&path).await.is_err());
+        assert_eq!(std::fs::read(&path).unwrap(), broken);
+    }
+
     use super::*;
     use tempfile::tempdir;
 
