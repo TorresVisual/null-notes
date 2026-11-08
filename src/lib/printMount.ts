@@ -89,3 +89,39 @@ export function markPageBreaks(root: HTMLElement): void {
     if (lines <= KEEP_TOGETHER_MAX_LINES) pre.setAttribute('data-keep-together', '')
   })
 }
+
+function printInk(hex: string): string {
+  const m = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(hex)
+  if (!m) return hex
+  const full = (m[1] ?? '').length === 3 ? (m[1] ?? '').replace(/./g, '$&$&') : (m[1] ?? '')
+  const n = parseInt(full, 16)
+  const r = ((n >> 16) & 255) / 255
+  const g = ((n >> 8) & 255) / 255
+  const b = (n & 255) / 255
+  const max = Math.max(r, g, b)
+  const min = Math.min(r, g, b)
+  const l = (max + min) / 2
+  if (l <= 0.5) return hex
+  const d = max - min
+  const s = d === 0 ? 0 : d / (1 - Math.abs(2 * l - 1))
+  const hue = d === 0 ? 0 : max === r ? ((g - b) / d + 6) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4
+  const nl = 1 - l
+  const a = s * Math.min(nl, 1 - nl)
+  const channel = (k: number) => {
+    const t = (k + hue * 2) % 12
+    return Math.round((nl - a * Math.max(-1, Math.min(t - 3, 9 - t, 1))) * 255)
+  }
+  return '#' + [channel(0), channel(8), channel(4)].map((v) => v.toString(16).padStart(2, '0')).join('')
+}
+
+/** Pens are tuned for the dark editor (near-white ink), which vanishes on a
+ *  white page. Recolouring the SVG instead of CSS-inverting it keeps the
+ *  strokes vector in the PDF. */
+export function adaptInkForPrint(root: HTMLElement): void {
+  root.querySelectorAll('.ink-preview-page [fill], .ink-preview-page [stroke]').forEach((el) => {
+    for (const attr of ['fill', 'stroke']) {
+      const value = el.getAttribute(attr)
+      if (value) el.setAttribute(attr, printInk(value))
+    }
+  })
+}

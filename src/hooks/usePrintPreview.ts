@@ -3,7 +3,7 @@ import type { RefObject } from 'react'
 import { Previewer } from 'pagedjs'
 import { buildPageCss, formatPrintDate } from '../lib/printPreviewCss'
 import { failure } from '../lib/failure'
-import { markPageBreaks, teardown, withPrintMount } from '../lib/printMount'
+import { adaptInkForPrint, markPageBreaks, teardown, withPrintMount } from '../lib/printMount'
 
 /** Paged.js keeps a placeholder copy of the top-level node's own tag/class
  *  around while it splits content across pages. Left as `.editor-pane`,
@@ -18,6 +18,7 @@ function cloneForPagination(el: HTMLElement): HTMLElement {
   clone.querySelectorAll('.fold-hidden, .fold-able').forEach((el) => el.classList.remove('fold-hidden', 'fold-able', 'fold-collapsed'))
   clone.querySelectorAll('.fold-toggle').forEach((el) => el.remove())
   markPageBreaks(clone)
+  adaptInkForPrint(clone)
   return clone
 }
 

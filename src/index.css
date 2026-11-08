@@ -6046,6 +6046,7 @@ input[type='checkbox']:focus-visible {
    itself must go, and any line hidden by an in-progress fold has to come
    back — a printed note can't silently drop code its author folded away
    while editing. Same principle as the collapsed-section rule above. */
+:is(.print-preview-pages, #print-root) .is-empty::before { content: none; }
 :is(.print-preview-pages, #print-root) .code-line-number.foldable::before { display: none; }
 :is(.print-preview-pages, #print-root) .code-fold-placeholder { display: none !important; }
 :is(.print-preview-pages, #print-root) .code-fold-hidden { display: inline !important; }

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { markPageBreaks, withPrintMount } from './printMount'
+import { adaptInkForPrint, markPageBreaks, withPrintMount } from './printMount'
 
 const previewMock = vi.hoisted(() => vi.fn())
 
@@ -91,5 +91,21 @@ describe('markPageBreaks', () => {
 
     expect(root.children.item(0)?.hasAttribute('data-keep-together')).toBe(true)
     expect(root.children.item(1)?.hasAttribute('data-keep-together')).toBe(false)
+  })
+})
+
+describe('adaptInkForPrint', () => {
+  it('darkens light ink, keeps hue, leaves dark and none alone', () => {
+    const root = document.createElement('div')
+    root.innerHTML =
+      '<div class="ink-preview-page"><svg><path fill="#e6edf3"/><path fill="#ff7b72"/><path fill="#111111"/><path fill="none" stroke="#fff"/></svg></div>'
+    adaptInkForPrint(root)
+    const fills = Array.from(root.querySelectorAll('path'), (el) => el.getAttribute('fill'))
+    const stroke = root.querySelectorAll('path')[3]?.getAttribute('stroke')
+    expect(fills[0]).toBe('#0c1319')
+    expect(fills[1]).toBe('#8d0900')
+    expect(fills[2]).toBe('#111111')
+    expect(fills[3]).toBe('none')
+    expect(stroke).toBe('#000000')
   })
 })
