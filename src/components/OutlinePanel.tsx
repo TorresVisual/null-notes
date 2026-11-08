@@ -15,6 +15,9 @@ interface OutlinePanelProps {
   // The DOM node the rendered note lives in (`.editor-pane`) — read only at
   // click/cursor time to find and jump to a heading element, never observed.
   containerRef: RefObject<HTMLDivElement | null>
+  // The note this outline belongs to; with two editor groups that is not
+  // necessarily the focused one.
+  notePath?: string | null
 }
 
 const HEADING_SELECTOR = 'h1, h2, h3, h4, h5, h6'
@@ -26,11 +29,12 @@ function tickWidth(level: number): number {
   return Math.max(6, 20 - (level - 1) * 4)
 }
 
-export function OutlinePanel({ content, containerRef }: OutlinePanelProps) {
+export function OutlinePanel({ content, containerRef, notePath: notePathProp }: OutlinePanelProps) {
   const headings = useMemo(() => parseHeadings(content), [content])
   const [activeIndex, setActiveIndex] = useState<number | null>(null)
   const [expanded, setExpanded] = useState(false)
-  const notePath = useWorkspaceStore((s) => s.activeTab)
+  const focusedNote = useWorkspaceStore((s) => s.activeTab)
+  const notePath = notePathProp === undefined ? focusedNote : notePathProp
   // The menu is portaled, so reaching it counts as leaving the panel — keep
   // the flyout (the menu's trigger) mounted until the menu closes.
   const [menuOpen, setMenuOpen] = useState(false)

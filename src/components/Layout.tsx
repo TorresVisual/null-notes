@@ -3,16 +3,13 @@ import type { Editor, Range } from '@tiptap/core'
 import { listen } from '@tauri-apps/api/event'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { Sidebar } from './Sidebar'
-import { TabBar } from './TabBar'
 import { Titlebar } from './Titlebar'
 import { TooltipProvider } from './ui/tooltip'
-import { EditorPane } from './EditorPane'
-import { ErrorBoundary } from './ErrorBoundary'
+import { EditorGroups } from './EditorGroups'
+import { EditorGroupPane, type GroupSharedProps } from './EditorGroupPane'
 import { SearchModal } from './SearchModal'
 import { QuickSwitcher } from './QuickSwitcher'
 import { CommandPalette } from './CommandPalette'
-import { OutlinePanel } from './OutlinePanel'
-import { OutgoingLinksPanel } from './OutgoingLinksPanel'
 import { SettingsPanel } from './SettingsPanel'
 import { ShortcutsOverlay } from './ShortcutsOverlay'
 import { PromptDialog } from './PromptDialog'
@@ -35,6 +32,7 @@ import { useNotesStore } from '../store/notes'
 import { useSettingsStore } from '../store/settings'
 import { clampZoom } from '../lib/zoom'
 import { useNote } from '../hooks/useNote'
+import type { ViewMode } from '../lib/editorGroups'
 import { flushAllNotes } from '../store/noteBuffers'
 import { useResetPageScroll } from '../hooks/useResetPageScroll'
 import { useCreateCanvas } from '../hooks/useCreateCanvas'
@@ -46,7 +44,6 @@ import { useBookmarksStore } from '../store/bookmarks'
 import { useCreateNote } from '../hooks/useCreateNote'
 import { useCreateFolder } from '../hooks/useCreateFolder'
 import { useCreateCanvasNote } from '../hooks/useCreateCanvasNote'
-import { useScrollRestoration } from '../hooks/useScrollRestoration'
 import { useWindowTitle } from '../hooks/useWindowTitle'
 import { useOverlayManager } from '../hooks/useOverlayManager'
 import { GitAutoCommitPrompt } from './GitAutoCommitPrompt'
@@ -85,11 +82,8 @@ import { isMobile, isWeb } from '../lib/platform'
 // them and only load when their overlay/pane is first opened.
 const ExportPdfDialog = lazy(() => import('./ExportPdfDialog').then((m) => ({ default: m.ExportPdfDialog })))
 const PrintDialog = lazy(() => import('./PrintDialog').then((m) => ({ default: m.PrintDialog })))
-const BasePane = lazy(() => import('./BasePane').then((m) => ({ default: m.BasePane })))
-const CanvasPane = lazy(() => import('./CanvasPane').then((m) => ({ default: m.CanvasPane })))
 const TerminalPane = lazy(() => import('./TerminalPane').then((m) => ({ default: m.TerminalPane })))
 
-type ViewMode = 'wysiwyg' | 'raw'
 
 const GIT_FLUSH_ON_CLOSE_TIMEOUT_MS = 5000
 
@@ -111,18 +105,7 @@ export function Layout() {
   const recentWorkspaces = useWorkspaceStore((s) => s.recentWorkspaces)
   const notes = useNotesStore((s) => s.notes)
   const currentNote = notes.find((n) => n.path === activeTab)
-  const {
-    content,
-    save,
-    isLoading,
-    saveState,
-    saveError,
-    retrySave,
-    dismissError,
-    conflict,
-    keepMine,
-    reloadTheirs,
-  } = useNote(canvasTab ? null : activeTab)
+  const { saveState, saveError, retrySave, dismissError } = useNote(canvasTab ? null : activeTab)
   const windowTitle = useWindowTitle(workspacePath, activeTab)
   const { saveSession, openWorkspace, openWorkspaceAt, openSingleNote, closeWorkspace } = useWorkspace()
   const { updateGit } = useGitConfig()
@@ -143,7 +126,15 @@ export function Layout() {
   const createFolder = useCreateFolder()
   const createCanvasNote = useCreateCanvasNote()
   const createAgentCanvas = useCreateCanvas()
-  const [primaryViewMode, setPrimaryViewMode] = useState<ViewMode>('wysiwyg')
+  const setGroupViewMode = useWorkspaceStore((s) => s.setGroupViewMode)
+  const setPrimaryViewMode = useCallback(
+    (mode: ViewMode | ((current: ViewMode) => ViewMode)) => {
+      const { layout } = useWorkspaceStore.getState()
+      const current = layout.groups[layout.focused]?.viewMode ?? 'wysiwyg'
+      setGroupViewMode(layout.focused, typeof mode === 'function' ? mode(current) : mode)
+    },
+    [setGroupViewMode],
+  )
   const { activeOverlay, openOverlay, closeOverlay } = useOverlayManager()
   const [outlineOpen, setOutlineOpen] = useState(true)
   const [outgoingLinksOpen, setOutgoingLinksOpen] = useState(false)
@@ -163,7 +154,6 @@ export function Layout() {
   useEffect(() => {
     document.documentElement.style.zoom = String(uiZoomPct / 100)
   }, [uiZoomPct])
-  const scrollRef = useScrollRestoration(activeTab, isLoading, primaryViewMode)
 
   // The backend vetoes the close and hands control here so a pending edit
   // reaches disk first; the window only dies once confirmClose is called.
@@ -475,6 +465,7 @@ export function Layout() {
     },
     [
       activeTab,
+      setPrimaryViewMode,
       workspacePath,
       openTabs,
       setActiveTab,
@@ -579,7 +570,7 @@ export function Layout() {
 
   useEffect(() => {
     setPrimaryViewMode('wysiwyg')
-  }, [activeTab])
+  }, [activeTab, setPrimaryViewMode])
 
   useEffect(() => {
     void refreshTags()
@@ -724,43 +715,33 @@ export function Layout() {
     </>
   )
 
-  const primaryEditorPane = canvasTab && activeTab ? (
-    <ErrorBoundary key={activeTab}>
-      <Suspense fallback={null}>
-        {isBasePath(activeTab) ? <BasePane path={activeTab} /> : <CanvasPane path={activeTab} />}
-      </Suspense>
-    </ErrorBoundary>
-  ) : (
-    <EditorPane
-      ref={editorPaneRef}
-      scrollRef={scrollRef}
-      notePath={activeTab}
-      content={content}
-      isLoading={isLoading}
-      saveState={saveState}
-      saveError={saveError}
-      onSave={(md) => void save(md)}
-      onRetrySave={retrySave}
-      onDismissSaveError={dismissError}
-      conflict={conflict}
-      onKeepMine={keepMine}
-      onReloadTheirs={reloadTheirs}
-      viewMode={primaryViewMode}
-      onViewModeChange={setPrimaryViewMode}
-      onFlashcardCommand={handleFlashcardCommand}
-      onDiagramCommand={handleDiagramCommand}
-      emptyState={{
-        onOpenTaskView: () => openOverlay('task'),
-        onOpenReview: () => {
-          setPendingCram(null)
-          openOverlay('review')
-        },
-        onOpenDeckView: () => openOverlay('deck'),
-        onOpenSettings: () => openOverlay('settings'),
-        overlayOpen: activeOverlay !== null,
-      }}
-    />
-  )
+  const groupShared: GroupSharedProps = {
+    status: {
+      saveState,
+      saveError,
+      onRetrySave: () => void retrySave(),
+      onDismissSaveError: dismissError,
+      gitCommitStatus,
+      gitCommitDetail,
+      onSyncNow: syncNow,
+      syncingNow,
+    },
+    exportPaneRef: editorPaneRef,
+    outlineOpen,
+    outgoingLinksOpen,
+    onFlashcardCommand: handleFlashcardCommand,
+    onDiagramCommand: handleDiagramCommand,
+    emptyState: {
+      onOpenTaskView: () => openOverlay('task'),
+      onOpenReview: () => {
+        setPendingCram(null)
+        openOverlay('review')
+      },
+      onOpenDeckView: () => openOverlay('deck'),
+      onOpenSettings: () => openOverlay('settings'),
+      overlayOpen: activeOverlay !== null,
+    },
+  }
 
   if (mobile) {
     return (
@@ -787,7 +768,7 @@ export function Layout() {
               overlayOpen={activeOverlay !== null}
             />
           }
-          editor={primaryEditorPane}
+          editor={<EditorGroupPane group={0} shared={groupShared} bare />}
           saveStatus={
             <SaveStatus state={saveState} error={saveError} onRetry={() => void retrySave()} onDismiss={dismissError} />
           }
@@ -825,30 +806,8 @@ export function Layout() {
         />
       )}
       <main className="main">
-        <TabBar
-          viewMode={primaryViewMode}
-          onToggleView={() => setPrimaryViewMode((m) => (m === 'wysiwyg' ? 'raw' : 'wysiwyg'))}
-          saveState={saveState}
-          saveError={saveError}
-          onRetrySave={() => void retrySave()}
-          onDismissSaveError={dismissError}
-          gitCommitStatus={gitCommitStatus}
-          gitCommitDetail={gitCommitDetail}
-          onSyncNow={syncNow}
-          syncingNow={syncingNow}
-        />
         {gitBars}
-        <div className="editor-body">
-          <div className="pane-wrapper">
-            {primaryEditorPane}
-            {!canvasTab && !isLoading && activeTab && primaryViewMode === 'wysiwyg' && outlineOpen && (
-              <OutlinePanel content={content} containerRef={editorPaneRef} />
-            )}
-            {!canvasTab && !isLoading && activeTab && primaryViewMode === 'wysiwyg' && outgoingLinksOpen && (
-              <OutgoingLinksPanel content={content} notePath={activeTab} />
-            )}
-          </div>
-        </div>
+        <EditorGroups {...groupShared} />
         {terminalMounted && workspacePath && (
           <Suspense fallback={null}>
             <TerminalPane

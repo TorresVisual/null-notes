@@ -12,6 +12,8 @@ import { goBack, goForward, useNavigationHistoryStore } from '../lib/navigationH
 import type { SaveState } from '../hooks/useNote'
 import type { GitCommitStatus as GitStatus } from '../types'
 
+const NO_TABS: string[] = []
+
 const TAB_KEY_STEP: Record<string, number> = { ArrowRight: 1, ArrowLeft: -1 }
 
 function moveTabFocus(e: KeyboardEvent<HTMLButtonElement>) {
@@ -26,9 +28,7 @@ function moveTabFocus(e: KeyboardEvent<HTMLButtonElement>) {
   target.click()
 }
 
-interface TabBarProps {
-  viewMode: 'wysiwyg' | 'raw'
-  onToggleView: () => void
+export interface TabBarStatus {
   saveState: SaveState
   saveError: string | null
   onRetrySave: () => void
@@ -39,20 +39,20 @@ interface TabBarProps {
   syncingNow: boolean
 }
 
-export function TabBar({
-  viewMode,
-  onToggleView,
-  saveState,
-  saveError,
-  onRetrySave,
-  onDismissSaveError,
-  gitCommitStatus,
-  gitCommitDetail,
-  onSyncNow,
-  syncingNow,
-}: TabBarProps) {
-  const { openTabs, pinnedTabs, activeTab, setActiveTab, togglePinTab, flashTabPath, setFlashTabPath, reorderTabs } =
+interface TabBarProps {
+  group: number
+  // Present only on the first group's bar: save state, git status, sync and
+  // history arrows are workspace-wide and stay in one stable place.
+  status?: TabBarStatus
+}
+
+export function TabBar({ group, status }: TabBarProps) {
+  const { flashTabPath, setFlashTabPath, togglePinTab, reorderTabs, activateTabIn, setGroupViewMode } =
     useWorkspaceStore()
+  const openTabs = useWorkspaceStore((s) => s.layout.groups[group]?.tabs ?? NO_TABS)
+  const pinnedTabs = useWorkspaceStore((s) => s.layout.groups[group]?.pinned ?? NO_TABS)
+  const activeTab = useWorkspaceStore((s) => s.layout.groups[group]?.active ?? null)
+  const viewMode = useWorkspaceStore((s) => s.layout.groups[group]?.viewMode ?? 'wysiwyg')
   const workspacePath = useWorkspaceStore((s) => s.path)
   const repoMode = useWorkspaceStore((s) => s.repoMode)
   const autoCommit = useWorkspaceStore((s) => s.git.autoCommit)
@@ -100,7 +100,7 @@ export function TabBar({
                 role="tab"
                 aria-selected={isActive}
                 tabIndex={isActive ? 0 : -1}
-                onClick={() => setActiveTab(path)}
+                onClick={() => activateTabIn(path, group)}
                 onKeyDown={moveTabFocus}
                 title={name}
               >
@@ -109,7 +109,7 @@ export function TabBar({
               <button
                 className="tab-close"
                 tabIndex={isActive ? 0 : -1}
-                onClick={() => void requestCloseTab(path)}
+                onClick={() => void requestCloseTab(path, group)}
                 aria-label={`Close ${name}`}
               >
                 <X size={12} />
@@ -120,7 +120,7 @@ export function TabBar({
               <ContextMenuItem onSelect={() => togglePinTab(path)}>
                 {isPinned ? 'Unpin tab' : 'Pin tab'}
               </ContextMenuItem>
-              <ContextMenuItem onSelect={() => void requestCloseTab(path)}>Close tab</ContextMenuItem>
+              <ContextMenuItem onSelect={() => void requestCloseTab(path, group)}>Close tab</ContextMenuItem>
               <ContextMenuSeparator />
               <NoteContextMenuItems path={path} />
             </ContextMenuContent>
@@ -130,14 +130,16 @@ export function TabBar({
       </div>
     </div>
     <div className="nav-bar">
-      <div className="nav-history">
-        <button onClick={goBack} disabled={!canGoBack} title="Back (Alt+Left)" aria-label="Back">
-          <ChevronLeft size={16} />
-        </button>
-        <button onClick={goForward} disabled={!canGoForward} title="Forward (Alt+Right)" aria-label="Forward">
-          <ChevronRight size={16} />
-        </button>
-      </div>
+      {status && (
+        <div className="nav-history">
+          <button onClick={goBack} disabled={!canGoBack} title="Back (Alt+Left)" aria-label="Back">
+            <ChevronLeft size={16} />
+          </button>
+          <button onClick={goForward} disabled={!canGoForward} title="Forward (Alt+Right)" aria-label="Forward">
+            <ChevronRight size={16} />
+          </button>
+        </div>
+      )}
       {trail.length > 0 && (
         <nav className="breadcrumb" aria-label="Note location">
           {trail.map((segment, i) => (
@@ -150,35 +152,39 @@ export function TabBar({
       )}
       {activeTab && (
         <div className="tab-bar-status">
-          <SaveStatus
-            state={saveState}
-            error={saveError}
-            onRetry={onRetrySave}
-            onDismiss={onDismissSaveError}
-          />
-          <GitCommitStatus status={gitCommitStatus} detail={gitCommitDetail} />
-          {repoMode && (
-            <button
-              className="git-sync-now"
-              onClick={onSyncNow}
-              disabled={syncingNow}
-              title="Commit, push, and pull now"
-            >
-              <RefreshCw size={12} className={syncingNow ? 'spin' : ''} />
-              Sync now
-            </button>
-          )}
-          {repoMode && !autoCommit && (
-            <span
-              className="git-commit-status"
-              title="This machine isn't auto-committing this workspace — enable it in Settings to keep it in sync with other machines."
-            >
-              Auto-commit off
-            </span>
+          {status && (
+            <>
+              <SaveStatus
+                state={status.saveState}
+                error={status.saveError}
+                onRetry={status.onRetrySave}
+                onDismiss={status.onDismissSaveError}
+              />
+              <GitCommitStatus status={status.gitCommitStatus} detail={status.gitCommitDetail} />
+              {repoMode && (
+                <button
+                  className="git-sync-now"
+                  onClick={status.onSyncNow}
+                  disabled={status.syncingNow}
+                  title="Commit, push, and pull now"
+                >
+                  <RefreshCw size={12} className={status.syncingNow ? 'spin' : ''} />
+                  Sync now
+                </button>
+              )}
+              {repoMode && !autoCommit && (
+                <span
+                  className="git-commit-status"
+                  title="This machine isn't auto-committing this workspace — enable it in Settings to keep it in sync with other machines."
+                >
+                  Auto-commit off
+                </span>
+              )}
+            </>
           )}
           <button
             className={`view-toggle${viewMode === 'raw' ? ' active' : ''}`}
-            onClick={onToggleView}
+            onClick={() => setGroupViewMode(group, viewMode === 'wysiwyg' ? 'raw' : 'wysiwyg')}
             title={viewMode === 'wysiwyg' ? 'View source' : 'View preview'}
           >
             {viewMode === 'wysiwyg' ? 'Source' : 'Preview'}

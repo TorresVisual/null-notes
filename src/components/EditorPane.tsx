@@ -1,7 +1,6 @@
 import { forwardRef } from 'react'
 import type { CSSProperties } from 'react'
 import type { Editor, Range } from '@tiptap/core'
-import { X } from 'lucide-react'
 import { NoteEditor } from '../editor/NoteEditor'
 import { RawEditor } from '../editor/RawEditor'
 import { BacklinksPanel } from './BacklinksPanel'
@@ -31,14 +30,13 @@ export interface EditorPaneProps {
   onKeepMine: () => void
   onReloadTheirs: () => void
   viewMode: 'wysiwyg' | 'raw'
-  onViewModeChange: (mode: 'wysiwyg' | 'raw') => void
   onFlashcardCommand: (editor: Editor, range: Range) => void
   onDiagramCommand?: (editor: Editor, range: Range | null) => void
-  // Present only for the secondary pane — its header (view toggle + close)
-  // only renders when there's somewhere for "close" to collapse back to.
-  onClose?: () => void
-  // Only the primary pane shows the pre-workspace picker / empty-workspace
-  // state / home dashboard — a second pane is never opened without a note.
+  // False for a group that isn't focused: window-level commands (Add
+  // Property) must reach one pane, not every pane showing a note.
+  acceptsCommands?: boolean
+  // Only the first group shows the pre-workspace picker / empty-workspace
+  // state / home dashboard — a second group is never opened without a note.
   // Grouped into one object (rather than four optional callbacks) so using
   // them never needs a non-null assertion: narrowing on `emptyState &&`
   // proves every field inside it is defined, where four independent
@@ -67,10 +65,9 @@ export const EditorPane = forwardRef<HTMLDivElement, EditorPaneProps>(function E
     onKeepMine,
     onReloadTheirs,
     viewMode,
-    onViewModeChange,
     onFlashcardCommand,
     onDiagramCommand,
-    onClose,
+    acceptsCommands = true,
     emptyState,
     scrollRef,
   },
@@ -88,20 +85,6 @@ export const EditorPane = forwardRef<HTMLDivElement, EditorPaneProps>(function E
   return (
     <div className="editor-scroll" ref={scrollRef}>
       {conflict && <ConflictBar noteName={currentNote?.title} onKeepMine={onKeepMine} onReloadTheirs={onReloadTheirs} />}
-      {onClose && (
-        <div className="editor-pane-header">
-          <button
-            className={`view-toggle${viewMode === 'raw' ? ' active' : ''}`}
-            onClick={() => onViewModeChange(viewMode === 'wysiwyg' ? 'raw' : 'wysiwyg')}
-            title={viewMode === 'wysiwyg' ? 'View source' : 'View preview'}
-          >
-            {viewMode === 'wysiwyg' ? 'Source' : 'Preview'}
-          </button>
-          <button className="pane-close" onClick={onClose} aria-label="Close split pane">
-            <X size={12} />
-          </button>
-        </div>
-      )}
       <div
         ref={ref}
         className={`editor-pane${!notePath && !workspacePath ? ' editor-pane--center' : ''}`}
@@ -110,7 +93,7 @@ export const EditorPane = forwardRef<HTMLDivElement, EditorPaneProps>(function E
         {isLoading && <LoadingStatus />}
         {!isLoading && notePath && viewMode === 'wysiwyg' && (
           <>
-            <PropertiesBlock content={content} onSave={onSave} listenForAddCommand={!onClose} />
+            <PropertiesBlock content={content} onSave={onSave} listenForAddCommand={acceptsCommands} />
             <NoteEditor
               content={body}
               notePath={notePath}

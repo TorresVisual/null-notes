@@ -158,7 +158,6 @@ export function useWorkspace() {
       setFolders,
       setCanvases,
       setExpandedFolders,
-      openTab,
       resetForNewWorkspace,
       saveSession,
       flushGitCommit,

@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest'
+import { describe, it, expect, afterEach, beforeEach } from 'vitest'
 import { render, cleanup, fireEvent } from '@testing-library/react'
 import { TabBar } from './TabBar'
 import { useWorkspaceStore } from '../store/workspace'
@@ -18,6 +18,16 @@ beforeEach(() => {
 })
 
 const noop = () => {}
+const STATUS = {
+  saveState: 'clean' as const,
+  saveError: null,
+  onRetrySave: noop,
+  onDismissSaveError: noop,
+  gitCommitStatus: 'idle' as const,
+  gitCommitDetail: null,
+  onSyncNow: noop,
+  syncingNow: false,
+}
 
 // jsdom has no DataTransfer constructor, so build the minimal shape
 // TabBar's onDragStart actually reads/writes (same approach as
@@ -32,20 +42,7 @@ function fakeDataTransfer(): DataTransfer {
 
 describe('TabBar drag payload', () => {
   it('sets the note path as plain-text drag data on dragstart, for drop targets outside the tab strip', () => {
-    const { getByText } = render(
-      <TabBar
-        viewMode="wysiwyg"
-        onToggleView={noop}
-        saveState="clean"
-        saveError={null}
-        onRetrySave={noop}
-        onDismissSaveError={noop}
-        gitCommitStatus="idle"
-        gitCommitDetail={null}
-        onSyncNow={noop}
-        syncingNow={false}
-      />,
-    )
+    const { getByText } = render(<TabBar group={0} status={STATUS} />)
     const tab = getByText('b').closest('[role="tab"]') as HTMLElement
     const dataTransfer = fakeDataTransfer()
 
@@ -57,20 +54,7 @@ describe('TabBar drag payload', () => {
 
 describe('TabBar keyboard', () => {
   it('is a tablist with one tab stop; arrow keys move focus and activate, wrapping at the ends', () => {
-    const { getByRole, getAllByRole } = render(
-      <TabBar
-        viewMode="wysiwyg"
-        onToggleView={noop}
-        saveState="clean"
-        saveError={null}
-        onRetrySave={noop}
-        onDismissSaveError={noop}
-        gitCommitStatus="idle"
-        gitCommitDetail={null}
-        onSyncNow={noop}
-        syncingNow={false}
-      />,
-    )
+    const { getByRole, getAllByRole } = render(<TabBar group={0} status={STATUS} />)
     const [a, b] = getAllByRole('tab') as HTMLElement[]
     expect(getByRole('tablist', { name: 'Open notes' })).toBeTruthy()
     expect([a!.tabIndex, b!.tabIndex]).toEqual([0, -1])
@@ -87,20 +71,7 @@ describe('TabBar keyboard', () => {
 describe('TabBar context menu on a canvas tab', () => {
   it('offers canvas actions only, never the note-only ones', async () => {
     useWorkspaceStore.setState({ openTabs: ['/ws/map.canvas'], activeTab: '/ws/map.canvas' })
-    const { getByRole, findByText, queryByText } = render(
-      <TabBar
-        viewMode="wysiwyg"
-        onToggleView={noop}
-        saveState="clean"
-        saveError={null}
-        onRetrySave={noop}
-        onDismissSaveError={noop}
-        gitCommitStatus="idle"
-        gitCommitDetail={null}
-        onSyncNow={noop}
-        syncingNow={false}
-      />,
-    )
+    const { getByRole, findByText, queryByText } = render(<TabBar group={0} status={STATUS} />)
 
     fireEvent.contextMenu(getByRole('tab', { name: /map/ }))
 
