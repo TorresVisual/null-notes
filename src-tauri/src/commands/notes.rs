@@ -1025,9 +1025,22 @@ pub async fn scan_workspace(
             .map_err(|e| e.to_string())?;
     }
 
-    let indexed = db::notes::list_by_workspace(&db, &workspace)
+    // A note deleted or moved while the app was closed (git pull, another
+    // editor) keeps its index row, and the tree builds folders from note
+    // paths, so it would resurrect a folder that no longer exists.
+    let mut indexed = db::notes::list_by_workspace(&db, &workspace)
         .await
         .map_err(|e| e.to_string())?;
+    let mut gone = Vec::new();
+    for note in &indexed {
+        if matches!(tokio::fs::try_exists(&note.path).await, Ok(false)) {
+            gone.push(note.path.clone());
+        }
+    }
+    for path in &gone {
+        forget_note(path, &db).await.map_err(|e| e.to_string())?;
+    }
+    indexed.retain(|n| !gone.contains(&n.path));
 
     Ok(WorkspaceTree {
         notes: indexed,
