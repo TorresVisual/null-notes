@@ -88,7 +88,7 @@ Docs issues: say which statement is wrong or missing, where, and what's true ins
 
 Body hygiene: the repo may go public (#232), so no absolute local paths (use repo-relative), no tokens, no contents of the user's private notes, no stack traces with home directories. Wrap code identifiers in backticks; reference issues as `#n`.
 
-**Labels** — reuse the existing set; check `gh label list` if unsure, never invent one.
+**Labels** — run `gh label list --repo <repo> --limit 100` and reuse what fits. The repo's labels are the core set below plus GitHub defaults and bot labels (`dependencies`, `rust`, …, which Dependabot owns; don't apply them to issues).
 
 | Label | Use |
 |---|---|
@@ -100,13 +100,21 @@ Body hygiene: the repo may go public (#232), so no absolute local paths (use rep
 
 Severity goes on every issue, not just bugs — judge by real impact, not by how interesting it is.
 
+**New labels** — create one only when an *area or theme* recurs and none of the above covers it (e.g. `pdf`, `ink`, `mobile`, `ci`), so filtering by it would actually help. A one-off doesn't earn a label; put it in the body. Never add a second type or severity label, and don't create near-duplicates of existing ones (check the list first, including GitHub's `good first issue` / `help wanted` / `question`). Use short lowercase names. List each proposed label in the draft with its description and colour so the user approves it along with the issue. Create it before filing, since `gh issue create` fails on a label that doesn't exist:
+
+```bash
+gh label create "pdf" --repo TorresVisual/null-notes --description "PDF import pipeline" --color 5319E7
+```
+
+Pick a colour not already in use for a different meaning (severity labels are green/yellow/orange, `security` red). Colours are 6-digit hex without `#`. If the label already exists, `gh label create --force` updates it; use plain create so an existing label's description isn't overwritten by accident.
+
 ### 6. Review before filing
 
-Show all drafts together: repo, title, labels, full body. Say in one line anything you couldn't verify. **Do not run `gh issue create` until the user approves** — filing is outward-facing and issue numbers can't be reused. Fold edits in and re-show only what changed. Items you had to ask about go in a follow-up batch once answered; don't hold the clear ones back.
+Show all drafts together: repo, title, labels (flagging any that don't exist yet, with description and colour), full body. Say in one line anything you couldn't verify. **Do not run `gh issue create` until the user approves** — filing is outward-facing and issue numbers can't be reused. Fold edits in and re-show only what changed. Items you had to ask about go in a follow-up batch once answered; don't hold the clear ones back.
 
 ### 7. File
 
-Write each body to a temp file and pass `--body-file` — backticks, `$`, and quotes in an inline `--body` get mangled by the shell:
+Create any approved new labels first (see **New labels**). Then write each body to a temp file and pass `--body-file` — backticks, `$`, and quotes in an inline `--body` get mangled by the shell:
 
 ```bash
 gh issue create --repo TorresVisual/null-notes --title "…" --body-file "$TMPDIR/issue.md" --label bug --label high
