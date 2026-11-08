@@ -7,6 +7,13 @@ import { pendingInkOpens } from '../toolbar/insertInk'
 import type { InkData } from '../../ink/types'
 
 const PREVIEW_MAX_HEIGHT = 320
+// A tall, narrow page would otherwise shrink to an unreadable sliver; it keeps
+// this much of its size and the block grows taller instead.
+export const PREVIEW_MIN_SCALE = 0.6
+
+export function previewScale(pageHeight: number): number {
+  return Math.max(PREVIEW_MIN_SCALE, Math.min(1, PREVIEW_MAX_HEIGHT / pageHeight))
+}
 
 interface InkPreviewProps {
   src: string
@@ -57,7 +64,7 @@ export function InkPreview({ src, width, height, editable }: InkPreviewProps) {
   // node attrs keep the size it was inserted with.
   const pageWidth = data?.width ?? width
   const pageHeight = data?.height ?? height
-  const scale = Math.min(1, PREVIEW_MAX_HEIGHT / pageHeight)
+  const scale = previewScale(pageHeight)
 
   return (
     <>
