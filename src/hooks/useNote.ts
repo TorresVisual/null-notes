@@ -23,6 +23,7 @@ interface PendingWrite {
 export function useNote(path: string | null) {
   const [content, setContent] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [loadedPath, setLoadedPath] = useState<string | null>(null)
   const [saveState, setSaveState] = useState<SaveState>('clean')
   const [saveError, setSaveError] = useState<string | null>(null)
   const workspacePath = useWorkspaceStore((s) => s.path)
@@ -57,7 +58,10 @@ export function useNote(path: string | null) {
       .open(workspacePath, path)
       .then(setContentAndRef)
       .catch((e: unknown) => setSaveError(`Couldn't open note: ${String(e)}`))
-      .finally(() => setIsLoading(false))
+      .finally(() => {
+        setLoadedPath(path)
+        setIsLoading(false)
+      })
   }, [path, workspacePath, setContentAndRef])
 
   // The backend refuses CLI writes to a note whose edits are not on disk yet,
@@ -141,6 +145,10 @@ export function useNote(path: string | null) {
 
   const save = useCallback(
     (markdown: string) => {
+      // `content` and the editor holding it still belong to the previous note
+      // until the new one's open() lands; pairing that buffer with the new
+      // path would overwrite this note with the other one's text.
+      if (path !== loadedPath) return
       setContentAndRef(markdown)
       if (!path || !workspacePath) return
       pendingWrite.current = { path, workspace: workspacePath, content: markdown }
@@ -150,7 +158,7 @@ export function useNote(path: string | null) {
         if (incoming.current === null) void flushSave()
       }, saveDebounceMs)
     },
-    [path, workspacePath, flushSave, saveDebounceMs, setContentAndRef],
+    [path, loadedPath, workspacePath, flushSave, saveDebounceMs, setContentAndRef],
   )
 
   // Dismissing only hides the message — the buffer stays dirty and will retry
@@ -243,7 +251,7 @@ export function useNote(path: string | null) {
   return {
     content,
     save,
-    isLoading,
+    isLoading: isLoading || (path !== null && path !== loadedPath),
     saveState,
     saveError,
     flush,

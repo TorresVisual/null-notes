@@ -419,4 +419,27 @@ describe('useNote', () => {
     expect(result.current.saveError).toBeNull()
     expect(result.current.saveState).toBe('dirty')
   })
+
+  it('never writes the previous note buffer to the path being switched to', async () => {
+    let release: (text: string) => void = () => {}
+    notes.open.mockResolvedValueOnce('# A\n')
+    const { result, rerender } = renderHook(({ path }) => useNote(path), {
+      initialProps: { path: '/ws/a.md' },
+    })
+    await waitFor(() => expect(result.current.isLoading).toBe(false))
+
+    notes.open.mockReturnValueOnce(new Promise<string>((resolve) => (release = resolve)))
+    rerender({ path: '/ws/b.md' })
+
+    expect(result.current.isLoading).toBe(true)
+    act(() => result.current.save('# A\nedited by the old editor'))
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(PAST_SAVE)
+    })
+    expect(notes.save).not.toHaveBeenCalledWith('/ws', '/ws/b.md', expect.anything())
+
+    await act(async () => release('# B\n'))
+    await waitFor(() => expect(result.current.isLoading).toBe(false))
+    expect(result.current.content).toBe('# B\n')
+  })
 })
