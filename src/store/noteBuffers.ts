@@ -254,7 +254,7 @@ export async function flushNote(path: string) {
 }
 
 export async function flushAllNotes() {
-  await Promise.all([...internals.values()].map(flush))
+  await Promise.all([...[...internals.values()].map(flush), ...closing.values()])
 }
 
 export function retrySaveNote(path: string) {

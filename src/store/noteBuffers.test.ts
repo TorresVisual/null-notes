@@ -189,6 +189,25 @@ describe('noteBuffers', () => {
     expect(notes.save).toHaveBeenCalledWith('/ws', B, '# B\ny')
   })
 
+  it('flushAllNotes waits for a write that a release already started', async () => {
+    await acquire(A)
+    let finishSave: () => void = () => {}
+    notes.save.mockReturnValue(new Promise<void>((resolve) => (finishSave = resolve)))
+    saveNote(A, '# Note\nx')
+    releaseNote(A)
+    await vi.waitFor(() => expect(notes.save).toHaveBeenCalled())
+
+    let flushed = false
+    const flushing = flushAllNotes().then(() => (flushed = true))
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(flushed).toBe(false)
+
+    finishSave()
+    await flushing
+    expect(flushed).toBe(true)
+  })
+
   it('marks the path dirty until the write lands and forgets it on last release', async () => {
     await acquire(A)
     const dirty = () => useDirtyPathsStore.getState().paths.has(A)
