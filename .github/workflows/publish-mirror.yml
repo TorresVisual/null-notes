@@ -36,6 +36,9 @@ jobs:
           sed -i "s#github.com/$SOURCE_REPO/releases/download/#github.com/$MIRROR_REPO/releases/download/#g" assets/latest.json
           grep -q "$MIRROR_REPO" assets/latest.json
 
+      - name: Add a version-less installer name for the README download link
+        run: cp assets/*_x64-setup.exe assets/Null-Notes-setup.exe
+
       - name: Create or update the mirror release
         env:
           GH_TOKEN: ${{ secrets.RELEASES_REPO_TOKEN }}

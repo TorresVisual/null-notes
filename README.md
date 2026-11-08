@@ -82,7 +82,8 @@ plain `.md` files on disk, never locked into a proprietary format — see
 
 ## Installing
 
-**[⬇ Download the latest release](https://github.com/TorresVisual/null-notes-releases/releases/latest)** —
+**[⬇ Download the Windows installer](https://github.com/TorresVisual/null-notes-releases/releases/latest/download/Null-Notes-setup.exe)** ·
+[all releases and platforms](https://github.com/TorresVisual/null-notes-releases/releases/latest) —
 this repo is private, so downloads are published to the public
 [`null-notes-releases`](https://github.com/TorresVisual/null-notes-releases)
 mirror.
