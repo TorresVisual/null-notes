@@ -79,6 +79,7 @@ Data integrity rules. Breaking one of these silently loses or corrupts a note.
 - **`save_note` does no database work.** It writes the file; `reindex_note` carries FTS/tags/links on a slower debounce. Keeping DB work off the keystroke path is the point — don't merge them back.
 - **The watcher reports our own writes back to us.** Before treating a `workspace-changed` event as an external edit, check the disk against both the buffer and the last content we wrote, or normal typing raises a false conflict.
 - **A dirty buffer is never overwritten from disk.** External changes to an edited note prompt; they don't auto-reload.
+- **One buffer per note path.** `src/store/noteBuffers.ts` owns content, timers, `recentWrites` and the watcher listener, ref-counted per path; `useNote` only subscribes. Editor groups showing the same note share it — never give a second view its own copy, or two writers race on one file.
 
 ---
 
@@ -86,7 +87,7 @@ Data integrity rules. Breaking one of these silently loses or corrupts a note.
 
 Where a file lives decides whether it syncs. That is the whole contract between storage and sync, so it's a decision to make deliberately, not a side effect of picking a path.
 
-- **Inside the workspace folder** — travels with the notes: `.md` files, `NoteName.ink/`, `NoteName.pdf/`, `NoteName.diagrams/` and `NoteName.assets/` sidecars, standalone `Name.canvas` files (JSON Canvas with `pass` extension fields, pretty-printed one node/edge per block so it merges; the canvas is a file of its own, not a sidecar), `Name.base` files (Bases definitions, YAML in Obsidian's syntax; a file of its own, listed beside canvases in `WorkspaceTree.canvases`), `.bookmarks` (sidebar bookmarks, one JSON entry per line so it merges), and `.workspace.json` (UI state, gitignored; includes per-canvas `canvasViewports`, never stored in the `.canvas`).
+- **Inside the workspace folder** — travels with the notes: `.md` files, `NoteName.ink/`, `NoteName.pdf/`, `NoteName.diagrams/` and `NoteName.assets/` sidecars, standalone `Name.canvas` files (JSON Canvas with `pass` extension fields, pretty-printed one node/edge per block so it merges; the canvas is a file of its own, not a sidecar), `Name.base` files (Bases definitions, YAML in Obsidian's syntax; a file of its own, listed beside canvases in `WorkspaceTree.canvases`), `.bookmarks` (sidebar bookmarks, one JSON entry per line so it merges), and `.workspace.json` (UI state, gitignored; includes per-canvas `canvasViewports`, never stored in the `.canvas`, and the editor-group `layout`).
 - **In the OS app-data dir** — stays on this machine: `index.db`, `settings.json`, `recent-workspaces.json`, `cli-token`, `logs/` (daily-rotating `tracing` files; `NULLNOTES_LOG=debug` raises verbosity).
 
 `index.db` is outside because a binary SQLite file cannot be merged across machines, and it's safe to exclude only because it's rebuildable — those two facts hold each other up. Ink, PDF and image sidecars are inside because a note whose drawings or figures didn't travel with it is a broken note.

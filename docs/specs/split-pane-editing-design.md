@@ -1,5 +1,7 @@
 # Split-pane editing (#54)
 
+> **Superseded by [editor-groups-design.md](editor-groups-design.md) (#235).** The single `secondaryTab` pointer described here was replaced by two editor groups, each with its own tabs.
+
 ## Problem
 
 `docs/ROADMAP.md:1299` deferred split-pane editing to "reconsider at P4," naming the deciding case explicitly: a PDF-imported exercise sheet on one side, its worked solution on the other. P4 shipped and froze without ever revisiting that decision — the roadmap row is still ❌ Missing. The workflow it named is now real and in daily use, and today it costs constant tab-switching in the single editor pane (`TabBar.tsx`/`Layout.tsx`), losing sight of the exercise while writing the solution.
