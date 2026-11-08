@@ -3919,7 +3919,7 @@ dependencies = [
 
 [[package]]
 name = "null-notes"
-version = "1.0.10"
+version = "1.0.11"
 dependencies = [
  "android-native-keyring-store",
  "anyhow",
