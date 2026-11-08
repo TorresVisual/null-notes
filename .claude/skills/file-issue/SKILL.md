@@ -1,58 +1,119 @@
 ---
 name: file-issue
-description: Turns a rough, badly-worded bug report or feature idea into a proper GitHub issue on TorresVisual/null-notes — investigates the codebase for context, asks the user for clarification on anything ambiguous, drafts title/body/labels for review, then files it with gh issue create. Use when the user hands you a rough note to turn into a trackable issue, or to migrate an item out of TODO.md's "TODO's" section.
+description: Turns a rough bug report, feature idea, or finding into a well-researched GitHub issue on TorresVisual/null-notes (or null-ide) — checks for duplicates, investigates the code so the body names real files and functions, asks only the questions that block a good issue, drafts title/body/labels for approval, then files it with gh. Use whenever the user hands over a messy note, says "file/open/log/create an issue", "track this", "write this up as a ticket", or another skill (capture-findings, bug-hunter, product-audit, feature-brainstorm) has a finding to record — even if they never say "issue".
 ---
 
-# Filing a GitHub issue from a rough note
+# Filing a GitHub issue
 
-## Why this exists
+GitHub Issues are the only tracker: `TorresVisual/null-notes` for the app, `TorresVisual/null-ide` for IDE-side work (`docs/agents/issue-tracker.md`). `TODO.md` is not a tracker — never add to it.
 
-GitHub Issues on `TorresVisual/null-notes` are the source of truth for bugs
-and features — `TODO.md` is no longer the tracker (see
-`docs/agents/issue-tracker.md`). The user's raw notes arrive terse, garbled,
-or half-finished ("search needs major improvements", a sentence that trails
-into an unrelated stack trace). Filed as-is, a future session with no memory
-of this conversation has nothing to act on. This skill does the enrichment
-and the asking before anything gets created.
+**Why this skill exists.** Raw notes are terse or garbled ("search needs major improvements"). The session that eventually picks the issue up has no memory of this conversation, so everything it needs — what is wrong, where in the code, how to tell it's fixed — must already be in the issue. The job is enrichment and judgement, not transcription. Quality bar: a cold session could start work from the issue alone, without asking a question.
 
 ## Steps
 
-1. **Read the raw note(s).** Source is either a `TODO.md` line or text the
-   user typed inline.
-2. **Flag ambiguity before drafting anything.** If the note has a vague
-   repro ("editing large notes is laggy" with no size/steps), unclear scope
-   (bug vs. feature vs. already-shipped), or contradicts a documented
-   decision (e.g. `docs/ROADMAP.md`'s "Not doing" table), ask the user
-   directly in plain text. Don't guess a fix, don't fabricate repro steps,
-   don't silently drop an item that looks stale — surface it and ask.
-3. **Investigate before drafting.** Grep/read the relevant code path
-   (extension, command, store) so the issue body names actual
-   files/functions/line numbers, not just the symptom. This is what makes
-   it fixable by a session that starts cold. Check `docs/ROADMAP.md` for
-   whether the phase this touches is already done, already cut, or still
-   open — a note can describe something that shipped since it was written.
-4. **Draft, per item:**
-   - Title: short and specific, no `bug:`/`feature:` prefix (labels carry
-     that).
-   - Body: symptom, relevant `file:line` pointers, suspected cause if
-     found, and enough context (design doc links, related issues) that no
-     prior conversation is assumed.
-   - Labels: `bug` or `enhancement` at minimum; add `low`/`medium`/`high`
-     for bugs by real impact (data loss/crash = high); add `security` if it
-     touches a trust boundary (see `src-tauri/src/commands/CLAUDE.md`).
-     Reuse the repo's existing label set (`gh label list`) — don't invent
-     new ones.
-5. **Show the full batch of drafts to the user. Wait for approval or edits
-   — never call `gh issue create` before this.** Group the unambiguous
-   drafts into one review pass; handle the flagged ones after the user
-   answers, in a follow-up batch.
-6. **On approval**, file each: `gh issue create --repo TorresVisual/null-notes --title "..." --body "..." --label bug,medium`.
-7. **If the source was a `TODO.md` line**, remove that line once the issue
-   is confirmed filed — the issue number replaces it as the tracker. Leave
-   the phased roadmap sections and the "Not doing" table alone; those
-   aren't issues.
+### 1. Split and classify
 
-## Verifying
+Read the note(s). One issue per independently fixable concern: split a note that mixes two, but don't shred one coherent change into tickets. Decide per item:
 
-`gh issue list --repo TorresVisual/null-notes --limit 5` — confirm the new
-issue(s) appear with the labels drafted in step 4.
+- **Type** — bug (behaves wrongly), enhancement (new or better behaviour), documentation (docs/agent files wrong or missing).
+- **Repo** — `null-ide` only if it's IDE-side; everything else `null-notes`.
+- **Size** — a large goal ("redesign mobile UI") is still one issue, but its body should name the sub-areas rather than pretend it's a small task.
+
+### 2. Check it isn't already tracked
+
+Do this before investigating, it's cheap and avoids wasted work:
+
+```bash
+gh issue list --repo TorresVisual/null-notes --state all --search "<2-3 distinctive keywords>" --limit 15
+```
+
+Try a second search with different words (symptom vs. component name). Also grep `docs/ROADMAP.md` — it records decisions inline, including a "Not doing" table of options rejected on inspection.
+
+- Open duplicate → don't file; tell the user the number. If the note adds new information, offer to comment on it (`gh issue comment`).
+- Closed as fixed → possible regression; file new and link it (`Regression of #n`).
+- Contradicts a documented decision or already shipped → surface it and ask; don't silently drop it.
+
+### 3. Investigate the code
+
+Project rule: run `graphify query "<question>"` first, then read the files it points to. Goal is to put real anchors in the issue:
+
+- `path:line` or `path` + function name for where the behaviour lives (names survive refactors better than line numbers; include both when cheap).
+- For bugs: trace to a cause. If you confirmed it by reading the code, state it as the **Cause**. If you only suspect it, say "Suspected cause" — a wrong confident cause sends the fixer down the wrong path.
+- For features: what exists today that the feature extends or collides with, and the architectural constraints that apply (e.g. the save-path rules, the storage boundary — workspace vs. app-data — in `CLAUDE.md`).
+- Siblings: if the same defect shape exists elsewhere (other callers, other node types), list them. One issue should cover the root cause, not just the reported instance.
+
+Use only what's in front of you. Don't fabricate repro steps, versions, or behaviour you haven't seen. Don't fix anything.
+
+### 4. Ask only what blocks the issue
+
+Ask when the answer changes the issue and you can't get it from the code: a vague repro ("laggy on big notes" — how big?), unclear intent (bug or wanted behaviour?), or a real design fork. Put every question in **one** message, with your best-guess default for each so the user can just say "yes".
+
+Don't ask about things you can look up, or about style. When another skill invoked you (capture-findings, bug-hunter, product-audit), answer from the context it handed you and only relay what you truly can't answer.
+
+### 5. Draft
+
+**Title** — a plain sentence naming the problem or the capability, specific enough to recognise in a list of 200. No `bug:`/`feat:` prefix (labels carry type). Bugs describe the symptom ("Autosave silently overwrites an external edit while the conflict prompt is showing"); enhancements describe the outcome ("Add 'Crop to content' to the ink editor").
+
+**Body** — lead with substance, no greeting, no restating the title, no "this issue tracks". Use the shape that fits; drop sections that would be empty rather than filling them with filler.
+
+Bug:
+
+```markdown
+**Symptom:** what the user sees, and the impact (data lost? crash? cosmetic?).
+
+**Repro:** numbered steps, or "not reproduced — found by reading code".
+
+**Cause:** where and why, with `path` / function names. ("Suspected cause:" if unverified.)
+
+**Fix:** direction, if one is clear — which layer owns it and what must not break (e.g. "stay off the keystroke path").
+
+**Related:** #n …
+```
+
+Enhancement:
+
+```markdown
+Why this matters / the problem, in one or two sentences.
+
+**Today:** what exists, with `path` anchors — and the specific gaps.
+
+**Proposal:** the behaviour wanted. Concrete enough to build; leave real design forks as explicit questions.
+
+**Acceptance:** observable conditions that mean it's done.
+
+**Related:** #n …
+```
+
+Docs issues: say which statement is wrong or missing, where, and what's true instead.
+
+Body hygiene: the repo may go public (#232), so no absolute local paths (use repo-relative), no tokens, no contents of the user's private notes, no stack traces with home directories. Wrap code identifiers in backticks; reference issues as `#n`.
+
+**Labels** — reuse the existing set; check `gh label list` if unsure, never invent one.
+
+| Label | Use |
+|---|---|
+| `bug` / `enhancement` / `documentation` | exactly one, by type |
+| `high` | data loss or corruption, crash, app won't start, silent overwrite |
+| `medium` | wrong behaviour with a workaround, or meaningful hardening |
+| `low` | cosmetic, rare edge case, nice-to-have |
+| `security` | touches a trust boundary (process spawning, the CLI pipe — see `src-tauri/src/commands/CLAUDE.md`, file paths, untrusted input); add alongside a severity |
+
+Severity goes on every issue, not just bugs — judge by real impact, not by how interesting it is.
+
+### 6. Review before filing
+
+Show all drafts together: repo, title, labels, full body. Say in one line anything you couldn't verify. **Do not run `gh issue create` until the user approves** — filing is outward-facing and issue numbers can't be reused. Fold edits in and re-show only what changed. Items you had to ask about go in a follow-up batch once answered; don't hold the clear ones back.
+
+### 7. File
+
+Write each body to a temp file and pass `--body-file` — backticks, `$`, and quotes in an inline `--body` get mangled by the shell:
+
+```bash
+gh issue create --repo TorresVisual/null-notes --title "…" --body-file "$TMPDIR/issue.md" --label bug --label high
+```
+
+Remove the temp file afterwards. Filing several related issues: file the parent/root first so the others can reference its number.
+
+### 8. Report
+
+Reply with each issue's number, title and URL, nothing more. If `gh` fails (auth, network), say so and show the draft so it isn't lost — don't fall back to writing it into `TODO.md` or another file. To confirm labels landed: `gh issue view <n> --repo TorresVisual/null-notes --json labels`.
