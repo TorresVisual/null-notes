@@ -1,6 +1,7 @@
 import { useCallback } from 'react'
 import { api } from '../lib/tauri'
 import { useWorkspaceStore } from '../store/workspace'
+import { sessionTabs } from '../lib/editorGroups'
 import type { GitWorkspaceConfig } from '../types'
 
 /**
@@ -20,11 +21,9 @@ export function useGitConfig() {
       const {
         path,
         git,
-        openTabs,
-        activeTab,
+        layout,
         sidebarCollapsed,
         tagsCollapsed,
-        pinnedTabs,
         canvasViewports,
         expandedFolders,
         recentSearches,
@@ -33,11 +32,9 @@ export function useGitConfig() {
       const next = { ...git, ...patch }
       setGit(next)
       await api.workspace.save(path, {
-        openTabs,
-        activeTab,
+        ...sessionTabs(layout),
         sidebarCollapsed,
         tagsCollapsed,
-        pinnedTabs,
         canvasViewports,
         expandedFolders,
         recentSearches,

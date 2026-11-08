@@ -119,6 +119,31 @@ pub struct SearchPaging {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
+pub struct EditorGroupState {
+    pub tabs: Vec<String>,
+    #[serde(default)]
+    pub pinned: Vec<String>,
+    pub active: Option<String>,
+    #[serde(default)]
+    pub view_mode: String,
+}
+
+/// `direction` and `view_mode` stay strings: the frontend validates them on
+/// load, so a hand-edited value can't make the whole file unreadable.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct EditorLayoutState {
+    pub groups: Vec<EditorGroupState>,
+    #[serde(default)]
+    pub focused: usize,
+    #[serde(default)]
+    pub direction: String,
+    #[serde(default)]
+    pub ratio: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
 pub struct WorkspaceState {
     pub open_tabs: Vec<String>,
     pub active_tab: Option<String>,
@@ -138,14 +163,16 @@ pub struct WorkspaceState {
     // tolerate its own absence in a file an older build wrote.
     #[serde(default)]
     pub git: GitWorkspaceConfig,
-    // Split-pane editing (#54). Added after `.workspace.json` shipped, so
-    // both tolerate their own absence in a file an older build wrote —
-    // `None` means "single pane" / "use the default 0.5 ratio", the same
-    // posture the frontend already needs for a workspace that was never
-    // split at all.
+    // Editor groups (#235). Absent in a file an older build wrote, in which
+    // case the frontend builds the layout from `open_tabs` and the legacy
+    // split fields below.
     #[serde(default)]
+    pub layout: Option<EditorLayoutState>,
+    // Split-pane editing (#54), superseded by `layout`. Read so an old file
+    // still opens as the same split, never written back.
+    #[serde(default, skip_serializing)]
     pub secondary_tab: Option<String>,
-    #[serde(default)]
+    #[serde(default, skip_serializing)]
     pub split_ratio: Option<f64>,
     // Sidebar rail+panel UI state. Both default to false (panel open, Tags
     // section open), which is also what a file from an older build means.

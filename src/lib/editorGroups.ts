@@ -1,5 +1,6 @@
 import { isBasePath, isCanvasPath } from './canvasPath'
 import { isUnderPath, replacePathPrefix } from './pathPrefix'
+import type { WorkspaceState } from '../types'
 
 export type ViewMode = 'wysiwyg' | 'raw'
 export type SplitSide = 'left' | 'right' | 'up' | 'down'
@@ -170,3 +171,38 @@ export function removeUnder(l: GroupLayout, prefix: string): GroupLayout {
 }
 
 export const openPaths = (l: GroupLayout): string[] => [...new Set(l.groups.flatMap((g) => g.tabs))]
+
+// Group 0 doubles as the flat tab fields so a build that predates groups still
+// opens the file with something sensible.
+export function sessionTabs(l: GroupLayout) {
+  const g = l.groups[0] ?? emptyGroup()
+  return { openTabs: g.tabs, activeTab: g.active, pinnedTabs: g.pinned, layout: l }
+}
+
+// Reads a layout back from .workspace.json. The file is user-editable and may
+// be older than this feature, so nothing in it is trusted: legacy fields become
+// the equivalent layout, and anything that can't be shown is dropped.
+export function layoutFromSession(s: WorkspaceState, existing: (path: string) => boolean): GroupLayout {
+  const saved = s.layout?.groups?.length ? s.layout : null
+  const raw: Partial<EditorGroup>[] = saved
+    ? saved.groups.slice(0, 2)
+    : [
+        { tabs: s.openTabs, pinned: s.pinnedTabs, active: s.activeTab },
+        ...(s.secondaryTab ? [{ tabs: [s.secondaryTab], active: s.secondaryTab }] : []),
+      ]
+  const groups = raw.map((g, i): EditorGroup => {
+    const tabs = [...new Set(g.tabs ?? [])].filter((p) => existing(p) && (i === 0 || splittable(p)))
+    const pinned = (g.pinned ?? []).filter((p) => tabs.includes(p))
+    const active = g.active == null ? null : tabs.includes(g.active) ? g.active : (tabs[tabs.length - 1] ?? null)
+    return { tabs: pinnedFirst(tabs, pinned), pinned, active, viewMode: g.viewMode === 'raw' ? 'raw' : 'wysiwyg' }
+  })
+  const ratio = saved ? saved.ratio : s.splitRatio
+  const base: GroupLayout = {
+    groups,
+    focused: 0,
+    direction: saved?.direction === 'column' ? 'column' : 'row',
+    ratio: 0.5,
+  }
+  const settled = settle(base, groups, groups[saved?.focused ?? 0])
+  return setRatio(settled, Number.isFinite(ratio) ? (ratio as number) : 0.5)
+}

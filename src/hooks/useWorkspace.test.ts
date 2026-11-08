@@ -253,6 +253,90 @@ describe('useWorkspace', () => {
     expect(git.autoCommit).toHaveBeenCalledWith('/old', 'notesOnly', ['/old/a.md'], false)
   })
 
+  describe('editor group layout', () => {
+    const note = (path: string) => ({ id: path, path, title: path, workspace: '/ws', updatedAt: 0 })
+    const tree = (...paths: string[]): WorkspaceTree => ({ notes: paths.map(note), folders: [], canvases: [] })
+
+    it('saveSession persists the layout, with group 0 as the legacy tab fields', async () => {
+      const st = useWorkspaceStore.getState()
+      useWorkspaceStore.setState({ path: '/ws' })
+      st.openTab('/ws/a.md')
+      st.openTab('/ws/b.md')
+      st.splitEditor('right')
+      st.openTab('/ws/c.md')
+      const { result } = renderHook(() => useWorkspace())
+
+      await result.current.saveSession()
+
+      expect(workspace.save).toHaveBeenCalledWith(
+        '/ws',
+        expect.objectContaining({
+          openTabs: ['/ws/a.md', '/ws/b.md'],
+          activeTab: '/ws/b.md',
+          layout: expect.objectContaining({ focused: 1, direction: 'row', ratio: 0.5 }),
+        }),
+      )
+      expect(vi.mocked(workspace.save).mock.calls[0]?.[1]).not.toHaveProperty('secondaryTab')
+    })
+
+    it('openWorkspaceAt restores a saved layout into the store', async () => {
+      notes.scan.mockResolvedValue(tree('/ws/a.md', '/ws/b.md'))
+      workspace.load.mockResolvedValue({
+        ...emptySession,
+        layout: {
+          groups: [
+            { tabs: ['/ws/a.md'], pinned: [], active: '/ws/a.md', viewMode: 'wysiwyg' },
+            { tabs: ['/ws/b.md'], pinned: [], active: '/ws/b.md', viewMode: 'raw' },
+          ],
+          focused: 1,
+          direction: 'column',
+          ratio: 0.3,
+        },
+      })
+      const { result } = renderHook(() => useWorkspace())
+
+      await result.current.openWorkspaceAt('/ws')
+
+      const state = useWorkspaceStore.getState()
+      expect(state.layout.groups.map((g) => [g.active, g.viewMode])).toEqual([
+        ['/ws/a.md', 'wysiwyg'],
+        ['/ws/b.md', 'raw'],
+      ])
+      expect(state.layout).toMatchObject({ focused: 1, direction: 'column', ratio: 0.3 })
+      expect(state.activeTab).toBe('/ws/b.md')
+    })
+
+    it('openWorkspaceAt restores a file saved before editor groups as the same split', async () => {
+      notes.scan.mockResolvedValue(tree('/ws/a.md', '/ws/b.md'))
+      workspace.load.mockResolvedValue({
+        ...emptySession,
+        openTabs: ['/ws/a.md', '/ws/b.md'],
+        activeTab: '/ws/a.md',
+        secondaryTab: '/ws/b.md',
+        splitRatio: 0.4,
+      })
+      const { result } = renderHook(() => useWorkspace())
+
+      await result.current.openWorkspaceAt('/ws')
+
+      const { layout } = useWorkspaceStore.getState()
+      expect(layout.groups).toHaveLength(2)
+      expect(layout.groups[1]?.tabs).toEqual(['/ws/b.md'])
+      expect(layout).toMatchObject({ direction: 'row', ratio: 0.4, focused: 0 })
+    })
+
+    it('openWorkspaceAt skips tabs for notes that are gone', async () => {
+      notes.scan.mockResolvedValue(tree('/ws/a.md'))
+      workspace.load.mockResolvedValue({ ...emptySession, openTabs: ['/ws/a.md', '/ws/gone.md'], activeTab: '/ws/gone.md' })
+      const { result } = renderHook(() => useWorkspace())
+
+      await result.current.openWorkspaceAt('/ws')
+
+      expect(useWorkspaceStore.getState().openTabs).toEqual(['/ws/a.md'])
+      expect(useWorkspaceStore.getState().activeTab).toBe('/ws/a.md')
+    })
+  })
+
   it('saveSession persists the sidebar collapsed state', async () => {
     useWorkspaceStore.setState({ path: '/ws', sidebarCollapsed: true, tagsCollapsed: true })
     const { result } = renderHook(() => useWorkspace())

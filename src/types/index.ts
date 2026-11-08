@@ -1,3 +1,5 @@
+import type { GroupLayout } from '../lib/editorGroups'
+
 export interface NoteMetadata {
   id: string
   title: string
@@ -90,6 +92,8 @@ export interface GitWorkspaceConfig {
 export interface WorkspaceState {
   openTabs: string[]
   activeTab: string | null
+  layout?: GroupLayout
+  /** Read-only legacy (#54): a file written before editor groups. Never written. */
   secondaryTab?: string | null
   splitRatio?: number
   sidebarCollapsed?: boolean

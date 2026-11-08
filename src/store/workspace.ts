@@ -61,6 +61,7 @@ const withActive = (layout: GroupLayout, group: number, path: string | null): Gr
 interface WorkspaceStore {
   path: string | null
   layout: GroupLayout
+  restoreLayout: (layout: GroupLayout) => void
   splitEditor: (side: SplitSide) => void
   moveTabToGroup: (notePath: string, to: number, copy: boolean) => void
   focusGroup: (group: number) => void
@@ -241,6 +242,8 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => {
   closeTab: (notePath) => closeIn(notePath, get().layout.focused),
 
   closeTabInGroup: closeIn,
+
+  restoreLayout: (layout) => commit(layout),
 
   splitEditor: (side) => commit(splitActive(get().layout, side)),
 

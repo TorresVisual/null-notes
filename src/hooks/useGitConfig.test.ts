@@ -41,6 +41,7 @@ describe('useGitConfig', () => {
     expect(workspace.save).toHaveBeenCalledWith('/ws', {
       openTabs: ['/ws/a.md'],
       activeTab: '/ws/a.md',
+      layout: expect.objectContaining({ focused: 0 }),
       sidebarCollapsed: false,
       tagsCollapsed: false,
       pinnedTabs: [],

@@ -15,8 +15,11 @@ import {
   replacePrefixAll,
   removeUnder,
   openPaths,
+  layoutFromSession,
+  type EditorGroup,
   type GroupLayout,
 } from './editorGroups'
+import type { WorkspaceState } from '../types'
 
 const A = '/ws/a.md'
 const B = '/ws/b.md'
@@ -290,5 +293,116 @@ describe('path rewrites across groups', () => {
 describe('openPaths', () => {
   it('lists each open path once across groups', () => {
     expect(openPaths(openIn(split(A, B), C, 0)).sort()).toEqual([A, B, C])
+  })
+})
+
+const GIT = {
+  prompted: false,
+  autoCommit: false,
+  idleMinutes: 10,
+  skipHooks: false,
+  autoPush: true,
+  allowCodeRepoPush: false,
+}
+const session = (over: Partial<WorkspaceState>): WorkspaceState => ({
+  openTabs: [],
+  activeTab: null,
+  expandedFolders: [],
+  recentSearches: [],
+  git: GIT,
+  ...over,
+})
+const everything = () => true
+
+describe('layoutFromSession', () => {
+  it('builds one group from a file that only has openTabs, activeTab and pinnedTabs', () => {
+    const l = layoutFromSession(session({ openTabs: [A, B], activeTab: A, pinnedTabs: [B] }), everything)
+    expect(l.groups).toEqual([{ tabs: [B, A], pinned: [B], active: A, viewMode: 'wysiwyg' }])
+    expect(l).toMatchObject({ focused: 0, direction: 'row', ratio: 0.5 })
+  })
+
+  it('turns a legacy secondaryTab into a second group, side by side at the old ratio', () => {
+    const l = layoutFromSession(
+      session({ openTabs: [A, B], activeTab: A, secondaryTab: B, splitRatio: 0.4 }),
+      everything,
+    )
+    expect(l.groups).toHaveLength(2)
+    expect(l.groups[0]).toMatchObject({ tabs: [A, B], active: A })
+    expect(l.groups[1]).toMatchObject({ tabs: [B], active: B })
+    expect(l).toMatchObject({ focused: 0, direction: 'row', ratio: 0.4 })
+  })
+
+  it('prefers the saved layout over the legacy fields', () => {
+    const saved = setViewMode(split(A, B), 1, 'raw')
+    const l = layoutFromSession(
+      session({ openTabs: [C], activeTab: C, secondaryTab: C, layout: saved }),
+      everything,
+    )
+    expect(l).toEqual(saved)
+  })
+
+  it('round-trips a split layout with pins, modes, direction and ratio', () => {
+    const saved = setRatio(toggleDirection(pinToggle(setViewMode(split(A, B), 0, 'raw'), A, 0)), 0.3)
+    expect(layoutFromSession(session({ layout: saved }), everything)).toEqual(saved)
+  })
+
+  it('drops notes that no longer exist and collapses a group that empties', () => {
+    const group = (tabs: string[], active: string): EditorGroup => ({ tabs, pinned: [], active, viewMode: 'wysiwyg' })
+    const saved = (second: EditorGroup): GroupLayout => ({
+      groups: [group([A, 'gone-1'], 'gone-1'), second],
+      focused: 1,
+      direction: 'row',
+      ratio: 0.5,
+    })
+    const exists = (p: string) => !p.startsWith('gone')
+
+    const kept = layoutFromSession(session({ layout: saved(group([B, 'gone-2'], 'gone-2')) }), exists)
+    expect(kept.groups.map((g) => [g.tabs, g.active])).toEqual([[[A], A], [[B], B]])
+
+    const collapsed = layoutFromSession(session({ layout: saved(group(['gone-2'], 'gone-2')) }), exists)
+    expect(collapsed.groups).toHaveLength(1)
+    expect(collapsed.focused).toBe(0)
+  })
+
+  it('never lets a canvas or base into group 1', () => {
+    const saved: GroupLayout = {
+      groups: [
+        { tabs: [A], pinned: [], active: A, viewMode: 'wysiwyg' },
+        { tabs: [CANVAS, BASE], pinned: [], active: CANVAS, viewMode: 'wysiwyg' },
+      ],
+      focused: 1,
+      direction: 'row',
+      ratio: 0.5,
+    }
+    const l = layoutFromSession(session({ layout: saved }), everything)
+    expect(l.groups).toHaveLength(1)
+    expect(l.focused).toBe(0)
+    expect(l.groups[0]?.tabs).toEqual([A])
+  })
+
+  it('repairs values a hand-edited file could hold', () => {
+    const l = layoutFromSession(
+      session({
+        layout: {
+          groups: [
+            { tabs: [A], pinned: [B], active: C, viewMode: 'bogus' as never },
+            { tabs: [B], pinned: [], active: B, viewMode: 'wysiwyg' },
+            { tabs: [C], pinned: [], active: C, viewMode: 'wysiwyg' },
+          ],
+          focused: 9,
+          direction: 'diagonal' as never,
+          ratio: 7,
+        },
+      }),
+      everything,
+    )
+    expect(l.groups).toHaveLength(2)
+    expect(l.groups[0]).toMatchObject({ tabs: [A], pinned: [], active: A, viewMode: 'wysiwyg' })
+    expect(l).toMatchObject({ focused: 0, direction: 'row', ratio: 0.8 })
+  })
+
+  it('keeps a group on Home when it was saved with tabs but no active one', () => {
+    const l = layoutFromSession(session({ openTabs: [A], activeTab: null }), everything)
+    expect(l.groups[0]).toMatchObject({ tabs: [A], active: null })
   })
 })

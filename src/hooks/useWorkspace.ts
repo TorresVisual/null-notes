@@ -6,6 +6,7 @@ import { useNotesStore } from '../store/notes'
 import { useGitAutoPull } from './useGitAutoPull'
 import { useGitAutoCommit } from './useGitAutoCommit'
 import { clearNavigationHistory } from '../lib/navigationHistory'
+import { layoutFromSession, sessionTabs } from '../lib/editorGroups'
 
 export async function refreshTree(): Promise<void> {
   const path = useWorkspaceStore.getState().path
@@ -36,11 +37,9 @@ export function useWorkspace() {
   const saveSession = useCallback(async () => {
     const {
       path,
-      openTabs,
-      activeTab,
+      layout,
       sidebarCollapsed,
       tagsCollapsed,
-      pinnedTabs,
       canvasViewports,
       expandedFolders,
       recentSearches,
@@ -48,11 +47,9 @@ export function useWorkspace() {
     } = useWorkspaceStore.getState()
     if (!path || useWorkspaceStore.getState().singleNote) return
     await api.workspace.save(path, {
-      openTabs,
-      activeTab,
+      ...sessionTabs(layout),
       sidebarCollapsed,
       tagsCollapsed,
-      pinnedTabs,
       canvasViewports,
       expandedFolders,
       recentSearches,
@@ -86,7 +83,7 @@ export function useWorkspace() {
         setGitPriorAutomation,
         setSidebarCollapsed,
         setTagsCollapsed,
-        setPinnedTabs,
+        restoreLayout,
       } = useWorkspaceStore.getState()
       setFolderLoading(true)
       let tree, session
@@ -116,10 +113,8 @@ export function useWorkspace() {
       setGit(session.git)
       setSidebarCollapsed(session.sidebarCollapsed ?? false)
       setTagsCollapsed(session.tagsCollapsed ?? false)
-      for (const tab of session.openTabs) {
-        openTab(tab)
-      }
-      setPinnedTabs(session.pinnedTabs ?? [])
+      const known = new Set([...tree.notes.map((n) => n.path), ...tree.canvases])
+      restoreLayout(layoutFromSession(session, (p) => known.has(p)))
       useWorkspaceStore.getState().setCanvasViewports(session.canvasViewports ?? {})
       await refreshTags()
       if (remember) {

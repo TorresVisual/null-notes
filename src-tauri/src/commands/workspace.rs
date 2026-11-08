@@ -225,7 +225,7 @@ mod tests {
     }
 
     use super::*;
-    use crate::models::CanvasViewport;
+    use crate::models::{CanvasViewport, EditorGroupState, EditorLayoutState};
     use tempfile::tempdir;
 
     #[tokio::test]
@@ -360,20 +360,66 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_split_pane_state_roundtrips() {
+    async fn test_editor_layout_roundtrips() {
         let dir = tempdir().unwrap();
         let path = dir.path().to_string_lossy().into_owned();
         let original = WorkspaceState {
-            secondary_tab: Some("/ws/solution.md".into()),
-            split_ratio: Some(0.35),
+            layout: Some(EditorLayoutState {
+                groups: vec![
+                    EditorGroupState {
+                        tabs: vec!["/ws/a.md".into(), "/ws/b.md".into()],
+                        pinned: vec!["/ws/a.md".into()],
+                        active: Some("/ws/b.md".into()),
+                        view_mode: "wysiwyg".into(),
+                    },
+                    EditorGroupState {
+                        tabs: vec!["/ws/b.md".into()],
+                        pinned: vec![],
+                        active: Some("/ws/b.md".into()),
+                        view_mode: "raw".into(),
+                    },
+                ],
+                focused: 1,
+                direction: "column".into(),
+                ratio: 0.35,
+            }),
             ..Default::default()
         };
 
         save_workspace_to_dir(&path, &original).await.unwrap();
         let loaded = load_workspace_from_dir(&path).await.unwrap();
 
-        assert_eq!(loaded.secondary_tab, original.secondary_tab);
-        assert_eq!(loaded.split_ratio, original.split_ratio);
+        let layout = loaded.layout.unwrap();
+        assert_eq!(layout.groups.len(), 2);
+        assert_eq!(layout.groups[1].view_mode, "raw");
+        assert_eq!(layout.focused, 1);
+        assert_eq!(layout.direction, "column");
+        assert_eq!(layout.ratio, 0.35);
+    }
+
+    // The pre-groups split (#54) stays readable so the frontend can turn it into
+    // a layout, but is never written back out.
+    #[tokio::test]
+    async fn test_legacy_split_fields_load_but_are_not_rewritten() {
+        let dir = tempdir().unwrap();
+        tokio::fs::write(
+            dir.path().join(".workspace.json"),
+            r#"{"openTabs":["/ws/a.md"],"activeTab":"/ws/a.md","secondaryTab":"/ws/b.md","splitRatio":0.4}"#,
+        )
+        .await
+        .unwrap();
+        let path = dir.path().to_string_lossy().into_owned();
+
+        let loaded = load_workspace_from_dir(&path).await.unwrap();
+        assert_eq!(loaded.secondary_tab.as_deref(), Some("/ws/b.md"));
+        assert_eq!(loaded.split_ratio, Some(0.4));
+
+        save_workspace_to_dir(&path, &loaded).await.unwrap();
+        let written = tokio::fs::read_to_string(dir.path().join(".workspace.json"))
+            .await
+            .unwrap();
+        assert!(!written.contains("secondaryTab"));
+        assert!(!written.contains("splitRatio"));
     }
 
     // A `.workspace.json` written before split-pane editing shipped has neither
@@ -394,6 +440,7 @@ mod tests {
 
         assert!(state.secondary_tab.is_none());
         assert!(state.split_ratio.is_none());
+        assert!(state.layout.is_none());
     }
 
     #[tokio::test]
