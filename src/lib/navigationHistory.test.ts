@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { useWorkspaceStore } from '../store/workspace'
+import { rememberPosition } from './notePositions'
 import {
   goBack,
   goForward,
@@ -152,5 +153,28 @@ describe('navigationHistory', () => {
 
     clearNavigationHistory()
     expect(useNavigationHistoryStore.getState()).toEqual({ canGoBack: false, canGoForward: false })
+  })
+  it('goBack scrolls the focused group, not the first scroller in the document', () => {
+    const scroller = (focused: boolean) => {
+      const group = document.createElement('div')
+      group.className = focused ? 'editor-group editor-group--focused' : 'editor-group'
+      const el = document.createElement('div')
+      el.className = 'editor-scroll'
+      Object.defineProperty(el, 'scrollHeight', { value: 1000 })
+      Object.defineProperty(el, 'clientHeight', { value: 200 })
+      group.appendChild(el)
+      document.body.appendChild(group)
+      return el
+    }
+    const first = scroller(false)
+    const second = scroller(true)
+    rememberPosition('/ws/a.md', { scrollFraction: 0.5 })
+    useWorkspaceStore.getState().openTab('/ws/a.md')
+    useWorkspaceStore.getState().openTab('/ws/b.md')
+
+    goBack()
+
+    expect(second.scrollTop).toBe(400)
+    expect(first.scrollTop).toBe(0)
   })
 })

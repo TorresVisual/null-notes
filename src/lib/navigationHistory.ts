@@ -41,6 +41,7 @@ let restoring = false
 useWorkspaceStore.subscribe((state, prevState) => {
   if (restoring) return
   if (state.activeTab === prevState.activeTab) return
+  if (state.layout.focused !== prevState.layout.focused) return
   if (!prevState.activeTab) return
   back.push(entryFor(prevState.activeTab))
   forward.length = 0
@@ -55,7 +56,9 @@ useWorkspaceStore.subscribe((state, prevState) => {
  *  since `activeTab` not changing means the tab-switch scroll-restoration
  *  effect never re-fires. */
 function scrollToOffset(fraction: number, attempt = 0): void {
-  const el = document.querySelector<HTMLElement>('.editor-scroll')
+  const el =
+    document.querySelector<HTMLElement>('.editor-group--focused .editor-scroll') ??
+    document.querySelector<HTMLElement>('.editor-scroll')
   if (el) {
     const scrollable = el.scrollHeight - el.clientHeight
     el.scrollTop = scrollable > 0 ? fraction * scrollable : 0

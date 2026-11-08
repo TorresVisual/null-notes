@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { useWorkspaceStore } from './workspace'
 import { initialLayout } from '../lib/editorGroups'
-import { goBack } from '../lib/navigationHistory'
+import { canGoBack, clearNavigationHistory, goBack } from '../lib/navigationHistory'
 
 const reset = () =>
   useWorkspaceStore.setState({
@@ -484,15 +484,17 @@ describe('useWorkspaceStore', () => {
       expect(st().openTabs).toEqual([A, B])
     })
 
-    it('goBack after focusing group 1 opens the note in group 1', () => {
+    it('moving focus between groups is not navigation', () => {
       st().openTab(A)
       st().openTab(B)
       st().splitEditor('right')
+      clearNavigationHistory()
       st().activateTabIn(A, 0)
       st().focusGroup(1)
+      st().focusGroup(0)
+      expect(canGoBack()).toBe(false)
       goBack()
-      expect(st().layout.focused).toBe(1)
-      expect(st().layout.groups[1]?.active).toBe(A)
+      expect(st().layout.groups[1]?.active).toBe(B)
     })
 
     it('reopenClosedTab opens into the focused group', () => {
