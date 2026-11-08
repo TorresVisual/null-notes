@@ -3,6 +3,7 @@ import { render, cleanup, waitFor } from '@testing-library/react'
 import { NoteEditor } from './NoteEditor'
 import { useSettingsStore, DEFAULT_SETTINGS } from '../store/settings'
 import { rememberPosition } from '../lib/notePositions'
+import type { Editor } from '@tiptap/core'
 import { confirm } from '@tauri-apps/plugin-dialog'
 
 vi.mock('@tauri-apps/plugin-dialog', () => ({
@@ -162,5 +163,42 @@ describe('NoteEditor accessible name', () => {
     expect(textboxes[0]).toHaveAttribute('aria-label', 'Note')
     expect(textboxes[0]).toHaveAttribute('aria-multiline', 'true')
     expect(textboxes[0]).toHaveClass('ProseMirror')
+  })
+})
+
+describe('NoteEditor content sync from another view of the same note', () => {
+  const renderNote = (content: string) => (
+    <NoteEditor
+      content={content}
+      notePath="/note.md"
+      spellcheck={false}
+      spellcheckLanguage="en"
+      onChange={() => {}}
+      onFlashcardCommand={() => {}}
+    />
+  )
+  const editorOf = (container: HTMLElement) =>
+    (container.querySelector('.ProseMirror') as unknown as { editor: Editor }).editor
+
+  it('keeps the caret and stays out of undo history when text arrives from elsewhere', () => {
+    const { container, rerender } = render(renderNote('hello world'))
+    const editor = editorOf(container)
+    editor.commands.setTextSelection(3)
+
+    rerender(renderNote('hello brave world'))
+
+    expect(editor.getText()).toBe('hello brave world')
+    expect(editor.state.selection.from).toBe(3)
+    expect(editor.can().undo()).toBe(false)
+  })
+
+  it('clamps the caret when the incoming text is shorter', () => {
+    const { container, rerender } = render(renderNote('hello world'))
+    const editor = editorOf(container)
+    editor.commands.setTextSelection(10)
+
+    rerender(renderNote('hi'))
+
+    expect(editor.state.selection.from).toBeLessThanOrEqual(3)
   })
 })

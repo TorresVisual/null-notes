@@ -113,7 +113,14 @@ export function NoteEditor({
       const wasInitialized = withInitFlag.isEditorContentInitialized
       withInitFlag.isEditorContentInitialized = false
       editor.storage.noteContext.notePath = notePath
-      editor.commands.setContent(content)
+      // Text that arrives from another view of the note must not move this
+      // view's caret or land in its undo history, or Ctrl+Z here would undo
+      // typing done in the other group.
+      const { anchor, head } = editor.state.selection
+      const fromPeer = !editor.isFocused
+      editor.chain().setMeta('addToHistory', !fromPeer).setContent(content).run()
+      const size = editor.state.doc.content.size
+      editor.commands.setTextSelection({ from: Math.min(anchor, size), to: Math.min(head, size) })
       withInitFlag.isEditorContentInitialized = wasInitialized
       isProgrammaticUpdate.current = false
     }
