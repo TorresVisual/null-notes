@@ -3,6 +3,7 @@ import type { Editor, Range } from '@tiptap/core'
 import { useWorkspaceStore } from '../store/workspace'
 import { useNote } from '../hooks/useNote'
 import { useScrollRestoration } from '../hooks/useScrollRestoration'
+import { useTabDrop } from '../hooks/useTabDrop'
 import { isBasePath, isCanvasPath } from '../lib/canvasPath'
 import { EditorPane, type EditorPaneProps } from './EditorPane'
 import { ErrorBoundary } from './ErrorBoundary'
@@ -42,6 +43,8 @@ export function EditorGroupPane({ group, shared, bare = false }: EditorGroupPane
   const fileTab = active !== null && (isCanvasPath(active) || isBasePath(active))
   const note = useNote(fileTab ? null : active)
   const paneRef = useRef<HTMLDivElement>(null)
+  const bodyRef = useRef<HTMLDivElement>(null)
+  const { zone, dropProps } = useTabDrop(group, bodyRef)
   const scrollRef = useScrollRestoration(active, note.isLoading, viewMode)
 
   useEffect(() => {
@@ -56,9 +59,11 @@ export function EditorGroupPane({ group, shared, bare = false }: EditorGroupPane
       style={multiple ? { flex: `${share} 1 0%` } : undefined}
       onMouseDownCapture={() => !focused && focusGroup(group)}
       onFocusCapture={() => !focused && focusGroup(group)}
+      {...(bare ? {} : dropProps)}
     >
       {!bare && <TabBar group={group} status={group === 0 ? shared.status : undefined} />}
-      <div className="editor-body">
+      <div className="editor-body" ref={bodyRef}>
+        {zone && <div className={`split-drop-zone split-drop-zone--${zone}`} />}
         <div className="pane-wrapper">
           {fileTab && active ? (
             <ErrorBoundary key={active}>

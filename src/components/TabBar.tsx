@@ -3,6 +3,7 @@ import { ChevronLeft, ChevronRight, Pin, RefreshCw, X } from 'lucide-react'
 import { useWorkspaceStore } from '../store/workspace'
 import { useNotesStore, noteTitle } from '../store/notes'
 import { requestCloseTab } from '../lib/requestCloseTab'
+import { TAB_DRAG_MIME } from '../lib/dropZone'
 import { folderName, isUnderPath, noteFolderSegments } from '../lib/pathPrefix'
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuTrigger } from './ui/context-menu'
 import { NoteContextMenuItems } from './NoteContextMenuItems'
@@ -86,12 +87,18 @@ export function TabBar({ group, status }: TabBarProps) {
               onDragStart={(e) => {
                 setDraggedPath(path)
                 e.dataTransfer.setData('text/plain', path)
+                e.dataTransfer.setData(TAB_DRAG_MIME, path)
               }}
               onDragEnd={() => setDraggedPath(null)}
-              onDragOver={(e) => e.preventDefault()}
+              onDragOver={(e) => {
+                e.preventDefault()
+                if (draggedPath) e.stopPropagation()
+              }}
               onDrop={(e) => {
                 e.preventDefault()
-                if (draggedPath) reorderTabs(draggedPath, path)
+                if (!draggedPath) return
+                e.stopPropagation()
+                reorderTabs(draggedPath, path)
                 setDraggedPath(null)
               }}
             >

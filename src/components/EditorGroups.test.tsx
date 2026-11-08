@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from 'vitest'
 import { render, screen, cleanup, fireEvent, within, act } from '@testing-library/react'
 import { EditorGroups } from './EditorGroups'
 import { TooltipProvider } from './ui/tooltip'
@@ -206,5 +206,103 @@ describe('EditorGroups divider', () => {
     expect(st().layout.ratio).toBeCloseTo(0.8)
     fireEvent.keyDown(divider, { key: 'Home' })
     expect(st().layout.ratio).toBeCloseTo(0.2)
+  })
+})
+
+describe('EditorGroups tab drops', () => {
+  const TAB_MIME = 'application/x-nullnotes-tab'
+
+  // jsdom has no DragEvent, so testing-library would build a plain Event and
+  // drop clientX/clientY/ctrlKey, which is exactly what these tests need.
+  beforeAll(() => {
+    if (!('DragEvent' in window)) {
+      Object.defineProperty(window, 'DragEvent', { configurable: true, value: class extends MouseEvent {} })
+    }
+  })
+
+  function dropData(path: string, types: string[] = [TAB_MIME, 'text/plain']) {
+    return { types, getData: () => path, dropEffect: 'move' }
+  }
+
+  function dropOnGroup(index: number, path: string, at: { x: number; y: number }, init: object = {}, types?: string[]) {
+    const group = document.querySelectorAll('.editor-group')[index] as HTMLElement
+    fireEvent.drop(group, { clientX: at.x, clientY: at.y, dataTransfer: dropData(path, types), ...init })
+  }
+
+  beforeEach(() => {
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({
+      left: 0, top: 0, right: 1000, bottom: 800, width: 1000, height: 800, x: 0, y: 0, toJSON: () => ({}),
+    })
+  })
+
+  afterEach(() => vi.restoreAllMocks())
+
+  it('splits when a tab is dropped on the left edge of a single group, new group first', () => {
+    st().openTab(A)
+    st().openTab(B)
+    renderGroups()
+
+    dropOnGroup(0, A, { x: 40, y: 500 })
+
+    expect(st().layout.groups).toHaveLength(2)
+    expect(st().layout.groups[0]?.tabs).toEqual([A])
+    expect(st().layout.groups[1]?.tabs).toEqual([A, B])
+    expect(st().layout.focused).toBe(0)
+  })
+
+  it('moves a tab into the other group when dropped on its body', () => {
+    st().openTab(A)
+    st().openTab(B)
+    st().splitEditor('right')
+    renderGroups()
+
+    dropOnGroup(1, A, { x: 700, y: 500 })
+
+    expect(st().layout.groups[0]?.tabs).toEqual([B])
+    expect(st().layout.groups[1]?.tabs).toEqual([B, A])
+    expect(st().layout.focused).toBe(1)
+  })
+
+  it('copies instead of moving when Ctrl is held', () => {
+    st().openTab(A)
+    st().openTab(B)
+    st().splitEditor('right')
+    renderGroups()
+
+    dropOnGroup(1, A, { x: 700, y: 500 }, { ctrlKey: true })
+
+    expect(st().layout.groups[0]?.tabs).toEqual([A, B])
+    expect(st().layout.groups[1]?.tabs).toEqual([B, A])
+  })
+
+  it('never splits a canvas into a new group', () => {
+    st().openTab(A)
+    st().openTab('/ws/map.canvas')
+    renderGroups()
+
+    dropOnGroup(0, '/ws/map.canvas', { x: 960, y: 500 })
+
+    expect(st().layout.groups).toHaveLength(1)
+  })
+
+  it('ignores a drag that is not a tab, such as selected text', () => {
+    st().openTab(A)
+    renderGroups()
+
+    dropOnGroup(0, A, { x: 960, y: 500 }, {}, ['text/plain'])
+
+    expect(st().layout.groups).toHaveLength(1)
+  })
+
+  it('shows an edge highlight while a tab is dragged over a single group', () => {
+    st().openTab(A)
+    renderGroups()
+    const group = document.querySelector('.editor-group') as HTMLElement
+
+    fireEvent.dragOver(group, { clientX: 960, clientY: 500, dataTransfer: dropData(A) })
+
+    expect(document.querySelector('.split-drop-zone--right')).not.toBeNull()
+    fireEvent.dragLeave(group, { relatedTarget: document.body })
+    expect(document.querySelector('.split-drop-zone')).toBeNull()
   })
 })

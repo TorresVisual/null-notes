@@ -3437,15 +3437,16 @@ li .fold-toggle { left: -2.4em; }
 
 .split-drop-zone {
   position: absolute;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  width: 25%;
   background: var(--accent-bg-hover);
-  border-left: 2px solid var(--accent);
   pointer-events: none;
   z-index: 1;
 }
+
+.split-drop-zone--right { top: 0; right: 0; bottom: 0; width: 25%; border-left: 2px solid var(--accent); }
+.split-drop-zone--left { top: 0; left: 0; bottom: 0; width: 25%; border-right: 2px solid var(--accent); }
+.split-drop-zone--up { top: 0; left: 0; right: 0; height: 25%; border-bottom: 2px solid var(--accent); }
+.split-drop-zone--down { bottom: 0; left: 0; right: 0; height: 25%; border-top: 2px solid var(--accent); }
+.split-drop-zone--center { inset: 0; border: 2px solid var(--accent); }
 
 /* Folder context menu */
 .context-menu {
