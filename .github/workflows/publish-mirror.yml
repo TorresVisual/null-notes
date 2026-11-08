@@ -24,6 +24,11 @@ jobs:
     env:
       TAG: ${{ github.event.release.tag_name || inputs.tag }}
     steps:
+      - uses: actions/checkout@v7
+        with:
+          sparse-checkout: src-tauri/icons/icon.png
+          sparse-checkout-cone-mode: false
+
       - name: Download release assets
         env:
           GH_TOKEN: ${{ github.token }}
