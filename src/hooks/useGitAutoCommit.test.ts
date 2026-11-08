@@ -50,6 +50,38 @@ describe('useGitAutoCommit', () => {
     expect(useWorkspaceStore.getState().gitCommitStatus).toBe('committed')
   })
 
+  it('keeps a path queued while the commit was running', async () => {
+    git.autoCommit.mockImplementation(async () => {
+      useWorkspaceStore.getState().addGitPendingPath('/ws/map.canvas')
+      return { kind: 'committed' }
+    })
+    renderHook(() => useGitAutoCommit())
+
+    useWorkspaceStore.getState().addGitPendingPath('/ws/a.md')
+    await act(() => vi.advanceTimersByTimeAsync(10 * 60_000))
+
+    expect(useWorkspaceStore.getState().gitPendingPaths).toEqual(['/ws/map.canvas'])
+  })
+
+  it('sweeps the whole workspace once after opening it, for changes lost with the previous session', async () => {
+    git.autoCommit.mockResolvedValue({ kind: 'nothingToCommit' })
+    renderHook(() => useGitAutoCommit())
+
+    await act(() => vi.advanceTimersByTimeAsync(10 * 60_000))
+
+    expect(git.autoCommit).toHaveBeenCalledTimes(1)
+    expect(git.autoCommit).toHaveBeenCalledWith('/ws', 'notesOnly', ['.'], false)
+  })
+
+  it('does not sweep a code repo', async () => {
+    useWorkspaceStore.setState({ repoMode: 'codeRepo' })
+    renderHook(() => useGitAutoCommit())
+
+    await act(() => vi.advanceTimersByTimeAsync(60 * 60_000))
+
+    expect(git.autoCommit).not.toHaveBeenCalled()
+  })
+
   it('does nothing when auto-commit is off', async () => {
     useWorkspaceStore.setState({
       git: { prompted: true, autoCommit: false, idleMinutes: 10, skipHooks: false, autoPush: false, allowCodeRepoPush: false },

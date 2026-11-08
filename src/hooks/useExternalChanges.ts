@@ -6,6 +6,14 @@ import { useBookmarksStore } from '../store/bookmarks'
 import { useBaseRowsStore } from '../store/baseRows'
 import { refreshTree, refreshTags } from './useWorkspace'
 
+// The watcher sees every create, edit and delete under the workspace, whoever
+// made it — the CLI, a file manager, a git pull. Queueing its paths means a
+// delete (which no editor save ever announces) still reaches the auto-commit.
+function queueForCommit(paths: string[]) {
+  const { addGitPendingPath } = useWorkspaceStore.getState()
+  for (const path of paths) addGitPendingPath(path)
+}
+
 // Files are the source of truth, so anything that edits them — another editor,
 // a git pull, a sync client — has to be able to move the index and the tree.
 export function useExternalChanges() {
@@ -21,7 +29,8 @@ export function useExternalChanges() {
   }, [])
 
   useEffect(() => {
-    const unlisten = listen('canvas-changed', () => {
+    const unlisten = listen<string[]>('canvas-changed', (event) => {
+      queueForCommit(event.payload)
       void refreshTree()
       void useBaseRowsStore.getState().reload()
     })
@@ -32,6 +41,7 @@ export function useExternalChanges() {
     const unlisten = listen<string[]>('workspace-changed', async (event) => {
       const workspace = useWorkspaceStore.getState().path
       if (!workspace) return
+      queueForCommit(event.payload)
       await Promise.all(
         event.payload.map((path) => api.notes.reindexFromDisk(path, workspace)),
       )

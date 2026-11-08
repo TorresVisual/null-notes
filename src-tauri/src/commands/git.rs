@@ -2619,6 +2619,41 @@ mod tests {
         );
     }
 
+    #[test]
+    fn auto_commit_stages_deleted_canvas_and_base_files() {
+        let tmp = tempdir().unwrap();
+        git_init(tmp.path());
+        commit_note_file(
+            tmp.path(),
+            "map.canvas",
+            "{}
+",
+            "add canvas",
+        );
+        commit_note_file(
+            tmp.path(),
+            "tasks.base",
+            "views: []
+",
+            "add base",
+        );
+        std::fs::remove_file(tmp.path().join("map.canvas")).unwrap();
+        std::fs::remove_file(tmp.path().join("tasks.base")).unwrap();
+
+        let outcome = checked_auto_commit(
+            &tmp.path().to_string_lossy(),
+            RepoMode::NotesOnly,
+            &[
+                tmp.path().join("map.canvas").to_string_lossy().into_owned(),
+                tmp.path().join("tasks.base").to_string_lossy().into_owned(),
+            ],
+            false,
+        )
+        .unwrap();
+
+        assert_eq!(outcome, CommitOutcome::Committed);
+    }
+
     // The far more common real-world case P5-1 was built for: the workspace
     // is already someone's existing repo, never created through this app's
     // own init flow, so nothing has ever written its .gitignore.

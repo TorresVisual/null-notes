@@ -115,7 +115,7 @@ interface WorkspaceStore {
   // order — what the next batched commit will touch.
   gitPendingPaths: string[]
   addGitPendingPath: (path: string) => void
-  clearGitPendingPaths: () => void
+  clearGitPendingPaths: (committed?: string[]) => void
   gitCommitStatus: GitCommitStatus
   setGitCommitStatus: (status: GitCommitStatus) => void
   // The specific reason behind a 'skipped'/'error'/'pushFailed' status —
@@ -337,7 +337,12 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
     if (gitPendingPaths.includes(path)) return
     set({ gitPendingPaths: [...gitPendingPaths, path] })
   },
-  clearGitPendingPaths: () => set({ gitPendingPaths: [] }),
+  // Only the batch that was committed: a path queued while the commit ran must
+  // survive, or its change waits for the next relaunch's "Sync now".
+  clearGitPendingPaths: (committed) =>
+    set({
+      gitPendingPaths: committed ? get().gitPendingPaths.filter((p) => !committed.includes(p)) : [],
+    }),
   setGitCommitStatus: (status) => set({ gitCommitStatus: status }),
   setGitCommitDetail: (detail) => set({ gitCommitDetail: detail }),
   setGitDiverged: (d) => set({ gitDiverged: d }),

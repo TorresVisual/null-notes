@@ -51,13 +51,14 @@ export function useGitAutoCommit() {
       // back to the whole workspace and lets git decide what is dirty (#129).
       if (gitPendingPaths.length === 0 && !force) return
 
-      const paths = gitPendingPaths.length > 0 ? gitPendingPaths : ['.']
+      const queued = gitPendingPaths.length > 0
+      const paths = queued ? gitPendingPaths : ['.']
       setGitCommitStatus('committing')
       setGitCommitDetail(null)
       try {
         const outcome = await api.git.autoCommit(path, repoMode, paths, git.skipHooks)
         if (outcome.kind === 'committed') {
-          clearGitPendingPaths()
+          clearGitPendingPaths(queued ? paths : undefined)
           setGitCommitStatus('committed')
           // "Committed" would otherwise sit in the tab bar indefinitely until
           // the next commit cycle — revert to idle so it reads as a
@@ -79,7 +80,7 @@ export function useGitAutoCommit() {
             await pushIfAllowed(path, repoMode, git)
           }
         } else if (outcome.kind === 'nothingToCommit') {
-          clearGitPendingPaths()
+          clearGitPendingPaths(queued ? paths : undefined)
           setGitCommitStatus('idle')
         } else if (outcome.kind === 'hookFailed') {
           // Leave the batch pending so the next trigger retries rather than
@@ -102,6 +103,21 @@ export function useGitAutoCommit() {
   const gitPendingPaths = useWorkspaceStore((s) => s.gitPendingPaths)
   const idleMinutes = useWorkspaceStore((s) => s.git.idleMinutes)
   const autoCommit = useWorkspaceStore((s) => s.git.autoCommit)
+  const workspacePath = useWorkspaceStore((s) => s.path)
+  const repoMode = useWorkspaceStore((s) => s.repoMode)
+
+  // The pending list lives in memory, so whatever was edited or deleted before
+  // the last quit or crash is on disk but in no list. One sweep per workspace
+  // open picks it up; a code repo is excluded because its dirty files are not
+  // all ours to commit.
+  const sweepsWorkspace = !!workspacePath && autoCommit && !!repoMode && repoMode !== 'codeRepo'
+  useEffect(() => {
+    if (!sweepsWorkspace) return
+    const timer = setTimeout(() => void flushGitCommit(true), idleMinutes * 60_000)
+    return () => clearTimeout(timer)
+    // idleMinutes is deliberately omitted: changing it mid-session must not re-sweep.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [workspacePath, sweepsWorkspace, flushGitCommit])
 
   useEffect(() => {
     if (!autoCommit || gitPendingPaths.length === 0) return

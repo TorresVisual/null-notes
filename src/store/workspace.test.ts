@@ -375,6 +375,13 @@ describe('useWorkspaceStore', () => {
     expect(useWorkspaceStore.getState().gitPendingPaths).toEqual([])
   })
 
+  it('clearGitPendingPaths keeps paths queued after the committed batch was taken', () => {
+    useWorkspaceStore.getState().addGitPendingPath('/ws/a.md')
+    useWorkspaceStore.getState().addGitPendingPath('/ws/map.canvas')
+    useWorkspaceStore.getState().clearGitPendingPaths(['/ws/a.md'])
+    expect(useWorkspaceStore.getState().gitPendingPaths).toEqual(['/ws/map.canvas'])
+  })
+
   it('setSecondaryTab opens a second pane on an already-open tab without changing activeTab', () => {
     useWorkspaceStore.getState().openTab('/ws/a.md')
     useWorkspaceStore.getState().openTab('/ws/b.md')
