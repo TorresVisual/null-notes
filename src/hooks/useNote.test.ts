@@ -295,6 +295,7 @@ describe('useNote', () => {
     })
 
     expect(result.current.conflict).toBe(false)
+    notes.save.mockResolvedValue(undefined)
     await act(async () => finish.forEach((f) => f()))
   })
 
