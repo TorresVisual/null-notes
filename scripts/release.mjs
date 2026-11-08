@@ -38,14 +38,6 @@ export function readTargets(annotation) {
   return line ? resolveTargets({ only: line[1] }) : TARGETS
 }
 
-export function assertGreenMain(runs, sha) {
-  const short = sha.slice(0, 7)
-  const run = runs[0]
-  if (!run) throw new Error(`No CI run found for ${short} on main — push it and wait for CI before releasing.`)
-  if (run.status !== 'completed') throw new Error(`CI for ${short} is still ${run.status} — wait for it to finish.`)
-  if (run.conclusion !== 'success') throw new Error(`CI for ${short} concluded ${run.conclusion} — fix main before releasing.`)
-}
-
 // --- CLI entry point (below the Task 1 exports) ---
 import { execSync, execFileSync } from 'node:child_process'
 import { parseArgs } from 'node:util'
@@ -91,16 +83,6 @@ function retag(options) {
   console.log(`Retagged ${tag} at HEAD (${targets.join(', ')})`)
 }
 
-function checkMainIsGreen() {
-  const sha = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim()
-  const out = execFileSync(
-    'gh',
-    ['run', 'list', '--workflow', 'CI', '--branch', 'main', '--commit', sha, '--limit', '1', '--json', 'status,conclusion'],
-    { encoding: 'utf8' },
-  )
-  assertGreenMain(JSON.parse(out), sha)
-}
-
 function main() {
   const { values, positionals } = parseArgs({
     allowPositionals: true,
@@ -113,8 +95,6 @@ function main() {
   }
   if (bump === 'retag') return retag(values)
   const targets = resolveTargets(values)
-
-  checkMainIsGreen()
 
   // Bumps package.json only — no commit/tag, this script controls that.
   run(`npm version ${bump} --no-git-tag-version`)

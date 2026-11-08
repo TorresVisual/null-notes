@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { updateTauriConf, updateCargoToml, assertRetaggable, assertGreenMain, resolveTargets, tagMessages, tagArgs, readTargets, TARGETS } from './release.mjs'
+import { updateTauriConf, updateCargoToml, assertRetaggable, resolveTargets, tagMessages, tagArgs, readTargets, TARGETS } from './release.mjs'
 
 describe('updateTauriConf', () => {
   it('replaces the version field and preserves formatting', () => {
@@ -25,20 +25,6 @@ describe('updateCargoToml', () => {
     const output = updateCargoToml(input, '0.2.0')
     expect(output).toContain('\nversion = "0.2.0"\n')
     expect(output).toContain('serde = { version = "1.0", features = ["derive"] }')
-  })
-})
-
-describe('assertGreenMain', () => {
-  const sha = 'abcdef1234567890'
-
-  it('passes for a completed successful run', () => {
-    expect(() => assertGreenMain([{ status: 'completed', conclusion: 'success' }], sha)).not.toThrow()
-  })
-
-  it('refuses a missing, running or failed run', () => {
-    expect(() => assertGreenMain([], sha)).toThrow(/No CI run/)
-    expect(() => assertGreenMain([{ status: 'in_progress', conclusion: '' }], sha)).toThrow(/still in_progress/)
-    expect(() => assertGreenMain([{ status: 'completed', conclusion: 'failure' }], sha)).toThrow(/concluded failure/)
   })
 })
 
