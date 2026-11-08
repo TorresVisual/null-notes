@@ -7,6 +7,8 @@ import { useSettingsStore, DEFAULT_SETTINGS } from '../store/settings'
 import { useNote } from '../hooks/useNote'
 import { api } from '../lib/tauri'
 import { platform } from '@tauri-apps/plugin-os'
+import { listen } from '@tauri-apps/api/event'
+import { acquireNote, saveNote, releaseNote, useNoteBuffers } from '../store/noteBuffers'
 
 vi.mock('@tauri-apps/api/event', () => ({
   listen: vi.fn().mockResolvedValue(vi.fn()),
@@ -53,7 +55,12 @@ vi.mock('../lib/tauri', () => ({
     },
     terminal: { close: vi.fn().mockResolvedValue(undefined) },
     window: { confirmClose: vi.fn().mockResolvedValue(undefined) },
+    assets: { gc: vi.fn().mockResolvedValue(undefined) },
+    cli: { reportDirtyPaths: vi.fn().mockResolvedValue(undefined) },
     notes: {
+      open: vi.fn().mockResolvedValue('# Note\n'),
+      save: vi.fn().mockResolvedValue(undefined),
+      reindex: vi.fn().mockResolvedValue(undefined),
       notesWithTag: vi.fn().mockResolvedValue([]),
       listOpenTasks: vi.fn().mockResolvedValue([]),
       listDueCards: vi.fn().mockResolvedValue([]),
@@ -382,5 +389,36 @@ describe('Layout on a phone', () => {
     expect(container.querySelector('.titlebar')).toBeNull()
     expect(container.querySelector('aside.sidebar')).toBeNull()
     vi.mocked(platform).mockReturnValue('windows')
+  })
+})
+
+describe('Layout window close', () => {
+  it('writes every dirty note buffer before confirming the close', async () => {
+    let closeRequested: () => Promise<void> = async () => {}
+    vi.mocked(listen).mockImplementation(((event: string, handler: () => Promise<void>) => {
+      if (event === 'close-requested') closeRequested = handler
+      return Promise.resolve(vi.fn())
+    }) as unknown as typeof listen)
+    useWorkspaceStore.setState({ path: '/ws', activeTab: null, tagFilter: null })
+    acquireNote('/ws/a.md')
+    acquireNote('/ws/b.md')
+    await waitFor(() => {
+      const { buffers } = useNoteBuffers.getState()
+      expect(buffers['/ws/a.md']?.loadedPath).toBe('/ws/a.md')
+      expect(buffers['/ws/b.md']?.loadedPath).toBe('/ws/b.md')
+    })
+    saveNote('/ws/a.md', '# A\nx')
+    saveNote('/ws/b.md', '# B\ny')
+
+    render(<Layout />)
+    await act(async () => {
+      await closeRequested()
+    })
+
+    expect(api.notes.save).toHaveBeenCalledWith('/ws', '/ws/a.md', '# A\nx')
+    expect(api.notes.save).toHaveBeenCalledWith('/ws', '/ws/b.md', '# B\ny')
+    expect(api.window.confirmClose).toHaveBeenCalled()
+    releaseNote('/ws/a.md')
+    releaseNote('/ws/b.md')
   })
 })

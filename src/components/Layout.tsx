@@ -35,6 +35,7 @@ import { useNotesStore } from '../store/notes'
 import { useSettingsStore } from '../store/settings'
 import { clampZoom } from '../lib/zoom'
 import { useNote } from '../hooks/useNote'
+import { flushAllNotes } from '../store/noteBuffers'
 import { useResetPageScroll } from '../hooks/useResetPageScroll'
 import { useCreateCanvas } from '../hooks/useCreateCanvas'
 import { isBasePath, isCanvasPath } from '../lib/canvasPath'
@@ -116,7 +117,6 @@ export function Layout() {
     isLoading,
     saveState,
     saveError,
-    flush,
     retrySave,
     dismissError,
     conflict,
@@ -156,7 +156,6 @@ export function Layout() {
     isLoading: secondaryLoading,
     saveState: secondarySaveState,
     saveError: secondarySaveError,
-    flush: flushSecondary,
     retrySave: retrySecondarySave,
     dismissError: dismissSecondaryError,
     conflict: secondaryConflict,
@@ -189,8 +188,7 @@ export function Layout() {
   useEffect(() => {
     const unlisten = listen('close-requested', async () => {
       try {
-        await flush()
-        await flushSecondary()
+        await flushAllNotes()
         await flushAllCanvases()
         await saveSession()
         // A hung commit hook or push must not trap the window open; the
@@ -208,7 +206,7 @@ export function Layout() {
       }
     })
     return () => void unlisten.then((off) => off())
-  }, [flush, flushSecondary, saveSession, flushGitCommit])
+  }, [saveSession, flushGitCommit])
 
   // #77: the open-time check in useWorkspace only ever fires once, so a
   // workspace left open never learns it fell behind a remote another
@@ -270,11 +268,10 @@ export function Layout() {
   // trashed source back to disk.
   const flushThenMerge = useCallback(
     async (source: string, dest: string) => {
-      await flush()
-      await flushSecondary()
+      await flushAllNotes()
       await mergeNotes(source, dest)
     },
-    [flush, flushSecondary],
+    [],
   )
 
   useEffect(() => {
