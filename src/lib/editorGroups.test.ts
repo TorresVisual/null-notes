@@ -55,14 +55,14 @@ describe('openIn', () => {
   it('opens in the focused group by default', () => {
     const l = openIn(split(A), B)
     expect(l.groups[1]).toMatchObject({ tabs: [A, B], active: B })
-    expect(l.groups[0].tabs).toEqual([A])
+    expect(l.groups[0]?.tabs).toEqual([A])
   })
 
   it('forces canvas and base paths into group 0 and focuses it', () => {
     const two = split(A)
     expect(openIn(two, CANVAS, 1)).toMatchObject({ focused: 0 })
-    expect(openIn(two, CANVAS, 1).groups[0].tabs).toEqual([A, CANVAS])
-    expect(openIn(two, BASE).groups[1].tabs).toEqual([A])
+    expect(openIn(two, CANVAS, 1).groups[0]?.tabs).toEqual([A, CANVAS])
+    expect(openIn(two, BASE).groups[1]?.tabs).toEqual([A])
   })
 })
 
@@ -81,13 +81,13 @@ describe('closeTabIn', () => {
     const l = closeTabIn(split(A), A, 1)
     expect(l.groups).toHaveLength(1)
     expect(l.focused).toBe(0)
-    expect(l.groups[0].tabs).toEqual([A])
+    expect(l.groups[0]?.tabs).toEqual([A])
   })
 
   it('removes an emptied group 0 and the survivor becomes group 0', () => {
     const l = closeTabIn(openIn(split(A), B), A, 0)
     expect(l.groups).toHaveLength(1)
-    expect(l.groups[0].tabs).toEqual([A, B])
+    expect(l.groups[0]?.tabs).toEqual([A, B])
     expect(l.focused).toBe(0)
   })
 
@@ -99,7 +99,7 @@ describe('closeTabIn', () => {
 
   it('drops the pin of a closed tab', () => {
     const l = closeTabIn(pinToggle(open(A, B), A, 0), A, 0)
-    expect(l.groups[0].pinned).toEqual([])
+    expect(l.groups[0]?.pinned).toEqual([])
   })
 })
 
@@ -114,7 +114,7 @@ describe('splitActive', () => {
 
   it('left puts the new group at index 0 in a row', () => {
     const l = splitActive(open(A), 'left')
-    expect(l.groups[0].tabs).toEqual([A])
+    expect(l.groups[0]?.tabs).toEqual([A])
     expect(l).toMatchObject({ focused: 0, direction: 'row' })
   })
 
@@ -125,7 +125,7 @@ describe('splitActive', () => {
 
   it('copies the source group view mode', () => {
     const l = splitActive(setViewMode(open(A), 0, 'raw'), 'right')
-    expect(l.groups[1].viewMode).toBe('raw')
+    expect(l.groups[1]?.viewMode).toBe('raw')
   })
 
   it('is a no-op on a canvas, a base, with no active tab, or with two groups', () => {
@@ -150,9 +150,9 @@ describe('moveTab', () => {
 
   it('copies instead of moving when asked', () => {
     const l = moveTab(split(A, B), A, 0, 1, true)
-    expect(l.groups[0].tabs).toEqual([A, B])
-    expect(l.groups[1].tabs).toEqual([B, A])
-    expect(l.groups[1].active).toBe(A)
+    expect(l.groups[0]?.tabs).toEqual([A, B])
+    expect(l.groups[1]?.tabs).toEqual([B, A])
+    expect(l.groups[1]?.active).toBe(A)
   })
 
   it('closes the source group when its last tab leaves', () => {
@@ -162,7 +162,7 @@ describe('moveTab', () => {
     const two = openIn(split(A), B)
     const moved = moveTab(moveTab(two, A, 1, 0, false), B, 1, 0, false)
     expect(moved.groups).toHaveLength(1)
-    expect(moved.groups[0].tabs).toEqual([A, B])
+    expect(moved.groups[0]?.tabs).toEqual([A, B])
     expect(moved.focused).toBe(0)
   })
 
@@ -175,8 +175,8 @@ describe('moveTab', () => {
 
   it('does not carry the pin across', () => {
     const l = moveTab(pinToggle(split(A, B), A, 0), A, 0, 1, true)
-    expect(l.groups[1].pinned).toEqual([])
-    expect(l.groups[0].pinned).toEqual([A])
+    expect(l.groups[1]?.pinned).toEqual([])
+    expect(l.groups[0]?.pinned).toEqual([A])
   })
 
   it('is a no-op within one group or with a single group', () => {
@@ -191,14 +191,14 @@ describe('closeGroup', () => {
     const two = openIn(split(A, B), C)
     const { layout, dropped } = closeGroup(two, 1)
     expect(layout.groups).toHaveLength(1)
-    expect(layout.groups[0].tabs).toEqual([A, B])
+    expect(layout.groups[0]?.tabs).toEqual([A, B])
     expect(dropped).toEqual([C])
     expect(layout.focused).toBe(0)
   })
 
   it('closing group 0 leaves group 1 as the only group', () => {
     const { layout, dropped } = closeGroup(openIn(split(A), B, 0), 0)
-    expect(layout.groups[0].tabs).toEqual([A])
+    expect(layout.groups[0]?.tabs).toEqual([A])
     expect(dropped).toEqual([B])
   })
 
@@ -238,12 +238,12 @@ describe('pinning and order', () => {
   it('pinning moves the tab to the pinned prefix', () => {
     const l = pinToggle(open(A, B, C), C, 0)
     expect(l.groups[0]).toMatchObject({ tabs: [C, A, B], pinned: [C] })
-    expect(pinToggle(l, C, 0).groups[0].pinned).toEqual([])
+    expect(pinToggle(l, C, 0).groups[0]?.pinned).toEqual([])
   })
 
   it('reorderIn moves a tab before another within its group', () => {
     const l = reorderIn(open(A, B, C), C, A, 0)
-    expect(l.groups[0].tabs).toEqual([C, A, B])
+    expect(l.groups[0]?.tabs).toEqual([C, A, B])
   })
 
   it('reorderIn refuses to cross the pinned boundary', () => {
@@ -264,19 +264,19 @@ describe('path rewrites across groups', () => {
     const l = openIn(split('/ws/dir/a.md', '/ws/keep.md'), '/ws/dir/b.md')
     const r = removeUnder(l, '/ws/dir')
     expect(r.groups).toHaveLength(2)
-    expect(r.groups[0].tabs).toEqual(['/ws/keep.md'])
-    expect(r.groups[1].tabs).toEqual(['/ws/keep.md'])
-    expect(r.groups[1].active).toBe('/ws/keep.md')
+    expect(r.groups[0]?.tabs).toEqual(['/ws/keep.md'])
+    expect(r.groups[1]?.tabs).toEqual(['/ws/keep.md'])
+    expect(r.groups[1]?.active).toBe('/ws/keep.md')
     expect(r.focused).toBeLessThan(r.groups.length)
   })
 
   it('removeUnder collapses a group that empties and refocuses the survivor', () => {
     const l = moveTab(openIn(split('/ws/keep.md'), '/ws/dir/a.md', 1), '/ws/keep.md', 1, 0, false)
-    expect(l.groups[1].tabs).toEqual(['/ws/dir/a.md'])
+    expect(l.groups[1]?.tabs).toEqual(['/ws/dir/a.md'])
     const r = removeUnder(setFocused(l, 1), '/ws/dir')
     expect(r.groups).toHaveLength(1)
     expect(r.focused).toBe(0)
-    expect(r.groups[0].tabs).toEqual(['/ws/keep.md'])
+    expect(r.groups[0]?.tabs).toEqual(['/ws/keep.md'])
   })
 
   it('removeUnder leaves one empty group when everything goes', () => {
