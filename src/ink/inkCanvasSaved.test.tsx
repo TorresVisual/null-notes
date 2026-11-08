@@ -202,7 +202,7 @@ describe('Delete reaches only the canvas that owns the selection', () => {
     selectStrokeIn(container)
     useInkStore.getState().setActiveCanvas('/ws/N.ink/b.svg', {
       undo: vi.fn(), redo: vi.fn(), canUndo: false, canRedo: false, deleteSelected: vi.fn(),
-      hasSelection: false, toggleRuler: vi.fn(), rulerOn: false, zoom: 1, setZoom: vi.fn(),
+      hasSelection: false, toggleRuler: vi.fn(), rulerOn: false, zoom: 1, setZoom: vi.fn(), cropToContent: vi.fn(),
     })
     write.mockClear()
 

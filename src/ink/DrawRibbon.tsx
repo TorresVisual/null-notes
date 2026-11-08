@@ -3,6 +3,7 @@ import {
   Eraser,
   Lasso,
   Type,
+  Crop,
   Ruler as RulerIcon,
   Trash2,
   Undo2,
@@ -154,6 +155,15 @@ export function DrawRibbon({ onDone }: DrawRibbonProps) {
           title="Ruler — draw along its edge; drag the middle to slide it, an end to swing it"
         >
           <RulerIcon size={ICON_SIZE} />
+        </button>
+        <button
+          type="button"
+          className="ink-tool"
+          onClick={active?.cropToContent}
+          aria-label="Crop to content"
+          title="Crop to content — trim the empty page around your drawing"
+        >
+          <Crop size={ICON_SIZE} />
         </button>
         <ToolFlyout
           className="ink-tool"

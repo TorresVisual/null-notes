@@ -16,7 +16,7 @@ import { drawShapePreview } from './shapePreview'
 import { drawTextItem } from './textRender'
 import { pointInTextItem, translateTextItem, boundsOfTextItem } from './textBounds'
 import { backingScale } from './zoom'
-import { EMPTY_BOUNDS, growCanvas, boundsOfPoints, type Bounds } from './growCanvas'
+import { EMPTY_BOUNDS, cropToContent as cropPage, growCanvas, boundsOfPoints, type Bounds } from './growCanvas'
 import { straightLineEnds } from './straighten'
 import { paintOrder } from './paintOrder'
 import { strokeOptions } from './strokeOptions'
@@ -376,6 +376,11 @@ export function useInkCanvas(
     setInkData(next)
     save(next)
   }, [history, future, inkData, save])
+
+  const cropToContent = useCallback(() => {
+    const next = cropPage(inkData)
+    if (next !== inkData) commit(next)
+  }, [inkData, commit])
 
   const startNewText = useCallback(
     (x: number, y: number) => {
@@ -915,6 +920,7 @@ export function useInkCanvas(
     inkData,
     undo,
     redo,
+    cropToContent,
     canUndo: history.length > 0,
     canRedo: future.length > 0,
     editingText,

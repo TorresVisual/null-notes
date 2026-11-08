@@ -67,6 +67,7 @@ function spyHandle(): CanvasHandle {
     rulerOn: false,
     zoom: 1,
     setZoom: vi.fn(),
+    cropToContent: vi.fn(),
   }
 }
 

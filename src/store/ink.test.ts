@@ -107,6 +107,7 @@ function handle(overrides: Partial<CanvasHandle> = {}): CanvasHandle {
     rulerOn: false,
     zoom: 1,
     setZoom: () => {},
+    cropToContent: () => {},
     ...overrides,
   }
 }

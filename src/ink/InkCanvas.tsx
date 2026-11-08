@@ -64,6 +64,7 @@ export function InkCanvas({
     inkData,
     undo,
     redo,
+    cropToContent,
     canUndo,
     canRedo,
     editingText,
@@ -93,8 +94,9 @@ export function InkCanvas({
       rulerOn: ruler !== null,
       zoom,
       setZoom: (next: number) => onZoomChange?.(next),
+      cropToContent,
     }),
-    [undo, redo, canUndo, canRedo, deleteSelected, hasSelection, toggleRuler, ruler, zoom, onZoomChange],
+    [undo, redo, cropToContent, canUndo, canRedo, deleteSelected, hasSelection, toggleRuler, ruler, zoom, onZoomChange],
   )
 
   // Re-registered whenever a value the bar renders changes, so `canUndo` in the
