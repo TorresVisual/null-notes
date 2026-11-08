@@ -3422,8 +3422,6 @@ li .fold-toggle { left: -2.4em; }
   overflow: hidden;
 }
 
-.editor-group--focused > .tab-bar { box-shadow: inset 0 2px 0 var(--accent); }
-
 .split-divider {
   flex: none;
   background: var(--border);
