@@ -22,8 +22,6 @@ export function useGitConfig() {
         git,
         openTabs,
         activeTab,
-        secondaryTab,
-        splitRatio,
         sidebarCollapsed,
         tagsCollapsed,
         pinnedTabs,
@@ -37,8 +35,6 @@ export function useGitConfig() {
       await api.workspace.save(path, {
         openTabs,
         activeTab,
-        secondaryTab,
-        splitRatio,
         sidebarCollapsed,
         tagsCollapsed,
         pinnedTabs,

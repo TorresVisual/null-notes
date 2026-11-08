@@ -41,8 +41,6 @@ describe('useGitConfig', () => {
     expect(workspace.save).toHaveBeenCalledWith('/ws', {
       openTabs: ['/ws/a.md'],
       activeTab: '/ws/a.md',
-      secondaryTab: null,
-      splitRatio: 0.5,
       sidebarCollapsed: false,
       tagsCollapsed: false,
       pinnedTabs: [],

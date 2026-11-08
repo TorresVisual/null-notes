@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { useWorkspaceStore } from './workspace'
+import { initialLayout } from '../lib/editorGroups'
+import { goBack } from '../lib/navigationHistory'
 
 const reset = () =>
   useWorkspaceStore.setState({
@@ -7,8 +9,7 @@ const reset = () =>
     openTabs: [],
     pinnedTabs: [],
     activeTab: null,
-    secondaryTab: null,
-    splitRatio: 0.5,
+    layout: initialLayout(),
     closedTabs: [],
     canvasViewports: {},
     expandedFolders: [],
@@ -98,18 +99,6 @@ describe('useWorkspaceStore', () => {
       state().replaceOpenPath('/ws/C1', '/ws/C2')
       expect(state().pinnedTabs).toEqual(['/ws/C2/a.md'])
     })
-  })
-
-  it('refuses to open a canvas in the secondary pane', () => {
-    useWorkspaceStore.getState().setSecondaryTab('/ws/map.canvas')
-    expect(useWorkspaceStore.getState().secondaryTab).toBeNull()
-    expect(useWorkspaceStore.getState().openTabs).not.toContain('/ws/map.canvas')
-  })
-
-  it('refuses to open a base in the secondary pane', () => {
-    useWorkspaceStore.getState().setSecondaryTab('/ws/Tasks.base')
-    expect(useWorkspaceStore.getState().secondaryTab).toBeNull()
-    expect(useWorkspaceStore.getState().openTabs).not.toContain('/ws/Tasks.base')
   })
 
   describe('canvas viewports', () => {
@@ -382,63 +371,182 @@ describe('useWorkspaceStore', () => {
     expect(useWorkspaceStore.getState().gitPendingPaths).toEqual(['/ws/map.canvas'])
   })
 
-  it('setSecondaryTab opens a second pane on an already-open tab without changing activeTab', () => {
-    useWorkspaceStore.getState().openTab('/ws/a.md')
-    useWorkspaceStore.getState().openTab('/ws/b.md')
-    useWorkspaceStore.getState().setSecondaryTab('/ws/a.md')
-    expect(useWorkspaceStore.getState().secondaryTab).toBe('/ws/a.md')
-    expect(useWorkspaceStore.getState().activeTab).toBe('/ws/b.md')
-  })
+  describe('editor groups', () => {
+    const st = () => useWorkspaceStore.getState()
+    const A = '/ws/a.md'
+    const B = '/ws/b.md'
+    const C = '/ws/c.md'
 
-  it('setSecondaryTab adds the path to openTabs if it was not already open', () => {
-    useWorkspaceStore.getState().openTab('/ws/a.md')
-    useWorkspaceStore.getState().setSecondaryTab('/ws/c.md')
-    expect(useWorkspaceStore.getState().openTabs).toEqual(['/ws/a.md', '/ws/c.md'])
-    expect(useWorkspaceStore.getState().secondaryTab).toBe('/ws/c.md')
-  })
+    const projectionMatchesFocused = () => {
+      const { layout, openTabs, pinnedTabs, activeTab } = st()
+      expect(layout.groups[layout.focused]).toMatchObject({ tabs: openTabs, pinned: pinnedTabs, active: activeTab })
+    }
 
-  it('setSecondaryTab accepts null to collapse back to single-pane', () => {
-    useWorkspaceStore.getState().openTab('/ws/a.md')
-    useWorkspaceStore.getState().setSecondaryTab('/ws/a.md')
-    useWorkspaceStore.getState().setSecondaryTab(null)
-    expect(useWorkspaceStore.getState().secondaryTab).toBeNull()
-    expect(useWorkspaceStore.getState().openTabs).toEqual(['/ws/a.md'])
-  })
+    it('splitEditor copies the active tab into a focused second group', () => {
+      st().openTab(A)
+      st().openTab(B)
+      st().splitEditor('right')
+      expect(st().layout.groups).toHaveLength(2)
+      expect(st().layout.focused).toBe(1)
+      expect(st().openTabs).toEqual([B])
+      expect(st().activeTab).toBe(B)
+      projectionMatchesFocused()
+    })
 
-  it('closeTab clears secondaryTab when the closed path is the secondary pane', () => {
-    useWorkspaceStore.getState().openTab('/ws/a.md')
-    useWorkspaceStore.getState().openTab('/ws/b.md')
-    useWorkspaceStore.getState().setSecondaryTab('/ws/b.md')
-    useWorkspaceStore.getState().closeTab('/ws/b.md')
-    expect(useWorkspaceStore.getState().secondaryTab).toBeNull()
-  })
+    it('splitEditor does nothing for a canvas or a base', () => {
+      st().openTab('/ws/map.canvas')
+      st().splitEditor('right')
+      st().openTab('/ws/Tasks.base')
+      st().splitEditor('right')
+      expect(st().layout.groups).toHaveLength(1)
+    })
 
-  it('closeTabsUnder clears secondaryTab when it sits under the closed prefix', () => {
-    useWorkspaceStore.getState().openTab('/ws/Course1/a.md')
-    useWorkspaceStore.getState().openTab('/ws/Course10/b.md')
-    useWorkspaceStore.getState().setSecondaryTab('/ws/Course1/a.md')
-    useWorkspaceStore.getState().closeTabsUnder('/ws/Course1')
-    expect(useWorkspaceStore.getState().secondaryTab).toBeNull()
-  })
+    it('the projection follows the focused group through focus changes and tab actions', () => {
+      st().openTab(A)
+      st().openTab(B)
+      st().splitEditor('right')
+      st().openTab(C)
+      projectionMatchesFocused()
+      st().focusGroup(0)
+      expect(st().openTabs).toEqual([A, B])
+      expect(st().activeTab).toBe(B)
+      projectionMatchesFocused()
+      st().togglePinTab(B)
+      expect(st().pinnedTabs).toEqual([B])
+      expect(st().layout.groups[1]?.pinned).toEqual([])
+      projectionMatchesFocused()
+    })
 
-  it('replaceOpenPath rewrites secondaryTab under the old prefix', () => {
-    useWorkspaceStore.getState().openTab('/ws/Course1/a.md')
-    useWorkspaceStore.getState().setSecondaryTab('/ws/Course1/a.md')
-    useWorkspaceStore.getState().replaceOpenPath('/ws/Course1', '/ws/Renamed')
-    expect(useWorkspaceStore.getState().secondaryTab).toBe('/ws/Renamed/a.md')
-  })
+    it('a state seeded directly on the projection fields is picked up by the layout', () => {
+      useWorkspaceStore.setState({ openTabs: [A, B], activeTab: B })
+      expect(st().layout.groups[0]).toMatchObject({ tabs: [A, B], active: B })
+      st().splitEditor('right')
+      expect(st().layout.groups[1]?.tabs).toEqual([B])
+    })
 
-  it('setSplitRatio stores the primary pane width fraction', () => {
-    useWorkspaceStore.getState().setSplitRatio(0.35)
-    expect(useWorkspaceStore.getState().splitRatio).toBe(0.35)
-  })
+    it('closeTab keeps a note open in the other group and does not push closedTabs', () => {
+      st().openTab(A)
+      st().splitEditor('right')
+      st().closeTab(A)
+      expect(st().layout.groups).toHaveLength(1)
+      expect(st().openTabs).toEqual([A])
+      expect(st().closedTabs).toEqual([])
+    })
 
-  it('resetForNewWorkspace clears secondaryTab and splitRatio back to defaults', () => {
-    useWorkspaceStore.getState().openTab('/ws/a.md')
-    useWorkspaceStore.getState().setSecondaryTab('/ws/a.md')
-    useWorkspaceStore.getState().setSplitRatio(0.7)
-    useWorkspaceStore.getState().resetForNewWorkspace()
-    expect(useWorkspaceStore.getState().secondaryTab).toBeNull()
-    expect(useWorkspaceStore.getState().splitRatio).toBe(0.5)
+    it('closeTab pushes closedTabs once the note is open nowhere', () => {
+      st().openTab(A)
+      st().closeTab(A)
+      expect(st().closedTabs).toEqual([A])
+    })
+
+    it('closeTabInGroup and activateTabIn address a specific group', () => {
+      st().openTab(A)
+      st().openTab(B)
+      st().splitEditor('right')
+      st().activateTabIn(A, 0)
+      expect(st().layout.focused).toBe(0)
+      expect(st().activeTab).toBe(A)
+      st().closeTabInGroup(B, 1)
+      expect(st().layout.groups).toHaveLength(1)
+      expect(st().openTabs).toEqual([A, B])
+    })
+
+    it('focusNextGroup is a no-op with one group and cycles with two', () => {
+      st().openTab(A)
+      st().focusNextGroup()
+      expect(st().layout.focused).toBe(0)
+      st().splitEditor('right')
+      st().focusPrevGroup()
+      expect(st().layout.focused).toBe(0)
+      st().focusNextGroup()
+      expect(st().layout.focused).toBe(1)
+      st().focusNextGroup()
+      expect(st().layout.focused).toBe(0)
+    })
+
+    it('closeEditorGroup pushes only notes that fall out of every group', () => {
+      st().openTab(A)
+      st().openTab(B)
+      st().splitEditor('right')
+      st().openTab(C)
+      st().closeEditorGroup()
+      expect(st().layout.groups).toHaveLength(1)
+      expect(st().closedTabs).toEqual([C])
+      projectionMatchesFocused()
+    })
+
+    it('moveTabToGroup moves a tab and collapses an emptied group', () => {
+      st().openTab(A)
+      st().openTab(B)
+      st().splitEditor('right')
+      st().moveTabToGroup(B, 0, false)
+      expect(st().layout.groups).toHaveLength(1)
+      expect(st().openTabs).toEqual([A, B])
+    })
+
+    it('goBack after focusing group 1 opens the note in group 1', () => {
+      st().openTab(A)
+      st().openTab(B)
+      st().splitEditor('right')
+      st().activateTabIn(A, 0)
+      st().focusGroup(1)
+      goBack()
+      expect(st().layout.focused).toBe(1)
+      expect(st().layout.groups[1]?.active).toBe(A)
+    })
+
+    it('reopenClosedTab opens into the focused group', () => {
+      st().openTab(A)
+      st().openTab(B)
+      st().splitEditor('right')
+      st().closeTab(B)
+      st().closeTab(A)
+      st().reopenClosedTab()
+      expect(st().activeTab).toBe(A)
+    })
+
+    it('toggleSplitDirection, setSplitRatio and resetSplitRatio edit the layout', () => {
+      st().toggleSplitDirection()
+      expect(st().layout.direction).toBe('column')
+      st().setSplitRatio(0.95)
+      expect(st().layout.ratio).toBe(0.8)
+      st().resetSplitRatio()
+      expect(st().layout.ratio).toBe(0.5)
+    })
+
+    it('setGroupViewMode sets one group only', () => {
+      st().openTab(A)
+      st().splitEditor('right')
+      st().setGroupViewMode(1, 'raw')
+      expect(st().layout.groups.map((g) => g.viewMode)).toEqual(['wysiwyg', 'raw'])
+    })
+
+    it('replaceOpenPath rewrites both groups', () => {
+      st().openTab('/ws/Course1/a.md')
+      st().splitEditor('right')
+      st().replaceOpenPath('/ws/Course1', '/ws/Renamed')
+      expect(st().layout.groups.map((g) => g.active)).toEqual(['/ws/Renamed/a.md', '/ws/Renamed/a.md'])
+      projectionMatchesFocused()
+    })
+
+    it('closeTabsUnder closes notes in both groups without touching closedTabs', () => {
+      st().openTab('/ws/Course1/a.md')
+      st().openTab(B)
+      st().splitEditor('right')
+      st().openTab('/ws/Course1/a.md')
+      st().closeTabsUnder('/ws/Course1')
+      expect(st().layout.groups.flatMap((g) => g.tabs)).not.toContain('/ws/Course1/a.md')
+      expect(st().closedTabs).toEqual([])
+      projectionMatchesFocused()
+    })
+
+    it('resetForNewWorkspace returns to one empty group', () => {
+      st().openTab(A)
+      st().splitEditor('right')
+      st().setSplitRatio(0.7)
+      st().resetForNewWorkspace()
+      expect(st().layout).toEqual(initialLayout())
+      expect(st().openTabs).toEqual([])
+    })
   })
 })

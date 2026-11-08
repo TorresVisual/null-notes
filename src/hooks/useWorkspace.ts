@@ -38,8 +38,6 @@ export function useWorkspace() {
       path,
       openTabs,
       activeTab,
-      secondaryTab,
-      splitRatio,
       sidebarCollapsed,
       tagsCollapsed,
       pinnedTabs,
@@ -52,8 +50,6 @@ export function useWorkspace() {
     await api.workspace.save(path, {
       openTabs,
       activeTab,
-      secondaryTab,
-      splitRatio,
       sidebarCollapsed,
       tagsCollapsed,
       pinnedTabs,
@@ -88,8 +84,6 @@ export function useWorkspace() {
         setGit,
         setRepoMode,
         setGitPriorAutomation,
-        setSecondaryTab,
-        setSplitRatio,
         setSidebarCollapsed,
         setTagsCollapsed,
         setPinnedTabs,
@@ -120,8 +114,6 @@ export function useWorkspace() {
       setExpandedFolders(session.expandedFolders)
       setRecentSearches(session.recentSearches)
       setGit(session.git)
-      setSecondaryTab(session.secondaryTab ?? null)
-      setSplitRatio(session.splitRatio ?? 0.5)
       setSidebarCollapsed(session.sidebarCollapsed ?? false)
       setTagsCollapsed(session.tagsCollapsed ?? false)
       for (const tab of session.openTabs) {

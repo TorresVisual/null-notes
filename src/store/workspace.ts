@@ -1,6 +1,25 @@
 import { create } from 'zustand'
-import { isBasePath, isCanvasPath } from '../lib/canvasPath'
-import { isUnderPath, replacePathPrefix } from '../lib/pathPrefix'
+import { replacePathPrefix } from '../lib/pathPrefix'
+import {
+  closeGroup,
+  closeTabIn,
+  initialLayout,
+  moveTab,
+  openIn,
+  openPaths,
+  pinToggle,
+  reorderIn,
+  removeUnder,
+  replacePrefixAll,
+  setFocused,
+  setRatio,
+  setViewMode,
+  splitActive,
+  toggleDirection,
+  type GroupLayout,
+  type SplitSide,
+  type ViewMode,
+} from '../lib/editorGroups'
 import { useBookmarksStore } from './bookmarks'
 import type { CanvasViewport, GitWorkspaceConfig, RepoMode, GitCommitStatus, SearchSort } from '../types'
 
@@ -27,21 +46,40 @@ const pinnedFirst = (tabs: string[], pinned: string[]) => [
   ...tabs.filter((p) => !pinned.includes(p)),
 ]
 
+// openTabs/pinnedTabs/activeTab mirror the focused group so the many callers
+// that predate editor groups keep working; commit() is the only writer.
+const project = (layout: GroupLayout) => {
+  const g = layout.groups[layout.focused]
+  return { layout, openTabs: g?.tabs ?? [], pinnedTabs: g?.pinned ?? [], activeTab: g?.active ?? null }
+}
+
+const withActive = (layout: GroupLayout, group: number, path: string | null): GroupLayout => ({
+  ...layout,
+  groups: layout.groups.map((g, i) => (i === group ? { ...g, active: path } : g)),
+})
+
 interface WorkspaceStore {
   path: string | null
-  // Invariant: pinnedTabs ⊆ openTabs, and pinned tabs are a prefix of openTabs,
-  // so tab order (and Ctrl+1..9) is just openTabs order.
+  layout: GroupLayout
+  splitEditor: (side: SplitSide) => void
+  moveTabToGroup: (notePath: string, to: number, copy: boolean) => void
+  focusGroup: (group: number) => void
+  focusNextGroup: () => void
+  focusPrevGroup: () => void
+  closeEditorGroup: () => void
+  toggleSplitDirection: () => void
+  resetSplitRatio: () => void
+  setGroupViewMode: (group: number, mode: ViewMode) => void
+  activateTabIn: (notePath: string, group: number) => void
+  closeTabInGroup: (notePath: string, group: number) => void
+  // Mirror of the focused group. Invariant: pinnedTabs ⊆ openTabs, and pinned
+  // tabs are a prefix of openTabs, so tab order (and Ctrl+1..9) is just
+  // openTabs order.
   openTabs: string[]
   pinnedTabs: string[]
   togglePinTab: (notePath: string) => void
   setPinnedTabs: (paths: string[]) => void
   activeTab: string | null
-  // The second pane's note, or null for today's single-pane layout. A
-  // pointer into openTabs, not a second tab list — see setSecondaryTab.
-  secondaryTab: string | null
-  setSecondaryTab: (notePath: string | null) => void
-  // Primary pane's width as a fraction of the split, 0..1.
-  splitRatio: number
   setSplitRatio: (ratio: number) => void
   // Sidebar rail+panel UI state, persisted per workspace via WorkspaceState.
   sidebarCollapsed: boolean
@@ -146,14 +184,31 @@ interface WorkspaceStore {
   setFlashTabPath: (path: string | null) => void
 }
 
-export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
+export const useWorkspaceStore = create<WorkspaceStore>((set, get) => {
+  const commit = (layout: GroupLayout, extra: Partial<WorkspaceStore> = {}) =>
+    set({ ...project(layout), ...extra })
+
+  const closeIn = (notePath: string, group: number) => {
+    const { layout, closedTabs } = get()
+    const next = closeTabIn(layout, notePath, group)
+    commit(
+      next,
+      openPaths(next).includes(notePath)
+        ? {}
+        : { closedTabs: [...closedTabs, notePath].slice(-CLOSED_TABS_CAP) },
+    )
+  }
+
+  const stepFocus = (step: number) => {
+    const { layout } = get()
+    const n = layout.groups.length
+    if (n > 1) commit(setFocused(layout, (layout.focused + step + n) % n))
+  }
+
+  return {
   path: null,
-  openTabs: [],
-  pinnedTabs: [],
+  ...project(initialLayout()),
   canvasViewports: {},
-  activeTab: null,
-  secondaryTab: null,
-  splitRatio: 0.5,
   sidebarCollapsed: false,
   tagsCollapsed: false,
   closedTabs: [],
@@ -181,28 +236,35 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
 
   setPath: (path) => set({ path, selectedFolder: path }),
 
-  openTab: (notePath) => {
-    const { openTabs } = get()
-    if (openTabs.includes(notePath)) {
-      set({ activeTab: notePath })
-      return
-    }
-    set({ openTabs: [...openTabs, notePath], activeTab: notePath })
+  openTab: (notePath) => commit(openIn(get().layout, notePath)),
+
+  closeTab: (notePath) => closeIn(notePath, get().layout.focused),
+
+  closeTabInGroup: closeIn,
+
+  splitEditor: (side) => commit(splitActive(get().layout, side)),
+
+  moveTabToGroup: (notePath, to, copy) =>
+    commit(moveTab(get().layout, notePath, to === 0 ? 1 : 0, to, copy)),
+
+  focusGroup: (group) => commit(setFocused(get().layout, group)),
+  focusNextGroup: () => stepFocus(1),
+  focusPrevGroup: () => stepFocus(-1),
+
+  closeEditorGroup: () => {
+    const { layout, closedTabs } = get()
+    const closed = closeGroup(layout, layout.focused)
+    if (closed.layout === layout) return
+    commit(closed.layout, { closedTabs: [...closedTabs, ...closed.dropped].slice(-CLOSED_TABS_CAP) })
   },
 
-  closeTab: (notePath) => {
-    const { openTabs, pinnedTabs, activeTab, secondaryTab, closedTabs } = get()
-    const next = openTabs.filter((p) => p !== notePath)
-    const newActive =
-      activeTab === notePath ? (next[next.length - 1] ?? null) : activeTab
-    const nextClosed = [...closedTabs, notePath].slice(-CLOSED_TABS_CAP)
-    set({
-      openTabs: next,
-      pinnedTabs: pinnedTabs.filter((p) => p !== notePath),
-      activeTab: newActive,
-      secondaryTab: secondaryTab === notePath ? null : secondaryTab,
-      closedTabs: nextClosed,
-    })
+  toggleSplitDirection: () => commit(toggleDirection(get().layout)),
+  resetSplitRatio: () => commit(setRatio(get().layout, 0.5)),
+  setGroupViewMode: (group, mode) => commit(setViewMode(get().layout, group, mode)),
+
+  activateTabIn: (notePath, group) => {
+    const { layout } = get()
+    if (layout.groups[group]) commit(withActive(setFocused(layout, group), group, notePath))
   },
 
   reopenClosedTab: () => {
@@ -213,50 +275,36 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
     get().openTab(notePath)
   },
 
-  setActiveTab: (notePath) => set({ activeTab: notePath }),
-
-  setSecondaryTab: (notePath) => {
-    if (notePath !== null && (isCanvasPath(notePath) || isBasePath(notePath))) return
-    if (notePath === null) {
-      set({ secondaryTab: null })
-      return
-    }
-    const { openTabs } = get()
-    if (!openTabs.includes(notePath)) {
-      set({ openTabs: [...openTabs, notePath] })
-    }
-    set({ secondaryTab: notePath })
+  setActiveTab: (notePath) => {
+    const { layout } = get()
+    commit(withActive(layout, layout.focused, notePath))
   },
 
-  setSplitRatio: (ratio) => set({ splitRatio: ratio }),
+  setSplitRatio: (ratio) => commit(setRatio(get().layout, ratio)),
   toggleSidebar: () => set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
   setSidebarCollapsed: (collapsed) => set({ sidebarCollapsed: collapsed }),
   toggleTags: () => set((s) => ({ tagsCollapsed: !s.tagsCollapsed })),
   setTagsCollapsed: (collapsed) => set({ tagsCollapsed: collapsed }),
 
   togglePinTab: (notePath) => {
-    const { openTabs, pinnedTabs } = get()
-    if (!openTabs.includes(notePath)) return
-    const pinned = pinnedTabs.includes(notePath)
-      ? pinnedTabs.filter((p) => p !== notePath)
-      : [...pinnedTabs, notePath]
-    set({ pinnedTabs: pinned, openTabs: pinnedFirst(openTabs, pinned) })
+    const { layout } = get()
+    commit(pinToggle(layout, notePath, layout.focused))
   },
 
   setPinnedTabs: (paths) => {
-    const { openTabs } = get()
+    const { layout, openTabs } = get()
     const pinned = paths.filter((p) => openTabs.includes(p))
-    set({ pinnedTabs: pinned, openTabs: pinnedFirst(openTabs, pinned) })
+    commit({
+      ...layout,
+      groups: layout.groups.map((g, i) =>
+        i === layout.focused ? { ...g, pinned, tabs: pinnedFirst(g.tabs, pinned) } : g,
+      ),
+    })
   },
 
   reorderTabs: (fromPath, toPath) => {
-    if (fromPath === toPath) return
-    const { openTabs, pinnedTabs } = get()
-    if (pinnedTabs.includes(fromPath) !== pinnedTabs.includes(toPath)) return
-    const next = openTabs.filter((p) => p !== fromPath)
-    const toIndex = next.indexOf(toPath)
-    next.splice(toIndex, 0, fromPath)
-    set({ openTabs: next })
+    const { layout } = get()
+    commit(reorderIn(layout, fromPath, toPath, layout.focused))
   },
 
   toggleFolder: (folderPath) => {
@@ -287,32 +335,17 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
 
   replaceOpenPath: (oldPrefix, newPrefix) => {
     useBookmarksStore.getState().rewritePrefix(oldPrefix, newPrefix)
-    const { openTabs, pinnedTabs, activeTab, secondaryTab, expandedFolders, selectedFolder, canvasViewports } = get()
-    set({
+    const { layout, expandedFolders, selectedFolder, canvasViewports } = get()
+    commit(replacePrefixAll(layout, oldPrefix, newPrefix), {
       canvasViewports: Object.fromEntries(
         Object.entries(canvasViewports).map(([p, v]) => [replacePathPrefix(p, oldPrefix, newPrefix), v]),
       ),
-      openTabs: openTabs.map((p) => replacePathPrefix(p, oldPrefix, newPrefix)),
-      pinnedTabs: pinnedTabs.map((p) => replacePathPrefix(p, oldPrefix, newPrefix)),
-      activeTab: activeTab ? replacePathPrefix(activeTab, oldPrefix, newPrefix) : activeTab,
-      secondaryTab: secondaryTab ? replacePathPrefix(secondaryTab, oldPrefix, newPrefix) : secondaryTab,
       expandedFolders: expandedFolders.map((p) => replacePathPrefix(p, oldPrefix, newPrefix)),
       selectedFolder: selectedFolder ? replacePathPrefix(selectedFolder, oldPrefix, newPrefix) : selectedFolder,
     })
   },
 
-  closeTabsUnder: (prefix) => {
-    const { openTabs, pinnedTabs, activeTab, secondaryTab } = get()
-    const next = openTabs.filter((p) => !isUnderPath(p, prefix))
-    const newActive = activeTab && isUnderPath(activeTab, prefix) ? (next[next.length - 1] ?? null) : activeTab
-    const newSecondary = secondaryTab && isUnderPath(secondaryTab, prefix) ? null : secondaryTab
-    set({
-      openTabs: next,
-      pinnedTabs: pinnedTabs.filter((p) => !isUnderPath(p, prefix)),
-      activeTab: newActive,
-      secondaryTab: newSecondary,
-    })
-  },
+  closeTabsUnder: (prefix) => commit(removeUnder(get().layout, prefix)),
 
   setFolderError: (message) => set({ folderError: message }),
   setFolderLoading: (loading) => set({ folderLoading: loading }),
@@ -351,13 +384,8 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   setFlashTabPath: (path) => set({ flashTabPath: path }),
 
   resetForNewWorkspace: () =>
-    set({
-      openTabs: [],
-      pinnedTabs: [],
+    commit(initialLayout(), {
       canvasViewports: {},
-      activeTab: null,
-      secondaryTab: null,
-      splitRatio: 0.5,
       sidebarCollapsed: false,
       tagsCollapsed: false,
       closedTabs: [],
@@ -380,4 +408,21 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
       gitAhead: null,
       flashTabPath: null,
     }),
-}))
+  }
+})
+
+// Code that seeds or edits openTabs/pinnedTabs/activeTab directly (tests, older
+// call sites) is folded into the focused group, so the layout never goes stale.
+useWorkspaceStore.subscribe((s, prev) => {
+  if (s.openTabs === prev.openTabs && s.pinnedTabs === prev.pinnedTabs && s.activeTab === prev.activeTab) return
+  const g = s.layout.groups[s.layout.focused]
+  if (!g || (g.tabs === s.openTabs && g.pinned === s.pinnedTabs && g.active === s.activeTab)) return
+  useWorkspaceStore.setState({
+    layout: {
+      ...s.layout,
+      groups: s.layout.groups.map((x, i) =>
+        i === s.layout.focused ? { ...x, tabs: s.openTabs, pinned: s.pinnedTabs, active: s.activeTab } : x,
+      ),
+    },
+  })
+})

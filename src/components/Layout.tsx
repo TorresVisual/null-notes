@@ -144,24 +144,6 @@ export function Layout() {
   const createCanvasNote = useCreateCanvasNote()
   const createAgentCanvas = useCreateCanvas()
   const [primaryViewMode, setPrimaryViewMode] = useState<ViewMode>('wysiwyg')
-  const [secondaryViewMode, setSecondaryViewMode] = useState<ViewMode>('wysiwyg')
-  const secondaryTab = useWorkspaceStore((s) => s.secondaryTab)
-  const setSecondaryTab = useWorkspaceStore((s) => s.setSecondaryTab)
-  const splitRatio = useWorkspaceStore((s) => s.splitRatio)
-  const setSplitRatio = useWorkspaceStore((s) => s.setSplitRatio)
-  const paneContainerRef = useRef<HTMLDivElement>(null)
-  const {
-    content: secondaryContent,
-    save: saveSecondary,
-    isLoading: secondaryLoading,
-    saveState: secondarySaveState,
-    saveError: secondarySaveError,
-    retrySave: retrySecondarySave,
-    dismissError: dismissSecondaryError,
-    conflict: secondaryConflict,
-    keepMine: keepMineSecondary,
-    reloadTheirs: reloadTheirsSecondary,
-  } = useNote(secondaryTab)
   const { activeOverlay, openOverlay, closeOverlay } = useOverlayManager()
   const [outlineOpen, setOutlineOpen] = useState(true)
   const [outgoingLinksOpen, setOutgoingLinksOpen] = useState(false)
@@ -541,49 +523,6 @@ export function Layout() {
     [workspacePath, openOverlay],
   )
 
-  const startPaneResize = useCallback((e: React.MouseEvent) => {
-    e.preventDefault()
-    const container = paneContainerRef.current
-    if (!container) return
-    const rect = container.getBoundingClientRect()
-    const onMove = (moveEvent: MouseEvent) => {
-      const ratio = (moveEvent.clientX - rect.left) / rect.width
-      setSplitRatio(Math.min(0.8, Math.max(0.2, ratio)))
-    }
-    const onUp = () => {
-      window.removeEventListener('mousemove', onMove)
-      window.removeEventListener('mouseup', onUp)
-    }
-    window.addEventListener('mousemove', onMove)
-    window.addEventListener('mouseup', onUp)
-  }, [setSplitRatio])
-
-  const [splitDropZoneActive, setSplitDropZoneActive] = useState(false)
-
-  const handleEditorDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
-    if (!e.dataTransfer.types.includes('text/plain')) return
-    const rect = e.currentTarget.getBoundingClientRect()
-    const inZone = e.clientX > rect.left + rect.width * 0.75
-    if (inZone) e.preventDefault()
-    setSplitDropZoneActive(inZone)
-  }, [])
-
-  const handleEditorDragLeave = useCallback((e: React.DragEvent<HTMLDivElement>) => {
-    if (e.currentTarget.contains(e.relatedTarget as Node)) return
-    setSplitDropZoneActive(false)
-  }, [])
-
-  const handleEditorDrop = useCallback(
-    (e: React.DragEvent<HTMLDivElement>) => {
-      const path = e.dataTransfer.getData('text/plain')
-      setSplitDropZoneActive(false)
-      if (!path) return
-      e.preventDefault()
-      setSecondaryTab(path)
-    },
-    [setSecondaryTab],
-  )
-
   useEffect(() => {
     const unlisten = listen<string>('menu-action', (event) => void runCommand(event.payload))
     return () => void unlisten.then((off) => off())
@@ -899,15 +838,8 @@ export function Layout() {
           syncingNow={syncingNow}
         />
         {gitBars}
-        <div
-          className="editor-body"
-          ref={paneContainerRef}
-          onDragOver={handleEditorDragOver}
-          onDragLeave={handleEditorDragLeave}
-          onDrop={handleEditorDrop}
-        >
-          {splitDropZoneActive && <div className="split-drop-zone" />}
-          <div className="pane-wrapper" style={secondaryTab ? { flex: `0 0 ${splitRatio * 100}%` } : undefined}>
+        <div className="editor-body">
+          <div className="pane-wrapper">
             {primaryEditorPane}
             {!canvasTab && !isLoading && activeTab && primaryViewMode === 'wysiwyg' && outlineOpen && (
               <OutlinePanel content={content} containerRef={editorPaneRef} />
@@ -916,31 +848,6 @@ export function Layout() {
               <OutgoingLinksPanel content={content} notePath={activeTab} />
             )}
           </div>
-          {secondaryTab && (
-            <>
-              <div className="pane-divider" onMouseDown={startPaneResize} />
-              <div className="pane-wrapper" style={{ flex: `0 0 ${(1 - splitRatio) * 100}%` }}>
-                <EditorPane
-                  notePath={secondaryTab}
-                  content={secondaryContent}
-                  isLoading={secondaryLoading}
-                  saveState={secondarySaveState}
-                  saveError={secondarySaveError}
-                  onSave={(md) => void saveSecondary(md)}
-                  onRetrySave={retrySecondarySave}
-                  onDismissSaveError={dismissSecondaryError}
-                  conflict={secondaryConflict}
-                  onKeepMine={keepMineSecondary}
-                  onReloadTheirs={reloadTheirsSecondary}
-                  viewMode={secondaryViewMode}
-                  onViewModeChange={setSecondaryViewMode}
-                  onFlashcardCommand={handleFlashcardCommand}
-                  onDiagramCommand={handleDiagramCommand}
-                  onClose={() => setSecondaryTab(null)}
-                />
-              </div>
-            </>
-          )}
         </div>
         {terminalMounted && workspacePath && (
           <Suspense fallback={null}>
