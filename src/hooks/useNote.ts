@@ -6,12 +6,10 @@ import { useSettingsStore } from '../store/settings'
 import { useDirtyPathsStore } from '../store/dirtyPaths'
 import { folderName, sidecarDir } from '../lib/pathPrefix'
 
-export type SaveState = 'clean' | 'dirty' | 'saving' | 'error'
+import { type SaveState, SAVE_DEBOUNCE_MS, REINDEX_DEBOUNCE_MS } from '../store/noteBuffers'
 
-export const SAVE_DEBOUNCE_MS = 600
-// Indexing is deliberately lazier than the file write: search may lag behind,
-// the file on disk may not.
-export const REINDEX_DEBOUNCE_MS = 2500
+export { SAVE_DEBOUNCE_MS, REINDEX_DEBOUNCE_MS }
+export type { SaveState }
 const RECENT_WRITES = 4
 
 interface PendingWrite {
