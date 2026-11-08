@@ -442,4 +442,23 @@ describe('useNote', () => {
     await waitFor(() => expect(result.current.isLoading).toBe(false))
     expect(result.current.content).toBe('# B\n')
   })
+
+  it('shows nothing and saves nothing when the switched-to note fails to open', async () => {
+    notes.open.mockResolvedValueOnce('# A\n')
+    const { result, rerender } = renderHook(({ path }) => useNote(path), {
+      initialProps: { path: '/ws/a.md' },
+    })
+    await waitFor(() => expect(result.current.isLoading).toBe(false))
+
+    notes.open.mockRejectedValueOnce('stream did not contain valid UTF-8')
+    rerender({ path: '/ws/b.md' })
+    await waitFor(() => expect(result.current.saveError).toMatch(/Couldn't open note/))
+
+    expect(result.current.content).toBe('')
+    act(() => result.current.save('# A\nedited'))
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(PAST_SAVE)
+    })
+    expect(notes.save).not.toHaveBeenCalledWith('/ws', '/ws/b.md', expect.anything())
+  })
 })

@@ -24,6 +24,7 @@ export function useNote(path: string | null) {
   const [content, setContent] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [loadedPath, setLoadedPath] = useState<string | null>(null)
+  const [failedPath, setFailedPath] = useState<string | null>(null)
   const [saveState, setSaveState] = useState<SaveState>('clean')
   const [saveError, setSaveError] = useState<string | null>(null)
   const workspacePath = useWorkspaceStore((s) => s.path)
@@ -53,15 +54,23 @@ export function useNote(path: string | null) {
     setSaveState('clean')
     setSaveError(null)
     setConflict(false)
+    setFailedPath(null)
     recentWrites.current = []
     api.notes
       .open(workspacePath, path)
-      .then(setContentAndRef)
-      .catch((e: unknown) => setSaveError(`Couldn't open note: ${String(e)}`))
-      .finally(() => {
+      .then((text) => {
+        setContentAndRef(text)
         setLoadedPath(path)
-        setIsLoading(false)
       })
+      .catch((e: unknown) => {
+        // The buffer would otherwise still hold the previous note, and an edit
+        // to it would be saved over this one. Unloaded stays unloaded: save()
+        // drops everything until a real open succeeds.
+        setContentAndRef('')
+        setFailedPath(path)
+        setSaveError(`Couldn't open note: ${String(e)}`)
+      })
+      .finally(() => setIsLoading(false))
   }, [path, workspacePath, setContentAndRef])
 
   // The backend refuses CLI writes to a note whose edits are not on disk yet,
@@ -251,7 +260,7 @@ export function useNote(path: string | null) {
   return {
     content,
     save,
-    isLoading: isLoading || (path !== null && path !== loadedPath),
+    isLoading: isLoading || (path !== null && path !== loadedPath && path !== failedPath),
     saveState,
     saveError,
     flush,
