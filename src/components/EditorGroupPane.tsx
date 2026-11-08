@@ -51,6 +51,21 @@ export function EditorGroupPane({ group, shared, bare = false }: EditorGroupPane
     if (focused) shared.exportPaneRef.current = paneRef.current
   })
 
+  // A keyboard command moves the focused group without moving DOM focus, so
+  // the caret has to follow it or typing would land in the old group.
+  useEffect(() => {
+    if (!focused || !multiple) return
+    // A group created by the command mounts its editor a frame later.
+    const focusEditor = () => {
+      const root = paneRef.current?.closest('.editor-group')
+      if (!root || root.contains(document.activeElement)) return
+      paneRef.current?.querySelector<HTMLElement>('.ProseMirror, .raw-editor, textarea')?.focus()
+    }
+    focusEditor()
+    const frame = requestAnimationFrame(focusEditor)
+    return () => cancelAnimationFrame(frame)
+  }, [focused, multiple])
+
   const showPanels = !bare && !fileTab && !note.isLoading && active !== null && viewMode === 'wysiwyg'
 
   return (

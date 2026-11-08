@@ -140,6 +140,19 @@ describe('EditorGroups', () => {
     expect(within(firstBar).getByText('Sync now')).toBeInTheDocument()
   })
 
+  it('moves the caret into the group that a keyboard command focuses', () => {
+    st().openTab(A)
+    st().splitEditor('right')
+    renderGroups()
+    const groups = document.querySelectorAll('.editor-group')
+
+    act(() => st().focusPrevGroup())
+    expect(groups[0]?.contains(document.activeElement)).toBe(true)
+
+    act(() => st().focusNextGroup())
+    expect(groups[1]?.contains(document.activeElement)).toBe(true)
+  })
+
   it('a tab click in the other group activates it there and focuses that group', () => {
     st().openTab(A)
     st().openTab(B)
