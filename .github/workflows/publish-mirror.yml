@@ -32,8 +32,18 @@ jobs:
           gh release view "$TAG" --repo "$SOURCE_REPO" --json body --jq .body > notes.md
 
       - name: Point latest.json at the mirror
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          sed -i "s#github.com/$SOURCE_REPO/releases/download/#github.com/$MIRROR_REPO/releases/download/#g" assets/latest.json
+          # tauri-action 1.x writes api.github.com/.../releases/assets/<id> URLs; map each id back to its asset name
+          gh api "repos/$SOURCE_REPO/releases/tags/$TAG" --jq '[.assets[] | {key: (.id | tostring), value: .name}] | from_entries' > asset-names.json
+          jq --slurpfile names asset-names.json --arg base "https://github.com/$MIRROR_REPO/releases/download/$TAG" '
+            .platforms |= with_entries(.value.url |= (
+              capture("/releases/assets/(?<id>[0-9]+)$") as $m
+              | "\($base)/\($names[0][$m.id])"
+            ))' assets/latest.json > latest.json.new
+          mv latest.json.new assets/latest.json
+          ! grep -q "api.github.com" assets/latest.json
           grep -q "$MIRROR_REPO" assets/latest.json
 
       - name: Add a version-less installer name for the README download link
