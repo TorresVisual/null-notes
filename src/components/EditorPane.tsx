@@ -95,6 +95,7 @@ export const EditorPane = forwardRef<HTMLDivElement, EditorPaneProps>(function E
           <>
             <PropertiesBlock content={content} onSave={onSave} listenForAddCommand={acceptsCommands} />
             <NoteEditor
+              key={notePath}
               content={body}
               notePath={notePath}
               spellcheck={settings.spellcheck}
@@ -107,6 +108,7 @@ export const EditorPane = forwardRef<HTMLDivElement, EditorPaneProps>(function E
         )}
         {!isLoading && notePath && viewMode === 'raw' && (
           <RawEditor
+            key={notePath}
             content={content}
             notePath={notePath}
             spellcheck={settings.spellcheck}
