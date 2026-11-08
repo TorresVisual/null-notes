@@ -3,9 +3,11 @@ import { render, cleanup, fireEvent } from '@testing-library/react'
 import { TabBar } from './TabBar'
 import { useWorkspaceStore } from '../store/workspace'
 import { useNotesStore } from '../store/notes'
+import { initialLayout } from '../lib/editorGroups'
 
 afterEach(cleanup)
 beforeEach(() => {
+  useWorkspaceStore.setState({ layout: initialLayout() })
   useWorkspaceStore.setState({ openTabs: ['/ws/a.md', '/ws/b.md'], activeTab: '/ws/a.md', flashTabPath: null })
   useNotesStore.setState({
     notes: [
@@ -79,5 +81,40 @@ describe('TabBar context menu on a canvas tab', () => {
     for (const noteOnly of ['Duplicate', 'Move to…', 'Merge into…']) {
       expect(queryByText(noteOnly)).toBeNull()
     }
+  })
+})
+
+describe('TabBar split items', () => {
+  const splitLabels = ['Split Right', 'Split Left', 'Split Up', 'Split Down']
+
+  it('offers the four splits on a note tab and splits that tab when chosen', async () => {
+    const { getByRole, findByText } = render(<TabBar group={0} status={STATUS} />)
+    fireEvent.contextMenu(getByRole('tab', { name: 'b' }))
+
+    for (const label of splitLabels) expect(await findByText(label)).toBeTruthy()
+    fireEvent.click(await findByText('Split Left'))
+
+    const { layout } = useWorkspaceStore.getState()
+    expect(layout.groups).toHaveLength(2)
+    expect(layout.groups[0]?.tabs).toEqual(['/ws/b.md'])
+    expect(layout.direction).toBe('row')
+  })
+
+  it('disables the splits once two groups exist', async () => {
+    useWorkspaceStore.getState().splitEditor('right')
+    const { getByRole, findByText } = render(<TabBar group={0} status={STATUS} />)
+    fireEvent.contextMenu(getByRole('tab', { name: 'a' }))
+
+    for (const label of splitLabels) {
+      expect((await findByText(label)).closest('[role="menuitem"]')).toHaveAttribute('data-disabled')
+    }
+  })
+
+  it('disables them on a canvas tab', async () => {
+    useWorkspaceStore.setState({ openTabs: ['/ws/map.canvas'], activeTab: '/ws/map.canvas' })
+    const { getByRole, findByText } = render(<TabBar group={0} status={STATUS} />)
+    fireEvent.contextMenu(getByRole('tab', { name: /map/ }))
+
+    expect((await findByText('Split Right')).closest('[role="menuitem"]')).toHaveAttribute('data-disabled')
   })
 })

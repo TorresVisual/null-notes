@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { COMMANDS, bindingError, comboFromEvent, effectiveKeymap } from './keymap'
+import { COMMANDS, bindingError, commandById, comboFromEvent, effectiveKeymap } from './keymap'
 
 const key = (init: KeyboardEventInit) => comboFromEvent(new KeyboardEvent('keydown', init))
 
@@ -28,6 +28,27 @@ describe('effectiveKeymap', () => {
   it('has no two commands sharing a default', () => {
     const keys = COMMANDS.map((c) => c.defaultKey).filter(Boolean)
     expect(new Set(keys).size).toBe(keys.length)
+  })
+})
+
+describe('editor group commands', () => {
+  it('binds the split and focus commands and moves the sidebar toggle off the backslash key', () => {
+    expect(commandById('split-editor')?.defaultKey).toBe('Ctrl+\\')
+    expect(commandById('focus-next-group')?.defaultKey).toBe('Ctrl+Alt+ArrowRight')
+    expect(commandById('focus-prev-group')?.defaultKey).toBe('Ctrl+Alt+ArrowLeft')
+    expect(commandById('toggle-sidebar')?.defaultKey).toBe('Ctrl+Shift+B')
+  })
+
+  it('leaves the rarer group commands unbound but present', () => {
+    for (const id of ['split-editor-down', 'close-editor-group', 'reset-split-ratio', 'toggle-split-direction']) {
+      expect(commandById(id)).toBeDefined()
+      expect(commandById(id)?.defaultKey).toBeUndefined()
+    }
+  })
+
+  it('lets the new defaults be pressed', () => {
+    expect(key({ key: '\\', ctrlKey: true })).toBe('Ctrl+\\')
+    expect(key({ key: 'ArrowRight', ctrlKey: true, altKey: true })).toBe('Ctrl+Alt+ArrowRight')
   })
 })
 

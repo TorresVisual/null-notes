@@ -5,6 +5,8 @@ import { useNotesStore, noteTitle } from '../store/notes'
 import { requestCloseTab } from '../lib/requestCloseTab'
 import { TAB_DRAG_MIME } from '../lib/dropZone'
 import { folderName, isUnderPath, noteFolderSegments } from '../lib/pathPrefix'
+import { isBasePath, isCanvasPath } from '../lib/canvasPath'
+import type { SplitSide } from '../lib/editorGroups'
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuTrigger } from './ui/context-menu'
 import { NoteContextMenuItems } from './NoteContextMenuItems'
 import { SaveStatus } from './SaveStatus'
@@ -14,6 +16,13 @@ import type { SaveState } from '../hooks/useNote'
 import type { GitCommitStatus as GitStatus } from '../types'
 
 const NO_TABS: string[] = []
+
+const SPLIT_ITEMS: { side: SplitSide; label: string }[] = [
+  { side: 'right', label: 'Split Right' },
+  { side: 'left', label: 'Split Left' },
+  { side: 'up', label: 'Split Up' },
+  { side: 'down', label: 'Split Down' },
+]
 
 const TAB_KEY_STEP: Record<string, number> = { ArrowRight: 1, ArrowLeft: -1 }
 
@@ -48,8 +57,9 @@ interface TabBarProps {
 }
 
 export function TabBar({ group, status }: TabBarProps) {
-  const { flashTabPath, setFlashTabPath, togglePinTab, reorderTabs, activateTabIn, setGroupViewMode } =
+  const { flashTabPath, setFlashTabPath, togglePinTab, reorderTabs, activateTabIn, setGroupViewMode, splitEditor } =
     useWorkspaceStore()
+  const canSplit = useWorkspaceStore((s) => s.layout.groups.length < 2)
   const openTabs = useWorkspaceStore((s) => s.layout.groups[group]?.tabs ?? NO_TABS)
   const pinnedTabs = useWorkspaceStore((s) => s.layout.groups[group]?.pinned ?? NO_TABS)
   const activeTab = useWorkspaceStore((s) => s.layout.groups[group]?.active ?? null)
@@ -128,6 +138,19 @@ export function TabBar({ group, status }: TabBarProps) {
                 {isPinned ? 'Unpin tab' : 'Pin tab'}
               </ContextMenuItem>
               <ContextMenuItem onSelect={() => void requestCloseTab(path, group)}>Close tab</ContextMenuItem>
+              <ContextMenuSeparator />
+              {SPLIT_ITEMS.map(({ side, label }) => (
+                <ContextMenuItem
+                  key={side}
+                  disabled={!canSplit || isCanvasPath(path) || isBasePath(path)}
+                  onSelect={() => {
+                    activateTabIn(path, group)
+                    splitEditor(side)
+                  }}
+                >
+                  {label}
+                </ContextMenuItem>
+              ))}
               <ContextMenuSeparator />
               <NoteContextMenuItems path={path} />
             </ContextMenuContent>

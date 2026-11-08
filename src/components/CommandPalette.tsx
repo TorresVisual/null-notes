@@ -25,6 +25,8 @@ const NEEDS_NOTE = new Set([
   'fold-all',
   'unfold-all',
   'close-tab',
+  'split-editor',
+  'split-editor-down',
   'toggle-pin-tab',
   'next-tab',
   'prev-tab',

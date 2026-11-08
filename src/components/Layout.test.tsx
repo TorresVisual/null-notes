@@ -425,3 +425,58 @@ describe('Layout view mode per group', () => {
     expect(modes()).toEqual(['raw', 'wysiwyg'])
   })
 })
+
+describe('Layout editor group commands', () => {
+  const A = '/ws/a.md'
+  const st = () => useWorkspaceStore.getState()
+
+  beforeEach(() => {
+    useWorkspaceStore.setState({ path: '/ws', tagFilter: null, layout: initialLayout() })
+    useNotesStore.setState({
+      notes: [{ id: A, path: A, title: 'a', workspace: '/ws', updatedAt: 0 }],
+      folders: [],
+      tags: [],
+    })
+    st().openTab(A)
+  })
+
+  it('Ctrl+Backslash splits the active note to the right and Ctrl+Alt+Arrow moves focus between groups', () => {
+    render(<Layout />)
+
+    act(() => {
+      document.body.dispatchEvent(new KeyboardEvent('keydown', { key: '\\', ctrlKey: true, bubbles: true }))
+    })
+    expect(st().layout.groups).toHaveLength(2)
+    expect(st().layout.focused).toBe(1)
+
+    act(() => {
+      document.body.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'ArrowLeft', ctrlKey: true, altKey: true, bubbles: true }),
+      )
+    })
+    expect(st().layout.focused).toBe(0)
+  })
+
+  it('split-editor goes down when the layout is stacked, and the sidebar toggle moved to Ctrl+Shift+B', () => {
+    st().toggleSplitDirection()
+    render(<Layout />)
+
+    act(() => runCommand('split-editor'))
+    expect(st().layout).toMatchObject({ direction: 'column', focused: 1 })
+
+    const collapsed = st().sidebarCollapsed
+    act(() => {
+      document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'B', ctrlKey: true, shiftKey: true, bubbles: true }))
+    })
+    expect(st().sidebarCollapsed).toBe(!collapsed)
+  })
+
+  it('close-editor-group collapses back to one group', () => {
+    st().splitEditor('right')
+    render(<Layout />)
+
+    act(() => runCommand('close-editor-group'))
+
+    expect(st().layout.groups).toHaveLength(1)
+  })
+})

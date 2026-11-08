@@ -443,6 +443,29 @@ export function Layout() {
         case 'toggle-sidebar':
           toggleSidebar()
           break
+        case 'split-editor': {
+          const { layout, splitEditor } = useWorkspaceStore.getState()
+          splitEditor(layout.direction === 'column' ? 'down' : 'right')
+          break
+        }
+        case 'split-editor-down':
+          useWorkspaceStore.getState().splitEditor('down')
+          break
+        case 'focus-next-group':
+          useWorkspaceStore.getState().focusNextGroup()
+          break
+        case 'focus-prev-group':
+          useWorkspaceStore.getState().focusPrevGroup()
+          break
+        case 'close-editor-group':
+          useWorkspaceStore.getState().closeEditorGroup()
+          break
+        case 'reset-split-ratio':
+          useWorkspaceStore.getState().resetSplitRatio()
+          break
+        case 'toggle-split-direction':
+          useWorkspaceStore.getState().toggleSplitDirection()
+          break
         case 'zoom-in':
         case 'zoom-out':
         case 'zoom-reset': {
