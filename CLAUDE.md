@@ -20,6 +20,7 @@ src-tauri/        Rust backend
     commands/     Tauri IPC commands (one file per domain)
     pdf/          PDF pipeline (render, parse)
     db/           SQLite queries
+  cli/            `nullnotes` CLI crate (separate Cargo.toml)
 
 src/              React frontend
   components/     Shared UI components
@@ -29,7 +30,10 @@ src/              React frontend
   hooks/          Custom React hooks
   store/          Global state (Zustand)
   lib/            Pure utilities (no React)
+  web/            Browser shims for @tauri-apps/* (dev:web / build:web)
 ```
+
+`vite.web.config.ts` aliases each `@tauri-apps/*` module the frontend imports to a shim in `src/web/`. Importing a Tauri module not aliased there breaks `build:web` — add the shim in the same change.
 
 ---
 
@@ -177,7 +181,6 @@ export function InkBlock({ src, width, height, locked }: InkBlockProps) { ... }
 - Local state: `useState` / `useReducer`
 - Shared state: Zustand store in `src/store/`
 - No prop drilling past 2 levels — lift to store or context
-- Server/file data: React Query (TanStack Query)
 
 ### Hooks
 
@@ -235,6 +238,7 @@ cargo test                   # run Rust tests
 cargo clippy -- -D warnings  # lint (must pass clean)
 cargo fmt --check            # formatting gate (must pass clean); cargo fmt to apply
 cargo audit                  # scan Rust deps for known vulnerabilities (from src-tauri/)
+cargo deny check             # licences/bans/advisories (from src-tauri/, config in deny.toml; CI runs it per crate)
 cargo llvm-cov --summary-only  # coverage report (from src-tauri/); no enforced threshold
 cargo test --release perf_bench -- --ignored --nocapture  # 2,000-note reindex/search timings (src-tauri/); run before releases, no thresholds
 cargo +nightly fuzz run fts_query -- -max_total_time=60  # or `properties` (src-tauri/); needs nightly + cargo-fuzz, local only, not in CI
@@ -243,6 +247,8 @@ cargo +nightly fuzz run fts_query -- -max_total_time=60  # or `properties` (src-
 npm run dev                  # Vite dev server
 npm run build                # production build
 npm run typecheck            # tsc --noEmit
+npm run lint                 # eslint; CI gates on it
+npm run dev:web              # frontend in a plain browser (port 1422), Tauri calls shimmed
 npm test                     # vitest run (NULL_NOTES_MD_CORPUS=<dir> adds a .md round-trip idempotence check)
 npm run test:coverage        # vitest run --coverage; no enforced threshold
 npm audit                    # scan npm deps for known vulnerabilities
