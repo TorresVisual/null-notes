@@ -8,6 +8,7 @@ import { InsertGroup } from './InsertGroup'
 import { SheetGroup } from './SheetGroup'
 import { insertInk } from './insertInk'
 import { report } from '../splitIntoTasks'
+import { isMobile } from '../../lib/platform'
 
 interface EditorToolbarProps {
   editor: Editor | null
@@ -26,6 +27,7 @@ const NO_CODE_BLOCK: CodeBlockState = { active: false, language: '' }
 // it alone rather than sharing a row it could not fit in anyway.
 export function EditorToolbar({ editor, notePath }: EditorToolbarProps) {
   const drawing = useInkStore((s) => s.activeCanvas !== null)
+  const mobile = isMobile()
 
   // Subscribed directly to the editor's own `transaction` event rather than
   // to a re-render forced by a parent: `setCodeBlock()` and
@@ -82,8 +84,12 @@ export function EditorToolbar({ editor, notePath }: EditorToolbarProps) {
               </>
             )}
             {editor && <InsertGroup editor={editor} notePath={notePath} />}
-            {editor && <span className="toolbar-sep" aria-hidden />}
-            {editor && <SheetGroup editor={editor} />}
+            {editor && !mobile && (
+              <>
+                <span className="toolbar-sep" aria-hidden />
+                <SheetGroup editor={editor} />
+              </>
+            )}
           </div>
           {editor && codeBlockState.active && (
             <label className="code-language-control">

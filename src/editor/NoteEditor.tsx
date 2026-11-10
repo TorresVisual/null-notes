@@ -16,7 +16,7 @@ import { linkMention, LINK_MENTION_EVENT } from './linkMention'
 import { EditorStatusBar } from './EditorStatusBar'
 import { BlockHandle } from './extensions/BlockHandle'
 import { EditorToolbar } from './toolbar/EditorToolbar'
-import { useKeepCaretVisible, caretScrollProps } from './useKeepCaretVisible'
+import { useKeepCaretVisible, useKeyboardInset, caretScrollProps } from './useKeepCaretVisible'
 import { useMobileEditMode } from './useMobileEditMode'
 import { MobileEditToggle } from './MobileEditToggle'
 import { isMobile } from '../lib/platform'
@@ -90,6 +90,7 @@ export function NoteEditor({
   })
 
   useKeepCaretVisible(editor)
+  useKeyboardInset()
   const { readOnly, startEditing, stopEditing } = useMobileEditMode(editor, notePath)
 
   // ProseMirror re-applies editorProps.attributes to the DOM on every state

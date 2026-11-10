@@ -568,7 +568,7 @@ button, [role="button"], .tree-row, .tab, .search-result, .slash-menu-item,
 [data-shell='mobile'] .editor-toolbar {
   position: fixed;
   top: auto;
-  bottom: 0;
+  bottom: var(--keyboard-inset, 0px);
   left: 0;
   right: 0;
   margin: 0;
@@ -585,7 +585,7 @@ button, [role="button"], .tree-row, .tab, .search-result, .slash-menu-item,
 .mobile-edit-toggle {
   position: fixed;
   right: var(--space-lg);
-  bottom: calc(var(--space-lg) + var(--safe-bottom));
+  bottom: calc(var(--space-lg) + var(--safe-bottom) + var(--keyboard-inset, 0px));
   z-index: 21;
   display: flex;
   align-items: center;
@@ -601,7 +601,7 @@ button, [role="button"], .tree-row, .tab, .search-result, .slash-menu-item,
 
 /* Clears the bottom toolbar, whose height is the 72px editor-scroll clearance above. */
 .mobile-edit-toggle.is-editing {
-  bottom: calc(72px + var(--safe-bottom));
+  bottom: calc(72px + var(--safe-bottom) + var(--keyboard-inset, 0px));
   background: var(--accent);
   border-color: var(--accent);
   color: var(--bg-raised);

@@ -6,6 +6,8 @@ import { NoteEditor } from '../NoteEditor'
 import { useInkStore } from '../../store/ink'
 import type { CanvasHandle } from '../../store/ink'
 import { insertInk } from './insertInk'
+import { platform } from '@tauri-apps/plugin-os'
+import { useMobileEditStore } from '../../store/mobileEdit'
 
 vi.mock('../../lib/ink', () => ({
   inkApi: { ensureDir: () => Promise.resolve('/ws/N.ink'), write: () => Promise.resolve() },
@@ -240,5 +242,40 @@ describe('the editor toolbar', () => {
 
     await waitFor(() => expect(insertInk).toHaveBeenCalledTimes(1))
     expect(vi.mocked(insertInk).mock.calls[0]?.[1]).toBe('/ws/b.md')
+  })
+})
+
+describe('the phone toolbar', () => {
+  afterEach(() => vi.mocked(platform).mockReturnValue('windows'))
+
+  function mountNote() {
+    return render(
+      <NoteEditor
+        content="hello"
+        notePath="/a.md"
+        spellcheck={false}
+        spellcheckLanguage="en"
+        onChange={() => {}}
+        onFlashcardCommand={() => {}}
+      />,
+    )
+  }
+
+  it('keeps the formatting and insert groups but drops the exercise-sheet group on a phone', () => {
+    vi.mocked(platform).mockReturnValue('android')
+    useMobileEditStore.setState({ editingPath: '/a.md' })
+    const { getByRole, queryByRole } = mountNote()
+
+    expect(getByRole('group', { name: 'Formatting' })).toBeInTheDocument()
+    expect(getByRole('group', { name: 'Insert' })).toBeInTheDocument()
+    expect(queryByRole('group', { name: 'Exercise sheet' })).toBeNull()
+  })
+
+  it('renders all three groups on desktop', () => {
+    const { getByRole } = mountNote()
+
+    expect(getByRole('group', { name: 'Formatting' })).toBeInTheDocument()
+    expect(getByRole('group', { name: 'Insert' })).toBeInTheDocument()
+    expect(getByRole('group', { name: 'Exercise sheet' })).toBeInTheDocument()
   })
 })
