@@ -1,19 +1,21 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { HomeView } from './HomeView'
 import { useWorkspaceStore } from '../store/workspace'
 import { useNotesStore } from '../store/notes'
 import { api } from '../lib/tauri'
+import { platform } from '@tauri-apps/plugin-os'
 
 vi.mock('../lib/tauri', () => ({
   api: {
-    notes: { listOpenTasks: vi.fn(), listDueCards: vi.fn() },
+    notes: { listOpenTasks: vi.fn(), listDueCards: vi.fn(), listAllCards: vi.fn() },
   },
 }))
 
 const listOpenTasks = vi.mocked(api.notes.listOpenTasks)
 const listDueCards = vi.mocked(api.notes.listDueCards)
+const listAllCards = vi.mocked(api.notes.listAllCards)
 
 const resetWorkspace = () =>
   useWorkspaceStore.setState({
@@ -30,6 +32,7 @@ beforeEach(() => {
   useNotesStore.setState({ notes: [], folders: [], tags: [] })
   listOpenTasks.mockResolvedValue([])
   listDueCards.mockResolvedValue([])
+  listAllCards.mockResolvedValue([])
 })
 
 afterEach(() => {
@@ -190,5 +193,85 @@ describe('HomeView', () => {
     render(<HomeView onOpenTaskView={() => {}} onOpenReview={() => {}} onOpenDeckView={() => {}} onOpenSettings={() => {}} />)
 
     expect(await screen.findByText("Nothing outstanding — everything's up to date.")).toBeInTheDocument()
+  })
+})
+
+describe('HomeView on a phone', () => {
+  const dueCard = (position: number) => ({
+    notePath: '/ws/a.md', noteTitle: 'A', workspace: '/ws', kind: 'qa' as const, front: 'Q', back: 'A', position, options: [], streak: 0,
+  })
+  const summary = (position: number) => ({ notePath: '/ws/a.md', position }) as never
+  const note = (title: string, updatedAt: number) => ({ id: title, title, path: `/ws/${title}.md`, workspace: '/ws', updatedAt })
+  const renderHome = (onOpenReview = vi.fn()) =>
+    render(<HomeView onOpenTaskView={() => {}} onOpenReview={onOpenReview} onOpenDeckView={() => {}} onOpenSettings={() => {}} />)
+
+  beforeEach(() => vi.mocked(platform).mockReturnValue('android'))
+  afterEach(() => vi.mocked(platform).mockReturnValue('windows'))
+
+  it('leads with "N cards due" and a Start review button when cards are due', async () => {
+    listDueCards.mockResolvedValue([dueCard(0), dueCard(1), dueCard(2)])
+    listAllCards.mockResolvedValue([summary(0), summary(1), summary(2)])
+    const onOpenReview = vi.fn()
+    renderHome(onOpenReview)
+
+    expect(await screen.findByText('3 cards due')).toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: 'Start review' })).toHaveLength(1)
+    fireEvent.click(screen.getByRole('button', { name: 'Start review' }))
+    expect(onOpenReview).toHaveBeenCalled()
+  })
+
+  it('offers the last-edited note, caught up, when there are cards but none due, and drops it from Continue', async () => {
+    useNotesStore.setState({ notes: [note('Older', 1), note('Newer', 2)], folders: [], tags: [] })
+    useWorkspaceStore.setState({ openTabs: ['/ws/Older.md', '/ws/Newer.md'] })
+    listAllCards.mockResolvedValue([summary(0)])
+    renderHome()
+
+    expect(await screen.findByText('All caught up')).toBeInTheDocument()
+    expect(screen.getByText('Pick up where you left off')).toBeInTheDocument()
+    const hero = screen.getByText('Pick up where you left off').closest('section')!
+    expect(hero).toHaveTextContent('Newer')
+    const continueSection = screen.getByText('Continue').closest('section')!
+    expect(continueSection).not.toHaveTextContent('Newer')
+    expect(continueSection).toHaveTextContent('Older')
+
+    fireEvent.click(within(hero).getByRole('button'))
+    expect(useWorkspaceStore.getState().activeTab).toBe('/ws/Newer.md')
+  })
+
+  it('shows no review UI in a workspace with no flashcards', async () => {
+    useNotesStore.setState({ notes: [note('Only', 1)], folders: [], tags: [] })
+    renderHome()
+
+    expect(await screen.findByText('Pick up where you left off')).toBeInTheDocument()
+    expect(screen.queryByText('All caught up')).toBeNull()
+    expect(screen.queryByText(/cards? due/)).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Start review' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Browse all cards' })).toBeNull()
+  })
+
+  it('has no hero at all in an empty workspace', async () => {
+    renderHome()
+
+    await waitFor(() => expect(listAllCards).toHaveBeenCalled())
+    expect(screen.queryByText('Pick up where you left off')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Start review' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Browse all cards' })).toBeNull()
+  })
+
+  it('keeps Browse all cards when the workspace has cards', async () => {
+    listAllCards.mockResolvedValue([summary(0)])
+    renderHome()
+
+    expect(await screen.findByRole('button', { name: 'Browse all cards' })).toBeInTheDocument()
+  })
+
+  it('leaves the desktop layout alone', async () => {
+    vi.mocked(platform).mockReturnValue('windows')
+    useNotesStore.setState({ notes: [note('Only', 1)], folders: [], tags: [] })
+    renderHome()
+
+    expect(await screen.findByText('Nothing due.')).toBeInTheDocument()
+    expect(screen.queryByText('Pick up where you left off')).toBeNull()
+    expect(screen.getByRole('button', { name: 'Browse all cards' })).toBeInTheDocument()
   })
 })

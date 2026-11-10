@@ -5867,6 +5867,38 @@ input[type='checkbox']:focus-visible {
 }
 .home-actions .home-view-all { margin-top: 0; }
 
+.home-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-md);
+  padding: var(--space-lg);
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  background: var(--accent-bg);
+}
+
+.home-hero-title {
+  margin: 0;
+  font: var(--text-display);
+  color: var(--text-primary);
+}
+
+.home-hero-sub {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.home-hero .home-hero-action {
+  min-height: 44px;
+  padding: 0 var(--space-lg);
+  font-size: 14px;
+  background: var(--accent);
+  color: var(--bg-raised);
+}
+.home-hero .home-hero-action:hover { background: var(--accent); }
+
 .home-action-primary {
   background: var(--accent-bg);
   border: 1px solid var(--accent);

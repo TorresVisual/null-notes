@@ -4,6 +4,8 @@ import { useWorkspaceStore } from '../store/workspace'
 import { useNotesStore, noteTitle } from '../store/notes'
 import { api } from '../lib/tauri'
 import { buildHomeSummary } from '../lib/homeSummary'
+import { homeNextAction } from '../lib/homeNextAction'
+import { isMobile } from '../lib/platform'
 import type { OpenTask, DueCard } from '../types'
 
 const SECTION_CAP = 5
@@ -32,10 +34,7 @@ export function HomeView({ onOpenTaskView, onOpenReview, onOpenDeckView, onOpenS
   const openTab = useWorkspaceStore((s) => s.openTab)
   const notes = useNotesStore((s) => s.notes)
 
-  const continueItems = useMemo(
-    () => [...openTabs].reverse().slice(0, SECTION_CAP),
-    [openTabs],
-  )
+  const mobile = isMobile()
   const recentItems = useMemo(
     () => [...notes].sort((a, b) => b.updatedAt - a.updatedAt).slice(0, SECTION_CAP),
     [notes],
@@ -45,12 +44,24 @@ export function HomeView({ onOpenTaskView, onOpenReview, onOpenDeckView, onOpenS
   const [tasks, setTasks] = useState<OpenTask[]>([])
 
   const [dueCards, setDueCards] = useState<DueCard[]>([])
+  const [hasCards, setHasCards] = useState(false)
 
   useEffect(() => {
     if (!workspacePath || overlayOpen) return
     api.notes.listOpenTasks(workspacePath).then(setTasks)
     api.notes.listDueCards(workspacePath).then(setDueCards)
-  }, [workspacePath, overlayOpen])
+    // Phone only: its Home hides review UI in a workspace with no cards.
+    if (mobile) api.notes.listAllCards(workspacePath).then((cards) => setHasCards(cards.length > 0))
+  }, [workspacePath, overlayOpen, mobile])
+
+  const nextAction = mobile
+    ? homeNextAction({ dueCount: dueCards.length, hasCards: hasCards || dueCards.length > 0, lastEdited: recentItems[0] ?? null })
+    : null
+  const resumedPath = nextAction?.kind === 'resume' ? nextAction.path : null
+  const continueItems = useMemo(
+    () => [...openTabs].reverse().filter((path) => path !== resumedPath).slice(0, SECTION_CAP),
+    [openTabs, resumedPath],
+  )
 
   const taskItems = tasks.slice(0, SECTION_CAP)
 
@@ -68,8 +79,25 @@ export function HomeView({ onOpenTaskView, onOpenReview, onOpenDeckView, onOpenS
 
   return (
     <div className="home-view">
+      {nextAction?.kind === 'review' && (
+        <section className="home-hero">
+          <p className="home-hero-title">{nextAction.dueCount} {nextAction.dueCount === 1 ? 'card' : 'cards'} due</p>
+          <button className="home-action-primary home-hero-action" onClick={onOpenReview}>
+            Start review
+          </button>
+        </section>
+      )}
+      {nextAction?.kind === 'resume' && (
+        <section className="home-hero">
+          <p className="home-hero-title">Pick up where you left off</p>
+          <button className="home-action-primary home-hero-action" onClick={() => openTab(nextAction.path)}>
+            {noteTitle(notes, nextAction.path)}
+          </button>
+          {nextAction.caughtUp && <p className="home-hero-sub">All caught up</p>}
+        </section>
+      )}
       <p className="home-summary">
-        {buildHomeSummary({ taskCount: tasks.length, dueCount: dueCards.length, gitStatus })}
+        {buildHomeSummary({ taskCount: tasks.length, dueCount: mobile ? 0 : dueCards.length, gitStatus })}
       </p>
       <div className="home-layout">
         <div className="home-main">
@@ -132,23 +160,25 @@ export function HomeView({ onOpenTaskView, onOpenReview, onOpenDeckView, onOpenS
               </>
             )}
           </section>
-          <section className="home-section">
-            <div className="home-section-head">
-              <h2><GraduationCap size={14} /> Study</h2>
-              {dueCards.length > 0 && <span className="home-count">{dueCards.length} due</span>}
-            </div>
-            {dueCards.length === 0 && <p className="home-empty">Nothing due.</p>}
-            <div className="home-actions">
-              {dueCards.length > 0 && (
-                <button className="home-action-primary" onClick={onOpenReview}>
-                  Start review
+          {(!mobile || hasCards) && (
+            <section className="home-section">
+              <div className="home-section-head">
+                <h2><GraduationCap size={14} /> Study</h2>
+                {!mobile && dueCards.length > 0 && <span className="home-count">{dueCards.length} due</span>}
+              </div>
+              {!mobile && dueCards.length === 0 && <p className="home-empty">Nothing due.</p>}
+              <div className="home-actions">
+                {!mobile && dueCards.length > 0 && (
+                  <button className="home-action-primary" onClick={onOpenReview}>
+                    Start review
+                  </button>
+                )}
+                <button className="home-view-all" onClick={onOpenDeckView}>
+                  Browse all cards
                 </button>
-              )}
-              <button className="home-view-all" onClick={onOpenDeckView}>
-                Browse all cards
-              </button>
-            </div>
-          </section>
+              </div>
+            </section>
+          )}
           <section className="home-section">
             <h2><GitBranch size={14} /> Git</h2>
             {gitStatus ? (
