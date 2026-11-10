@@ -85,19 +85,17 @@ async function typeLabel(text: string): Promise<HTMLTextAreaElement> {
 
 // A React node view has to render a NodeViewWrapper; ReactNodeViewRenderer
 // throws "Please use the NodeViewWrapper component for your node view" from
-// its own `get dom()` otherwise. InkCanvas puts a plain <div class="ink-canvas-wrap">
-// at its root — so mounting one throws, and that is what Split Into Tasks hit
-// the moment it started creating ink blocks for every solution.
+// its own `get dom()` otherwise.
 describe('mounting an ink block in a real React editor', () => {
-  it('renders an inline block without throwing', async () => {
+  it('renders a legacy inline block as a preview, keeping the flag in the markdown', async () => {
     const { container } = render(<TestEditor content={INLINE_FENCE} />)
 
-    await waitFor(() => expect(editor).not.toBeNull())
-    // The precise thing that was missing: ReactNodeViewRenderer looks this
-    // attribute up to find the node's DOM, and throws without it.
     await waitFor(() => expect(container.querySelector('[data-node-view-wrapper]')).not.toBeNull())
-    expect(container.querySelector('.ink-canvas-wrap')).not.toBeNull()
-    expect(container.querySelector('.ink-preview')).toBeNull()
+    await previewOf(container)
+    expect(container.querySelector('canvas.ink-canvas')).toBeNull()
+    expect(container.querySelector('.ink-canvas-wrap')).toBeNull()
+    const storage = editor?.storage as unknown as { markdown: { getMarkdown: () => string } }
+    expect(storage.markdown.getMarkdown()).toContain('#ink=700x400,inline')
   })
 
   it('renders a block without the flag as a preview, not a canvas', async () => {
