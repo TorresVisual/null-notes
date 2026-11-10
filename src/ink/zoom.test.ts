@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { pinchZoom, clampZoom, distanceBetween, backingScale, anchorShift, wheelZoom, zoomForKey,MAX_CANVAS_DIMENSION, MAX_CANVAS_PIXELS, MIN_ZOOM, MAX_ZOOM } from './zoom'
+import { pinchZoom, distanceBetween, backingScale, anchorShift, wheelZoom, zoomForKey, MAX_CANVAS_DIMENSION, MAX_CANVAS_PIXELS } from './zoom'
+import { MIN_SCALE, MAX_SCALE } from './camera'
 
 describe('anchorShift', () => {
   it('scrolls by the anchor times the zoom change', () => {
@@ -14,8 +15,8 @@ describe('zoomForKey', () => {
     expect(zoomForKey('=', 1)).toBe(1.25)
     expect(zoomForKey('+', 1)).toBe(1.25)
     expect(zoomForKey('-', 1)).toBe(0.8)
-    expect(zoomForKey('+', MAX_ZOOM)).toBe(MAX_ZOOM)
-    expect(zoomForKey('-', MIN_ZOOM)).toBe(MIN_ZOOM)
+    expect(zoomForKey('+', MAX_SCALE)).toBe(MAX_SCALE)
+    expect(zoomForKey('-', MIN_SCALE)).toBe(MIN_SCALE)
     expect(zoomForKey('0', 2)).toBe(1)
     expect(zoomForKey('a', 1)).toBeNull()
   })
@@ -25,8 +26,8 @@ describe('wheelZoom', () => {
   it('zooms in on negative delta, out on positive, and clamps', () => {
     expect(wheelZoom(1, -100)).toBeGreaterThan(1)
     expect(wheelZoom(1, 100)).toBeLessThan(1)
-    expect(wheelZoom(MAX_ZOOM, -1000)).toBe(MAX_ZOOM)
-    expect(wheelZoom(MIN_ZOOM, 1000)).toBe(MIN_ZOOM)
+    expect(wheelZoom(MAX_SCALE, -1000)).toBe(MAX_SCALE)
+    expect(wheelZoom(MIN_SCALE, 1000)).toBe(MIN_SCALE)
   })
 })
 
@@ -50,20 +51,12 @@ describe('pinchZoom', () => {
   })
 
   it('stays within the zoom limits', () => {
-    expect(pinchZoom(1, 10, 1000)).toBe(MAX_ZOOM)
-    expect(pinchZoom(1, 1000, 10)).toBe(MIN_ZOOM)
+    expect(pinchZoom(1, 10, 1000)).toBe(MAX_SCALE)
+    expect(pinchZoom(1, 1000, 10)).toBe(MIN_SCALE)
   })
 
   it('survives a degenerate first frame where both touches land together', () => {
     expect(pinchZoom(1.25, 0, 80)).toBe(1.25)
-  })
-})
-
-describe('clampZoom', () => {
-  it('bounds the range', () => {
-    expect(clampZoom(99)).toBe(MAX_ZOOM)
-    expect(clampZoom(0.01)).toBe(MIN_ZOOM)
-    expect(clampZoom(1.25)).toBe(1.25)
   })
 })
 
