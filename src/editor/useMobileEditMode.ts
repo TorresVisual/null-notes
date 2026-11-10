@@ -2,6 +2,7 @@ import { useCallback, useEffect } from 'react'
 import type { Editor } from '@tiptap/core'
 import { useMobileEditStore } from '../store/mobileEdit'
 import { isMobile } from '../lib/platform'
+import { discardIfUntouched } from '../hooks/useQuickNote'
 
 export function useMobileEditMode(editor: Editor | null, notePath: string) {
   const editingPath = useMobileEditStore((s) => s.editingPath)
@@ -9,8 +10,12 @@ export function useMobileEditMode(editor: Editor | null, notePath: string) {
 
   // emitUpdate false: toggling editability is not a content change, and an
   // update event would push the unchanged note through onChange and the save path.
+  // Focus lives here as well as in startEditing: a note opened already in edit
+  // mode (the + button) never goes through the pencil.
   useEffect(() => {
-    editor?.setEditable(!readOnly, false)
+    if (!editor) return
+    editor.setEditable(!readOnly, false)
+    if (!readOnly && isMobile()) editor.commands.focus()
   }, [editor, readOnly])
 
   const startEditing = useCallback(() => {
@@ -24,7 +29,8 @@ export function useMobileEditMode(editor: Editor | null, notePath: string) {
   const stopEditing = useCallback(() => {
     useMobileEditStore.getState().stopEditing()
     editor?.commands.blur()
-  }, [editor])
+    void discardIfUntouched(notePath)
+  }, [editor, notePath])
 
   return { readOnly, startEditing, stopEditing }
 }

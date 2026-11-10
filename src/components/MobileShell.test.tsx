@@ -6,10 +6,12 @@ import { onBackButtonPress } from '@tauri-apps/api/app'
 import { MobileShell } from './MobileShell'
 import { api } from '../lib/tauri'
 import { useWorkspaceStore } from '../store/workspace'
+import { discardIfUntouched } from '../hooks/useQuickNote'
 
 vi.mock('@tauri-apps/plugin-os', () => ({ platform: vi.fn(() => 'android') }))
 vi.mock('@tauri-apps/api/app', () => ({ onBackButtonPress: vi.fn() }))
 vi.mock('../lib/tauri', () => ({ api: { window: { exitApp: vi.fn() } } }))
+vi.mock('../hooks/useQuickNote', () => ({ discardIfUntouched: vi.fn() }))
 vi.mock('./MobileNotes', () => ({ MobileNotes: () => <div>notes-screen</div> }))
 
 let press: () => void
@@ -110,6 +112,20 @@ describe('MobileShell editor screen', () => {
     expect(useWorkspaceStore.getState().activeTab).toBeNull()
     expect(useWorkspaceStore.getState().openTabs).toEqual(['/ws/a.md'])
     expect(screen.getByText('home-screen')).toBeInTheDocument()
+  })
+})
+
+describe('leaving a quick note', () => {
+  it('offers the open note to the cleanup from the back arrow and from system Back', async () => {
+    useWorkspaceStore.setState({ activeTab: '/ws/a.md', openTabs: ['/ws/a.md'] })
+    setup()
+    await act(async () => {})
+    await userEvent.click(screen.getByRole('button', { name: 'Back' }))
+    expect(discardIfUntouched).toHaveBeenLastCalledWith('/ws/a.md')
+
+    act(() => useWorkspaceStore.setState({ activeTab: '/ws/b.md', openTabs: ['/ws/a.md', '/ws/b.md'] }))
+    act(() => press())
+    expect(discardIfUntouched).toHaveBeenLastCalledWith('/ws/b.md')
   })
 })
 

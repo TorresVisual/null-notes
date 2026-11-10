@@ -3,11 +3,14 @@ import { render, cleanup, screen, fireEvent, waitFor } from '@testing-library/re
 import { platform } from '@tauri-apps/plugin-os'
 import { NoteEditor } from './NoteEditor'
 import { useMobileEditStore } from '../store/mobileEdit'
+import { discardIfUntouched } from '../hooks/useQuickNote'
 
 vi.mock('@tauri-apps/plugin-dialog', () => ({
   confirm: vi.fn().mockResolvedValue(false),
   message: vi.fn().mockResolvedValue(undefined),
 }))
+
+vi.mock('../hooks/useQuickNote', () => ({ discardIfUntouched: vi.fn() }))
 
 function mount(content: string, notePath = '/a.md') {
   const props = {
@@ -77,5 +80,21 @@ describe('mobile read/edit mode', () => {
     expect(textbox().getAttribute('contenteditable')).toBe('true')
     expect(screen.queryByRole('button', { name: 'Edit note' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Done' })).toBeNull()
+  })
+
+  it('focuses the editor when a note opens already in edit mode', async () => {
+    useMobileEditStore.setState({ editingPath: '/never-opened.md' })
+    mount('hello', '/never-opened.md')
+
+    await waitFor(() => expect(document.activeElement).toBe(textbox()))
+  })
+
+  it('Done offers the note to the quick-note cleanup', async () => {
+    useMobileEditStore.setState({ editingPath: '/a.md' })
+    mount('hello')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }))
+
+    expect(discardIfUntouched).toHaveBeenCalledWith('/a.md')
   })
 })

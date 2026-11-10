@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { ArrowLeft } from 'lucide-react'
 import { useWorkspaceStore } from '../store/workspace'
 import { useMobileEditStore } from '../store/mobileEdit'
+import { discardIfUntouched } from '../hooks/useQuickNote'
 import { useBackButton } from '../hooks/useBackButton'
 import type { OverlayKind } from '../hooks/useOverlayManager'
 import type { MobileTab } from '../lib/backNavigation'
@@ -64,6 +65,7 @@ export function MobileShell({
 
   function closeEditor() {
     useMobileEditStore.getState().stopEditing()
+    if (activeTab) void discardIfUntouched(activeTab)
     setActiveTab(null)
   }
 
