@@ -2,7 +2,7 @@
 
 ## From GitHub Releases
 
-1. Go to `https://github.com/TorresVisual/null-notes-releases/releases/latest` (the public mirror; this repo is private)
+1. Go to `https://github.com/TorresVisual/null-notes/releases/latest`
 2. Download the latest release's Windows installer (`.msi` or `.exe`)
 3. Run it
 

@@ -82,11 +82,8 @@ plain `.md` files on disk, never locked into a proprietary format — see
 
 ## Installing
 
-**[⬇ Download the Windows installer](https://github.com/TorresVisual/null-notes-releases/releases/latest/download/Null-Notes-setup.exe)** ·
-[all releases and platforms](https://github.com/TorresVisual/null-notes-releases/releases/latest) —
-this repo is private, so downloads are published to the public
-[`null-notes-releases`](https://github.com/TorresVisual/null-notes-releases)
-mirror.
+**[⬇ Download the latest release](https://github.com/TorresVisual/null-notes/releases/latest)** —
+installers for every platform are attached to each release.
 
 | Platform | Get                                                                     |
 | -------- | ----------------------------------------------------------------------- |
@@ -235,7 +232,7 @@ Four skills teach a coding agent (Claude Code, or any tool that reads `SKILL.md`
 - `brainstorm-canvas` — append-only brainstorm passes in a `.canvas` file (`/null-notes:brainstorm-canvas <path> <topic>`)
 - `null-notes-bases` — `.base` files and the functions the evaluator implements
 
-The repo is private, so install from a local clone or with `gh` authentication:
+Install from GitHub or from a local clone:
 
 ```
 /plugin marketplace add TorresVisual/null-notes
