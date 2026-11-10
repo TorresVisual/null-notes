@@ -170,7 +170,7 @@ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
 - [ ] **Step 1: Build the debug APK for the emulator ABI**
 
 ```powershell
-$env:ANDROID_HOME = "C:\Users\Moritz\AppData\Local\Android\Sdk"
+$env:ANDROID_HOME = "C:\Users\<you>\AppData\Local\Android\Sdk"
 $env:NDK_HOME = "$env:ANDROID_HOME\ndk\29.0.14206865"
 $env:JAVA_HOME = "C:\Program Files\Eclipse Adoptium\jdk-25.0.1.8-hotspot"
 npx tauri android build --debug --target x86_64

@@ -59,7 +59,7 @@ your human partner before Step 1 and checks the chosen boxes itself.
 - [ ] **Step 1: Build, clean-install, launch**
 
 ```powershell
-$env:ANDROID_HOME = "C:\Users\Moritz\AppData\Local\Android\Sdk"
+$env:ANDROID_HOME = "C:\Users\<you>\AppData\Local\Android\Sdk"
 $env:NDK_HOME = "$env:ANDROID_HOME\ndk\29.0.14206865"
 $env:JAVA_HOME = "C:\Program Files\Eclipse Adoptium\jdk-21"
 npx tauri android build --debug --target x86_64

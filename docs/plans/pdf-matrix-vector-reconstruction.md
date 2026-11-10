@@ -632,7 +632,7 @@ Compute its determinant.
 \end{document}
 EOF
 cd .null/scratch
-"/c/Users/Moritz/AppData/Local/Programs/MiKTeX/miktex/bin/x64/pdflatex.exe" -interaction=nonstopmode matrix_2x2_test.tex
+"/c/Users/<you>/AppData/Local/Programs/MiKTeX/miktex/bin/x64/pdflatex.exe" -interaction=nonstopmode matrix_2x2_test.tex
 cp matrix_2x2_test.pdf ../../notes/tests/matrix_2x2_test.pdf
 ```
 

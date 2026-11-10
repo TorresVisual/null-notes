@@ -43,7 +43,7 @@ your human partner before Step 1 and checks the chosen boxes itself.
 - Produces: `ANDROID_HOME`, `NDK_HOME`, and `JAVA_HOME` set correctly for this session (and persistently for future sessions), the four Android Rust targets installed via `rustup`, and a confirmed-booting emulator that `adb` can see — Task 2 assumes all of this before running `tauri android init`.
 
 Current machine state, already checked before writing this plan (re-verify rather than trust blindly — this was checked once, on 2026-09-16):
-- Android SDK present at `C:\Users\Moritz\AppData\Local\Android\Sdk` (`ANDROID_SDK_ROOT` already points here) — contains `platforms\android-34`, `build-tools\34.0.0` and `36.1.0`, `ndk\29.0.14206865`, `platform-tools` (with a working `adb`), and an existing AVD: `Pixel_3a_API_34_extension_level_7_x86_64`.
+- Android SDK present at `C:\Users\<you>\AppData\Local\Android\Sdk` (`ANDROID_SDK_ROOT` already points here) — contains `platforms\android-34`, `build-tools\34.0.0` and `36.1.0`, `ndk\29.0.14206865`, `platform-tools` (with a working `adb`), and an existing AVD: `Pixel_3a_API_34_extension_level_7_x86_64`.
 - `ANDROID_HOME`, `NDK_HOME`, and `JAVA_HOME` are **not** set — Tauri's Android tooling specifically looks for `ANDROID_HOME` and `NDK_HOME` (not `ANDROID_SDK_ROOT`/`ANDROID_NDK_HOME`), per Tauri's own prerequisites docs.
 - A JDK is installed (Eclipse Temurin 25) at `C:\Program Files\Eclipse Adoptium\jdk-25.0.1.8-hotspot`, but nothing points `JAVA_HOME` at it.
 - Only `x86_64-pc-windows-msvc` is installed via `rustup target list --installed` — none of the four Android targets are present yet.
@@ -53,16 +53,16 @@ Current machine state, already checked before writing this plan (re-verify rathe
 Persistently (so future sessions/terminals also have them — takes effect in *new* shells only):
 
 ```powershell
-setx ANDROID_HOME "C:\Users\Moritz\AppData\Local\Android\Sdk"
-setx NDK_HOME "C:\Users\Moritz\AppData\Local\Android\Sdk\ndk\29.0.14206865"
+setx ANDROID_HOME "C:\Users\<you>\AppData\Local\Android\Sdk"
+setx NDK_HOME "C:\Users\<you>\AppData\Local\Android\Sdk\ndk\29.0.14206865"
 setx JAVA_HOME "C:\Program Files\Eclipse Adoptium\jdk-25.0.1.8-hotspot"
 ```
 
 And for the current session (this tool's shell state doesn't persist across calls, so every subsequent PowerShell call in this plan that needs these vars must set them inline or rely on a fresh shell already having picked up the `setx` values — confirm which before Task 2):
 
 ```powershell
-$env:ANDROID_HOME = "C:\Users\Moritz\AppData\Local\Android\Sdk"
-$env:NDK_HOME = "C:\Users\Moritz\AppData\Local\Android\Sdk\ndk\29.0.14206865"
+$env:ANDROID_HOME = "C:\Users\<you>\AppData\Local\Android\Sdk"
+$env:NDK_HOME = "C:\Users\<you>\AppData\Local\Android\Sdk\ndk\29.0.14206865"
 $env:JAVA_HOME = "C:\Program Files\Eclipse Adoptium\jdk-25.0.1.8-hotspot"
 ```
 

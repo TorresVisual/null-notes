@@ -30,7 +30,7 @@ your human partner before Step 1 and checks the chosen boxes itself.
 - **No real credential.** The fixture server enforces no auth. The token field gets the dummy value `dummy-token-for-android`.
 - **Fixture binds `127.0.0.1` only**, never `0.0.0.0` (emulator's `10.0.2.2` maps to host loopback), and is stopped at the end.
 - **No production source changes.** A bug found here is recorded as the result and fixed in a separate commit, not folded in.
-- **Environment per session:** `ANDROID_HOME=C:\Users\Moritz\AppData\Local\Android\Sdk`, `NDK_HOME`, `JAVA_HOME` as in the credentials plan; drive the device with `adb`, not the Android Studio UI.
+- **Environment per session:** `ANDROID_HOME=C:\Users\<you>\AppData\Local\Android\Sdk`, `NDK_HOME`, `JAVA_HOME` as in the credentials plan; drive the device with `adb`, not the Android Studio UI.
 - **Windows quirk (verified while writing this plan):** Python's CGI handler only execs `.exe` scripts when the URL names the extension. The remote URL is `/cgi-bin/git-http-backend.exe/fixture-remote.git`; without `.exe` the server answers 404 and git reports "repository not found". The `cgi-bin` directory is a junction to `git --exec-path`.
 
 ## Review Focus
@@ -150,7 +150,7 @@ sock.onerror = (e) => {
 `$env:TEMP\android-attach.ps1`:
 
 ```powershell
-$env:ANDROID_HOME = "C:\Users\Moritz\AppData\Local\Android\Sdk"
+$env:ANDROID_HOME = "C:\Users\<you>\AppData\Local\Android\Sdk"
 $adb = "$env:ANDROID_HOME\platform-tools\adb.exe"
 function Attach-Webview {
   $procId = (& $adb shell pidof dev.nullnotes.app).Trim()
