@@ -3,6 +3,7 @@ import { InkEditorOverlay } from '../../ink/InkEditorOverlay'
 import { InkSvg } from '../../ink/InkSvg'
 import { useInkSidecar } from '../../hooks/useInkSidecar'
 import { pendingInkOpens } from '../toolbar/insertInk'
+import { isMobile } from '../../lib/platform'
 import type { InkData } from '../../ink/types'
 
 const PREVIEW_MAX_HEIGHT = 320
@@ -44,7 +45,9 @@ export function InkPreview({ src, width, height, editable }: InkPreviewProps) {
     return () => window.removeEventListener('ink:auto-open', onAutoOpen)
   }, [src, editable])
 
-  const open = editable ? () => setEditing(true) : undefined
+  // A phone note is read-only until the pencil is tapped, but its drawings
+  // still open full-screen: that overlay is its own editor, not note editing.
+  const open = editable || isMobile() ? () => setEditing(true) : undefined
   // The page's own size, not the node's: the page grows as you write, and the
   // node attrs keep the size it was inserted with.
   const pageWidth = data?.width ?? width

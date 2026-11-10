@@ -3,6 +3,7 @@ import { PlainText } from './PlainText'
 import { Code } from '@tiptap/extension-code'
 import { markInputRule, Extension, InputRule } from '@tiptap/core'
 import type { ResolvedPos } from '@tiptap/pm/model'
+import { Plugin } from '@tiptap/pm/state'
 import { Markdown } from 'tiptap-markdown'
 import Placeholder from '@tiptap/extension-placeholder'
 import { TableRow } from '@tiptap/extension-table-row'
@@ -159,7 +160,40 @@ const TaskItemInLists = TaskItem.extend({
       }),
     ]
   },
-})
+  // The stock node view ignores a checkbox tap when the editor is read-only.
+  // Its onReadOnlyChecked callback only receives the node it was built with —
+  // stale after the first toggle, and not unique among identical items — so
+  // the toggle is applied here, from the tapped checkbox's own position.
+  addProseMirrorPlugins() {
+    return [
+      ...(this.parent?.() ?? []),
+      new Plugin({
+        props: {
+          handleDOMEvents: {
+            change(view, event) {
+              const target = event.target
+              if (view.editable || !(target instanceof HTMLInputElement) || target.type !== 'checkbox') return false
+              const pos = view.posAtDOM(target, 0)
+              const $pos = view.state.doc.resolve(pos)
+              const itemPos = $pos.nodeAfter?.type.name === 'taskItem' ? pos : findTaskItemStart($pos)
+              const item = itemPos === null ? null : view.state.doc.nodeAt(itemPos)
+              if (itemPos === null || !item) return false
+              view.dispatch(view.state.tr.setNodeMarkup(itemPos, undefined, { ...item.attrs, checked: target.checked }))
+              return true
+            },
+          },
+        },
+      }),
+    ]
+  },
+}).configure({ onReadOnlyChecked: () => true })
+
+function findTaskItemStart($pos: ResolvedPos): number | null {
+  for (let depth = $pos.depth; depth > 0; depth--) {
+    if ($pos.node(depth).type.name === 'taskItem') return $pos.before(depth)
+  }
+  return null
+}
 
 export const coreExtensions = [
   // StarterKit 3 bundles its own Link and Underline; leaving them on registers
