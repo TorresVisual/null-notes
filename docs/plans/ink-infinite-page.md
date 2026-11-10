@@ -1,5 +1,7 @@
 # Ink Infinite Page Implementation Plan
 
+> **Superseded by `docs/plans/ink-camera.md`** — the scroll-and-grow page was replaced by a camera.
+
 > **For agentic workers:** See Execution Options below — the checked Execution Mode box names the REQUIRED SUB-SKILL (superpowers:executing-plans or superpowers:subagent-driven-development).
 
 **Goal:** In the full-screen ink editor the page grows in all four directions as ink approaches an edge, without moving any stored coordinate and without a visible jump.

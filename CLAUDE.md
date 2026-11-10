@@ -1,6 +1,6 @@
 # Null Notes
 
-A WYSIWYG Markdown note-taking app for CS students. Desktop-primary (Tauri + Windows), inline ink support, PDF import pipeline.
+A WYSIWYG Markdown note-taking app for CS students. Desktop-primary (Tauri + Windows), ink drawing (inline preview, full-screen pan/zoom editor), PDF import pipeline.
 
 ## Stack
 

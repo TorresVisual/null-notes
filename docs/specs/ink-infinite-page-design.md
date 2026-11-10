@@ -1,5 +1,7 @@
 # null-notes — Ink Infinite Page Design
 
+> **Superseded by `docs/specs/ink-camera-design.md`** — the scroll-and-grow page was replaced by a camera.
+
 **Date:** 2026-10-20
 **Scope:** Sub-project 3 of 4 in the "make free drawing feel like OneNote" effort. Depends on `ink-fullscreen-editor-design.md` (the overlay supplies the scroll container and opts in to all-sides growth).
 
