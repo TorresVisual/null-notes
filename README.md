@@ -253,3 +253,7 @@ Use one of the `marketplace add` lines, not both. To try the skills without inst
 - [`docs/cli.md`](docs/cli.md) — the `nullnotes` CLI contract
 - [`docs/design-tokens.md`](docs/design-tokens.md) — the Terminal Precision
   design tokens
+
+## License
+
+[Apache-2.0](LICENSE). Bundled third-party fonts keep their own licences.
