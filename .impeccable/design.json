@@ -1,0 +1,119 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-10T00:00:00.000Z",
+  "title": "Design System: Null Notes",
+  "extensions": {
+    "colorMeta": {
+      "signal-green": { "role": "primary", "displayName": "Signal Green", "canonical": "#7ee787" },
+      "signal-green-hover": { "role": "primary", "displayName": "Signal Green Lifted", "canonical": "#a3f0ac" },
+      "signal-green-ink": { "role": "primary", "displayName": "Signal Ink", "canonical": "#0d0f12" },
+      "ground": { "role": "neutral", "displayName": "Ground", "canonical": "#1f1f1f" },
+      "raised": { "role": "neutral", "displayName": "Raised", "canonical": "#181818" },
+      "sunken": { "role": "neutral", "displayName": "Sunken", "canonical": "#121212" },
+      "hover-fill": { "role": "neutral", "displayName": "Hover Fill", "canonical": "#2a2a2a" },
+      "hairline": { "role": "neutral", "displayName": "Hairline", "canonical": "#2c2c2c" },
+      "hairline-strong": { "role": "neutral", "displayName": "Hairline Strong", "canonical": "#3a3a3a" },
+      "text-primary": { "role": "neutral", "displayName": "Text Primary", "canonical": "#e6edf3" },
+      "text-secondary": { "role": "neutral", "displayName": "Text Secondary", "canonical": "#9da7b3" },
+      "text-tertiary": { "role": "neutral", "displayName": "Text Tertiary", "canonical": "#808a96" },
+      "text-disabled": { "role": "neutral", "displayName": "Text Disabled", "canonical": "#6a737e" },
+      "danger": { "role": "secondary", "displayName": "Danger", "canonical": "#e05050" },
+      "warning": { "role": "secondary", "displayName": "Warning", "canonical": "#d29922" }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "The one brand moment: workspace-picker title." },
+      "headline": { "displayName": "Headline", "purpose": "Editor headings h1-h4, sans bold." },
+      "body": { "displayName": "Body", "purpose": "App default and note prose." },
+      "label": { "displayName": "Label", "purpose": "Small uppercase metadata captions." },
+      "code": { "displayName": "Code", "purpose": "UI-chrome monospace." }
+    },
+    "shadows": [
+      { "name": "popover", "value": "0 12px 40px rgba(0,0,0,0.5)", "purpose": "Math editor, slash menu, snippet menu." },
+      { "name": "modal", "value": "0 24px 64px rgba(0,0,0,0.6)", "purpose": "Search, settings, graph, tasks, review, import." },
+      { "name": "context-menu", "value": "0 12px 32px rgba(0,0,0,0.5)", "purpose": "Folder right-click menu." },
+      { "name": "compact", "value": "0 4px 16px rgba(0,0,0,0.4)", "purpose": "Block-handle menu, small popover tier." },
+      { "name": "focus-ring", "value": "0 0 0 2px #1f1f1f, 0 0 0 4px #7ee787", "purpose": "Two-ring :focus-visible indicator." }
+    ],
+    "motion": [
+      { "name": "duration-fast", "value": "120ms", "purpose": "State swaps: hover, press, toggle." },
+      { "name": "duration-base", "value": "180ms", "purpose": "Surface entering, chevron rotate." },
+      { "name": "ease-standard", "value": "cubic-bezier(0.4, 0, 0.2, 1)", "purpose": "Colour and position changes." },
+      { "name": "ease-out", "value": "cubic-bezier(0.16, 1, 0.3, 1)", "purpose": "Things settling into place; no overshoot." }
+    ],
+    "breakpoints": []
+  },
+  "components": [
+    {
+      "name": "Sidebar Button",
+      "kind": "button",
+      "refersTo": "button-sidebar",
+      "description": "Default shell button; green tint when selected.",
+      "html": "<button class=\"ds-btn\">New note</button> <button class=\"ds-btn ds-btn-selected\">Lecture 7</button>",
+      "css": ".ds-btn{display:inline-flex;align-items:center;gap:8px;padding:7px 10px;background:transparent;color:#e6edf3;border:1px solid transparent;border-radius:6px;font-size:13px;cursor:pointer;transition:background 120ms cubic-bezier(0.4,0,0.2,1)}.ds-btn:hover{background:#2a2a2a}.ds-btn:active{background:#121212}.ds-btn:focus-visible{outline:none;box-shadow:0 0 0 2px #1f1f1f,0 0 0 4px #7ee787}.ds-btn-selected{background:rgba(126,231,135,0.12);color:#7ee787}"
+    },
+    {
+      "name": "Tab",
+      "kind": "nav",
+      "refersTo": "tab",
+      "description": "Text-only tab; the active tab attaches to the editor with a green underline.",
+      "html": "<div class=\"ds-tabs\"><div class=\"ds-tab\">Notes</div><div class=\"ds-tab ds-tab-active\">Lecture 7</div></div>",
+      "css": ".ds-tabs{display:flex;background:#181818}.ds-tab{padding:6px 12px;color:#808a96;font-size:13px;border-right:1px solid #2c2c2c;cursor:pointer}.ds-tab:hover{background:#2a2a2a}.ds-tab-active{background:#1f1f1f;color:#e6edf3;font-weight:600;box-shadow:inset 0 -3px 0 #7ee787}"
+    },
+    {
+      "name": "Input",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Compact form control on a raised panel.",
+      "html": "<input class=\"ds-input\" value=\"14\" />",
+      "css": ".ds-input{width:72px;padding:5px 8px;background:#2a2a2a;border:1px solid #3a3a3a;border-radius:4px;color:#e6edf3;font-size:13px}.ds-input:hover{border-color:#808a96}.ds-input:focus-visible{outline:none;box-shadow:0 0 0 2px #1f1f1f,0 0 0 4px #7ee787}"
+    },
+    {
+      "name": "Dialog Panel",
+      "kind": "card",
+      "refersTo": "panel",
+      "description": "Raised modal surface with the modal shadow.",
+      "html": "<div class=\"ds-panel\">Settings</div>",
+      "css": ".ds-panel{background:#181818;color:#e6edf3;border:1px solid #3a3a3a;border-radius:10px;padding:16px;width:240px;box-shadow:0 24px 64px rgba(0,0,0,0.6)}"
+    },
+    {
+      "name": "Callout",
+      "kind": "custom",
+      "refersTo": "code-block",
+      "description": "Note-content block with a 4px coloured left stripe.",
+      "html": "<div class=\"ds-callout\">Theorem 1. Every finite tree has a leaf.</div>",
+      "css": ".ds-callout{border-left:4px solid #7ee787;background:#2a2a2a;border-radius:0 6px 6px 0;padding:10px 14px;color:#e6edf3;font-size:15px;line-height:1.6}"
+    }
+  ],
+  "narrative": {
+    "northStar": "Terminal Precision",
+    "overview": "CS coursework is exact, so the interface is not softer than the material it holds. Chrome is a near-black ground with one signal-green accent in place of a palette; anything symbolic is monospace; corners are small. Headings and body are sans-serif at real reading sizes.",
+    "keyCharacteristics": [
+      "Near-black ground, tonal layering instead of shadows for in-page chrome",
+      "One accent (signal green) plus semantic danger/warning",
+      "Monospace for code/math/chrome-symbols, sans for prose and headings",
+      "Small radii (3-8px), hairline borders, no pills in chrome",
+      "Two motion durations, two curves, no overshoot"
+    ],
+    "rules": [
+      { "name": "The One Voice Rule", "body": "Green is the only brand color.", "section": "colors" },
+      { "name": "The Tint-Not-Fill Rule", "body": "Selection and active rows are accent-bg plus green text, not a solid green block.", "section": "colors" },
+      { "name": "The Token Bridge Rule", "body": "Never hardcode a colour; shadcn components read tokens that point at Terminal Precision.", "section": "colors" },
+      { "name": "The Reading Boundary Rule", "body": "Mono is for symbols, never for sentences or headings.", "section": "typography" },
+      { "name": "The Flat-Until-Floating Rule", "body": "A surface gets a shadow only if it overlays other content and is dismissed by clicking away.", "section": "elevation" },
+      { "name": "The Pick-A-Tier Rule", "body": "A new floating surface picks one of the four shadow tokens.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do read every colour, radius, shadow, duration from the :root tokens in src/index.css.",
+      "Do give every interactive element all eight states.",
+      "Do use --focus-ring for focus.",
+      "Do put non-prose text in --font-mono and sentences in --font-sans."
+    ],
+    "donts": [
+      "Don't introduce a second brand colour or a gradient.",
+      "Don't add a fifth shadow tier or put a shadow on an in-layout panel.",
+      "Don't use a coloured side stripe in app chrome.",
+      "Don't use monospace for headings or body text.",
+      "Don't animate on exit or overshoot."
+    ]
+  }
+}
