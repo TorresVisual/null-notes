@@ -17,6 +17,8 @@ import { EditorStatusBar } from './EditorStatusBar'
 import { BlockHandle } from './extensions/BlockHandle'
 import { EditorToolbar } from './toolbar/EditorToolbar'
 import { useKeepCaretVisible, caretScrollProps } from './useKeepCaretVisible'
+import { useMobileEditMode } from './useMobileEditMode'
+import { MobileEditToggle } from './MobileEditToggle'
 import { isMobile } from '../lib/platform'
 import { useInkStore } from '../store/ink'
 import { useSettingsStore } from '../store/settings'
@@ -88,6 +90,7 @@ export function NoteEditor({
   })
 
   useKeepCaretVisible(editor)
+  const { readOnly, startEditing, stopEditing } = useMobileEditMode(editor, notePath)
 
   // ProseMirror re-applies editorProps.attributes to the DOM on every state
   // update, so setting the attribute by hand would be undone on the next
@@ -273,7 +276,7 @@ export function NoteEditor({
 
   return (
     <div className="note-editor-wrap">
-      <EditorToolbar editor={editor} notePath={notePath} />
+      {!readOnly && <EditorToolbar editor={editor} notePath={notePath} />}
       <EditorContent
         editor={editor}
         className="note-editor"
@@ -286,6 +289,7 @@ export function NoteEditor({
           } as CSSProperties
         }
       />
+      {isMobile() && <MobileEditToggle readOnly={readOnly} onEdit={startEditing} onDone={stopEditing} />}
       {editor && <BlockHandle editor={editor} />}
       {editor && <EditorStatusBar editor={editor} />}
     </div>

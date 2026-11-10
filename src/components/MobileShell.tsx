@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { ArrowLeft } from 'lucide-react'
 import { useWorkspaceStore } from '../store/workspace'
+import { useMobileEditStore } from '../store/mobileEdit'
 import { useBackButton } from '../hooks/useBackButton'
 import type { OverlayKind } from '../hooks/useOverlayManager'
 import type { MobileTab } from '../lib/backNavigation'
@@ -61,12 +62,17 @@ export function MobileShell({
     }
   }, [])
 
+  function closeEditor() {
+    useMobileEditStore.getState().stopEditing()
+    setActiveTab(null)
+  }
+
   useBackButton(
     { overlayOpen: activeOverlay !== null, sheetOpen: moreOpen, editorOpen, tab },
     {
       'close-overlay': closeOverlay,
       'close-sheet': () => setMoreOpen(false),
-      'close-editor': () => setActiveTab(null),
+      'close-editor': closeEditor,
       'go-home': () => setTab('home'),
     },
   )
@@ -93,7 +99,7 @@ export function MobileShell({
       {editorOpen ? (
         <>
           <header className="mobile-topbar">
-            <button className="mobile-topbar-back" aria-label="Back" onClick={() => setActiveTab(null)}>
+            <button className="mobile-topbar-back" aria-label="Back" onClick={closeEditor}>
               <ArrowLeft size={20} />
             </button>
             <span className="mobile-topbar-title">{noteTitle}</span>
