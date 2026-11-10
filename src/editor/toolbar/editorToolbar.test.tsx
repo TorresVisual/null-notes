@@ -18,7 +18,7 @@ function handle(overrides: Partial<CanvasHandle> = {}): CanvasHandle {
     undo: () => {}, redo: () => {}, canUndo: false, canRedo: false,
     deleteSelected: () => {}, hasSelection: false,
     toggleRuler: () => {}, rulerOn: false,
-    zoom: 1, setZoom: () => {}, cropToContent: () => {},
+    zoom: 1, setZoom: () => {},
     ...overrides,
   }
 }

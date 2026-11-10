@@ -15,7 +15,7 @@ import type { Ruler, RulerGrab } from './ruler'
 import { drawShapePreview } from './shapePreview'
 import { drawTextItem } from './textRender'
 import { pointInTextItem, translateTextItem, boundsOfTextItem } from './textBounds'
-import { MIN_EXTENT, cropToContent as cropPage, boundsOfPoints, type Bounds } from './bounds'
+import { MIN_EXTENT, extentOf, boundsOfPoints, type Bounds } from './bounds'
 import { isVisible, screenToWorld } from './camera'
 import type { Camera, Viewport } from './camera'
 import { straightLineEnds } from './straighten'
@@ -385,11 +385,21 @@ export function useInkCanvas(
 
   // Writes are fire-and-forget, so a caller re-reading the sidecar on close could
   // beat the last stroke to disk. `onSaved` fires from the resolved write instead.
+  // The declared extent follows the ink, except over a page backdrop where it
+  // stays the page rectangle so the preview keeps lining up with the image.
+  // Keyed on the page's size, not the backdrop object, so the identity of this
+  // callback (and the unmount flush that depends on it) does not churn.
+  const pageWidth = backdrop?.width
+  const pageHeight = backdrop?.height
   const save = useCallback(
     (data: InkData) => {
-      void inkApi.write(svgPath, data).then(() => onSavedRef.current?.())
+      const sized =
+        pageWidth !== undefined && pageHeight !== undefined
+          ? { ...data, originX: 0, originY: 0, width: pageWidth, height: pageHeight }
+          : extentOf(data)
+      void inkApi.write(svgPath, sized).then(() => onSavedRef.current?.())
     },
-    [svgPath],
+    [svgPath, pageWidth, pageHeight],
   )
 
   // The selected preset *is* the pen — colour, width and opacity all come from
@@ -466,11 +476,6 @@ export function useInkCanvas(
     setInkData(next)
     save(next)
   }, [history, future, inkData, save])
-
-  const cropToContent = useCallback(() => {
-    const next = cropPage(inkData)
-    if (next !== inkData) commit(next)
-  }, [inkData, commit])
 
   const startNewText = useCallback(
     (x: number, y: number) => {
@@ -994,7 +999,6 @@ export function useInkCanvas(
     inkData,
     undo,
     redo,
-    cropToContent,
     canUndo: history.length > 0,
     canRedo: future.length > 0,
     editingText,

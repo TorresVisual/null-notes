@@ -39,7 +39,6 @@ export interface CanvasHandle {
   rulerOn: boolean
   zoom: number
   setZoom: (zoom: number) => void
-  cropToContent: () => void
 }
 
 interface InkStore {

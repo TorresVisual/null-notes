@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { EMPTY_BOUNDS, boundsOfPoints, inkBounds, cropToContent, CROP_PADDING, MIN_EXTENT, extentOf } from './bounds'
+import { EMPTY_BOUNDS, boundsOfPoints, inkBounds, CROP_PADDING, MIN_EXTENT, extentOf } from './bounds'
 import type { InkData } from './types'
 
 describe('boundsOfPoints', () => {
@@ -42,26 +42,6 @@ describe('inkBounds', () => {
 const page = { originX: 0, originY: 0, width: 800, height: 600 }
 const bounds = (minX: number, minY: number, maxX: number, maxY: number) => ({ minX, minY, maxX, maxY })
 const inside = bounds(300, 300, 400, 400)
-
-describe('cropToContent', () => {
-  const page: InkData = { originX: 0, originY: 0, width: 700, height: 900, strokes: [], shapes: [], texts: [] }
-
-  it('leaves an empty page alone', () => {
-    expect(cropToContent(page)).toBe(page)
-  })
-
-  it('shrinks the page to the ink plus padding without touching coordinates', () => {
-    const stroke = { id: 's', points: [{ x: 100, y: 200, pressure: 0.5 }, { x: 300, y: 260, pressure: 0.5 }], color: '#000', size: 2, opacity: 1 }
-    const cropped = cropToContent({ ...page, strokes: [stroke] })
-    expect(cropped).toMatchObject({
-      originX: 100 - CROP_PADDING,
-      originY: 200 - CROP_PADDING,
-      width: 200 + 2 * CROP_PADDING,
-      height: 60 + 2 * CROP_PADDING,
-    })
-    expect(cropped.strokes).toEqual([stroke])
-  })
-})
 
 describe('extentOf', () => {
   const dot: InkData = {

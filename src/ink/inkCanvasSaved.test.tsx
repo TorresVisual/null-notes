@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest'
-import { render, cleanup, fireEvent, waitFor } from '@testing-library/react'
+import { render, cleanup, createEvent, fireEvent, waitFor } from '@testing-library/react'
 import { InkCanvas } from './InkCanvas'
 import { useInkStore } from '../store/ink'
 import { DEFAULT_PENS } from './pens'
@@ -168,12 +168,100 @@ describe('Delete reaches only the canvas that owns the selection', () => {
     selectStrokeIn(container)
     useInkStore.getState().setActiveCanvas('/ws/N.ink/b.svg', {
       undo: vi.fn(), redo: vi.fn(), canUndo: false, canRedo: false, deleteSelected: vi.fn(),
-      hasSelection: false, toggleRuler: vi.fn(), rulerOn: false, zoom: 1, setZoom: vi.fn(), cropToContent: vi.fn(),
+      hasSelection: false, toggleRuler: vi.fn(), rulerOn: false, zoom: 1, setZoom: vi.fn(),
     })
     write.mockClear()
 
     fireEvent.keyDown(window, { key: 'Delete' })
 
     expect(write).not.toHaveBeenCalled()
+  })
+})
+
+describe('the saved extent', () => {
+  const STROKE = (id: string, x: number, y: number) => ({
+    id,
+    points: [
+      { x, y, pressure: 0.5 },
+      { x: x + 40, y: y + 90, pressure: 0.5 },
+      { x: x + 80, y: y + 10, pressure: 0.5 },
+    ],
+    color: '#000000',
+    size: 2,
+    opacity: 1,
+    thinning: 0.5,
+  })
+
+  function drawBent(canvas: Element, at: [number, number][]) {
+    const fire = (type: 'pointerDown' | 'pointerMove' | 'pointerUp', [x, y]: [number, number]) => {
+      const event = createEvent[type](canvas, { pointerType: 'pen', pointerId: 1, clientX: x, clientY: y, pressure: 0.5 })
+      Object.defineProperty(event, 'getCoalescedEvents', { value: undefined })
+      fireEvent(canvas, event)
+    }
+    const [first, ...rest] = at
+    if (!first) return
+    fire('pointerDown', first)
+    for (const point of rest.slice(0, -1)) fire('pointerMove', point)
+    const last = rest[rest.length - 1]
+    if (last) fire('pointerUp', last)
+  }
+
+  beforeEach(() => useInkStore.setState({ tool: 'pen' }))
+
+  it('keeps every stored stroke byte-identical and covers them all when the origin is not zero', async () => {
+    const loaded: InkData = {
+      originX: -300,
+      originY: -200,
+      width: 700,
+      height: 400,
+      strokes: [STROKE('a', -250, -150), STROKE('b', 0, 0), STROKE('c', 100, 50)],
+      shapes: [],
+      texts: [],
+    }
+    read.mockResolvedValue(loaded)
+    const { container } = render(<InkCanvas svgPath="/ws/N.ink/a.svg" />)
+    await waitFor(() => expect(read).toHaveBeenCalled())
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    drawBent(container.querySelector('canvas')!, [[2000, 1500], [2040, 1590], [2080, 1510], [2080, 1510]])
+
+    await waitFor(() => expect(write).toHaveBeenCalledTimes(1))
+    const written = write.mock.calls[0]![1]
+    expect(written.strokes.slice(0, 3)).toEqual(loaded.strokes)
+    expect(written.originX).toBeLessThanOrEqual(-250 - 40)
+    expect(written.originY).toBeLessThanOrEqual(-150 - 40)
+    expect(written.originX + written.width).toBeGreaterThanOrEqual(2080 + 40)
+    expect(written.originY + written.height).toBeGreaterThanOrEqual(1590 + 40)
+  })
+
+  it('writes a finite extent when the last stroke is undone', async () => {
+    read.mockResolvedValue({ originX: 0, originY: 0, width: 700, height: 400, strokes: [], shapes: [], texts: [] })
+    const { container } = render(<InkCanvas svgPath="/ws/N.ink/a.svg" autoActivate />)
+    await waitFor(() => expect(read).toHaveBeenCalled())
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    drawBent(container.querySelector('canvas')!, [[10, 10], [50, 100], [90, 20], [90, 20]])
+    await waitFor(() => expect(write).toHaveBeenCalledTimes(1))
+
+    useInkStore.getState().activeCanvas?.undo()
+
+    await waitFor(() => expect(write).toHaveBeenCalledTimes(2))
+    expect(write.mock.calls[1]![1]).toMatchObject({ originX: 0, originY: 0, width: 200, height: 200, strokes: [] })
+  })
+
+  it('keeps the page rectangle as the extent over a backdrop, whatever lies outside it', async () => {
+    read.mockResolvedValue({ originX: -90, originY: -90, width: 800, height: 1000, strokes: [], shapes: [], texts: [] })
+    const { container } = render(
+      <InkCanvas svgPath="/ws/N.ink/a.svg" backdrop={{ dataUrl: 'data:image/png;base64,AAAA', width: 600, height: 800 }} />,
+    )
+    await waitFor(() => expect(read).toHaveBeenCalled())
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    drawBent(container.querySelector('canvas')!, [[-50, -50], [-10, 40], [30, -40], [30, -40]])
+
+    await waitFor(() => expect(write).toHaveBeenCalledTimes(1))
+    const written = write.mock.calls[0]![1]
+    expect(written).toMatchObject({ originX: 0, originY: 0, width: 600, height: 800 })
+    expect(written.strokes).toHaveLength(1)
+    expect(written.strokes[0]?.points[0]).toMatchObject({ x: -50, y: -50 })
   })
 })

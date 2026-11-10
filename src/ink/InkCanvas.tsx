@@ -50,7 +50,6 @@ export function InkCanvas({ svgPath, backdrop, onSaved, autoActivate = false }: 
     releaseRuler,
     undo,
     redo,
-    cropToContent,
     canUndo,
     canRedo,
     editingText,
@@ -80,9 +79,8 @@ export function InkCanvas({ svgPath, backdrop, onSaved, autoActivate = false }: 
       rulerOn: ruler !== null,
       zoom: camera.scale,
       setZoom: zoomToward,
-      cropToContent,
     }),
-    [undo, redo, cropToContent, canUndo, canRedo, deleteSelected, hasSelection, toggleRuler, ruler, camera.scale, zoomToward],
+    [undo, redo, canUndo, canRedo, deleteSelected, hasSelection, toggleRuler, ruler, camera.scale, zoomToward],
   )
 
   // Re-registered whenever a value the bar renders changes, so `canUndo` in the

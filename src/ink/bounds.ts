@@ -44,22 +44,6 @@ export function inkBounds(data: InkData): Bounds {
 
 export const CROP_PADDING = 40
 
-// Shrinks the page to the ink plus padding by moving the origin, so no stored
-// coordinate changes. An empty page has nothing to crop to and is left alone.
-export function cropToContent(data: InkData): InkData {
-  const b = inkBounds(data)
-  if (b.minX === Infinity) return data
-  const originX = Math.floor(b.minX - CROP_PADDING)
-  const originY = Math.floor(b.minY - CROP_PADDING)
-  return {
-    ...data,
-    originX,
-    originY,
-    width: Math.ceil(b.maxX + CROP_PADDING) - originX,
-    height: Math.ceil(b.maxY + CROP_PADDING) - originY,
-  }
-}
-
 export const MIN_EXTENT = 200
 
 function extentAxis(min: number, max: number): { origin: number; size: number } {

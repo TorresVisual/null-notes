@@ -18,7 +18,6 @@ function handle(overrides: Partial<CanvasHandle> = {}): CanvasHandle {
     rulerOn: false,
     zoom: 1,
     setZoom: vi.fn(),
-    cropToContent: vi.fn(),
     ...overrides,
   }
 }
@@ -164,12 +163,10 @@ describe('DrawRibbon right side', () => {
     expect(canvas?.setZoom).toHaveBeenCalledWith(1.5)
   })
 
-  it('crops the active canvas to its content', () => {
-    const { canvas } = setup()
+  it('has no crop control: the saved extent follows the ink on its own', () => {
+    setup()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Crop to content' }))
-
-    expect(canvas?.cropToContent).toHaveBeenCalledTimes(1)
+    expect(screen.queryByRole('button', { name: /crop/i })).toBeNull()
   })
 
   it('has no fit-width control', () => {
