@@ -7,15 +7,22 @@ import { toolForShortcut } from './ribbonShortcuts'
 import { zoomForKey } from './zoom'
 import { useInkStore } from '../store/ink'
 
+export interface InkBackdrop {
+  dataUrl: string
+  width: number
+  height: number
+}
+
 interface InkEditorOverlayProps {
   src: string
   width: number
   height: number
+  backdrop?: InkBackdrop
   onSaved: () => void
   onClose: () => void
 }
 
-export function InkEditorOverlay({ src, width, height, onSaved, onClose }: InkEditorOverlayProps) {
+export function InkEditorOverlay({ src, width, height, backdrop, onSaved, onClose }: InkEditorOverlayProps) {
   const [zoom, setZoom] = useState(1)
   const rootRef = useRef<HTMLDivElement>(null)
 
@@ -79,8 +86,9 @@ export function InkEditorOverlay({ src, width, height, onSaved, onClose }: InkEd
           height={height}
           zoom={zoom}
           onZoomChange={setZoom}
-          autoGrow
-          growAllSides
+          autoGrow={!backdrop}
+          growAllSides={!backdrop}
+          backdrop={backdrop}
           autoActivate
           onSaved={onSaved}
         />

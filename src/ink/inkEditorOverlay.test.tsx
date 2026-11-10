@@ -1,6 +1,7 @@
 import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest'
 import { render, cleanup, createEvent, fireEvent, waitFor, screen } from '@testing-library/react'
 import { InkEditorOverlay } from './InkEditorOverlay'
+import type { InkBackdrop } from './InkEditorOverlay'
 import { useInkStore } from '../store/ink'
 import type { CanvasHandle } from '../store/ink'
 import { DEFAULT_PENS } from './pens'
@@ -33,10 +34,10 @@ beforeEach(() => {
 })
 afterEach(cleanup)
 
-function mount() {
+function mount(backdrop?: InkBackdrop) {
   const onClose = vi.fn()
   const onSaved = vi.fn()
-  render(<InkEditorOverlay src={SRC} width={700} height={400} onSaved={onSaved} onClose={onClose} />)
+  render(<InkEditorOverlay src={SRC} width={700} height={400} backdrop={backdrop} onSaved={onSaved} onClose={onClose} />)
   const overlay = document.querySelector<HTMLElement>('.ink-editor-overlay')
   if (!overlay) throw new Error('overlay not mounted')
   return { overlay, onClose, onSaved }
@@ -252,5 +253,25 @@ describe('infinite page', () => {
 
     await waitFor(() => expect(write).toHaveBeenCalled())
     expect(write.mock.calls[0]?.[1]).toMatchObject({ originX: -400, originY: -400 })
+  })
+})
+
+describe('page backdrop', () => {
+  const backdrop: InkBackdrop = { dataUrl: 'data:image/png;base64,AAAA', width: 600, height: 800 }
+
+  it('shows the page image at its size times the zoom', () => {
+    mount(backdrop)
+    const img = document.querySelector<HTMLImageElement>('img[alt="Page backdrop"]')
+
+    expect(img).not.toBeNull()
+    expect(img?.getAttribute('src')).toBe(backdrop.dataUrl)
+    expect(img?.style.width).toBe('600px')
+    expect(img?.style.height).toBe('800px')
+  })
+
+  it('renders no backdrop image without one', () => {
+    mount()
+
+    expect(document.querySelector('img[alt="Page backdrop"]')).toBeNull()
   })
 })

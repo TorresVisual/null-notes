@@ -5,6 +5,7 @@ import { pinchZoom, distanceBetween } from './zoom'
 import { scrollShift } from './growCanvas'
 import { useZoomAnchor } from './useZoomAnchor'
 import { useInkStore } from '../store/ink'
+import type { InkBackdrop } from './InkEditorOverlay'
 import type { CanvasHandle } from '../store/ink'
 
 // Dragging a finger moves the content with it, so the scroll offset goes the
@@ -35,6 +36,7 @@ interface InkCanvasProps {
   onZoomChange?: (zoom: number) => void
   autoGrow?: boolean
   growAllSides?: boolean
+  backdrop?: InkBackdrop
   onSaved?: () => void
   autoActivate?: boolean
 }
@@ -47,6 +49,7 @@ export function InkCanvas({
   onZoomChange,
   autoGrow = false,
   growAllSides = false,
+  backdrop,
   onSaved,
   autoActivate = false,
 }: InkCanvasProps) {
@@ -231,9 +234,24 @@ export function InkCanvas({
         onPointerCancel={handlePointerUp}
         onPointerLeave={handlePointerLeave}
       >
+        {backdrop && (
+          <img
+            src={backdrop.dataUrl}
+            alt="Page backdrop"
+            draggable={false}
+            style={{
+              position: 'absolute',
+              left: -inkData.originX * zoom,
+              top: -inkData.originY * zoom,
+              width: backdrop.width * zoom,
+              height: backdrop.height * zoom,
+              pointerEvents: 'none',
+            }}
+          />
+        )}
         <canvas
           ref={canvasRef}
-          className="ink-canvas"
+          className={backdrop ? 'ink-canvas ink-canvas-backdrop' : 'ink-canvas'}
           style={{
             position: 'absolute',
             top: 0,

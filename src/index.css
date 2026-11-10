@@ -4156,6 +4156,10 @@ li > .folder-tree.tree-guide {
   background-size: 24px 24px;
 }
 
+.ink-canvas.ink-canvas-backdrop {
+  background: none;
+}
+
 .ink-eraser-cursor {
   position: absolute;
   border: 1px solid var(--danger);
