@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { strokeToPath, shapeToElement, textItemToElement, inkDataToSvg, svgToInkData } from './svgSerialiser'
 import type { Stroke, Shape, TextItem, InkData } from './types'
 import { sanitizeNoteHtml } from '../lib/sanitizeHtml'
-import { GROW_MARGIN } from './growCanvas'
+import { GROW_MARGIN } from './bounds'
 
 const stroke: Stroke = {
   id: 's1',

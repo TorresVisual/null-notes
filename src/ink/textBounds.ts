@@ -1,4 +1,4 @@
-import type { Bounds } from './growCanvas'
+import type { Bounds } from './bounds'
 import type { TextItem } from './types'
 
 export const TEXT_LINE_HEIGHT = 1.2

@@ -2,7 +2,7 @@ import { useRef, useState, useEffect, useLayoutEffect, useCallback } from 'react
 import type { PointerEvent as ReactPointerEvent } from 'react'
 import { useInkCanvas, isDrawingPointer, isEraserTip, toInk } from './useInkCanvas'
 import { pinchZoom, distanceBetween } from './zoom'
-import { scrollShift } from './growCanvas'
+import { scrollShift } from './bounds'
 import { useZoomAnchor } from './useZoomAnchor'
 import { useInkStore } from '../store/ink'
 import type { InkBackdrop } from './InkEditorOverlay'

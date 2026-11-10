@@ -11,7 +11,7 @@ import {
   isSelectionEmpty,
   EMPTY_SELECTION,
 } from './lasso'
-import { EMPTY_BOUNDS } from './growCanvas'
+import { EMPTY_BOUNDS } from './bounds'
 import type { InkData, Shape, Stroke } from './types'
 
 // A 100x100 box with its top-left at the origin.

@@ -88,6 +88,26 @@ export function cropToContent(data: InkData): InkData {
   }
 }
 
+export const MIN_EXTENT = 200
+
+function extentAxis(min: number, max: number): { origin: number; size: number } {
+  const origin = Math.floor(min - CROP_PADDING)
+  const size = Math.ceil(max + CROP_PADDING) - origin
+  if (size >= MIN_EXTENT) return { origin, size }
+  return { origin: origin - Math.floor((MIN_EXTENT - size) / 2), size: MIN_EXTENT }
+}
+
+// The saved extent follows the ink: bounds plus padding, never smaller than
+// MIN_EXTENT so a lone dot isn't a speck in the preview. Only the declared
+// origin and size change; no stored coordinate moves.
+export function extentOf(data: InkData): InkData {
+  const b = inkBounds(data)
+  if (b.minX === Infinity) return { ...data, originX: 0, originY: 0, width: MIN_EXTENT, height: MIN_EXTENT }
+  const x = extentAxis(b.minX, b.maxX)
+  const y = extentAxis(b.minY, b.maxY)
+  return { ...data, originX: x.origin, originY: y.origin, width: x.size, height: y.size }
+}
+
 // Growing left or up adds screen space *before* the existing ink, so the scroll
 // position has to advance by the same amount or everything drawn jumps. Keyed on
 // any origin change — undo and redo restore the old origin and so shift back.

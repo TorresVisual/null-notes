@@ -1,6 +1,6 @@
 import { getStroke } from 'perfect-freehand'
 import { paintOrder } from './paintOrder'
-import { GROW_MARGIN, inkBounds } from './growCanvas'
+import { GROW_MARGIN, inkBounds } from './bounds'
 import { TEXT_LINE_HEIGHT } from './textBounds'
 import { DEFAULT_THINNING, strokeOptions } from './strokeOptions'
 import type { InkData, Stroke, Shape, TextItem } from './types'

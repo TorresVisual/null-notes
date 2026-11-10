@@ -1,4 +1,4 @@
-import type { Bounds } from './growCanvas'
+import type { Bounds } from './bounds'
 
 // screen = (world − (x, y)) · scale
 export interface Camera {

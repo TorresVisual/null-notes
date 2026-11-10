@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { GROW_MARGIN, PAGE_STEP, MAX_EXTENT, EMPTY_BOUNDS, boundsOfPoints, inkBounds, growCanvas, scrollShift, cropToContent, CROP_PADDING } from './growCanvas'
+import { GROW_MARGIN, PAGE_STEP, MAX_EXTENT, EMPTY_BOUNDS, boundsOfPoints, inkBounds, growCanvas, scrollShift, cropToContent, CROP_PADDING, MIN_EXTENT, extentOf } from './bounds'
 import type { InkData } from './types'
 
 describe('boundsOfPoints', () => {
@@ -144,5 +144,70 @@ describe('cropToContent', () => {
       height: 60 + 2 * CROP_PADDING,
     })
     expect(cropped.strokes).toEqual([stroke])
+  })
+})
+
+describe('extentOf', () => {
+  const dot: InkData = {
+    originX: 0,
+    originY: 0,
+    width: 9999,
+    height: 9999,
+    strokes: [
+      {
+        id: 'a',
+        points: [
+          { x: 500, y: 500, pressure: 0.5 },
+          { x: 510, y: 510, pressure: 0.5 },
+        ],
+        color: '#000000',
+        size: 4,
+        opacity: 1,
+      },
+    ],
+    shapes: [],
+    texts: [],
+  }
+
+  it('wraps small ink in at least MIN_EXTENT, keeping the ink plus padding inside', () => {
+    const out = extentOf(dot)
+
+    expect(out.width).toBeGreaterThanOrEqual(MIN_EXTENT)
+    expect(out.height).toBeGreaterThanOrEqual(MIN_EXTENT)
+    expect(out.originX).toBeLessThanOrEqual(500 - CROP_PADDING)
+    expect(out.originY).toBeLessThanOrEqual(500 - CROP_PADDING)
+    expect(out.originX + out.width).toBeGreaterThanOrEqual(510 + CROP_PADDING)
+    expect(out.originY + out.height).toBeGreaterThanOrEqual(510 + CROP_PADDING)
+  })
+
+  it('is ink bounds plus padding when that already exceeds the minimum', () => {
+    const wide: InkData = {
+      ...dot,
+      strokes: [{ ...dot.strokes[0]!, points: [{ x: -300, y: 0, pressure: 0.5 }, { x: 900, y: 400, pressure: 0.5 }] }],
+    }
+    const out = extentOf(wide)
+
+    expect(out).toMatchObject({ originX: -340, originY: -40, width: 1280, height: 480 })
+  })
+
+  it('gives an empty drawing a finite minimum extent at the origin', () => {
+    expect(extentOf({ ...dot, strokes: [] })).toMatchObject({
+      originX: 0,
+      originY: 0,
+      width: MIN_EXTENT,
+      height: MIN_EXTENT,
+    })
+  })
+
+  it('is idempotent', () => {
+    const once = extentOf(dot)
+    expect(extentOf(once)).toEqual(once)
+  })
+
+  it('leaves strokes, shapes and texts untouched', () => {
+    const out = extentOf(dot)
+    expect(out.strokes).toBe(dot.strokes)
+    expect(out.shapes).toBe(dot.shapes)
+    expect(out.texts).toBe(dot.texts)
   })
 })

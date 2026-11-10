@@ -1,4 +1,4 @@
-import { EMPTY_BOUNDS, mergeBounds, boundsOfPoints, type Bounds } from './growCanvas'
+import { EMPTY_BOUNDS, mergeBounds, boundsOfPoints, type Bounds } from './bounds'
 import type { InkData, Shape, Stroke } from './types'
 
 export interface LassoPoint {

@@ -11,7 +11,7 @@ import {
   zoomAbout,
 } from './camera'
 import type { Camera } from './camera'
-import { EMPTY_BOUNDS } from './growCanvas'
+import { EMPTY_BOUNDS } from './bounds'
 
 const VIEWPORT = { width: 1000, height: 500 }
 
