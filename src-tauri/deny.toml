@@ -11,6 +11,10 @@ ignore = [
     "RUSTSEC-2026-0370",
     "RUSTSEC-2026-0371",
     "RUSTSEC-2026-0372",
+    # libsqlite3-sys 0.30.1 is pinned by sqlx-sqlite 0.8.x (fix needs >=0.39).
+    # Exposure needs a crafted index.db plus -wal pair, and index.db lives in the
+    # OS app-data dir, outside the synced workspace. Revisit when sqlx moves.
+    "RUSTSEC-2026-0459",
 ]
 
 [licenses]

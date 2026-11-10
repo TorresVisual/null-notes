@@ -93,7 +93,8 @@ jobs:
         # pinned by tauri-plugin-updater 2.x (fix needs zip >=9, no 2.x release).
         # RUSTSEC-2026-0429 (zip 4.6.1): same extract() path and same pin; our own
         # code only writes zips (commands/export.rs), it never extracts.
-        run: cargo audit --ignore RUSTSEC-2026-0194 --ignore RUSTSEC-2026-0195 --ignore RUSTSEC-2023-0071 --ignore RUSTSEC-2026-0367 --ignore RUSTSEC-2026-0368 --ignore RUSTSEC-2026-0369 --ignore RUSTSEC-2026-0429
+        # RUSTSEC-2026-0459 (libsqlite3-sys 0.30.1): see deny.toml.
+        run: cargo audit --ignore RUSTSEC-2026-0194 --ignore RUSTSEC-2026-0195 --ignore RUSTSEC-2023-0071 --ignore RUSTSEC-2026-0367 --ignore RUSTSEC-2026-0368 --ignore RUSTSEC-2026-0369 --ignore RUSTSEC-2026-0429 --ignore RUSTSEC-2026-0459
 
   gitleaks:
     runs-on: ubuntu-latest
