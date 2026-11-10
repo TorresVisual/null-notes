@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest'
-import { render, cleanup, createEvent, fireEvent, waitFor, screen } from '@testing-library/react'
+import { render, cleanup, fireEvent, waitFor, screen } from '@testing-library/react'
 import { InkEditorOverlay } from './InkEditorOverlay'
 import type { InkBackdrop } from './InkEditorOverlay'
 import { useInkStore } from '../store/ink'
@@ -37,7 +37,7 @@ afterEach(cleanup)
 function mount(backdrop?: InkBackdrop) {
   const onClose = vi.fn()
   const onSaved = vi.fn()
-  render(<InkEditorOverlay src={SRC} width={700} height={400} backdrop={backdrop} onSaved={onSaved} onClose={onClose} />)
+  render(<InkEditorOverlay src={SRC} backdrop={backdrop} onSaved={onSaved} onClose={onClose} />)
   const overlay = document.querySelector<HTMLElement>('.ink-editor-overlay')
   if (!overlay) throw new Error('overlay not mounted')
   return { overlay, onClose, onSaved }
@@ -237,41 +237,111 @@ describe('draw ribbon in the overlay', () => {
   })
 })
 
-describe('infinite page', () => {
-  it('grows left and up when ink nears the top-left corner', async () => {
-    useInkStore.setState({ tool: 'rect' })
-    mount()
-    const canvas = document.querySelector('canvas')!
-    const at = (type: 'pointerDown' | 'pointerUp', x: number, y: number) => {
-      const event = createEvent[type](canvas, { pointerType: 'pen', pointerId: 1 })
-      Object.defineProperty(event, 'offsetX', { value: x })
-      Object.defineProperty(event, 'offsetY', { value: y })
-      fireEvent(canvas, event)
-    }
-    at('pointerDown', 40, 40)
-    at('pointerUp', 200, 200)
+interface Call {
+  name: string
+  args: unknown[]
+}
 
-    await waitFor(() => expect(write).toHaveBeenCalled())
-    expect(write.mock.calls[0]?.[1]).toMatchObject({ originX: -400, originY: -400 })
+function installRecordingContext(): Call[] {
+  const calls: Call[] = []
+  const state: Record<string, unknown> = {}
+  const ctx = new Proxy(state, {
+    get: (target, prop) => {
+      if (typeof prop === 'symbol') return undefined
+      if (prop in target) return target[prop]
+      return (...args: unknown[]) => {
+        calls.push({ name: prop, args })
+      }
+    },
+    set: (target, prop, value) => {
+      if (typeof prop === 'string') target[prop] = value
+      return true
+    },
+  })
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(
+    (() => ctx) as unknown as HTMLCanvasElement['getContext'],
+  )
+  return calls
+}
+
+function mockViewport(width: number, height: number) {
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(
+    () => ({ left: 0, top: 0, right: width, bottom: height, x: 0, y: 0, width, height, toJSON: () => ({}) }) as DOMRect,
+  )
+}
+
+// Each frame sets the device transform and then the world one, so the last
+// setTransform is the camera: setTransform(scale, 0, 0, scale, -x * scale, -y * scale).
+function paintedCamera(calls: Call[]): { scale: number; x: number; y: number } {
+  const world = calls.filter((c) => c.name === 'setTransform').pop()
+  if (!world) throw new Error('nothing painted yet')
+  const [scale = 1, , , , tx = 0, ty = 0] = world.args as number[]
+  return { scale, x: -tx / scale, y: -ty / scale }
+}
+
+describe('the camera in the overlay', () => {
+  afterEach(() => vi.restoreAllMocks())
+
+  it('keeps the world point under the cursor fixed on Ctrl+wheel', async () => {
+    const calls = installRecordingContext()
+    mockViewport(800, 600)
+    mount()
+    const surface = document.querySelector('.ink-canvas-wrap') as Element
+    await waitFor(() => expect(paintedCamera(calls)).toMatchObject({ scale: 1, x: -400, y: -300 }))
+    const before = paintedCamera(calls)
+    const worldBefore = { x: 600 / before.scale + before.x, y: 100 / before.scale + before.y }
+
+    fireEvent.wheel(surface, { ctrlKey: true, deltaY: -400, clientX: 600, clientY: 100 })
+
+    await waitFor(() => expect(paintedCamera(calls).scale).toBeGreaterThan(1))
+    const after = paintedCamera(calls)
+    expect(600 / after.scale + after.x).toBeCloseTo(worldBefore.x, 6)
+    expect(100 / after.scale + after.y).toBeCloseTo(worldBefore.y, 6)
+  })
+
+  it('zooms with Ctrl + = and resets with Ctrl + 0', async () => {
+    mockViewport(800, 600)
+    const { overlay } = mount()
+    await waitFor(() => expect(useInkStore.getState().activeCanvas).not.toBeNull())
+
+    fireEvent.keyDown(overlay, { key: '=', ctrlKey: true })
+    await waitFor(() => expect(useInkStore.getState().activeCanvas?.zoom).toBe(1.25))
+
+    fireEvent.keyDown(overlay, { key: '0', ctrlKey: true })
+    await waitFor(() => expect(useInkStore.getState().activeCanvas?.zoom).toBe(1))
   })
 })
 
 describe('page backdrop', () => {
   const backdrop: InkBackdrop = { dataUrl: 'data:image/png;base64,AAAA', width: 600, height: 800 }
 
-  it('shows the page image at its size times the zoom', () => {
-    mount(backdrop)
-    const img = document.querySelector<HTMLImageElement>('img[alt="Page backdrop"]')
+  class LoadedImage {
+    onload: (() => void) | null = null
+    set src(_value: string) {
+      queueMicrotask(() => this.onload?.())
+    }
+  }
 
-    expect(img).not.toBeNull()
-    expect(img?.getAttribute('src')).toBe(backdrop.dataUrl)
-    expect(img?.style.width).toBe('600px')
-    expect(img?.style.height).toBe('800px')
+  beforeEach(() => vi.stubGlobal('Image', LoadedImage))
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    vi.restoreAllMocks()
   })
 
-  it('renders no backdrop image without one', () => {
+  it('paints the page image at its own size in ink coordinates', async () => {
+    const calls = installRecordingContext()
+    mount(backdrop)
+
+    await waitFor(() => expect(calls.some((c) => c.name === 'drawImage')).toBe(true))
+    const draw = calls.find((c) => c.name === 'drawImage')
+    expect(draw?.args.slice(1)).toEqual([0, 0, 600, 800])
+  })
+
+  it('paints no backdrop without one', async () => {
+    const calls = installRecordingContext()
     mount()
 
-    expect(document.querySelector('img[alt="Page backdrop"]')).toBeNull()
+    await waitFor(() => expect(calls.some((c) => c.name === 'clearRect')).toBe(true))
+    expect(calls.some((c) => c.name === 'drawImage')).toBe(false)
   })
 })

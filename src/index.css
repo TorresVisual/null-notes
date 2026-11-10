@@ -4002,12 +4002,11 @@ li > .folder-tree.tree-guide {
 
 /* Ink toolbar and canvas (previously unstyled — default browser buttons) */
 .ink-canvas-wrap {
-  border: 1px solid var(--border-strong);
-  border-radius: 8px;
-  /* Zooming past the note column scrolls the canvas rather than clipping it. */
-  overflow-x: auto;
-  overflow-y: hidden;
-  background: var(--bg-raised);
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg-base);
 }
 
 /* Nested in the sticky `.editor-toolbar`, which already supplies the row's
@@ -4146,18 +4145,14 @@ li > .folder-tree.tree-guide {
   cursor: pointer;
 }
 
-/* Grid lives in CSS, not in the stroke data — it guides handwriting without
-   ever being saved into the .svg sidecar. */
+/* The canvas is exactly the editor body; the grid is painted onto it from the
+   camera, so it guides handwriting without ever being saved into the .svg. */
 .ink-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
   background-color: var(--bg-base);
-  background-image:
-    linear-gradient(to right, var(--ink-grid) 1px, transparent 1px),
-    linear-gradient(to bottom, var(--ink-grid) 1px, transparent 1px);
-  background-size: 24px 24px;
-}
-
-.ink-canvas.ink-canvas-backdrop {
-  background: none;
 }
 
 .ink-eraser-cursor {
@@ -6592,9 +6587,8 @@ input[type='checkbox']:focus-visible {
   outline: none;
 }
 
-/* Floats over the body so the page gets the whole window; the body's top
-   padding keeps the page clear of it. Only the two surfaces take the pointer,
-   so the page beside them stays drawable. */
+/* Floats over the body so the canvas gets the whole window. Only the two
+   surfaces take the pointer, so the canvas beside them stays drawable. */
 .ink-editor-header {
   position: absolute;
   top: var(--space-md);
@@ -6648,18 +6642,12 @@ input[type='checkbox']:focus-visible {
 
 .ink-editor-done { flex: none; }
 
-/* Anchored top-left on purpose, not centred: the page can then grow right and
-   down without the content shifting under the pen. */
+/* The canvas fills it and pans itself with a camera, so the body never scrolls. */
 .ink-editor-body {
+  position: relative;
   flex: 1;
   min-height: 0;
-  overflow: auto;
-  padding: 72px var(--space-lg) var(--space-lg);
-}
-
-.ink-editor-body .ink-canvas-wrap {
-  overflow: visible;
-  width: max-content;
+  overflow: hidden;
 }
 
 .ink-block {

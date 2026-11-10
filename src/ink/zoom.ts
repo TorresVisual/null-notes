@@ -22,27 +22,6 @@ export function zoomForKey(key: string, zoom: number): number | null {
   return null
 }
 
-// A point `anchor` ink units from the page origin sits at `anchor * zoom` pixels,
-// so changing zoom moves it by `anchor * Δzoom`. Scrolling by that much keeps it
-// under the cursor or fingers instead of the page growing away from its corner.
-export function anchorShift(anchor: number, fromZoom: number, toZoom: number): number {
-  return anchor * (toZoom - fromZoom)
-}
-
 export function distanceBetween(a: { x: number; y: number }, b: { x: number; y: number }): number {
   return Math.hypot(a.x - b.x, a.y - b.y)
-}
-
-export const MAX_CANVAS_DIMENSION = 16384
-export const MAX_CANVAS_PIXELS = 64_000_000
-
-// A canvas has a per-axis size limit and, in practice, a memory budget: an
-// 8000 × 8000 page at dpr 2 would be ~1 GB of RGBA. Past either, sharpness drops
-// rather than the canvas failing to render.
-export function backingScale(dpr: number, zoom: number, width: number, height: number): number {
-  return Math.min(
-    dpr * zoom,
-    MAX_CANVAS_DIMENSION / Math.max(width, height),
-    Math.sqrt(MAX_CANVAS_PIXELS / (width * height)),
-  )
 }

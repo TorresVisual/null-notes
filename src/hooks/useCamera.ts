@@ -27,13 +27,14 @@ export function useCamera(containerRef: RefObject<HTMLElement | null>, fitTo: Bo
   const cameraRef = useRef<Camera>(INITIAL_CAMERA)
   const viewportRef = useRef<Viewport>(NO_VIEWPORT)
   const fitted = useRef(false)
+  const moved = useRef(false)
   const frame = useRef<number | null>(null)
   const [camera, setCamera] = useState<Camera>(INITIAL_CAMERA)
   const [viewport, setViewport] = useState<Viewport>(NO_VIEWPORT)
 
   // The ref is the truth, so several events landing before a frame still
   // compose; React only sees it once per animation frame.
-  const updateCamera = useCallback((update: (current: Camera) => Camera) => {
+  const applyCamera = useCallback((update: (current: Camera) => Camera) => {
     cameraRef.current = update(cameraRef.current)
     if (frame.current !== null) return
     frame.current = requestAnimationFrame(() => {
@@ -41,6 +42,16 @@ export function useCamera(containerRef: RefObject<HTMLElement | null>, fitTo: Bo
       setCamera(cameraRef.current)
     })
   }, [])
+
+  // Anything the user does counts as moving: the initial fit must never undo a
+  // pan or zoom that landed while the drawing was still loading.
+  const updateCamera = useCallback(
+    (update: (current: Camera) => Camera) => {
+      moved.current = true
+      applyCamera(update)
+    },
+    [applyCamera],
+  )
 
   useEffect(
     () => () => {
@@ -78,7 +89,7 @@ export function useCamera(containerRef: RefObject<HTMLElement | null>, fitTo: Bo
       if (fitted.current) {
         const centre = screenToWorld(cameraRef.current, previous.width / 2, previous.height / 2)
         const scale = cameraRef.current.scale
-        updateCamera(() => ({ x: centre.x - next.width / (2 * scale), y: centre.y - next.height / (2 * scale), scale }))
+        applyCamera(() => ({ x: centre.x - next.width / (2 * scale), y: centre.y - next.height / (2 * scale), scale }))
         // Committed with the new viewport, not a frame later, so a resize never
         // paints one frame of the old camera over the new size.
         setCamera(cameraRef.current)
@@ -89,13 +100,13 @@ export function useCamera(containerRef: RefObject<HTMLElement | null>, fitTo: Bo
     const observer = new ResizeObserver(measure)
     observer.observe(el)
     return () => observer.disconnect()
-  }, [containerRef, updateCamera])
+  }, [containerRef, applyCamera])
 
   useEffect(() => {
     if (fitted.current || !fitTo || viewport.width <= 0 || viewport.height <= 0) return
     fitted.current = true
-    updateCamera(() => fitCamera(fitTo, viewport, 1))
-  }, [fitTo, viewport, updateCamera])
+    if (!moved.current) applyCamera(() => fitCamera(fitTo, viewport, 1))
+  }, [fitTo, viewport, applyCamera])
 
   useEffect(() => {
     const el = containerRef.current

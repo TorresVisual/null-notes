@@ -53,14 +53,14 @@ async function waitForEditor(container: HTMLElement): Promise<HTMLTextAreaElemen
 
 describe('the ink text tool', () => {
   it('tapping empty canvas with the text tool opens an editor', async () => {
-    const { container } = render(<InkCanvas svgPath="/ws/N.ink/a.svg" width={700} height={400} />)
+    const { container } = render(<InkCanvas svgPath="/ws/N.ink/a.svg" />)
     tap(container.querySelector('canvas')!)
 
     await waitForEditor(container)
   })
 
   it('typing and blurring commits the text to the sidecar and closes the editor', async () => {
-    const { container } = render(<InkCanvas svgPath="/ws/N.ink/a.svg" width={700} height={400} />)
+    const { container } = render(<InkCanvas svgPath="/ws/N.ink/a.svg" />)
     tap(container.querySelector('canvas')!)
     const editor = await waitForEditor(container)
 
@@ -75,7 +75,7 @@ describe('the ink text tool', () => {
   })
 
   it('committing an empty edit adds nothing', async () => {
-    const { container } = render(<InkCanvas svgPath="/ws/N.ink/a.svg" width={700} height={400} />)
+    const { container } = render(<InkCanvas svgPath="/ws/N.ink/a.svg" />)
     tap(container.querySelector('canvas')!)
     const editor = await waitForEditor(container)
 
@@ -85,7 +85,7 @@ describe('the ink text tool', () => {
   })
 
   it('pressing Escape discards the draft without writing', async () => {
-    const { container } = render(<InkCanvas svgPath="/ws/N.ink/a.svg" width={700} height={400} />)
+    const { container } = render(<InkCanvas svgPath="/ws/N.ink/a.svg" />)
     tap(container.querySelector('canvas')!)
     const editor = await waitForEditor(container)
 
@@ -97,7 +97,7 @@ describe('the ink text tool', () => {
   })
 
   it('pressing Enter commits without inserting a newline', async () => {
-    const { container } = render(<InkCanvas svgPath="/ws/N.ink/a.svg" width={700} height={400} />)
+    const { container } = render(<InkCanvas svgPath="/ws/N.ink/a.svg" />)
     tap(container.querySelector('canvas')!)
     const editor = await waitForEditor(container)
 
@@ -111,7 +111,7 @@ describe('the ink text tool', () => {
   // Tapping the item a second time (no drag in between) reopens it for
   // editing instead of stacking a fresh label on top of it.
   it('tapping an existing item again reopens it for editing, pre-filled', async () => {
-    const { container } = render(<InkCanvas svgPath="/ws/N.ink/a.svg" width={700} height={400} />)
+    const { container } = render(<InkCanvas svgPath="/ws/N.ink/a.svg" />)
     const canvas = container.querySelector('canvas')!
     tap(canvas)
     let editor = await waitForEditor(container)
@@ -128,7 +128,7 @@ describe('the ink text tool', () => {
   // Editing an existing item down to nothing removes it — the only delete
   // path a text item has, since neither the lasso nor the eraser reach in.
   it('editing an existing item to empty removes it', async () => {
-    const { container } = render(<InkCanvas svgPath="/ws/N.ink/a.svg" width={700} height={400} />)
+    const { container } = render(<InkCanvas svgPath="/ws/N.ink/a.svg" />)
     const canvas = container.querySelector('canvas')!
     tap(canvas)
     let editor = await waitForEditor(container)

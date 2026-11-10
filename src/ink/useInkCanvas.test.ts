@@ -4,6 +4,8 @@ import { useInkCanvas, isEraserTip, toInk } from './useInkCanvas'
 import { DEFAULT_PENS } from './pens'
 import { useInkStore } from '../store/ink'
 
+const CAMERA_OPTIONS = { camera: { x: 0, y: 0, scale: 1 }, viewport: { width: 800, height: 600 } }
+
 vi.mock('../lib/ink', () => ({
   inkApi: {
     read: vi.fn().mockResolvedValue(null),
@@ -55,25 +57,25 @@ describe('useInkCanvas', () => {
   beforeEach(() => localStorage.clear())
 
   it('initialises with empty ink data', async () => {
-    const { result } = renderHook(() => useInkCanvas('/ws/n.ink/s1.svg', 800, 600))
+    const { result } = renderHook(() => useInkCanvas('/ws/n.ink/s1.svg', CAMERA_OPTIONS))
     await act(async () => {})
     expect(result.current.inkData.strokes).toHaveLength(0)
     expect(result.current.inkData.shapes).toHaveLength(0)
   })
 
   it('starts with pen tool', () => {
-    const { result } = renderHook(() => useInkCanvas('/ws/n.ink/s1.svg', 800, 600))
+    const { result } = renderHook(() => useInkCanvas('/ws/n.ink/s1.svg', CAMERA_OPTIONS))
     expect(result.current.tool).toBe('pen')
   })
 
   it('canUndo is false initially', async () => {
-    const { result } = renderHook(() => useInkCanvas('/ws/n.ink/s1.svg', 800, 600))
+    const { result } = renderHook(() => useInkCanvas('/ws/n.ink/s1.svg', CAMERA_OPTIONS))
     await act(async () => {})
     expect(result.current.canUndo).toBe(false)
   })
 
   it('setTool updates tool', () => {
-    const { result } = renderHook(() => useInkCanvas('/ws/n.ink/s1.svg', 800, 600))
+    const { result } = renderHook(() => useInkCanvas('/ws/n.ink/s1.svg', CAMERA_OPTIONS))
     act(() => result.current.setTool('eraser'))
     expect(result.current.tool).toBe('eraser')
   })
@@ -82,7 +84,7 @@ describe('useInkCanvas', () => {
 describe('eraser size', () => {
   beforeEach(() => localStorage.clear())
 
-  const render = () => renderHook(() => useInkCanvas('/ws/n.ink/s1.svg', 800, 600))
+  const render = () => renderHook(() => useInkCanvas('/ws/n.ink/s1.svg', CAMERA_OPTIONS))
 
   // The whole point of Phase 4's second half: a fine nib and a broad eraser.
   it('is independent of the pen size', () => {
@@ -117,7 +119,7 @@ describe('eraser size', () => {
 describe('ruler', () => {
   beforeEach(() => localStorage.clear())
 
-  const render = () => renderHook(() => useInkCanvas('/ws/n.ink/s1.svg', 800, 600))
+  const render = () => renderHook(() => useInkCanvas('/ws/n.ink/s1.svg', CAMERA_OPTIONS))
 
   it('is out of the way until asked for', () => {
     expect(render().result.current.ruler).toBeNull()
@@ -198,7 +200,7 @@ describe('ruler', () => {
 describe('eraser mode', () => {
   beforeEach(() => localStorage.clear())
 
-  const render = () => renderHook(() => useInkCanvas('/ws/n.ink/s1.svg', 800, 600))
+  const render = () => renderHook(() => useInkCanvas('/ws/n.ink/s1.svg', CAMERA_OPTIONS))
 
   // Point is the default: it is the mode that cannot take work you meant to keep.
   it('starts on the point eraser', () => {
@@ -223,7 +225,7 @@ describe('eraser mode', () => {
 describe('lasso selection', () => {
   beforeEach(() => localStorage.clear())
 
-  const render = () => renderHook(() => useInkCanvas('/ws/n.ink/s1.svg', 800, 600))
+  const render = () => renderHook(() => useInkCanvas('/ws/n.ink/s1.svg', CAMERA_OPTIONS))
 
   it('starts with nothing selected', () => {
     const { result } = render()
@@ -256,7 +258,7 @@ describe('lasso selection', () => {
 describe('pen presets', () => {
   beforeEach(() => localStorage.clear())
 
-  const render = () => renderHook(() => useInkCanvas('/ws/n.ink/s1.svg', 800, 600))
+  const render = () => renderHook(() => useInkCanvas('/ws/n.ink/s1.svg', CAMERA_OPTIONS))
   // pens.test.ts pins down that a translucent pen ships by default.
   const highlighter = DEFAULT_PENS.find((p) => p.opacity < 1) ?? DEFAULT_PENS[0]
 
@@ -304,11 +306,17 @@ describe('pen presets', () => {
 })
 
 describe('toInk', () => {
-  it('divides by zoom, then adds the page origin', () => {
-    expect(toInk({ offsetX: 200, offsetY: 100 }, 2, { originX: -400, originY: -50 })).toEqual({ x: -300, y: 0 })
+  it('divides the screen offset by scale, then adds the camera position', () => {
+    expect(toInk({ clientX: 200, clientY: 100 }, { x: -400, y: -50, scale: 2 }, { left: 0, top: 0 })).toEqual({
+      x: -300,
+      y: 0,
+    })
   })
 
-  it('is plain offset / zoom for a page at the origin', () => {
-    expect(toInk({ offsetX: 90, offsetY: 30 }, 1.5, { originX: 0, originY: 0 })).toEqual({ x: 60, y: 20 })
+  it('measures from the canvas edge, not the window edge', () => {
+    expect(toInk({ clientX: 190, clientY: 130 }, { x: 0, y: 0, scale: 1.5 }, { left: 100, top: 100 })).toEqual({
+      x: 60,
+      y: 20,
+    })
   })
 })

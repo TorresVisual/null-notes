@@ -73,6 +73,17 @@ describe('useCamera', () => {
     expect(api.camera).toEqual({ x: -400, y: -300, scale: 1 })
   })
 
+  it('does not refit over a pan that landed before the drawing loaded', async () => {
+    const { rerender, getByTestId } = render(<Harness fitTo={null} />)
+    await waitFor(() => expect(api.viewport.width).toBe(800))
+
+    fireEvent.wheel(getByTestId('surface'), { deltaY: 100 })
+    rerender(<Harness fitTo={EMPTY_BOUNDS} />)
+
+    await waitFor(() => expect(api.camera.y).toBe(100))
+    expect(api.camera.x).toBe(0)
+  })
+
   it('zooms about the cursor on Ctrl+wheel', async () => {
     const { surface } = await mount()
     const before = api.toWorld(600, 100)

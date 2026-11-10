@@ -15,24 +15,24 @@ import type { Ruler, RulerGrab } from './ruler'
 import { drawShapePreview } from './shapePreview'
 import { drawTextItem } from './textRender'
 import { pointInTextItem, translateTextItem, boundsOfTextItem } from './textBounds'
-import { backingScale } from './zoom'
-import { EMPTY_BOUNDS, cropToContent as cropPage, growCanvas, boundsOfPoints, type Bounds } from './bounds'
+import { MIN_EXTENT, cropToContent as cropPage, boundsOfPoints, type Bounds } from './bounds'
+import { isVisible, screenToWorld } from './camera'
+import type { Camera, Viewport } from './camera'
 import { straightLineEnds } from './straighten'
 import { paintOrder } from './paintOrder'
 import { strokeOptions } from './strokeOptions'
-import { sameLayerKey, type LayerKey } from './layerCache'
 import {
   EMPTY_SELECTION,
   isSelectionEmpty,
   pointInPolygon,
   selectionIn,
-  selectionBounds,
   translatePolygon,
   translateSelection,
   deleteSelection as removeSelection,
 } from './lasso'
 import type { LassoPoint, Selection } from './lasso'
 import { useInkStore, activePenOf } from '../store/ink'
+import type { InkBackdrop } from './InkEditorOverlay'
 import type { PreviewShape } from './shapePreview'
 import type { InkData, Stroke, Shape, TextItem, Tool, Point } from './types'
 
@@ -106,11 +106,14 @@ function drawRuler(ctx: CanvasRenderingContext2D, ruler: Ruler): void {
 }
 
 interface InkOptions {
-  zoom?: number
-  autoGrow?: boolean
-  growAllSides?: boolean
+  camera: Camera
+  viewport: Viewport
+  backdrop?: InkBackdrop
   onSaved?: () => void
+  onLoaded?: (data: InkData) => void
 }
+
+const EMPTY_INK: InkData = { originX: 0, originY: 0, width: MIN_EXTENT, height: MIN_EXTENT, strokes: [], shapes: [], texts: [] }
 
 // Pointer Events reports the pen's eraser end as bit 5 of `buttons` (32) for
 // as long as it is down, but `button` only says 5 on the down and up events —
@@ -133,17 +136,12 @@ export function isDrawingPointer(e: { pointerType: string }): boolean {
   return e.pointerType === 'pen' || e.pointerType === 'mouse'
 }
 
-interface OffsetPoint {
-  offsetX: number
-  offsetY: number
-}
-
 export function toInk(
-  e: OffsetPoint,
-  zoom: number,
-  origin: { originX: number; originY: number },
+  e: { clientX: number; clientY: number },
+  camera: Camera,
+  rect: { left: number; top: number },
 ): { x: number; y: number } {
-  return { x: e.offsetX / zoom + origin.originX, y: e.offsetY / zoom + origin.originY }
+  return screenToWorld(camera, e.clientX - rect.left, e.clientY - rect.top)
 }
 
 function isShapeTool(tool: Tool): boolean {
@@ -177,19 +175,87 @@ function fillStroke(
   ctx.globalAlpha = 1
 }
 
-function paintCommitted(ctx: CanvasRenderingContext2D, data: InkData, editingTextId: string | null): void {
+// Bounds are cached per object: committed ink is replaced, never mutated, so a
+// stroke's box is computed once however many frames repaint it.
+const itemBounds = new WeakMap<object, Bounds>()
+
+function paddedBounds(points: { x: number; y: number }[], by: number): Bounds {
+  const b = boundsOfPoints(points)
+  return { minX: b.minX - by, minY: b.minY - by, maxX: b.maxX + by, maxY: b.maxY + by }
+}
+
+function strokeBounds(stroke: Stroke): Bounds {
+  let bounds = itemBounds.get(stroke)
+  if (!bounds) {
+    bounds = paddedBounds(stroke.points, stroke.size)
+    itemBounds.set(stroke, bounds)
+  }
+  return bounds
+}
+
+function shapeBounds(shape: Shape): Bounds {
+  let bounds = itemBounds.get(shape)
+  if (!bounds) {
+    bounds = paddedBounds(
+      [
+        { x: shape.x1, y: shape.y1 },
+        { x: shape.x2, y: shape.y2 },
+      ],
+      shape.size,
+    )
+    itemBounds.set(shape, bounds)
+  }
+  return bounds
+}
+
+function paintCommitted(
+  ctx: CanvasRenderingContext2D,
+  data: InkData,
+  editingTextId: string | null,
+  camera: Camera,
+  viewport: Viewport,
+): void {
   for (const stroke of paintOrder(data.strokes)) {
+    if (!isVisible(camera, viewport, strokeBounds(stroke))) continue
     fillStroke(ctx, stroke.points, stroke.color, stroke.size, stroke.opacity, stroke.thinning)
   }
   for (const shape of data.shapes) {
+    if (!isVisible(camera, viewport, shapeBounds(shape))) continue
     drawShapePreview(ctx, shape)
   }
   // The item being typed renders through the overlay textarea instead —
   // drawing it here too would show it twice, once live and once stale.
   for (const item of data.texts) {
     if (editingTextId === item.id) continue
+    if (!isVisible(camera, viewport, boundsOfTextItem(item))) continue
     drawTextItem(ctx, item)
   }
+}
+
+// Must match nothing but itself now: the grid is drawn from the camera, so it
+// is a world-space ruling that scales with zoom and is never saved.
+const GRID_SIZE = 24
+const MIN_GRID_PX = 4
+const FALLBACK_GRID_COLOR = 'rgba(128, 128, 128, 0.18)'
+
+function drawGrid(ctx: CanvasRenderingContext2D, camera: Camera, viewport: Viewport, color: string): void {
+  if (GRID_SIZE * camera.scale < MIN_GRID_PX) return
+  ctx.beginPath()
+  ctx.lineWidth = 1
+  ctx.strokeStyle = color
+  for (let wx = Math.ceil(camera.x / GRID_SIZE) * GRID_SIZE; ; wx += GRID_SIZE) {
+    const sx = Math.round((wx - camera.x) * camera.scale) + 0.5
+    if (sx > viewport.width) break
+    ctx.moveTo(sx, 0)
+    ctx.lineTo(sx, viewport.height)
+  }
+  for (let wy = Math.ceil(camera.y / GRID_SIZE) * GRID_SIZE; ; wy += GRID_SIZE) {
+    const sy = Math.round((wy - camera.y) * camera.scale) + 0.5
+    if (sy > viewport.height) break
+    ctx.moveTo(0, sy)
+    ctx.lineTo(viewport.width, sy)
+  }
+  ctx.stroke()
 }
 
 // The lasso and the marquee it becomes are drawn the same way — a dashed loop.
@@ -233,9 +299,7 @@ function releasePointer(canvas: HTMLCanvasElement | null, pointerId: number): vo
 
 export function useInkCanvas(
   svgPath: string,
-  width: number,
-  height: number,
-  { zoom = 1, autoGrow = false, growAllSides = false, onSaved }: InkOptions = {},
+  { camera, viewport, backdrop, onSaved, onLoaded }: InkOptions,
 ) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const tool = useInkStore((s) => s.tool)
@@ -249,11 +313,10 @@ export function useInkCanvas(
   const updateActivePen = useInkStore((s) => s.updateActivePen)
   const setEraserMode = useInkStore((s) => s.setEraserMode)
   const setEraserSize = useInkStore((s) => s.setEraserSize)
-  const [inkData, setInkData] = useState<InkData>({ originX: 0, originY: 0, width, height, strokes: [], shapes: [], texts: [] })
-  const origin = useMemo(
-    () => ({ originX: inkData.originX, originY: inkData.originY }),
-    [inkData.originX, inkData.originY],
+  const [inkData, setInkData] = useState<InkData>(
+    backdrop ? { ...EMPTY_INK, width: backdrop.width, height: backdrop.height } : EMPTY_INK,
   )
+  const [backdropImage, setBackdropImage] = useState<HTMLImageElement | null>(null)
   const [history, setHistory] = useState<InkData[]>([])
   const [future, setFuture] = useState<InkData[]>([])
 
@@ -263,7 +326,6 @@ export function useInkCanvas(
   const [editingText, setEditingText] = useState<EditingText | null>(null)
 
   const currentStroke = useRef<Point[]>([])
-  const committed = useRef<{ canvas: HTMLCanvasElement; key: LayerKey } | null>(null)
   const shapeStart = useRef<{ x: number; y: number } | null>(null)
   const eraseSnapshot = useRef<InkData | null>(null)
   const lassoPath = useRef<LassoPoint[]>([])
@@ -291,6 +353,35 @@ export function useInkCanvas(
   useEffect(() => {
     onSavedRef.current = onSaved
   }, [onSaved])
+  const onLoadedRef = useRef(onLoaded)
+  useEffect(() => {
+    onLoadedRef.current = onLoaded
+  }, [onLoaded])
+
+  // Pointer handlers read the camera through a ref so they are not re-bound on
+  // every frame of a pan or zoom.
+  const cameraRef = useRef(camera)
+  cameraRef.current = camera
+  const viewportRef = useRef(viewport)
+  viewportRef.current = viewport
+  const backdropUrl = backdrop?.dataUrl
+  useEffect(() => {
+    if (!backdropUrl) {
+      setBackdropImage(null)
+      return
+    }
+    const image = new Image()
+    image.onload = () => setBackdropImage(image)
+    image.src = backdropUrl
+    return () => {
+      image.onload = null
+    }
+  }, [backdropUrl])
+
+  const toWorld = useCallback((e: { clientX: number; clientY: number }) => {
+    const rect = canvasRef.current?.getBoundingClientRect() ?? { left: 0, top: 0 }
+    return toInk(e, cameraRef.current, rect)
+  }, [])
 
   // Writes are fire-and-forget, so a caller re-reading the sidecar on close could
   // beat the last stroke to disk. `onSaved` fires from the resolved write instead.
@@ -299,11 +390,6 @@ export function useInkCanvas(
       void inkApi.write(svgPath, data).then(() => onSavedRef.current?.())
     },
     [svgPath],
-  )
-
-  const growPage = useCallback(
-    (data: InkData, bounds: Bounds) => growCanvas(data, bounds, autoGrow, growAllSides),
-    [autoGrow, growAllSides],
   )
 
   // The selected preset *is* the pen — colour, width and opacity all come from
@@ -321,11 +407,14 @@ export function useInkCanvas(
     [updateActivePen],
   )
 
-  // The ruler arrives lying across the middle of the page you are looking at,
-  // not the middle of a page that has grown to twice the screen.
+  // The ruler arrives lying across the middle of what you are looking at.
   const toggleRuler = useCallback(() => {
-    setRuler((current) => (current ? null : centredRuler(inkData.width, height, inkData.originX)))
-  }, [inkData.width, inkData.originX, height])
+    setRuler((current) => {
+      if (current) return null
+      const { width, height } = viewportRef.current
+      return centredRuler(screenToWorld(cameraRef.current, width / 2, height / 2))
+    })
+  }, [])
 
   const clearSelection = useCallback(() => {
     lassoPath.current = []
@@ -346,6 +435,7 @@ export function useInkCanvas(
   useEffect(() => {
     inkApi.read(svgPath).then((data) => {
       if (data) setInkData(data)
+      onLoadedRef.current?.(data ?? EMPTY_INK)
     })
   }, [svgPath])
 
@@ -420,14 +510,14 @@ export function useInkCanvas(
         color: current.color,
         size: current.size,
       }
-      commit({ ...inkData, ...growPage(inkData, boundsOfTextItem(item)), texts: [...inkData.texts, item] })
+      commit({ ...inkData, texts: [...inkData.texts, item] })
     } else {
       commit({
         ...inkData,
         texts: inkData.texts.map((t) => (t.id === current.id ? { ...t, text: current.text } : t)),
       })
     }
-  }, [editingText, inkData, commit, growPage])
+  }, [editingText, inkData, commit])
 
   // Escape discards rather than commits: a fresh item was never added, and an
   // edited existing one was never mutated until `commitEditingText` runs, so
@@ -459,36 +549,30 @@ export function useInkCanvas(
     (livePoints: Point[], liveShape?: PreviewShape | null, liveLasso?: LassoPoint[] | null) => {
       const canvas = canvasRef.current
       if (!canvas) return
-      const ctx = canvas.getContext('2d')
-      if (!ctx) return
 
-      // Back the canvas with real device pixels — at 1x on a HiDPI pen display
-      // every stroke is drawn into a half-resolution buffer and upscaled. Zoom
-      // multiplies in here so magnified ink is redrawn, not stretched.
-      const scale = backingScale(window.devicePixelRatio || 1, zoom, inkData.width, inkData.height)
-      const pixelWidth = Math.round(inkData.width * scale)
-      const pixelHeight = Math.round(inkData.height * scale)
+      // The canvas is exactly the window, in real device pixels, and only a
+      // window resize changes that: zooming moves the camera, never the buffer.
+      const dpr = window.devicePixelRatio || 1
+      const pixelWidth = Math.round(viewport.width * dpr)
+      const pixelHeight = Math.round(viewport.height * dpr)
       if (canvas.width !== pixelWidth || canvas.height !== pixelHeight) {
         canvas.width = pixelWidth
         canvas.height = pixelHeight
       }
-      const key: LayerKey = { inkData, scale, editingTextId: editingText?.id ?? null }
-      const cached = committed.current
-      const layerCanvas = cached?.canvas ?? document.createElement('canvas')
-      if (!sameLayerKey(cached?.key ?? null, key)) {
-        const layerCtx = layerCanvas.getContext('2d')
-        if (!layerCtx) return
-        layerCanvas.width = pixelWidth
-        layerCanvas.height = pixelHeight
-        layerCtx.setTransform(scale, 0, 0, scale, -inkData.originX * scale, -inkData.originY * scale)
-        paintCommitted(layerCtx, inkData, key.editingTextId)
-        committed.current = { canvas: layerCanvas, key }
-      }
+      const ctx = canvas.getContext('2d')
+      if (!ctx) return
 
-      ctx.setTransform(1, 0, 0, 1, 0, 0)
-      ctx.clearRect(0, 0, pixelWidth, pixelHeight)
-      ctx.drawImage(layerCanvas, 0, 0)
-      ctx.setTransform(scale, 0, 0, scale, -inkData.originX * scale, -inkData.originY * scale)
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+      ctx.clearRect(0, 0, viewport.width, viewport.height)
+      const grid = getComputedStyle(canvas).getPropertyValue('--ink-grid').trim() || FALLBACK_GRID_COLOR
+      drawGrid(ctx, camera, viewport, grid)
+
+      const scale = dpr * camera.scale
+      ctx.setTransform(scale, 0, 0, scale, -camera.x * scale, -camera.y * scale)
+      if (backdrop && backdropImage) {
+        ctx.drawImage(backdropImage, 0, 0, backdrop.width, backdrop.height)
+      }
+      paintCommitted(ctx, inkData, editingText?.id ?? null, camera, viewport)
       if (livePoints.length > 1) {
         fillStroke(ctx, livePoints, color, size, opacity, thinning)
       }
@@ -504,7 +588,7 @@ export function useInkCanvas(
         drawRuler(ctx, ruler)
       }
     },
-    [inkData, color, size, opacity, zoom, lassoPolygon, ruler, editingText],
+    [inkData, color, size, opacity, thinning, camera, viewport, backdrop, backdropImage, lassoPolygon, ruler, editingText],
   )
 
   useEffect(() => {
@@ -592,7 +676,7 @@ export function useInkCanvas(
       if (!isDrawingPointer(e) || (e.pointerType === 'mouse' && e.button !== 0)) return
       capturePointer(canvasRef.current, e.pointerId)
       const activeTool = isEraserTip(e) ? 'eraser' : tool
-      const at = toInk(e, zoom, origin)
+      const at = toWorld(e)
 
       // The straightedge is grabbed before any tool gets a look in — landing on
       // it always means "put it somewhere else", whatever is in your hand.
@@ -649,7 +733,7 @@ export function useInkCanvas(
       currentStroke.current = [start]
     },
     [
-      tool, inkData, eraseAt, zoom, origin, lassoPolygon, selection, clearSelection, ruler, grabRuler,
+      tool, inkData, eraseAt, toWorld, lassoPolygon, selection, clearSelection, ruler, grabRuler,
       commitEditingText, startNewText,
     ],
   )
@@ -658,7 +742,7 @@ export function useInkCanvas(
     (e: PointerEvent) => {
       if (!isDrawingPointer(e)) return
       const activeTool = isEraserTip(e) ? 'eraser' : tool
-      const at = toInk(e, zoom, origin)
+      const at = toWorld(e)
 
       if (rulerGrab.current) {
         dragRuler(at.x, at.y)
@@ -726,11 +810,11 @@ export function useInkCanvas(
       if (currentStroke.current.length === 0) return
       const events = e.getCoalescedEvents?.() ?? [e]
       for (const ce of events) {
-        currentStroke.current.push({ ...toInk(ce, zoom, origin), pressure: ce.pressure })
+        currentStroke.current.push({ ...toWorld(ce), pressure: ce.pressure })
       }
       scheduleRedraw(snappedPoints(currentStroke.current))
     },
-    [tool, size, color, eraseAt, scheduleRedraw, zoom, origin, selection, snappedPoints, dragRuler],
+    [tool, size, color, eraseAt, scheduleRedraw, toWorld, selection, snappedPoints, dragRuler],
   )
 
   const handlePointerUp = useCallback(
@@ -769,10 +853,7 @@ export function useInkCanvas(
         if (textFrom.moved && snapshot) {
           setHistory((past) => [...past, snapshot])
           setFuture([])
-          const item = inkData.texts.find((t) => t.id === textFrom.id)
-          const grown = { ...inkData, ...growPage(inkData, item ? boundsOfTextItem(item) : EMPTY_BOUNDS) }
-          setInkData(grown)
-          save(grown)
+          save(inkData)
         } else {
           const item = inkData.texts.find((t) => t.id === textFrom.id)
           if (item) startEditText(item)
@@ -788,9 +869,7 @@ export function useInkCanvas(
         if (inkData !== dragged) {
           setHistory((past) => [...past, dragged])
           setFuture([])
-          const grown = { ...inkData, ...growPage(inkData, selectionBounds(inkData, selection)) }
-          setInkData(grown)
-          save(grown)
+          save(inkData)
         }
         return
       }
@@ -808,7 +887,7 @@ export function useInkCanvas(
       }
 
       if (shapeStart.current) {
-        const end = toInk(e, zoom, origin)
+        const end = toWorld(e)
         const shape: Shape = {
           id: crypto.randomUUID(),
           kind: tool as Shape['kind'],
@@ -821,11 +900,7 @@ export function useInkCanvas(
         }
         shapeStart.current = null
         currentStroke.current = []
-        const corners = [
-          { x: shape.x1, y: shape.y1 },
-          { x: shape.x2, y: shape.y2 },
-        ]
-        commit({ ...inkData, ...growPage(inkData, boundsOfPoints(corners)), shapes: [...inkData.shapes, shape] })
+        commit({ ...inkData, shapes: [...inkData.shapes, shape] })
         return
       }
 
@@ -845,16 +920,15 @@ export function useInkCanvas(
       const straight = straightLineEnds(points)
       if (straight) {
         const shape: Shape = { id: crypto.randomUUID(), kind: 'line', ...straight, color, size }
-        const ends = boundsOfPoints([{ x: straight.x1, y: straight.y1 }, { x: straight.x2, y: straight.y2 }])
-        commit({ ...inkData, ...growPage(inkData, ends), shapes: [...inkData.shapes, shape] })
+        commit({ ...inkData, shapes: [...inkData.shapes, shape] })
         return
       }
 
       const stroke: Stroke = { id: crypto.randomUUID(), points, color, size, opacity, thinning }
-      commit({ ...inkData, ...growPage(inkData, boundsOfPoints(stroke.points)), strokes: [...inkData.strokes, stroke] })
+      commit({ ...inkData, strokes: [...inkData.strokes, stroke] })
     },
     [
-      tool, inkData, color, size, opacity, commit, save, zoom, origin, growPage, selection,
+      tool, inkData, color, size, opacity, commit, save, toWorld, selection,
       snappedPoints, releaseRuler, startEditText, cancelRedraw,
     ],
   )

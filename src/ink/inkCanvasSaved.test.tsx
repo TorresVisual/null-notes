@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest'
-import { render, cleanup, createEvent, fireEvent, waitFor } from '@testing-library/react'
-import { InkCanvas, scrollAncestors } from './InkCanvas'
+import { render, cleanup, fireEvent, waitFor } from '@testing-library/react'
+import { InkCanvas } from './InkCanvas'
 import { useInkStore } from '../store/ink'
 import { DEFAULT_PENS } from './pens'
 import type { InkData } from './types'
@@ -49,7 +49,7 @@ async function openEditor(container: HTMLElement): Promise<HTMLTextAreaElement> 
 describe('onSaved', () => {
   it('fires after a committed edit has been written', async () => {
     const onSaved = vi.fn()
-    const { container } = render(<InkCanvas svgPath="/ws/N.ink/a.svg" width={700} height={400} onSaved={onSaved} />)
+    const { container } = render(<InkCanvas svgPath="/ws/N.ink/a.svg" onSaved={onSaved} />)
     const editor = await openEditor(container)
 
     fireEvent.change(editor, { target: { value: 'hello' } })
@@ -63,7 +63,7 @@ describe('onSaved', () => {
     let resolveWrite: () => void = () => {}
     write.mockImplementationOnce(() => new Promise<void>((resolve) => { resolveWrite = resolve }))
     const onSaved = vi.fn()
-    const { container } = render(<InkCanvas svgPath="/ws/N.ink/a.svg" width={700} height={400} onSaved={onSaved} />)
+    const { container } = render(<InkCanvas svgPath="/ws/N.ink/a.svg" onSaved={onSaved} />)
     const editor = await openEditor(container)
 
     fireEvent.change(editor, { target: { value: 'hello' } })
@@ -78,7 +78,7 @@ describe('onSaved', () => {
   it('fires for the flush of a label still open when the canvas unmounts', async () => {
     const onSaved = vi.fn()
     const { container, unmount } = render(
-      <InkCanvas svgPath="/ws/N.ink/a.svg" width={700} height={400} onSaved={onSaved} />,
+      <InkCanvas svgPath="/ws/N.ink/a.svg" onSaved={onSaved} />,
     )
     const editor = await openEditor(container)
     fireEvent.change(editor, { target: { value: 'unfinished' } })
@@ -92,49 +92,17 @@ describe('onSaved', () => {
 
 describe('autoActivate', () => {
   it('registers the canvas on mount, without a pointer press', async () => {
-    render(<InkCanvas svgPath="/ws/N.ink/a.svg" width={700} height={400} autoActivate />)
+    render(<InkCanvas svgPath="/ws/N.ink/a.svg" autoActivate />)
 
     await waitFor(() => expect(useInkStore.getState().activeCanvasId).toBe('/ws/N.ink/a.svg'))
     expect(useInkStore.getState().activeCanvas).not.toBeNull()
   })
 
   it('stays unregistered without the flag', async () => {
-    render(<InkCanvas svgPath="/ws/N.ink/a.svg" width={700} height={400} />)
+    render(<InkCanvas svgPath="/ws/N.ink/a.svg" />)
     await new Promise((resolve) => setTimeout(resolve, 0))
 
     expect(useInkStore.getState().activeCanvasId).toBeNull()
-  })
-})
-
-describe('scrollAncestors', () => {
-  function withScroll(el: HTMLElement) {
-    Object.defineProperty(el, 'scrollTop', { value: 100, writable: true })
-    Object.defineProperty(el, 'scrollLeft', { value: 100, writable: true })
-    return el
-  }
-
-  it('pans the overlay body on both axes, opposite to the drag', () => {
-    const body = withScroll(document.createElement('div'))
-    body.className = 'ink-editor-body'
-    const inner = document.createElement('div')
-    body.appendChild(inner)
-
-    scrollAncestors(inner, 10, 20)
-
-    expect(body.scrollTop).toBe(80)
-    expect(body.scrollLeft).toBe(90)
-  })
-
-  it('still pans the note column vertically when there is no overlay', () => {
-    const page = withScroll(document.createElement('div'))
-    page.className = 'editor-scroll'
-    const inner = document.createElement('div')
-    page.appendChild(inner)
-
-    scrollAncestors(inner, 10, 20)
-
-    expect(page.scrollTop).toBe(80)
-    expect(page.scrollLeft).toBe(100)
   })
 })
 
@@ -161,15 +129,13 @@ describe('Delete reaches only the canvas that owns the selection', () => {
     texts: [],
   }
 
-  // Lassoes the stroke above, leaving the canvas with a live selection.
-  // jsdom computes no offsetX, so the lasso's page coordinates are set by hand.
+  // Lassoes the stroke above, leaving the canvas with a live selection. With no
+  // measured viewport the camera sits at the origin, so client coordinates are
+  // ink coordinates.
   function selectStrokeIn(container: HTMLElement) {
     const canvas = container.querySelector('canvas')!
     const at = (type: 'pointerDown' | 'pointerMove' | 'pointerUp', x: number, y: number) => {
-      const event = createEvent[type](canvas, { pointerType: 'pen', pointerId: 1 })
-      Object.defineProperty(event, 'offsetX', { value: x })
-      Object.defineProperty(event, 'offsetY', { value: y })
-      fireEvent(canvas, event)
+      fireEvent[type](canvas, { pointerType: 'pen', pointerId: 1, clientX: x, clientY: y })
     }
     at('pointerDown', 100, 100)
     at('pointerMove', 200, 100)
@@ -184,7 +150,7 @@ describe('Delete reaches only the canvas that owns the selection', () => {
   })
 
   it('deletes the selection on the canvas that owns it', async () => {
-    const { container } = render(<InkCanvas svgPath="/ws/N.ink/a.svg" width={700} height={400} />)
+    const { container } = render(<InkCanvas svgPath="/ws/N.ink/a.svg" />)
     await waitFor(() => expect(read).toHaveBeenCalled())
     await new Promise((resolve) => setTimeout(resolve, 0))
     selectStrokeIn(container)
@@ -196,7 +162,7 @@ describe('Delete reaches only the canvas that owns the selection', () => {
   })
 
   it('leaves a selection on a canvas that no longer owns the slot alone', async () => {
-    const { container } = render(<InkCanvas svgPath="/ws/N.ink/a.svg" width={700} height={400} />)
+    const { container } = render(<InkCanvas svgPath="/ws/N.ink/a.svg" />)
     await waitFor(() => expect(read).toHaveBeenCalled())
     await new Promise((resolve) => setTimeout(resolve, 0))
     selectStrokeIn(container)

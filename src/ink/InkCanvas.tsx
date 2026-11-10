@@ -1,58 +1,42 @@
-import { useRef, useState, useEffect, useLayoutEffect, useCallback } from 'react'
+import { useRef, useState, useEffect, useCallback } from 'react'
 import type { PointerEvent as ReactPointerEvent } from 'react'
 import { useInkCanvas, isDrawingPointer, isEraserTip, toInk } from './useInkCanvas'
 import { pinchZoom, distanceBetween } from './zoom'
-import { scrollShift } from './bounds'
-import { useZoomAnchor } from './useZoomAnchor'
+import { panBy, zoomAbout, worldToScreen } from './camera'
+import { inkBounds } from './bounds'
+import type { Bounds } from './bounds'
+import { useCamera } from '../hooks/useCamera'
 import { useInkStore } from '../store/ink'
-import type { InkBackdrop } from './InkEditorOverlay'
 import type { CanvasHandle } from '../store/ink'
-
-// Dragging a finger moves the content with it, so the scroll offset goes the
-// opposite way. Vertical travel belongs to the note; horizontal only matters
-// once zoom has made the canvas wider than the column. The full-screen editor
-// owns a scroll container that pans on both axes, so it takes precedence.
-export function scrollAncestors(from: HTMLElement, dx: number, dy: number): void {
-  const editor = from.closest('.ink-editor-body')
-  if (editor) {
-    editor.scrollTop -= dy
-    editor.scrollLeft -= dx
-    return
-  }
-  const page = from.closest('.editor-scroll')
-  if (page) page.scrollTop -= dy
-  const canvas = from.closest('.ink-canvas-wrap')
-  if (canvas) canvas.scrollLeft -= dx
-}
-
-// Must match the grid background-size in index.css so it scales with zoom.
-const GRID_SIZE = 24
+import type { InkBackdrop } from './InkEditorOverlay'
+import type { InkData } from './types'
 
 interface InkCanvasProps {
   svgPath: string
-  width: number
-  height: number
-  zoom?: number
-  onZoomChange?: (zoom: number) => void
-  autoGrow?: boolean
-  growAllSides?: boolean
   backdrop?: InkBackdrop
   onSaved?: () => void
   autoActivate?: boolean
 }
 
-export function InkCanvas({
-  svgPath,
-  width,
-  height,
-  zoom = 1,
-  onZoomChange,
-  autoGrow = false,
-  growAllSides = false,
-  backdrop,
-  onSaved,
-  autoActivate = false,
-}: InkCanvasProps) {
+interface Pinch {
+  distance: number
+  scale: number
+  midX: number
+  midY: number
+}
+
+export function InkCanvas({ svgPath, backdrop, onSaved, autoActivate = false }: InkCanvasProps) {
+  const containerRef = useRef<HTMLDivElement>(null)
+  const [fitTo, setFitTo] = useState<Bounds | null>(null)
+  const { camera, viewport, zoomToward, updateCamera } = useCamera(containerRef, fitTo)
+
+  // Over a page backdrop the page is what you came to see, not the ink on it.
+  const fitOnLoad = useCallback(
+    (data: InkData) =>
+      setFitTo(backdrop ? { minX: 0, minY: 0, maxX: backdrop.width, maxY: backdrop.height } : inkBounds(data)),
+    [backdrop],
+  )
+
   const {
     canvasRef,
     tool,
@@ -64,7 +48,6 @@ export function InkCanvas({
     grabRuler,
     dragRuler,
     releaseRuler,
-    inkData,
     undo,
     redo,
     cropToContent,
@@ -74,7 +57,7 @@ export function InkCanvas({
     updateEditingText,
     commitEditingText,
     cancelEditingText,
-  } = useInkCanvas(svgPath, width, height, { zoom, autoGrow, growAllSides, onSaved })
+  } = useInkCanvas(svgPath, { camera, viewport, backdrop, onSaved, onLoaded: fitOnLoad })
 
   const setActiveCanvas = useInkStore((s) => s.setActiveCanvas)
   const clearActiveCanvas = useInkStore((s) => s.clearActiveCanvas)
@@ -95,11 +78,11 @@ export function InkCanvas({
       hasSelection,
       toggleRuler,
       rulerOn: ruler !== null,
-      zoom,
-      setZoom: (next: number) => onZoomChange?.(next),
+      zoom: camera.scale,
+      setZoom: zoomToward,
       cropToContent,
     }),
-    [undo, redo, cropToContent, canUndo, canRedo, deleteSelected, hasSelection, toggleRuler, ruler, zoom, onZoomChange],
+    [undo, redo, cropToContent, canUndo, canRedo, deleteSelected, hasSelection, toggleRuler, ruler, camera.scale, zoomToward],
   )
 
   // Re-registered whenever a value the bar renders changes, so `canUndo` in the
@@ -122,31 +105,18 @@ export function InkCanvas({
   useEffect(() => () => clearActiveCanvas(svgPath), [clearActiveCanvas, svgPath])
 
   const [cursorPos, setCursorPos] = useState<{ x: number; y: number } | null>(null)
-  const pageRef = useRef<HTMLDivElement>(null)
-  const anchorZoomAt = useZoomAnchor(pageRef, zoom, onZoomChange, scrollAncestors)
-  const lastOrigin = useRef({ originX: inkData.originX, originY: inkData.originY })
-
-  useLayoutEffect(() => {
-    const { dx, dy } = scrollShift(lastOrigin.current, inkData, zoom)
-    lastOrigin.current = { originX: inkData.originX, originY: inkData.originY }
-    const body = pageRef.current?.closest('.ink-editor-body')
-    if (!body || (dx === 0 && dy === 0)) return
-    body.scrollLeft += dx
-    body.scrollTop += dy
-  }, [inkData.originX, inkData.originY])
 
   // Fingers never draw — the pen owns the ink — so touch is free to mean
-  // everything else: hold the straightedge, drag the page, pinch to see more.
+  // everything else: hold the straightedge, drag the canvas, pinch to see more.
   // That is the paper division of labour, one hand positioning and one writing.
   const touches = useRef(new Map<number, { x: number; y: number }>())
-  const pinch = useRef<{ distance: number; zoom: number } | null>(null)
+  const pinch = useRef<Pinch | null>(null)
   // Which finger, if any, is holding the straightedge. It is kept out of the
-  // touches map so it can neither scroll the page nor count towards a pinch.
+  // touches map so it can neither pan the canvas nor count towards a pinch.
   const rulerTouch = useRef<number | null>(null)
 
-  function pagePoint(target: HTMLElement, clientX: number, clientY: number) {
-    const rect = target.getBoundingClientRect()
-    return toInk({ offsetX: clientX - rect.left, offsetY: clientY - rect.top }, zoom, inkData)
+  function worldPoint(e: { clientX: number; clientY: number }) {
+    return toInk(e, camera, containerRef.current?.getBoundingClientRect() ?? { left: 0, top: 0 })
   }
 
   function handlePointerDown(e: ReactPointerEvent<HTMLDivElement>) {
@@ -154,7 +124,7 @@ export function InkCanvas({
 
     if (e.pointerType !== 'touch') return
 
-    const { x, y } = pagePoint(e.currentTarget, e.clientX, e.clientY)
+    const { x, y } = worldPoint(e)
     if (rulerTouch.current === null && grabRuler(x, y)) {
       rulerTouch.current = e.pointerId
       return
@@ -175,7 +145,7 @@ export function InkCanvas({
   function handlePointerMove(e: ReactPointerEvent<HTMLDivElement>) {
     if (e.pointerType === 'touch') {
       if (rulerTouch.current === e.pointerId) {
-        const { x, y } = pagePoint(e.currentTarget, e.clientX, e.clientY)
+        const { x, y } = worldPoint(e)
         dragRuler(x, y)
         return
       }
@@ -185,20 +155,33 @@ export function InkCanvas({
       touches.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
       const points = [...touches.current.values()]
 
-      // One finger drags the page. This is done by hand rather than by letting
-      // touch-action scroll natively, because touch-action governs pen input
-      // too — allowing a native pan would make the pen scroll instead of draw.
-      if (points.length === 1) {
-        scrollAncestors(e.currentTarget, e.clientX - previous.x, e.clientY - previous.y)
+      // One finger drags the canvas. This is done by hand rather than by letting
+      // touch-action pan natively, because touch-action governs pen input too —
+      // allowing a native pan would make the pen scroll instead of draw.
+      const [a, b] = points
+      if (!a) return
+      if (!b) {
+        updateCamera((current) => panBy(current, e.clientX - previous.x, e.clientY - previous.y))
         return
       }
 
-      const [a, b] = points
-      if (!a || !b || !onZoomChange) return
+      const rect = containerRef.current?.getBoundingClientRect() ?? { left: 0, top: 0 }
+      const midX = (a.x + b.x) / 2 - rect.left
+      const midY = (a.y + b.y) / 2 - rect.top
       const distance = distanceBetween(a, b)
-      anchorZoomAt((a.x + b.x) / 2, (a.y + b.y) / 2)
-      if (!pinch.current) pinch.current = { distance, zoom }
-      else onZoomChange(pinchZoom(pinch.current.zoom, pinch.current.distance, distance))
+      const start = pinch.current
+      pinch.current = { distance: start?.distance ?? distance, scale: start?.scale ?? camera.scale, midX, midY }
+      if (!start) return
+      // The midpoint's own travel pans, then the spread zooms about where it
+      // now is, so two fingers can move and scale at once.
+      updateCamera((current) =>
+        zoomAbout(
+          panBy(current, midX - start.midX, midY - start.midY),
+          midX,
+          midY,
+          pinchZoom(start.scale, start.distance, distance),
+        ),
+      )
       return
     }
 
@@ -217,92 +200,59 @@ export function InkCanvas({
     setCursorPos(null)
   }
 
-  // Size from the ink data, not the props — the page grows as you write, and
-  // zoom scales what you see without touching the stored coordinates.
-  const displayWidth = inkData.width * zoom
-  const displayHeight = inkData.height * zoom
-  const eraserDiameter = eraserSize * zoom
+  const eraserDiameter = eraserSize * camera.scale
+  const labelAt = editingText ? worldToScreen(camera, editingText.x, editingText.y) : null
 
   return (
-    <div className="ink-canvas-wrap">
-      <div
-        ref={pageRef}
-        style={{ position: 'relative', width: displayWidth, height: displayHeight }}
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerUp}
-        onPointerCancel={handlePointerUp}
-        onPointerLeave={handlePointerLeave}
-      >
-        {backdrop && (
-          <img
-            src={backdrop.dataUrl}
-            alt="Page backdrop"
-            draggable={false}
-            style={{
-              position: 'absolute',
-              left: -inkData.originX * zoom,
-              top: -inkData.originY * zoom,
-              width: backdrop.width * zoom,
-              height: backdrop.height * zoom,
-              pointerEvents: 'none',
-            }}
-          />
-        )}
-        <canvas
-          ref={canvasRef}
-          className={backdrop ? 'ink-canvas ink-canvas-backdrop' : 'ink-canvas'}
+    <div
+      ref={containerRef}
+      className="ink-canvas-wrap"
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerUp}
+      onPointerLeave={handlePointerLeave}
+    >
+      <canvas ref={canvasRef} className="ink-canvas" style={{ touchAction: 'none' }} />
+      {cursorPos && (
+        <div
+          className="ink-eraser-cursor"
           style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            width: displayWidth,
-            height: displayHeight,
-            backgroundSize: `${GRID_SIZE * zoom}px ${GRID_SIZE * zoom}px`,
-            backgroundPosition: `${-inkData.originX * zoom}px ${-inkData.originY * zoom}px`,
-            touchAction: 'none',
+            left: cursorPos.x,
+            top: cursorPos.y,
+            width: eraserDiameter,
+            height: eraserDiameter,
           }}
         />
-        {cursorPos && (
-          <div
-            className="ink-eraser-cursor"
-            style={{
-              left: cursorPos.x,
-              top: cursorPos.y,
-              width: eraserDiameter,
-              height: eraserDiameter,
-            }}
-          />
-        )}
-        {editingText && (
-          <textarea
-            key={editingText.id}
-            className="ink-text-editor"
-            autoFocus
-            value={editingText.text}
-            onChange={(e) => updateEditingText(e.target.value)}
-            onBlur={commitEditingText}
-            onPointerDown={(e) => e.stopPropagation()}
-            onKeyDown={(e) => {
-              if (e.key === 'Escape') {
-                e.preventDefault()
-                cancelEditingText()
-              } else if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault()
-                e.currentTarget.blur()
-              }
-            }}
-            rows={Math.max(1, editingText.text.split('\n').length)}
-            wrap="off"
-            style={{
-              left: (editingText.x - inkData.originX) * zoom,
-              top: (editingText.y - inkData.originY) * zoom,
-              color: editingText.color,
-              fontSize: editingText.size * zoom,
-            }}
-          />
-        )}
-      </div>
+      )}
+      {editingText && labelAt && (
+        <textarea
+          key={editingText.id}
+          className="ink-text-editor"
+          autoFocus
+          value={editingText.text}
+          onChange={(e) => updateEditingText(e.target.value)}
+          onBlur={commitEditingText}
+          onPointerDown={(e) => e.stopPropagation()}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') {
+              e.preventDefault()
+              cancelEditingText()
+            } else if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault()
+              e.currentTarget.blur()
+            }
+          }}
+          rows={Math.max(1, editingText.text.split('\n').length)}
+          wrap="off"
+          style={{
+            left: labelAt.x,
+            top: labelAt.y,
+            color: editingText.color,
+            fontSize: editingText.size * camera.scale,
+          }}
+        />
+      )}
     </div>
   )
 }

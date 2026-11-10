@@ -24,13 +24,12 @@ function point(x: number, y: number): Point {
 }
 
 describe('centredRuler', () => {
-  it('lands in the middle of the page, lying flat', () => {
-    const ruler = centredRuler(800, 600)
-    expect(ruler).toMatchObject({ x: 400, y: 300, angle: 0 })
+  it('lands on the given centre, lying flat', () => {
+    expect(centredRuler({ x: 400, y: 300 })).toMatchObject({ x: 400, y: 300, angle: 0 })
   })
 
-  it('centres horizontally on the page, wherever its origin is', () => {
-    expect(centredRuler(1200, 600, -400)).toMatchObject({ x: 200, y: 300 })
+  it('follows the centre wherever it is in the world', () => {
+    expect(centredRuler({ x: -5200, y: 12000 })).toMatchObject({ x: -5200, y: 12000 })
   })
 })
 

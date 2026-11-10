@@ -81,8 +81,6 @@ function PdfPageBlockView({ node, editor }: ReactNodeViewProps) {
       {editing && dataUrl && inkSrc && (
         <InkEditorOverlay
           src={inkSrc}
-          width={width}
-          height={height}
           backdrop={{ dataUrl, width, height }}
           onSaved={refresh}
           onClose={() => {

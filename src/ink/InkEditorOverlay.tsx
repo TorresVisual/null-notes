@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import type { KeyboardEvent } from 'react'
 import { createPortal } from 'react-dom'
 import { InkCanvas } from './InkCanvas'
@@ -15,15 +15,12 @@ export interface InkBackdrop {
 
 interface InkEditorOverlayProps {
   src: string
-  width: number
-  height: number
   backdrop?: InkBackdrop
   onSaved: () => void
   onClose: () => void
 }
 
-export function InkEditorOverlay({ src, width, height, backdrop, onSaved, onClose }: InkEditorOverlayProps) {
-  const [zoom, setZoom] = useState(1)
+export function InkEditorOverlay({ src, backdrop, onSaved, onClose }: InkEditorOverlayProps) {
   const rootRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -46,11 +43,12 @@ export function InkEditorOverlay({ src, width, height, backdrop, onSaved, onClos
       return
     }
     if ((e.ctrlKey || e.metaKey) && !(e.target instanceof HTMLTextAreaElement)) {
-      const next = zoomForKey(e.key, zoom)
-      if (next !== null) {
+      const { activeCanvas, activeCanvasId } = useInkStore.getState()
+      const next = activeCanvas && activeCanvasId === src ? zoomForKey(e.key, activeCanvas.zoom) : null
+      if (next !== null && activeCanvas) {
         e.preventDefault()
         e.stopPropagation()
-        setZoom(next)
+        activeCanvas.setZoom(next)
         return
       }
     }
@@ -80,18 +78,7 @@ export function InkEditorOverlay({ src, width, height, backdrop, onSaved, onClos
         <DrawRibbon onDone={onClose} />
       </div>
       <div className="ink-editor-body">
-        <InkCanvas
-          svgPath={src}
-          width={width}
-          height={height}
-          zoom={zoom}
-          onZoomChange={setZoom}
-          autoGrow={!backdrop}
-          growAllSides={!backdrop}
-          backdrop={backdrop}
-          autoActivate
-          onSaved={onSaved}
-        />
+        <InkCanvas svgPath={src} backdrop={backdrop} autoActivate onSaved={onSaved} />
       </div>
     </div>,
     document.body,

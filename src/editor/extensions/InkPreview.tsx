@@ -73,8 +73,6 @@ export function InkPreview({ src, width, height, editable }: InkPreviewProps) {
       {editing && (
         <InkEditorOverlay
           src={src}
-          width={width}
-          height={height}
           onSaved={refresh}
           onClose={() => {
             setEditing(false)

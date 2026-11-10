@@ -78,6 +78,7 @@ afterEach(() => {
   editor?.destroy()
   editor = null
   cleanup()
+  vi.unstubAllGlobals()
   vi.restoreAllMocks()
 })
 
@@ -108,16 +109,41 @@ describe('a PDF page with ink', () => {
   })
 
   it('opens the full-screen editor with the page as backdrop on click', async () => {
+    const sources: string[] = []
+    class LoadedImage {
+      onload: (() => void) | null = null
+      set src(value: string) {
+        sources.push(value)
+        queueMicrotask(() => this.onload?.())
+      }
+    }
+    vi.stubGlobal('Image', LoadedImage)
+    const drawn: unknown[][] = []
+    const ctx = new Proxy({} as Record<string, unknown>, {
+      get: (target, prop) => {
+        if (typeof prop === 'symbol') return undefined
+        if (prop in target) return target[prop]
+        return (...args: unknown[]) => {
+          if (prop === 'drawImage') drawn.push(args)
+        }
+      },
+      set: (target, prop, value) => {
+        if (typeof prop === 'string') target[prop] = value
+        return true
+      },
+    })
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(
+      (() => ctx) as unknown as HTMLCanvasElement['getContext'],
+    )
     const { container } = render(<TestEditor />)
     await inkOverlayOf(container)
 
     fireEvent.click(container.querySelector('.pdf-page-block') as HTMLElement)
 
     await waitFor(() => expect(overlay()).not.toBeNull())
-    const backdrop = document.querySelector<HTMLImageElement>('img[alt="Page backdrop"]')
-    expect(backdrop?.getAttribute('src')).toBe('data:image/png;base64,AAAA')
-    expect(backdrop?.style.width).toBe('600px')
-    expect(backdrop?.style.height).toBe('800px')
+    await waitFor(() => expect(drawn.length).toBeGreaterThan(0))
+    expect(sources).toEqual(['data:image/png;base64,AAAA'])
+    expect(drawn[0]?.slice(1)).toEqual([0, 0, 600, 800])
   })
 
   it('does not open the editor when the note is not editable', async () => {

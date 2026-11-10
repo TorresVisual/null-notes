@@ -21,7 +21,7 @@ function pointerDownOn(container: HTMLElement) {
 
 describe('registering the canvas being drawn in', () => {
   it('registers on pointerdown', async () => {
-    const { container } = render(<InkCanvas svgPath="/ws/N.ink/a.svg" width={700} height={400} />)
+    const { container } = render(<InkCanvas svgPath="/ws/N.ink/a.svg" />)
 
     pointerDownOn(container)
 
@@ -31,7 +31,7 @@ describe('registering the canvas being drawn in', () => {
 
   it('clears when it unmounts while active', async () => {
     const { container, unmount } = render(
-      <InkCanvas svgPath="/ws/N.ink/a.svg" width={700} height={400} />,
+      <InkCanvas svgPath="/ws/N.ink/a.svg" />,
     )
     pointerDownOn(container)
     await waitFor(() => expect(useInkStore.getState().activeCanvas).not.toBeNull())
@@ -46,8 +46,8 @@ describe('registering the canvas being drawn in', () => {
   // and the one that lost the slot must not be able to reclaim or clear it
   // later, whether by its own state changing or by unmounting.
   it('a second canvas becoming active is not later overwritten by the first', async () => {
-    const a = render(<InkCanvas svgPath="/ws/N.ink/a.svg" width={700} height={400} />)
-    const b = render(<InkCanvas svgPath="/ws/N.ink/b.svg" width={700} height={400} />)
+    const a = render(<InkCanvas svgPath="/ws/N.ink/a.svg" />)
+    const b = render(<InkCanvas svgPath="/ws/N.ink/b.svg" />)
 
     pointerDownOn(a.container)
     await waitFor(() => expect(useInkStore.getState().activeCanvasId).toBe('/ws/N.ink/a.svg'))
