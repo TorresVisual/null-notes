@@ -105,7 +105,7 @@ describe('full-screen ink editor', () => {
     expect(await browser.execute(() => !!document.querySelector('.ink-canvas-wrap'))).toBe(false)
     await screenshot('ink-fullscreen-preview')
 
-    await browser.waitUntil(() => existsSync(notePath) && readFileSync(notePath, 'utf-8').includes('```ink'), {
+    await browser.waitUntil(() => existsSync(notePath) && readFileSync(notePath, 'utf-8').includes('#ink='), {
       timeout: 10000,
       interval: 300,
       timeoutMsg: 'note never saved the ink block',
@@ -124,25 +124,21 @@ describe('full-screen ink editor', () => {
     )
   })
 
-  it('keeps a canvas note inline', async () => {
+  it('shows a canvas note as a preview, not a live canvas', async () => {
     // A leftover note from an earlier run would make the new one a name collision.
     rmSync(join(fixtureWorkspace, 'Ink Canvas Note.md'), { force: true })
     rmSync(join(fixtureWorkspace, 'Ink Canvas Note.ink'), { recursive: true, force: true })
     await clickNewMenuItem('Canvas')
     await fillPromptDialog('Ink Canvas Note')
 
-    await waitForSelector('.ink-canvas-wrap', 'canvas note did not open inline')
-    // The previous note's preview can outlive the first canvas paint while the switch settles.
-    await browser.waitUntil(
-      async () => browser.execute(() => !document.querySelector('.ink-preview')),
-      { timeout: 10000, timeoutMsg: 'previous note preview never left the page' },
-    )
+    await waitForSelector('.ink-preview', 'canvas note did not show a preview')
+    expect(await browser.execute(() => !!document.querySelector('.ink-canvas-wrap'))).toBe(false)
     expect(await browser.execute(() => !!document.querySelector('.ink-editor-overlay'))).toBe(false)
 
     const notePath = join(fixtureWorkspace, 'Ink Canvas Note.md')
     await browser.waitUntil(() => existsSync(notePath), { timeout: 10000, timeoutMsg: 'canvas note never created' })
     expect(readFileSync(notePath, 'utf-8')).toContain('"inline":true')
     expect(readdirSync(fixtureWorkspace).some((name) => name === 'Ink Canvas Note.ink')).toBe(true)
-    await screenshot('ink-fullscreen-canvas-note-inline')
+    await screenshot('ink-fullscreen-canvas-note-preview')
   })
 })
