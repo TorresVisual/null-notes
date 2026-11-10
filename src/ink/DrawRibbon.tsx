@@ -146,25 +146,7 @@ export function DrawRibbon({ onDone }: DrawRibbonProps) {
             />
           </label>
         </ToolFlyout>
-        <button
-          type="button"
-          className={`ink-tool${active?.rulerOn ? ' active' : ''}`}
-          onClick={active?.toggleRuler}
-          aria-pressed={active?.rulerOn ?? false}
-          aria-label="Ruler"
-          title="Ruler — draw along its edge; drag the middle to slide it, an end to swing it"
-        >
-          <RulerIcon size={ICON_SIZE} />
-        </button>
-        <button
-          type="button"
-          className="ink-tool"
-          onClick={active?.cropToContent}
-          aria-label="Crop to content"
-          title="Crop to content — trim the empty page around your drawing"
-        >
-          <Crop size={ICON_SIZE} />
-        </button>
+        <span className="ink-sep" aria-hidden />
         <ToolFlyout
           className="ink-tool"
           active={isShapeTool(tool)}
@@ -196,6 +178,25 @@ export function DrawRibbon({ onDone }: DrawRibbonProps) {
             })}
           </div>
         </ToolFlyout>
+        <button
+          type="button"
+          className={`ink-tool${active?.rulerOn ? ' active' : ''}`}
+          onClick={active?.toggleRuler}
+          aria-pressed={active?.rulerOn ?? false}
+          aria-label="Ruler"
+          title="Ruler — draw along its edge; drag the middle to slide it, an end to swing it"
+        >
+          <RulerIcon size={ICON_SIZE} />
+        </button>
+        <button
+          type="button"
+          className="ink-tool"
+          onClick={active?.cropToContent}
+          aria-label="Crop to content"
+          title="Crop to content — trim the empty page around your drawing"
+        >
+          <Crop size={ICON_SIZE} />
+        </button>
       </div>
       <div className="draw-ribbon-pinned">
         <button type="button" className="ink-tool" onClick={active?.undo} disabled={!active?.canUndo} aria-label="Undo" title="Undo (Ctrl+Z)">

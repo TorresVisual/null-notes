@@ -6591,40 +6591,51 @@ input[type='checkbox']:focus-visible {
   outline: none;
 }
 
+/* Floats over the body so the page gets the whole window; the body's top
+   padding keeps the page clear of it. Only the two surfaces take the pointer,
+   so the page beside them stays drawable. */
 .ink-editor-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 14px;
-  background: var(--bg-base);
-  border-bottom: 1px solid var(--border);
-  flex-shrink: 0;
+  position: absolute;
+  top: var(--space-md);
+  left: var(--space-md);
+  right: var(--space-xl);
+  z-index: 1;
+  pointer-events: none;
 }
 
-/* Tools scroll sideways on a narrow window; undo/redo/zoom/Done stay put. */
+/* Tools dock centred, undo/redo/zoom/Done in the right corner. When the window
+   is too narrow the dock scrolls sideways; the corner cluster never shrinks. */
 .draw-ribbon {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  gap: 8px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(max-content, 1fr);
+  align-items: stretch;
+  gap: var(--space-sm);
 }
 
-.draw-ribbon-tools {
-  flex: 1;
-  min-width: 0;
+.draw-ribbon-tools,
+.draw-ribbon-pinned {
+  pointer-events: auto;
   display: flex;
   align-items: center;
   gap: 6px;
+  padding: 6px 10px;
+  background: var(--bg-raised);
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  box-shadow: var(--shadow-popover);
+}
+
+.draw-ribbon-tools {
+  grid-column: 2;
+  min-width: 0;
   overflow-x: auto;
+  scrollbar-width: thin;
 }
 .draw-ribbon-tools > * { flex: none; }
 
 .draw-ribbon-pinned {
-  flex: none;
-  display: flex;
-  align-items: center;
-  gap: 6px;
+  grid-column: 3;
+  justify-self: end;
 }
 
 .draw-ribbon .ink-tool { width: 32px; height: 32px; }
@@ -6642,7 +6653,7 @@ input[type='checkbox']:focus-visible {
   flex: 1;
   min-height: 0;
   overflow: auto;
-  padding: var(--space-lg);
+  padding: 72px var(--space-lg) var(--space-lg);
 }
 
 .ink-editor-body .ink-canvas-wrap {
