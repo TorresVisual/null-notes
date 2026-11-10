@@ -1,6 +1,6 @@
-import { Home, FolderTree, Search, GraduationCap, Menu, type LucideIcon } from 'lucide-react'
+import { Home, FolderTree, Search, Menu, type LucideIcon } from 'lucide-react'
 
-export type TabId = 'home' | 'notes' | 'search' | 'review' | 'more'
+export type TabId = 'home' | 'notes' | 'search' | 'more'
 
 interface TabSpec {
   id: TabId
@@ -13,7 +13,6 @@ const TABS: TabSpec[] = [
   { id: 'home', label: 'Home', icon: Home, needsWorkspace: false },
   { id: 'notes', label: 'Notes', icon: FolderTree, needsWorkspace: false },
   { id: 'search', label: 'Search', icon: Search, needsWorkspace: true },
-  { id: 'review', label: 'Review', icon: GraduationCap, needsWorkspace: true },
   { id: 'more', label: 'More', icon: Menu, needsWorkspace: false },
 ]
 

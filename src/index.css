@@ -447,6 +447,23 @@ button, [role="button"], .tree-row, .tab, .search-result, .slash-menu-item,
   font-size: 11px;
 }
 
+.mobile-fab {
+  position: fixed;
+  right: var(--space-lg);
+  bottom: calc(56px + var(--safe-bottom) + var(--space-lg));
+  z-index: 21;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: 0;
+  background: var(--accent);
+  color: var(--bg-raised);
+  box-shadow: var(--shadow-modal);
+}
+
 .mobile-tab.is-active { color: var(--accent); }
 .mobile-tab:disabled { opacity: 0.4; }
 

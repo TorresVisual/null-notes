@@ -1,4 +1,4 @@
-import { ListChecks, Network, RefreshCw, Settings, SquareFunction, type LucideIcon } from 'lucide-react'
+import { GraduationCap, ListChecks, Network, RefreshCw, Settings, SquareFunction, type LucideIcon } from 'lucide-react'
 import type { OverlayKind } from '../hooks/useOverlayManager'
 
 interface Item {
@@ -17,15 +17,19 @@ const ITEMS: Item[] = [
 interface MoreSheetProps {
   onClose: () => void
   onSelect: (kind: OverlayKind) => void
+  onReview: () => void
   onSyncNow: (() => void) | null
   syncing: boolean
 }
 
-export function MoreSheet({ onClose, onSelect, onSyncNow, syncing }: MoreSheetProps) {
+export function MoreSheet({ onClose, onSelect, onReview, onSyncNow, syncing }: MoreSheetProps) {
   return (
     <>
       <div className="mobile-sheet-backdrop" onClick={onClose} />
       <div className="mobile-sheet" role="dialog" aria-label="More">
+        <button className="mobile-sheet-action" onClick={onReview}>
+          <GraduationCap size={18} /> Review
+        </button>
         {ITEMS.map(({ kind, label, icon: Icon }) => (
           <button key={kind} className="mobile-sheet-action" onClick={() => onSelect(kind)}>
             <Icon size={18} /> {label}

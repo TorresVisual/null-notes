@@ -42,6 +42,7 @@ import { useWorkspace, refreshTags, refreshRecents } from '../hooks/useWorkspace
 import { useExternalChanges } from '../hooks/useExternalChanges'
 import { useBookmarksStore } from '../store/bookmarks'
 import { useCreateNote } from '../hooks/useCreateNote'
+import { useQuickNote } from '../hooks/useQuickNote'
 import { useCreateFolder } from '../hooks/useCreateFolder'
 import { useCreateCanvasNote } from '../hooks/useCreateCanvasNote'
 import { useWindowTitle } from '../hooks/useWindowTitle'
@@ -100,6 +101,7 @@ export function Layout() {
   const toggleFocusMode = useFocusModeStore((s) => s.toggle)
   const toggleSidebar = useWorkspaceStore((s) => s.toggleSidebar)
   const mobile = isMobile()
+  const quickNote = useQuickNote()
   useResetPageScroll()
   const workspacePath = useWorkspaceStore((s) => s.path)
   const recentWorkspaces = useWorkspaceStore((s) => s.recentWorkspaces)
@@ -773,6 +775,7 @@ export function Layout() {
             setPendingCram(null)
             openOverlay('review')
           }}
+          onNewNote={() => void quickNote()}
           hasWorkspace={workspacePath !== null}
           noteTitle={currentNote?.title ?? ''}
           home={

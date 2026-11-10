@@ -22,6 +22,7 @@ function setup(over: Partial<React.ComponentProps<typeof MobileShell>> = {}) {
     openOverlay: vi.fn(),
     closeOverlay: vi.fn(),
     onReviewOpen: vi.fn(),
+    onNewNote: vi.fn(),
     hasWorkspace: true,
     noteTitle: 'Lecture 7',
     home: <div>home-screen</div>,
@@ -59,13 +60,17 @@ describe('MobileShell tabs', () => {
     expect(screen.queryByText('home-screen')).not.toBeInTheDocument()
   })
 
-  it('Search and Review open their overlays instead of switching screen', async () => {
+  it('Search opens its overlay instead of switching screen', async () => {
     const { props } = setup()
     await userEvent.click(screen.getByRole('button', { name: 'Search' }))
     expect(props.openOverlay).toHaveBeenCalledWith('search')
-    await userEvent.click(screen.getByRole('button', { name: 'Review' }))
-    expect(props.onReviewOpen).toHaveBeenCalled()
     expect(screen.getByText('home-screen')).toBeInTheDocument()
+  })
+
+  it('has no Review tab: the bar is Home, Notes, Search, More', () => {
+    setup()
+    const bar = screen.getByRole('navigation', { name: 'Main' })
+    expect(Array.from(bar.querySelectorAll('button'), (b) => b.textContent)).toEqual(['Home', 'Notes', 'Search', 'More'])
   })
 
   it('highlights the tab whose overlay is open', () => {
@@ -83,6 +88,14 @@ describe('MobileShell More sheet', () => {
     expect(screen.queryByRole('button', { name: 'Tasks' })).not.toBeInTheDocument()
   })
 
+  it('Review in the sheet opens the review overlay and closes the sheet', async () => {
+    const { props } = setup()
+    await userEvent.click(screen.getByRole('button', { name: 'More' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Review' }))
+    expect(props.onReviewOpen).toHaveBeenCalled()
+    expect(screen.queryByRole('dialog', { name: 'More' })).not.toBeInTheDocument()
+  })
+
   it('offers Sync now only when a sync handler exists', async () => {
     const { unmount } = setup({ onSyncNow: null })
     await userEvent.click(screen.getByRole('button', { name: 'More' }))
@@ -92,6 +105,32 @@ describe('MobileShell More sheet', () => {
     await userEvent.click(screen.getByRole('button', { name: 'More' }))
     await userEvent.click(screen.getByRole('button', { name: 'Sync now' }))
     expect(props.onSyncNow).toHaveBeenCalled()
+  })
+})
+
+describe('MobileShell new-note button', () => {
+  it('shows on Home and Notes and calls onNewNote', async () => {
+    const { props } = setup()
+    await userEvent.click(screen.getByRole('button', { name: 'New note' }))
+    expect(props.onNewNote).toHaveBeenCalledTimes(1)
+
+    await userEvent.click(screen.getByRole('button', { name: 'Notes' }))
+    expect(screen.getByRole('button', { name: 'New note' })).toBeInTheDocument()
+  })
+
+  it('is hidden over the Search overlay, while the editor is open, and without a workspace', () => {
+    const { unmount } = setup({ activeOverlay: 'search' })
+    expect(screen.queryByRole('button', { name: 'New note' })).not.toBeInTheDocument()
+    unmount()
+
+    useWorkspaceStore.setState({ activeTab: '/ws/a.md', openTabs: ['/ws/a.md'] })
+    const editorView = setup()
+    expect(screen.queryByRole('button', { name: 'New note' })).not.toBeInTheDocument()
+    editorView.unmount()
+
+    useWorkspaceStore.setState({ activeTab: null, openTabs: [] })
+    setup({ hasWorkspace: false })
+    expect(screen.queryByRole('button', { name: 'New note' })).not.toBeInTheDocument()
   })
 })
 

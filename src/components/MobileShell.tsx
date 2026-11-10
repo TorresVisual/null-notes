@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, Plus } from 'lucide-react'
 import { useWorkspaceStore } from '../store/workspace'
 import { useMobileEditStore } from '../store/mobileEdit'
 import { discardIfUntouched } from '../hooks/useQuickNote'
@@ -15,6 +15,7 @@ interface MobileShellProps {
   openOverlay: (kind: OverlayKind) => void
   closeOverlay: () => void
   onReviewOpen: () => void
+  onNewNote: () => void
   hasWorkspace: boolean
   noteTitle: string
   home: ReactNode
@@ -29,7 +30,6 @@ interface MobileShellProps {
 function highlightedTab(tab: MobileTab, moreOpen: boolean, overlay: OverlayKind | null): TabId {
   if (moreOpen) return 'more'
   if (overlay === 'search') return 'search'
-  if (overlay === 'review' || overlay === 'deck') return 'review'
   return tab
 }
 
@@ -38,6 +38,7 @@ export function MobileShell({
   openOverlay,
   closeOverlay,
   onReviewOpen,
+  onNewNote,
   hasWorkspace,
   noteTitle,
   home,
@@ -81,9 +82,13 @@ export function MobileShell({
 
   function selectTab(id: TabId) {
     if (id === 'search') openOverlay('search')
-    else if (id === 'review') onReviewOpen()
     else if (id === 'more') setMoreOpen(true)
     else setTab(id)
+  }
+
+  function reviewFromSheet() {
+    setMoreOpen(false)
+    onReviewOpen()
   }
 
   function selectFromSheet(kind: OverlayKind) {
@@ -113,6 +118,11 @@ export function MobileShell({
       ) : (
         <>
           <main className="mobile-screen">{screen}</main>
+          {hasWorkspace && activeOverlay === null && (
+            <button className="mobile-fab" aria-label="New note" onClick={onNewNote}>
+              <Plus size={24} />
+            </button>
+          )}
           {hasWorkspace && (
             <MobileTabBar
               active={highlightedTab(tab, moreOpen, activeOverlay)}
@@ -126,6 +136,7 @@ export function MobileShell({
         <MoreSheet
           onClose={() => setMoreOpen(false)}
           onSelect={selectFromSheet}
+          onReview={reviewFromSheet}
           onSyncNow={onSyncNow}
           syncing={syncing}
         />
