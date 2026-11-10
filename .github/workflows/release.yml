@@ -1,7 +1,8 @@
 name: Release
 
-# Orchestrates one draft release across the per-target workflows. Which targets
-# build is read from the tag annotation's `targets:` line (written by
+# Orchestrates one release across the per-target workflows. Assets attach to a
+# draft, which is published once every selected target has succeeded. Which
+# targets build is read from the tag annotation's `targets:` line (written by
 # `npm run release -- <bump> --skip|--only ...`); no line means all of them.
 # Each target is also runnable alone via its own workflow_dispatch.
 on:
@@ -80,5 +81,26 @@ jobs:
     with:
       tag: ${{ github.ref_name }}
     secrets: inherit
+    permissions:
+      contents: write
+
+  publish:
+    needs: [checks, plan, draft, windows, linux, android, ios]
+    if: ${{ !cancelled() && !contains(needs.*.result, 'failure') && needs.draft.result == 'success' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: gh release edit "$GITHUB_REF_NAME" --draft=false --latest
+
+  altstore:
+    needs: [plan, publish]
+    if: ${{ needs.publish.result == 'success' && contains(needs.plan.outputs.targets, 'ios') }}
+    uses: ./.github/workflows/altstore-source.yml
+    with:
+      tag: ${{ github.ref_name }}
     permissions:
       contents: write

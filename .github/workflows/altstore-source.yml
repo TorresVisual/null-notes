@@ -1,16 +1,21 @@
 name: AltStore source
 
-# Adds a published release's .ipa to altstore.json at the repo root, which
-# AltStore reads over raw.githubusercontent.com. Runs on publish, not on the
-# draft, so the source never lists an asset that 404s.
+# Adds a published release's .ipa to altstore.json, which AltStore reads from
+# the permanent `altstore` pre-release (main is protected, so the file can't be
+# committed from CI). Called by release.yml after publish, so the source never
+# lists an asset that 404s; run it by hand to redo a tag.
 on:
-  release:
-    types: [published]
+  workflow_call:
+    inputs:
+      tag:
+        required: true
+        type: string
   workflow_dispatch:
     inputs:
       tag:
         description: Release tag to (re-)add, e.g. v1.0.12
         required: true
+        type: string
 
 concurrency: altstore-source
 
@@ -20,14 +25,10 @@ jobs:
     permissions:
       contents: write
     env:
-      TAG: ${{ github.event.release.tag_name || inputs.tag }}
+      TAG: ${{ inputs.tag }}
       GH_TOKEN: ${{ github.token }}
-      RAW: https://raw.githubusercontent.com/${{ github.repository }}/main
+      GH_REPO: ${{ github.repository }}
     steps:
-      - uses: actions/checkout@v7
-        with:
-          ref: main
-
       - name: Add the ipa to altstore.json
         run: |
           set -euo pipefail
@@ -36,12 +37,21 @@ jobs:
           [ -n "$ipa" ] || { echo "release has no ipa; AltStore source unchanged"; exit 0; }
           jq -r .body release.json > notes.md
           size=$(jq -r --arg n "$ipa" '.assets[] | select(.name == $n) | .size' release.json)
-          jq --arg raw "$RAW" --arg v "${TAG#v}" --arg date "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-             --arg url "https://github.com/${{ github.repository }}/releases/download/$TAG/$ipa" \
+          if ! gh release view altstore >/dev/null 2>&1; then
+            gh release create altstore --prerelease --latest=false --target main \
+              --title "AltStore source" \
+              --notes "Hosts altstore.json for the AltStore source. Maintained by altstore-source.yml."
+          fi
+          gh release download altstore --pattern altstore.json --output altstore.json --clobber \
+            || echo '{"apps":[{"versions":[]}]}' > altstore.json
+          jq --arg raw "https://raw.githubusercontent.com/$GH_REPO/main" --arg v "${TAG#v}" \
+             --arg date "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+             --arg src "https://github.com/$GH_REPO/releases/download/altstore/altstore.json" \
+             --arg url "https://github.com/$GH_REPO/releases/download/$TAG/$ipa" \
              --argjson size "$size" --rawfile notes notes.md '
             .name = "Null Notes"
             | .identifier = "dev.nullnotes.source"
-            | .sourceURL = "\($raw)/altstore.json"
+            | .sourceURL = $src
             | .apps[0] |= (
                 .name = "Null Notes"
                 | .bundleIdentifier = "dev.nullnotes.app"
@@ -55,9 +65,4 @@ jobs:
                                + (.versions | map(select(.version != $v)))))
           ' altstore.json > altstore.json.new
           mv altstore.json.new altstore.json
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add altstore.json
-          git commit -m "altstore: $TAG"
-          git pull --rebase origin main
-          git push origin HEAD:main
+          gh release upload altstore altstore.json --clobber

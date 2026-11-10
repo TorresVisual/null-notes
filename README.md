@@ -90,7 +90,7 @@ installers for every platform are attached to each release.
 | Windows  | `Null.Notes_<version>_x64-setup.exe` or `.msi` — run it; it replaces any older version in place |
 | Linux    | `.AppImage`, `.deb` or `.rpm`                                           |
 | Android  | `.apk` (arm64, sideload)                                                |
-| iOS      | AltStore source `https://raw.githubusercontent.com/TorresVisual/null-notes/main/altstore.json` |
+| iOS      | AltStore source `https://github.com/TorresVisual/null-notes/releases/download/altstore/altstore.json` |
 
 Linux and mobile builds are attached only to releases that were built
 for those targets, so check the release's asset list. Installed copies check for updates at startup and offer to install them.

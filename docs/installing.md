@@ -26,13 +26,13 @@ Versions before the first updater-enabled release (v1.0.4 and earlier) have no u
 
 Each release also carries a Linux build (`.AppImage`, `.deb`, `.rpm`; only the AppImage self-updates), a signed arm64 Android `.apk` to sideload, and an unsigned iOS `.ipa`.
 
-**iOS (AltStore):** in AltStore go to Browse → Sources → **+** and add `https://raw.githubusercontent.com/TorresVisual/null-notes/main/altstore.json`, then install or update Null Notes from the source. AltStore signs the `.ipa` with your Apple ID on the phone (free-tier certificates expire every 7 days; AltStore refreshes them over Wi-Fi when it can). Publishing a release adds its `.ipa` to `altstore.json` at the repo root (`altstore-source.yml`). The old mirror source stops at v1.0.12; re-add the URL above in AltStore.
+**iOS (AltStore):** in AltStore go to Browse → Sources → **+** and add `https://github.com/TorresVisual/null-notes/releases/download/altstore/altstore.json`, then install or update Null Notes from the source. AltStore signs the `.ipa` with your Apple ID on the phone (free-tier certificates expire every 7 days; AltStore refreshes them over Wi-Fi when it can). Publishing a release adds its `.ipa` to `altstore.json` on the `altstore` pre-release (`altstore-source.yml`). The old mirror source stops at v1.0.12; re-add the URL above in AltStore.
 
 **Android:** download the `.apk` from `https://github.com/TorresVisual/null-notes/releases` (or point Obtainium at this repo for updates) and open it.
 
 ## Cutting a release (maintainer)
 
-`npm run release -- patch|minor|major` refuses to start unless the `CI` run for the pushed `HEAD` on `main` has finished green (needs `gh`), then bumps, tags and pushes. CI builds a **draft** release with notes taken from commit subjects; review it and publish it (`gh release edit <tag> --draft=false`), which triggers `altstore-source.yml`. To redo it for a tag, run that workflow manually with the tag.
+`npm run release -- patch|minor|major` refuses to start unless the `CI` run for the pushed `HEAD` on `main` has finished green (needs `gh`), then bumps, tags and pushes. CI attaches every selected target to a draft release (notes from commit subjects) and publishes it automatically once all of them succeed, then runs `altstore-source.yml`. To redo that for a tag, run the workflow manually with the tag.
 
 ### Choosing targets
 
@@ -42,17 +42,9 @@ macOS minutes bill 10x, so `--skip ios` is the cheap option for releases that do
 
 One-time setup for Android: create a keystore (`keytool -genkeypair -v -keystore release.jks -keyalg RSA -keysize 2048 -validity 10000 -alias nullnotes`), keep it somewhere safe (a lost key strands every installed copy, like the updater key), and store these secrets: `ANDROID_KEYSTORE_BASE64` (`base64 -w0 release.jks`), `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`.
 
-### Before pressing Publish
+### Publishing is automatic
 
-Publishing means every installed copy updates, and there is no rollback. Nothing automated runs the installer, so do this on the draft's installer first:
-
-1. Download the draft's `.msi`/`.exe` and install it over the previous version.
-2. Launch it; the version in Settings → About matches the tag.
-3. Open an existing workspace; the sidebar tree and search load.
-4. Create a note, type, close and reopen it; the text is still there.
-5. For an updater check, install the *previous* release, then confirm it offers this one once published (or skip if the release only touches the updater-neutral parts).
-
-If any step fails, don't publish — fix forward and cut a new version.
+A published release updates every installed copy and there is no rollback, and nothing automated runs the installer. After a release, install the previous version, confirm it offers the new one, and check the basics (version in Settings → About, open a workspace, type in a note and reopen it). If something is broken, fix forward and cut a new version.
 
 If a release fails, `npm run release -- retag` moves the existing tag to `HEAD` and re-runs the pipeline at the same version (refused once that version is published). For a transient CI failure, "Re-run failed jobs" is enough.
 
