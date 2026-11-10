@@ -1,10 +1,12 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Node, mergeAttributes } from '@tiptap/core'
-import { ReactNodeViewRenderer } from '@tiptap/react'
+import { NodeViewWrapper, ReactNodeViewRenderer } from '@tiptap/react'
 import type { ReactNodeViewProps } from '@tiptap/react'
 import { api } from '../../lib/tauri'
 import { inkApi } from '../../lib/ink'
-import { InkCanvas } from '../../ink/InkCanvas'
+import { InkEditorOverlay } from '../../ink/InkEditorOverlay'
+import { InkSvg } from '../../ink/InkSvg'
+import { useInkSidecar } from '../../hooks/useInkSidecar'
 
 interface PdfPageBlockAttrs {
   src: string
@@ -25,8 +27,8 @@ function PdfPageBlockView({ node, editor }: ReactNodeViewProps) {
   const { src, width, height } = node.attrs as unknown as PdfPageBlockAttrs
   const [dataUrl, setDataUrl] = useState<string | null>(null)
   const [inkSrc, setInkSrc] = useState<string | null>(null)
-  const [geometry, setGeometry] = useState({ left: 0, top: 0, zoom: 1 })
-  const imgRef = useRef<HTMLImageElement>(null)
+  const [editing, setEditing] = useState(false)
+  const { data, refresh } = useInkSidecar(inkSrc)
 
   useEffect(() => {
     let cancelled = false
@@ -52,37 +54,44 @@ function PdfPageBlockView({ node, editor }: ReactNodeViewProps) {
     }
   }, [editor, src])
 
-  // Ink is stored in the page's native pixel space (matches `width`/`height`
-  // above) so a stroke stays put on the page regardless of column width —
-  // the image itself scales responsively, so its rendered size is tracked
-  // and fed to InkCanvas's own `zoom` as the ratio between the two.
-  useEffect(() => {
-    const img = imgRef.current
-    if (!img || !dataUrl) return
-    const sync = () => {
-      setGeometry({ left: img.offsetLeft, top: img.offsetTop, zoom: img.offsetWidth / width })
-    }
-    const observer = new ResizeObserver(sync)
-    observer.observe(img)
-    return () => observer.disconnect()
-  }, [dataUrl, width])
+  const hasInk = data !== null && data.strokes.length + data.shapes.length + data.texts.length > 0
+  const canEdit = editor.isEditable && dataUrl !== null && inkSrc !== null
 
-  if (!src) return null
+  if (!src) return <NodeViewWrapper />
   return (
-    <div className="pdf-page-block">
+    <NodeViewWrapper
+      className={`pdf-page-block${canEdit ? ' editable' : ''}`}
+      onClick={canEdit ? () => setEditing(true) : undefined}
+    >
       {dataUrl ? (
-        <>
-          <img ref={imgRef} src={dataUrl} width={width} height={height} alt="Imported PDF page" />
-          {inkSrc && (
-            <div className="pdf-page-ink" style={{ left: geometry.left, top: geometry.top }}>
-              <InkCanvas svgPath={inkSrc} width={width} height={height} zoom={geometry.zoom} />
+        <div className="pdf-page-sheet">
+          <img src={dataUrl} width={width} height={height} alt="Imported PDF page" />
+          {hasInk && (
+            // Ink is stored in the page's native pixel space, so the preview is
+            // mapped onto the page rectangle: whatever lies outside it stays in
+            // the file but is not drawn here.
+            <div className="pdf-page-ink" style={{ overflow: 'hidden' }}>
+              <InkSvg data={{ ...data, originX: 0, originY: 0, width, height }} />
             </div>
           )}
-        </>
+        </div>
       ) : (
         <p className="status">Loading page…</p>
       )}
-    </div>
+      {editing && dataUrl && inkSrc && (
+        <InkEditorOverlay
+          src={inkSrc}
+          width={width}
+          height={height}
+          backdrop={{ dataUrl, width, height }}
+          onSaved={refresh}
+          onClose={() => {
+            setEditing(false)
+            refresh()
+          }}
+        />
+      )}
+    </NodeViewWrapper>
   )
 }
 

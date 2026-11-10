@@ -1,8 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { InkEditorOverlay } from '../../ink/InkEditorOverlay'
-import { inkDataToSvg } from '../../ink/svgSerialiser'
-import { inkApi } from '../../lib/ink'
-import { sanitizeNoteHtml } from '../../lib/sanitizeHtml'
+import { InkSvg } from '../../ink/InkSvg'
+import { useInkSidecar } from '../../hooks/useInkSidecar'
 import { pendingInkOpens } from '../toolbar/insertInk'
 import type { InkData } from '../../ink/types'
 
@@ -27,22 +26,8 @@ function isEmpty(data: InkData | null): boolean {
 }
 
 export function InkPreview({ src, width, height, editable }: InkPreviewProps) {
-  const [data, setData] = useState<InkData | null>(null)
+  const { data, refresh } = useInkSidecar(src)
   const [editing, setEditing] = useState(false)
-  const latestRead = useRef(0)
-
-  // Reads can resolve out of order when saves land close together, so only the
-  // newest request is allowed to write the result.
-  const refresh = useCallback(() => {
-    const id = ++latestRead.current
-    void inkApi.read(src).then((next) => {
-      if (id === latestRead.current) setData(next)
-    })
-  }, [src])
-
-  useEffect(() => {
-    refresh()
-  }, [refresh])
 
   // insertInk dispatches this right after inserting a brand-new, empty drawing —
   // there is nothing to preview yet, so go straight to drawing. Matched on src so
@@ -75,12 +60,9 @@ export function InkPreview({ src, width, height, editable }: InkPreviewProps) {
           <div
             className="ink-preview-page"
             style={{ width: pageWidth * scale, aspectRatio: `${pageWidth} / ${pageHeight}` }}
-            // The sidecar is a file in a workspace that can be shared or synced — the
-            // same trust boundary as a note's own .md, so it gets the same sanitizing
-            // pass DiagramBlock gives its SVG.
-            // eslint-disable-next-line react/no-danger
-            dangerouslySetInnerHTML={{ __html: sanitizeNoteHtml(inkDataToSvg(data as InkData)) }}
-          />
+          >
+            <InkSvg data={data as InkData} />
+          </div>
         )}
         {editable && (
           <button type="button" className="diagram-block-edit ink-preview-edit" aria-label="Edit drawing" onClick={open}>

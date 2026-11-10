@@ -4854,24 +4854,21 @@ input[type='checkbox']:focus-visible {
   display: block;
 }
 
-/* The ink layer composited over an imported page — positioned by JS to match
-   the (responsively-scaled) image underneath it. Ink's usual chrome (opaque
-   grid background, border) is stripped here since it would otherwise hide
-   the page it's meant to annotate. */
+/* The page image and its ink sized together, so the overlay always lines up with
+   the (responsively-scaled) image. Ink outside the page rectangle is kept in the
+   file but never shown here. */
+.pdf-page-sheet {
+  position: relative;
+  max-width: 100%;
+}
+
+.pdf-page-block.editable { cursor: pointer; }
+
 .pdf-page-ink {
   position: absolute;
-}
-
-.pdf-page-ink .ink-canvas-wrap {
-  border: none;
-  border-radius: 0;
-  overflow: visible;
-  background: transparent;
-}
-
-.pdf-page-ink .ink-canvas {
-  background: transparent;
-  background-image: none;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
 }
 
 /* Scanned PDF: nothing to convert, so route to Pages mode */
@@ -6685,7 +6682,12 @@ input[type='checkbox']:focus-visible {
 
 .ink-preview-page { max-width: 100%; }
 
-.ink-preview-page svg {
+.ink-svg {
+  width: 100%;
+  height: 100%;
+}
+
+.ink-svg svg {
   display: block;
   width: 100%;
   height: 100%;
