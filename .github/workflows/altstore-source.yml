@@ -1,0 +1,63 @@
+name: AltStore source
+
+# Adds a published release's .ipa to altstore.json at the repo root, which
+# AltStore reads over raw.githubusercontent.com. Runs on publish, not on the
+# draft, so the source never lists an asset that 404s.
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to (re-)add, e.g. v1.0.12
+        required: true
+
+concurrency: altstore-source
+
+jobs:
+  altstore:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      TAG: ${{ github.event.release.tag_name || inputs.tag }}
+      GH_TOKEN: ${{ github.token }}
+      RAW: https://raw.githubusercontent.com/${{ github.repository }}/main
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+
+      - name: Add the ipa to altstore.json
+        run: |
+          set -euo pipefail
+          gh release view "$TAG" --json assets,body > release.json
+          ipa=$(jq -r '[.assets[] | select(.name | endswith(".ipa"))][0].name // empty' release.json)
+          [ -n "$ipa" ] || { echo "release has no ipa; AltStore source unchanged"; exit 0; }
+          jq -r .body release.json > notes.md
+          size=$(jq -r --arg n "$ipa" '.assets[] | select(.name == $n) | .size' release.json)
+          jq --arg raw "$RAW" --arg v "${TAG#v}" --arg date "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+             --arg url "https://github.com/${{ github.repository }}/releases/download/$TAG/$ipa" \
+             --argjson size "$size" --rawfile notes notes.md '
+            .name = "Null Notes"
+            | .identifier = "dev.nullnotes.source"
+            | .sourceURL = "\($raw)/altstore.json"
+            | .apps[0] |= (
+                .name = "Null Notes"
+                | .bundleIdentifier = "dev.nullnotes.app"
+                | .developerName = "TorresVisual"
+                | .subtitle = "Markdown notes with ink and PDF import"
+                | .localizedDescription = "A WYSIWYG Markdown note-taking app for CS students."
+                | .iconURL = "\($raw)/src-tauri/icons/icon.png"
+                | .tintColor = "7EE787"
+                | .versions = ([{version: $v, date: $date, downloadURL: $url, size: $size,
+                                 minOSVersion: "14.0", localizedDescription: $notes}]
+                               + (.versions | map(select(.version != $v)))))
+          ' altstore.json > altstore.json.new
+          mv altstore.json.new altstore.json
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add altstore.json
+          git commit -m "altstore: $TAG"
+          git pull --rebase origin main
+          git push origin HEAD:main

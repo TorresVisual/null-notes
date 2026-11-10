@@ -2,8 +2,8 @@ name: Release (iOS)
 
 # Builds an unsigned arm64 .ipa and attaches it to the draft release. AltStore
 # signs it on the phone, so nothing here needs an Apple account. Once the
-# release is published, publish-mirror.yml copies the ipa to the public mirror
-# and adds it to the AltStore source. macOS minutes bill 10x: skip this target
+# release is published, altstore-source.yml adds the ipa to the AltStore
+# source. macOS minutes bill 10x: skip this target
 # with `npm run release -- <bump> --skip ios` when a release doesn't need it.
 on:
   workflow_call:

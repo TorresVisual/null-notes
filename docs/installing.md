@@ -16,7 +16,9 @@ The release workflow also attests build provenance (`actions/attest-build-proven
 
 ## Updating
 
-Installed copies check for a new release once at startup and offer to install it. Updater traffic goes through the public binaries-only mirror `TorresVisual/null-notes-releases`, because the updater can't fetch assets from a private repo. Releases there are copied from this repo when a release is published; drafts are never visible to the updater.
+Installed copies check for a new release once at startup and offer to install it. The updater reads `latest.json` from this repo's latest published release; drafts are never visible to it.
+
+Copies older than the transition release still poll the retired mirror `TorresVisual/null-notes-releases`. `publish-mirror.yml` keeps copying releases there so they can reach the first build that polls this repo. Once that build is out and has had time to spread, delete the workflow, the `RELEASES_REPO_TOKEN` secret and archive the mirror.
 
 Versions before the first updater-enabled release (v1.0.4 and earlier) have no updater: install the first updater-enabled release by hand (repeat the steps above, no uninstall needed first).
 
@@ -24,13 +26,13 @@ Versions before the first updater-enabled release (v1.0.4 and earlier) have no u
 
 Each release also carries a Linux build (`.AppImage`, `.deb`, `.rpm`; only the AppImage self-updates), a signed arm64 Android `.apk` to sideload, and an unsigned iOS `.ipa`.
 
-**iOS (AltStore):** in AltStore go to Browse → Sources → **+** and add `https://raw.githubusercontent.com/TorresVisual/null-notes-releases/main/altstore.json`, then install or update Null Notes from the source. AltStore signs the `.ipa` with your Apple ID on the phone (free-tier certificates expire every 7 days; AltStore refreshes them over Wi-Fi when it can). Publishing a release adds its `.ipa` to `altstore.json` (`publish-mirror.yml`).
+**iOS (AltStore):** in AltStore go to Browse → Sources → **+** and add `https://raw.githubusercontent.com/TorresVisual/null-notes/main/altstore.json`, then install or update Null Notes from the source. AltStore signs the `.ipa` with your Apple ID on the phone (free-tier certificates expire every 7 days; AltStore refreshes them over Wi-Fi when it can). Publishing a release adds its `.ipa` to `altstore.json` at the repo root (`altstore-source.yml`). The old mirror source keeps working until `publish-mirror.yml` is removed; re-add the new URL in AltStore.
 
-**Android:** download the `.apk` from the public mirror `https://github.com/TorresVisual/null-notes-releases/releases` (or point Obtainium at that repo for updates) and open it.
+**Android:** download the `.apk` from `https://github.com/TorresVisual/null-notes/releases` (or point Obtainium at this repo for updates) and open it.
 
 ## Cutting a release (maintainer)
 
-`npm run release -- patch|minor|major` refuses to start unless the `CI` run for the pushed `HEAD` on `main` has finished green (needs `gh`), then bumps, tags and pushes. CI builds a **draft** release with notes taken from commit subjects; review it and publish it (`gh release edit <tag> --draft=false`), which triggers `publish-mirror.yml`. To re-mirror a tag, run that workflow manually with the tag.
+`npm run release -- patch|minor|major` refuses to start unless the `CI` run for the pushed `HEAD` on `main` has finished green (needs `gh`), then bumps, tags and pushes. CI builds a **draft** release with notes taken from commit subjects; review it and publish it (`gh release edit <tag> --draft=false`), which triggers `altstore-source.yml` (and, until it is retired, `publish-mirror.yml`). To redo either for a tag, run that workflow manually with the tag.
 
 ### Choosing targets
 
@@ -54,7 +56,7 @@ If any step fails, don't publish — fix forward and cut a new version.
 
 If a release fails, `npm run release -- retag` moves the existing tag to `HEAD` and re-runs the pipeline at the same version (refused once that version is published). For a transient CI failure, "Re-run failed jobs" is enough.
 
-One-time setup: create the public repo `TorresVisual/null-notes-releases` with an initial commit; run `npx tauri signer generate`, put the public key in `plugins.updater.pubkey` in `src-tauri/tauri.conf.json`, and store the private key and password as secrets `TAURI_SIGNING_PRIVATE_KEY` / `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`; add a fine-grained PAT (Contents: read/write on the releases repo) as `RELEASES_REPO_TOKEN`. Back the private key up outside the repo — losing it strands every installed copy. The key and password are also kept in the maintainer's gitignored `.env`; `RELEASES_REPO_TOKEN` has no expiry, so nothing needs rotating on a schedule.
+One-time setup: run `npx tauri signer generate`, put the public key in `plugins.updater.pubkey` in `src-tauri/tauri.conf.json`, and store the private key and password as secrets `TAURI_SIGNING_PRIVATE_KEY` / `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`. Back the private key up outside the repo — losing it strands every installed copy. The key and password are also kept in the maintainer's gitignored `.env`. `RELEASES_REPO_TOKEN` (a fine-grained PAT for the old mirror) is only needed until `publish-mirror.yml` is retired.
 
 ## Note: Explorer right-click integration
 

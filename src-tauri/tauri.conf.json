@@ -38,7 +38,7 @@
     "updater": {
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEI3NDQxODM0ODUyOEQ4NTMKUldSVDJDaUZOQmhFdDU5U3VJOFZ5NlV6Y0RNWkF1OWRUaDdXK0hhS2lQSU1LZ21PTzY4MjUwL1MK",
       "endpoints": [
-        "https://github.com/TorresVisual/null-notes-releases/releases/latest/download/latest.json"
+        "https://github.com/TorresVisual/null-notes/releases/latest/download/latest.json"
       ]
     }
   },
