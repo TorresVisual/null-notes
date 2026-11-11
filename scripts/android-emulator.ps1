@@ -1,6 +1,7 @@
 param(
     [switch]$Clean,
-    [switch]$SkipBuild
+    [switch]$SkipBuild,
+    [string]$Avd
 )
 
 $ErrorActionPreference = "Stop"
@@ -32,7 +33,7 @@ try {
     }
 
     $apkDir = Join-Path $repo "src-tauri\gen\android\app\build\outputs\apk"
-    $apk = Get-ChildItem $apkDir -Recurse -Filter "*x86_64*debug*.apk" -File |
+    $apk = Get-ChildItem $apkDir -Recurse -Filter "*debug*.apk" -File |
         Select-Object -First 1
     if (-not $apk) {
         Write-Error "APK not found in: $apkDir"
@@ -41,8 +42,21 @@ try {
 
     $devices = (& $adb devices) | Select-String -Pattern "\tdevice$"
     if (-not $devices) {
-        Write-Error "No emulator or device in 'adb devices'. Start the AVD first."
-        exit 1
+        $emulator = Join-Path $env:ANDROID_HOME "emulator\emulator.exe"
+        if (-not $Avd) {
+            $Avd = Get-ChildItem (Join-Path $env:USERPROFILE ".android\avd") -Filter "*.ini" -File |
+                Select-Object -First 1 -ExpandProperty BaseName
+        }
+        if (-not $Avd -or -not (Test-Path $emulator)) {
+            Write-Error "No device running and no AVD found. Pass -Avd <name> or start an emulator manually."
+            exit 1
+        }
+        Write-Host "Starting emulator $Avd..." -ForegroundColor Cyan
+        Start-Process $emulator -ArgumentList "-avd", $Avd
+        & $adb wait-for-device
+        while ((& $adb shell getprop sys.boot_completed 2>$null).Trim() -ne "1") {
+            Start-Sleep -Seconds 2
+        }
     }
 
     if ($Clean) {
