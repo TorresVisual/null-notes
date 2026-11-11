@@ -3803,17 +3803,17 @@ li .fold-toggle { left: -2.4em; }
 .tree-row:hover { background: var(--bg-hover); }
 .tree-row:active { background: var(--bg-sunken); }
 .tree-row:focus-visible { outline: none; box-shadow: var(--focus-ring); }
-.tree-row.active { background: var(--accent-bg); color: var(--text-primary); }
+.tree-row.active { background: var(--accent-bg); color: var(--text-primary); font-weight: 500; }
 
-/* The open note's row gets a pill landing in the gutter, not just a
-   background tint — the same "which channel am I in" signal Discord's
-   sidebar gives, scaled to this app's own accent and geometry. */
+/* The open note's row carries a pill inside its left edge, not just a tint.
+   Inside, because the gutter outside the row is clipped by the sidebar and
+   floats detached from the row it marks. */
 .tree-row.active::before {
   content: '';
   position: absolute;
-  left: -6px;
-  top: 5px;
-  bottom: 5px;
+  left: 2px;
+  top: 6px;
+  bottom: 6px;
   width: 3px;
   border-radius: 2px;
   background: var(--accent);
@@ -3824,8 +3824,20 @@ li .fold-toggle { left: -2.4em; }
   from { transform: scaleY(0); opacity: 0; }
   to { transform: scaleY(1); opacity: 1; }
 }
-.tree-row.selected { background: var(--bg-hover); }
-.tree-row.multi-selected { background: var(--accent-bg); }
+/* Selected must read differently from hovered and from the open note: a ring
+   marks "picked", the pill + weight mark "open". */
+.tree-row.selected {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+  box-shadow: inset 0 0 0 1px var(--border-strong);
+}
+.tree-row.multi-selected {
+  background: var(--accent-bg);
+  color: var(--text-primary);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 40%, transparent);
+}
+.tree-row.selected:focus-visible,
+.tree-row.multi-selected:focus-visible { box-shadow: var(--focus-ring); }
 .tree-row.is-disabled { opacity: var(--disabled-opacity); pointer-events: none; }
 .tree-row.is-loading { opacity: var(--loading-opacity); pointer-events: none; }
 .tree-row.is-error { color: var(--danger); }
