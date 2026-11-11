@@ -41,6 +41,15 @@
         ],
         "createdAt": "2026-08-25T18:25:06.139Z",
         "reason": "Claude (audit 2026-08-25): false positive — this is markdown-serializer code (typed.write(...) building a Markdown string for round-trip export), not a rendered DOM element. attrs always includes a populated src=\"${encodedSrc}\" built two lines above from the node's real src attr; there is no empty/placeholder src path here. broken-image isn't in the detector's directValueRules whitelist, so a literal-snippet value silently never matches — wildcard+file scope is the only form that works for this rule (confirmed by reading impeccable-config.mjs's extractFindingIgnoreValue)."
+      },
+      {
+        "rule": "icon-tile-stack",
+        "value": "*",
+        "files": [
+          "d:/Coding/Apps/null-notes/.superpowers/brainstorm/1205-1794414100/content/onboarding-signin.html"
+        ],
+        "createdAt": "2026-11-11T16:22:44.468Z",
+        "reason": "false positive: mockup of the real Null Notes brand lockup, logo tile sits beside the title (row flex), as in the shipped screen; assistant judged, user not asked"
       }
     ]
   }
