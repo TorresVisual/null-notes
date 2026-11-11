@@ -3817,6 +3817,11 @@ li .fold-toggle { left: -2.4em; }
   color: var(--text-primary);
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 30%, transparent);
 }
+.tree-row.active.multi-selected {
+  background: var(--accent-bg);
+  color: var(--accent);
+  box-shadow: none;
+}
 .tree-row.selected:focus-visible,
 .tree-row.multi-selected:focus-visible { box-shadow: var(--focus-ring); }
 .tree-row.is-disabled { opacity: var(--disabled-opacity); pointer-events: none; }
