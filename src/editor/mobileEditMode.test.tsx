@@ -98,3 +98,44 @@ describe('mobile read/edit mode', () => {
     expect(discardIfUntouched).toHaveBeenCalledWith('/a.md')
   })
 })
+
+// TipTap's focus() command takes a different path on Android, focusing the DOM
+// node inside the command; the focus event dispatches a transaction, and the
+// command's own, now stale, transaction then throws "mismatched transaction".
+describe('mobile read/edit mode on an Android WebView', () => {
+  const errors: unknown[] = []
+  const record = (event: ErrorEvent) => errors.push(event.error)
+
+  beforeEach(() => {
+    errors.length = 0
+    window.addEventListener('error', record)
+    vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue('Mozilla/5.0 (Linux; Android 14; Pixel 3a) Chrome/120')
+  })
+
+  afterEach(() => {
+    window.removeEventListener('error', record)
+    vi.restoreAllMocks()
+  })
+
+  it('the pencil and Done raise no error', async () => {
+    mount('# Quick note', '/q.md')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit note' }))
+    await waitFor(() => expect(textbox().getAttribute('contenteditable')).toBe('true'))
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }))
+    await waitFor(() => expect(textbox().getAttribute('contenteditable')).toBe('false'))
+
+    expect(errors).toEqual([])
+  })
+
+  it('a note opened already in edit mode raises no error when its content loads', async () => {
+    useMobileEditStore.setState({ editingPath: '/quick.md' })
+    const view = mount('', '/quick.md')
+
+    view.setContent('# Quick note')
+
+    await waitFor(() => expect(textbox().textContent).toContain('Quick note'))
+    expect(errors).toEqual([])
+  })
+})
+
