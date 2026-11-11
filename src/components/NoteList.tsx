@@ -4,6 +4,7 @@ import { useWorkspaceStore } from '../store/workspace'
 import { FolderTree } from './FolderTree'
 import { buildFolderTree, noteFileName } from '../lib/folderTree'
 import { api } from '../lib/tauri'
+import { isMobile } from '../lib/platform'
 import type { NoteMetadata } from '../types'
 
 export function NoteList() {
@@ -63,7 +64,11 @@ export function NoteList() {
         </ul>
       ) : workspacePath && tree.length === 0 ? (
         <p className="sidebar-onboarding">
-          No notes yet — click <strong>+</strong> above, or Ctrl N, to create your first one.
+          {isMobile() ? (
+            <>No notes yet — tap <strong>+</strong> to create your first one.</>
+          ) : (
+            <>No notes yet — click <strong>+</strong> above, or Ctrl N, to create your first one.</>
+          )}
         </p>
       ) : (
         <FolderTree entries={tree} />

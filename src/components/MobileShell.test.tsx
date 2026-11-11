@@ -8,6 +8,7 @@ import { api } from '../lib/tauri'
 import { useWorkspaceStore } from '../store/workspace'
 import { discardIfUntouched } from '../hooks/useQuickNote'
 import { useMobileOnboardingStore } from '../store/mobileOnboarding'
+import { useActionSheetStore } from '../store/actionSheet'
 
 vi.mock('@tauri-apps/plugin-os', () => ({ platform: vi.fn(() => 'android') }))
 vi.mock('@tauri-apps/api/app', () => ({ onBackButtonPress: vi.fn() }))
@@ -190,6 +191,20 @@ describe('MobileShell system Back', () => {
 
     act(() => press())
     expect(api.window.exitApp).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('MobileShell action sheet', () => {
+  it('system Back closes an open row sheet before leaving the tab', async () => {
+    setup()
+    await act(async () => {})
+    await userEvent.click(screen.getByRole('button', { name: 'Notes' }))
+    act(() => useActionSheetStore.getState().open({ title: 'ss', actions: [] }))
+    expect(screen.getByRole('dialog', { name: 'ss' })).toBeInTheDocument()
+
+    act(() => press())
+    expect(screen.queryByRole('dialog', { name: 'ss' })).not.toBeInTheDocument()
+    expect(screen.getByText('notes-screen')).toBeInTheDocument()
   })
 })
 

@@ -1,5 +1,7 @@
 import { useMemo, useState } from 'react'
 import { TreeNode } from './TreeNode'
+import { MobileTreeNode } from './MobileTreeNode'
+import { isMobile } from '../lib/platform'
 import { useWorkspaceStore } from '../store/workspace'
 import { refreshTree } from '../hooks/useWorkspace'
 import { folderName, isUnderPath } from '../lib/pathPrefix'
@@ -95,9 +97,13 @@ export function FolderTree({ entries }: FolderTreeProps) {
       // events did or didn't fire along the way.
       onDragEnd={() => setDragOver(false)}
     >
-      {entries.map((entry) => (
-        <TreeNode key={entry.path} entry={entry} visiblePaths={visiblePaths} />
-      ))}
+      {entries.map((entry) =>
+        isMobile() ? (
+          <MobileTreeNode key={entry.path} entry={entry} />
+        ) : (
+          <TreeNode key={entry.path} entry={entry} visiblePaths={visiblePaths} />
+        ),
+      )}
     </ul>
   )
 }

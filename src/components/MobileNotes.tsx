@@ -1,16 +1,15 @@
-import { SidebarHeader } from './SidebarHeader'
+import { MobileNotesHeader } from './MobileNotesHeader'
 import { NoteList } from './NoteList'
 import { TagList } from './TagList'
 
 interface MobileNotesProps {
-  onSearchOpen: () => void
   onTemplateOpen: () => void
 }
 
-export function MobileNotes({ onSearchOpen, onTemplateOpen }: MobileNotesProps) {
+export function MobileNotes({ onTemplateOpen }: MobileNotesProps) {
   return (
     <div className="mobile-notes sidebar-panel">
-      <SidebarHeader onSearchOpen={onSearchOpen} onTemplateOpen={onTemplateOpen} />
+      <MobileNotesHeader onTemplateOpen={onTemplateOpen} />
       <NoteList />
       <TagList />
     </div>

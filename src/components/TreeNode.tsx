@@ -1,18 +1,14 @@
 import { useState } from 'react'
 import { Archive, ChevronRight, Pencil, Plus, Trash2 } from 'lucide-react'
-import { confirm } from '@tauri-apps/plugin-dialog'
-import { offerUndoDelete } from '../hooks/useTrash'
 import { useWorkspaceStore } from '../store/workspace'
-import { useNotesStore } from '../store/notes'
-import { promptText } from '../store/promptDialog'
 import { api } from '../lib/tauri'
-import { deleteNote, exportZip, moveNoteInto, moveSelectionInto, renameCanvas, renameNote } from '../lib/noteActions'
+import { deleteFolder, deleteNote, exportZip, moveNoteInto, moveSelectionInto, renameCanvas, renameFolder, renameNote } from '../lib/noteActions'
 import { setDragChip } from '../lib/dragChip'
 import { rangeSelection,toggleSelection } from '../lib/treeSelection'
 import { refreshTree } from '../hooks/useWorkspace'
 import { useCreateBase } from '../hooks/useCreateBase'
 import { useCreateCanvas } from '../hooks/useCreateCanvas'
-import { folderName, isSingleSegmentName, isUnderPath } from '../lib/pathPrefix'
+import { folderName, isUnderPath } from '../lib/pathPrefix'
 import type { TreeEntry } from '../lib/folderTree'
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuTrigger } from './ui/context-menu'
 import { NoteContextMenuItems } from './NoteContextMenuItems'
@@ -71,10 +67,8 @@ export function TreeNode({ entry, visiblePaths = [] }: TreeNodeProps) {
   const setTagFilter = useWorkspaceStore((s) => s.setTagFilter)
   const expandFolder = useWorkspaceStore((s) => s.expandFolder)
   const replaceOpenPath = useWorkspaceStore((s) => s.replaceOpenPath)
-  const closeTabsUnder = useWorkspaceStore((s) => s.closeTabsUnder)
   const setFolderError = useWorkspaceStore((s) => s.setFolderError)
   const openTab = useWorkspaceStore((s) => s.openTab)
-  const notes = useNotesStore((s) => s.notes)
   const createCanvas = useCreateCanvas()
   const createBase = useCreateBase()
 
@@ -216,47 +210,6 @@ export function TreeNode({ entry, visiblePaths = [] }: TreeNodeProps) {
     }
   }
 
-  async function handleRenameFolder() {
-    const name = await promptText('New folder name:', entry.name)
-    if (!name || name === entry.name) return
-    if (!isSingleSegmentName(name)) {
-      setFolderError('A folder name cannot contain / or \\.')
-      return
-    }
-    const newPath = entry.path.replace(/[^/\\]+$/, name)
-    try {
-      await api.notes.renameFolder(entry.path, newPath)
-      replaceOpenPath(entry.path, newPath)
-      setFolderError(null)
-      useWorkspaceStore.getState().addGitPendingPath(entry.path)
-      useWorkspaceStore.getState().addGitPendingPath(newPath)
-      await refreshTree()
-    } catch (e) {
-      setFolderError(e instanceof Error ? e.message : String(e))
-    }
-  }
-
-  async function handleDeleteFolder() {
-    if (!workspacePath) return
-    const count = notes.filter((n) => isUnderPath(n.path, entry.path)).length
-    const noun = count === 1 ? 'note' : 'notes'
-    if (!(await confirm(`Delete "${entry.name}" and its ${count} ${noun}? You can restore it from Trash.`))) return
-    try {
-      const trashed = await api.notes.deleteFolder(workspacePath, entry.path)
-      closeTabsUnder(entry.path)
-      setSelectedFolder(null)
-      setFolderError(null)
-      // A directory pathspec stages every deletion under it in one shot —
-      // no need to enumerate each note individually. Without this the whole
-      // subtree's deletion never enters the auto-commit's pending list.
-      useWorkspaceStore.getState().addGitPendingPath(entry.path)
-      offerUndoDelete(workspacePath, trashed)
-      await refreshTree()
-    } catch (e) {
-      setFolderError(e instanceof Error ? e.message : String(e))
-    }
-  }
-
   return (
     <li>
       <ContextMenu>
@@ -298,11 +251,11 @@ export function TreeNode({ entry, visiblePaths = [] }: TreeNodeProps) {
           <ContextMenuItem onSelect={() => void exportZip(entry.path)}>
             <Archive size={14} /> Export as zip…
           </ContextMenuItem>
-          <ContextMenuItem onSelect={() => void handleRenameFolder()}>
+          <ContextMenuItem onSelect={() => void renameFolder(entry.path, entry.name)}>
             <Pencil size={14} /> Rename
           </ContextMenuItem>
           <ContextMenuSeparator />
-          <ContextMenuItem variant="destructive" onSelect={() => void handleDeleteFolder()}>
+          <ContextMenuItem variant="destructive" onSelect={() => void deleteFolder(entry.path, entry.name)}>
             <Trash2 size={14} /> Delete
           </ContextMenuItem>
         </ContextMenuContent>

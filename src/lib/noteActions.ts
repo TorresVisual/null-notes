@@ -3,7 +3,7 @@ import { api } from './tauri'
 import { writeToClipboard } from './clipboard'
 import { isBasePath } from './canvasPath'
 import { failure } from './failure'
-import { folderName, isUnderPath, sidecarDir } from './pathPrefix'
+import { folderName, isSingleSegmentName, isUnderPath, sidecarDir } from './pathPrefix'
 import { noteFileName } from './folderTree'
 import { topLevelPaths } from './treeSelection'
 import type { TrashEntry } from '../types'
@@ -99,6 +99,49 @@ export async function deleteNote(path: string): Promise<void> {
   // pending list and `git rm` never runs.
   queueGitPaths(path)
   offerUndoDelete(workspace, trashed)
+}
+
+export async function renameFolder(path: string, currentName: string): Promise<void> {
+  const name = await promptText('New folder name:', currentName)
+  if (!name || name === currentName) return
+  if (!isSingleSegmentName(name)) {
+    reportError('A folder name cannot contain / or \\.')
+    return
+  }
+  const newPath = path.replace(/[^/\\]+$/, name)
+  try {
+    await api.notes.renameFolder(path, newPath)
+    useWorkspaceStore.getState().replaceOpenPath(path, newPath)
+    useWorkspaceStore.getState().setFolderError(null)
+    useWorkspaceStore.getState().addGitPendingPath(path)
+    useWorkspaceStore.getState().addGitPendingPath(newPath)
+    await refreshTree()
+  } catch (e) {
+    reportError(e)
+  }
+}
+
+export async function deleteFolder(path: string, name: string): Promise<void> {
+  const workspace = useWorkspaceStore.getState().path
+  if (!workspace) return
+  const count = useNotesStore.getState().notes.filter((n) => isUnderPath(n.path, path)).length
+  const noun = count === 1 ? 'note' : 'notes'
+  if (!(await confirm(`Delete "${name}" and its ${count} ${noun}? You can restore it from Trash.`))) return
+  try {
+    const trashed = await api.notes.deleteFolder(workspace, path)
+    const store = useWorkspaceStore.getState()
+    store.closeTabsUnder(path)
+    store.setSelectedFolder(null)
+    store.setFolderError(null)
+    // A directory pathspec stages every deletion under it in one shot —
+    // no need to enumerate each note individually. Without this the whole
+    // subtree's deletion never enters the auto-commit's pending list.
+    store.addGitPendingPath(path)
+    offerUndoDelete(workspace, trashed)
+    await refreshTree()
+  } catch (e) {
+    reportError(e)
+  }
 }
 
 async function moveFolderInto(folderPath: string, destFolder: string): Promise<void> {

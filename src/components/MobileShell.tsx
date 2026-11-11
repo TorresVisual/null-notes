@@ -3,12 +3,14 @@ import { ArrowLeft, Plus } from 'lucide-react'
 import { useWorkspaceStore } from '../store/workspace'
 import { useMobileEditStore } from '../store/mobileEdit'
 import { useMobileOnboardingStore } from '../store/mobileOnboarding'
+import { useActionSheetStore } from '../store/actionSheet'
 import { discardIfUntouched } from '../hooks/useQuickNote'
 import { useBackButton } from '../hooks/useBackButton'
 import type { OverlayKind } from '../hooks/useOverlayManager'
 import type { MobileTab } from '../lib/backNavigation'
 import { MobileTabBar, type TabId } from './MobileTabBar'
 import { MoreSheet } from './MoreSheet'
+import { ActionSheet } from './ActionSheet'
 import { MobileNotes } from './MobileNotes'
 import { MobileOnboarding } from './MobileOnboarding'
 
@@ -73,11 +75,16 @@ export function MobileShell({
     setActiveTab(null)
   }
 
+  const actionSheetOpen = useActionSheetStore((s) => s.sheet !== null)
+
   useBackButton(
-    { overlayOpen: activeOverlay !== null, sheetOpen: moreOpen, onboardingStep: !hasWorkspace && onboardingStep, editorOpen, tab },
+    { overlayOpen: activeOverlay !== null, sheetOpen: moreOpen || actionSheetOpen, onboardingStep: !hasWorkspace && onboardingStep, editorOpen, tab },
     {
       'close-overlay': closeOverlay,
-      'close-sheet': () => setMoreOpen(false),
+      'close-sheet': () => {
+        setMoreOpen(false)
+        useActionSheetStore.getState().close()
+      },
       'leave-onboarding-step': () => useMobileOnboardingStore.getState().setStep('start'),
       'close-editor': closeEditor,
       'go-home': () => setTab('home'),
@@ -101,7 +108,7 @@ export function MobileShell({
   }
 
   const screen = !hasWorkspace ? <MobileOnboarding /> : tab === 'notes'
-    ? <MobileNotes onSearchOpen={() => openOverlay('search')} onTemplateOpen={() => openOverlay('template')} />
+    ? <MobileNotes onTemplateOpen={() => openOverlay('template')} />
     : home
 
   return (
@@ -136,6 +143,7 @@ export function MobileShell({
           )}
         </>
       )}
+      <ActionSheet />
       {moreOpen && (
         <MoreSheet
           onClose={() => setMoreOpen(false)}
