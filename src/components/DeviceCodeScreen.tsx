@@ -1,5 +1,6 @@
 import { openUrl } from '@tauri-apps/plugin-opener'
 import { useGithubDeviceFlow } from '../hooks/useGithubDeviceFlow'
+import { writeToClipboard } from '../lib/clipboard'
 import { useMobileOnboardingStore } from '../store/mobileOnboarding'
 import { OnboardingTopBar } from './OnboardingTopBar'
 
@@ -14,7 +15,7 @@ export function DeviceCodeScreen() {
 
   async function copyAndOpen() {
     if (!code) return
-    await navigator.clipboard.writeText(code.userCode).catch(() => undefined)
+    await writeToClipboard(code.userCode).catch(() => undefined)
     await openUrl(code.verificationUri)
   }
 

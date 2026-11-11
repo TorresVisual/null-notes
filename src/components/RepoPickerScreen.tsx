@@ -43,7 +43,12 @@ export function RepoPickerScreen() {
       <OnboardingTopBar title="Choose your notes repo" onBack={() => setStep('start')} />
       <div className="mobile-onboarding-body mobile-onboarding-body--list">
         {loadError ? (
-          <p className="workspace-picker-error" role="alert">{loadError}</p>
+          <>
+            <p className="workspace-picker-error" role="alert">{loadError}</p>
+            <button className="mobile-onboarding-link" onClick={() => setStep('code')}>
+              Sign in again
+            </button>
+          </>
         ) : repos === null ? (
           <p className="mobile-onboarding-wait">Loading your repositories…</p>
         ) : (

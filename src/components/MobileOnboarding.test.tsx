@@ -6,12 +6,16 @@ import { documentDir } from '@tauri-apps/api/path'
 import { MobileOnboarding } from './MobileOnboarding'
 import { useWorkspace } from '../hooks/useWorkspace'
 import { api } from '../lib/tauri'
+import { getStoredGitToken } from '../lib/gitCredentials'
 import type { GithubDeviceCode, GithubPollOutcome } from '../types'
 
 vi.mock('../hooks/useWorkspace')
 vi.mock('@tauri-apps/plugin-opener', () => ({ openUrl: vi.fn() }))
 vi.mock('@tauri-apps/api/path', () => ({ documentDir: vi.fn() }))
-vi.mock('../lib/gitCredentials', () => ({ setStoredGitToken: vi.fn() }))
+vi.mock('../lib/gitCredentials', () => ({
+  setStoredGitToken: vi.fn(),
+  getStoredGitToken: vi.fn(),
+}))
 vi.mock('../store/toast', () => ({ showToast: vi.fn() }))
 vi.mock('../lib/tauri', () => ({
   api: {
@@ -44,6 +48,7 @@ beforeEach(() => {
     saveSession: vi.fn(),
     closeWorkspace: vi.fn(),
   })
+  vi.mocked(getStoredGitToken).mockResolvedValue('')
   vi.mocked(api.git.githubDeviceStart).mockResolvedValue(code)
   vi.mocked(api.git.listGithubRepos).mockResolvedValue([
     { nameWithOwner: 'me/uni-notes', url: 'https://github.com/me/uni-notes', isPrivate: true },
@@ -60,7 +65,7 @@ afterEach(() => {
 async function startSignIn() {
   const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
   render(<MobileOnboarding />)
-  await user.click(screen.getByRole('button', { name: /Sign in with GitHub/ }))
+  await user.click(await screen.findByRole('button', { name: /Sign in with GitHub/ }))
   await screen.findByText('WDJB-MJHT')
   return user
 }
@@ -159,5 +164,26 @@ describe('MobileOnboarding repo picker', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't load your repositories: 401")
     expect(screen.getByRole('button', { name: 'Enter a URL manually' })).toBeEnabled()
+  })
+
+  it('offers a fresh sign-in when the stored token is rejected', async () => {
+    vi.mocked(getStoredGitToken).mockResolvedValue('gho_stale')
+    vi.mocked(api.git.listGithubRepos).mockRejectedValue(new Error('401'))
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+    render(<MobileOnboarding />)
+
+    await user.click(await screen.findByRole('button', { name: 'Sign in again' }))
+
+    expect(await screen.findByText('WDJB-MJHT')).toBeInTheDocument()
+  })
+})
+
+describe('MobileOnboarding after a restart', () => {
+  it('goes straight to the repo picker when a token is already stored', async () => {
+    vi.mocked(getStoredGitToken).mockResolvedValue('gho_saved')
+    render(<MobileOnboarding />)
+
+    expect(await screen.findByText('me/uni-notes')).toBeInTheDocument()
+    expect(api.git.githubDeviceStart).not.toHaveBeenCalled()
   })
 })

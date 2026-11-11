@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { useResumeSignIn } from '../hooks/useResumeSignIn'
 import { useMobileOnboardingStore } from '../store/mobileOnboarding'
 import { DeviceCodeScreen } from './DeviceCodeScreen'
 import { GithubMark } from './GithubMark'
@@ -10,8 +11,11 @@ export function MobileOnboarding() {
   const step = useMobileOnboardingStore((s) => s.step)
   const setStep = useMobileOnboardingStore((s) => s.setStep)
 
+  const resumeChecked = useResumeSignIn()
+
   useEffect(() => () => setStep('start'), [setStep])
 
+  if (!resumeChecked) return <div className="mobile-onboarding" />
   if (step === 'code') return <DeviceCodeScreen />
   if (step === 'repos') return <RepoPickerScreen />
   if (step === 'token') {
