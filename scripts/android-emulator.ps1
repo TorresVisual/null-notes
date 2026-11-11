@@ -10,7 +10,9 @@ $appId = "dev.nullnotes.app"
 
 if (-not $env:ANDROID_HOME) { $env:ANDROID_HOME = Join-Path $env:LOCALAPPDATA "Android\Sdk" }
 if (-not $env:NDK_HOME) { $env:NDK_HOME = Join-Path $env:ANDROID_HOME "ndk\29.0.14206865" }
-if (-not $env:JAVA_HOME) { $env:JAVA_HOME = "C:\Program Files\Eclipse Adoptium\jdk-21" }
+# Gradle in this project fails on JDK 25 ("A problem occurred configuring project ':buildSrc'. > 25.0.1"), so pin JDK 21.
+$env:JAVA_HOME = "C:\Program Files\Eclipse Adoptium\jdk-21"
+$env:Path = "$env:JAVA_HOME\bin;$env:Path"
 
 $adb = Join-Path $env:ANDROID_HOME "platform-tools\adb.exe"
 if (-not (Test-Path $adb)) {
