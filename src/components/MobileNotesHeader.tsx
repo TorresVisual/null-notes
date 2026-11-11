@@ -1,4 +1,4 @@
-import { ChevronDown, Ellipsis, FolderOpen, FolderPlus, LayoutTemplate, PenLine } from 'lucide-react'
+import { ArrowLeftRight, ChevronDown, Ellipsis, FolderOpen, FolderPlus, LayoutTemplate, PenLine } from 'lucide-react'
 import { useWorkspaceStore } from '../store/workspace'
 import { useActionSheetStore } from '../store/actionSheet'
 import { useWorkspace } from '../hooks/useWorkspace'
@@ -15,7 +15,7 @@ export function MobileNotesHeader({ onTemplateOpen }: MobileNotesHeaderProps) {
   const workspacePath = useWorkspaceStore((s) => s.path)
   const recentWorkspaces = useWorkspaceStore((s) => s.recentWorkspaces)
   const openSheet = useActionSheetStore((s) => s.open)
-  const { openWorkspaceAt } = useWorkspace()
+  const { openWorkspaceAt, closeWorkspace } = useWorkspace()
   const createFolder = useCreateFolder()
   const createCanvasNote = useCreateCanvasNote()
 
@@ -36,17 +36,19 @@ export function MobileNotesHeader({ onTemplateOpen }: MobileNotesHeaderProps) {
     <div className="mobile-notes-header">
       <button
         className="mobile-notes-workspace"
-        disabled={others.length === 0}
         onClick={() =>
           openSheet({
             title: 'Switch workspace',
-            actions: others.map((p) => ({ label: folderName(p), icon: FolderOpen, onSelect: () => void openWorkspaceAt(p) })),
+            actions: [
+              ...others.map((p) => ({ label: folderName(p), icon: FolderOpen, onSelect: () => void openWorkspaceAt(p) })),
+              { label: 'Open or clone another…', icon: ArrowLeftRight, onSelect: () => void closeWorkspace() },
+            ],
           })
         }
       >
         <FolderOpen size={16} />
         <span className="mobile-notes-workspace-name">{name}</span>
-        {others.length > 0 && <ChevronDown size={16} />}
+        <ChevronDown size={16} />
       </button>
       <button
         className="mobile-icon-btn"
