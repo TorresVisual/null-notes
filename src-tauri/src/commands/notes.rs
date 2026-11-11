@@ -2913,6 +2913,9 @@ async fn move_note_at(path: &str, dest_folder: &str, db: &DbPool) -> anyhow::Res
         .ok_or_else(|| anyhow::anyhow!("note path has no file name: {path}"))?
         .to_os_string();
     let new_path = std::path::Path::new(dest_folder).join(&file_name);
+    if new_path == std::path::Path::new(path) {
+        return Ok(path.to_string());
+    }
     // Same silent-overwrite hazard as `rename_folder_at`: a same-named note
     // already at the destination must block the move, not lose its content.
     if tokio::fs::metadata(&new_path).await.is_ok() {
@@ -6383,6 +6386,22 @@ Lecture.ink/1.svg
             "# Survivor",
             "existing note at the destination must not be overwritten"
         );
+    }
+
+    #[tokio::test]
+    async fn test_move_note_at_into_own_folder_is_a_noop() {
+        let tmp = tempdir().unwrap();
+        let note = tmp.path().join("Test.md");
+        std::fs::write(&note, "# Stay").unwrap();
+
+        let pool = make_pool().await;
+        let path = note.to_string_lossy().into_owned();
+        let result = move_note_at(&path, &tmp.path().to_string_lossy(), &pool)
+            .await
+            .unwrap();
+
+        assert_eq!(result, path);
+        assert_eq!(std::fs::read_to_string(&note).unwrap(), "# Stay");
     }
 
     #[test]
