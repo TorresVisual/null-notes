@@ -97,7 +97,7 @@ export function HomeView({ onOpenTaskView, onOpenReview, onOpenDeckView, onOpenS
         </section>
       )}
       <p className="home-summary">
-        {buildHomeSummary({ taskCount: tasks.length, dueCount: mobile ? 0 : dueCards.length, gitStatus })}
+        {buildHomeSummary({ taskCount: tasks.length, dueCount: dueCards.length, gitStatus })}
       </p>
       <div className="home-layout">
         <div className="home-main">

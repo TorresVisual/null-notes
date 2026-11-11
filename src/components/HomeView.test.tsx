@@ -215,6 +215,7 @@ describe('HomeView on a phone', () => {
     renderHome(onOpenReview)
 
     expect(await screen.findByText('3 cards due')).toBeInTheDocument()
+    expect(screen.queryByText(/Nothing outstanding/)).toBeNull()
     expect(screen.getAllByRole('button', { name: 'Start review' })).toHaveLength(1)
     fireEvent.click(screen.getByRole('button', { name: 'Start review' }))
     expect(onOpenReview).toHaveBeenCalled()
