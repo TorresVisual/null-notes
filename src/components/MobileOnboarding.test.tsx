@@ -93,7 +93,7 @@ describe('MobileOnboarding device flow', () => {
     expect(screen.getByText('Waiting for GitHub…')).toBeInTheDocument()
 
     await pollOnce('authorized')
-    expect(await screen.findByText('me/uni-notes')).toBeInTheDocument()
+    expect(await screen.findByText('uni-notes')).toBeInTheDocument()
   })
 
   it('backs off by five seconds after slow_down', async () => {
@@ -132,7 +132,7 @@ describe('MobileOnboarding repo picker', () => {
   async function reachPicker() {
     const user = await startSignIn()
     await pollOnce('authorized')
-    await screen.findByText('me/uni-notes')
+    await screen.findByText('uni-notes')
     return user
   }
 
@@ -142,7 +142,7 @@ describe('MobileOnboarding repo picker', () => {
     const user = await reachPicker()
 
     expect(screen.getByRole('button', { name: 'Choose a repository' })).toBeDisabled()
-    await user.click(screen.getByRole('button', { name: /me\/uni-notes/ }))
+    await user.click(screen.getByRole('button', { name: /uni-notes/ }))
     await user.click(screen.getByRole('button', { name: 'Clone uni-notes' }))
 
     expect(api.git.cloneRepo).toHaveBeenCalledWith('https://github.com/me/uni-notes', '/docs')
@@ -154,8 +154,28 @@ describe('MobileOnboarding repo picker', () => {
 
     await user.type(screen.getByPlaceholderText('Search 2 repositories'), 'dot')
 
-    expect(screen.queryByText('me/uni-notes')).not.toBeInTheDocument()
-    expect(screen.getByText('me/dotfiles')).toBeInTheDocument()
+    expect(screen.queryByText('uni-notes')).not.toBeInTheDocument()
+    expect(screen.getByText('dotfiles')).toBeInTheDocument()
+    expect(screen.getByText('1 of 2')).toBeInTheDocument()
+  })
+
+  it('states a shared owner once instead of on every row', async () => {
+    await reachPicker()
+
+    expect(screen.getByText('me')).toBeInTheDocument()
+    expect(screen.queryByText('me/')).not.toBeInTheDocument()
+    expect(screen.getByRole('img', { name: 'private' })).toBeInTheDocument()
+  })
+
+  it('prefixes each row with its owner when the repos span several owners', async () => {
+    vi.mocked(api.git.listGithubRepos).mockResolvedValue([
+      { nameWithOwner: 'me/uni-notes', url: 'https://github.com/me/uni-notes', isPrivate: true },
+      { nameWithOwner: 'club/exercises', url: 'https://github.com/club/exercises', isPrivate: false },
+    ])
+    await reachPicker()
+
+    expect(screen.getByText('me/')).toBeInTheDocument()
+    expect(screen.getByText('club/')).toBeInTheDocument()
   })
 
   it('falls back to manual entry when the list cannot load', async () => {
@@ -223,7 +243,7 @@ describe('MobileOnboarding with recent workspaces', () => {
     expect(await screen.findByText('old-notes')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: /Clone from GitHub/ }))
 
-    expect(await screen.findByText('me/uni-notes')).toBeInTheDocument()
+    expect(await screen.findByText('uni-notes')).toBeInTheDocument()
     expect(api.git.githubDeviceStart).not.toHaveBeenCalled()
   })
 
@@ -246,7 +266,7 @@ describe('MobileOnboarding after a restart', () => {
 
     await user.click(await screen.findByRole('button', { name: /Clone from GitHub/ }))
 
-    expect(await screen.findByText('me/uni-notes')).toBeInTheDocument()
+    expect(await screen.findByText('uni-notes')).toBeInTheDocument()
     expect(api.git.githubDeviceStart).not.toHaveBeenCalled()
   })
 })

@@ -740,7 +740,18 @@ button, [role="button"], .tree-row, .tab, .search-result, .slash-menu-item,
   overflow-y: auto;
   padding: var(--space-xl);
 }
-.mobile-onboarding-body--list { padding-top: var(--space-md); }
+.mobile-onboarding-body--list {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 0;
+}
+.mobile-onboarding-body--list > :is(p, .mobile-onboarding-link) { margin: var(--space-md) var(--space-xl); }
+.mobile-onboarding-body--list ~ .mobile-onboarding-foot {
+  padding-top: var(--space-md);
+  border-top: 1px solid var(--border);
+}
+.mobile-onboarding:has(.mobile-onboarding-search:focus-within) .mobile-onboarding-body--list ~ .mobile-onboarding-foot .mobile-onboarding-link { display: none; }
 
 .mobile-onboarding-steps {
   list-style: none;
@@ -783,51 +794,82 @@ button, [role="button"], .tree-row, .tab, .search-result, .slash-menu-item,
   color: var(--text-secondary);
 }
 
+.mobile-onboarding-repos-head { flex: none; padding: var(--space-md) var(--space-xl) 0; }
+
 .mobile-onboarding-search {
-  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
   min-height: 44px;
-  margin-bottom: var(--space-xs);
   padding: 0 var(--space-md);
   background: var(--bg-sunken);
   border: 1px solid var(--border);
   border-radius: 6px;
+  color: var(--text-tertiary);
+}
+.mobile-onboarding-search:focus-within { border-color: var(--accent); box-shadow: var(--focus-ring); }
+.mobile-onboarding-search input {
+  flex: 1;
+  min-width: 0;
+  min-height: 42px;
+  padding: 0;
+  background: none;
+  border: none;
+  outline: none;
   color: var(--text-primary);
   font-size: 14px;
 }
-.mobile-onboarding-search:focus-visible { outline: none; border-color: var(--accent); box-shadow: var(--focus-ring); }
+.mobile-onboarding-search input::placeholder { color: var(--text-tertiary); opacity: 1; }
+.mobile-onboarding-search input::-webkit-search-cancel-button { appearance: none; }
 
-.mobile-onboarding-repos { list-style: none; }
-.mobile-onboarding-repos li { border-bottom: 1px solid var(--border); }
+.mobile-onboarding-owner {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: var(--space-md) 0 var(--space-sm);
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+.mobile-onboarding-owner span:first-child { font-family: var(--font-mono); color: var(--text-secondary); }
+
+.mobile-onboarding-repos { flex: 1; min-height: 0; overflow-y: auto; list-style: none; }
 .mobile-onboarding-repos button {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: var(--space-sm);
+  gap: var(--space-md);
   width: 100%;
   min-height: 56px;
-  padding: var(--space-sm) var(--space-xs);
+  padding: var(--space-sm) var(--space-xl);
   background: none;
   border: none;
-  border-radius: 6px;
   color: var(--text-primary);
   text-align: left;
 }
-.mobile-onboarding-repos button.is-selected { background: var(--accent-bg-hover); box-shadow: inset 3px 0 0 var(--accent); }
+.mobile-onboarding-repos li + li button::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: var(--space-xl);
+  right: 0;
+  height: 1px;
+  background: var(--border);
+}
+.mobile-onboarding-repos button:active { background: var(--bg-hover); }
+.mobile-onboarding-repos button.is-selected { background: var(--accent-bg); }
+.mobile-onboarding-repos button.is-selected::before { display: none; }
 .mobile-onboarding-repo-name {
   flex: 1;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-weight: 600;
+  font-weight: 500;
 }
-.mobile-onboarding-pill {
-  flex: none;
-  padding: 1px 6px;
-  border: 1px solid var(--border-strong);
-  border-radius: 99px;
-  color: var(--text-secondary);
-  font-size: 10px;
-}
+.mobile-onboarding-repo-owner { font-weight: 400; color: var(--text-tertiary); }
+.is-selected .mobile-onboarding-repo-owner { color: var(--text-secondary); }
+.mobile-onboarding-lock { flex: none; color: var(--text-secondary); }
+.mobile-onboarding-tick { flex: none; color: var(--accent); }
 
 @media (hover: none) {
   .tree-row { min-height: 44px; }

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Check, Lock, Search } from 'lucide-react'
 import { documentDir } from '@tauri-apps/api/path'
 import { useWorkspace } from '../hooks/useWorkspace'
 import { api } from '../lib/tauri'
@@ -44,7 +45,10 @@ export function RepoPickerScreen() {
   }
 
   const needle = query.trim().toLowerCase()
-  const shown = (repos ?? []).filter((r) => r.nameWithOwner.toLowerCase().includes(needle))
+  const all = repos ?? []
+  const shown = all.filter((r) => r.nameWithOwner.toLowerCase().includes(needle))
+  const owners = new Set(all.map((r) => r.nameWithOwner.split('/')[0]))
+  const soleOwner = owners.size === 1 ? [...owners][0] : null
 
   return (
     <div className="mobile-onboarding">
@@ -61,30 +65,51 @@ export function RepoPickerScreen() {
           <p className="mobile-onboarding-wait">Loading your repositories…</p>
         ) : (
           <>
-            <input
-              className="mobile-onboarding-search"
-              type="search"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder={`Search ${repos.length} repositories`}
-              disabled={cloning}
-            />
-            <ul className="mobile-onboarding-repos">
-              {shown.map((r) => (
-                <li key={r.url}>
-                  <button
-                    className={r.url === selected?.url ? 'is-selected' : undefined}
-                    aria-pressed={r.url === selected?.url}
-                    disabled={cloning}
-                    onClick={() => setSelected(r)}
-                  >
-                    <span className="mobile-onboarding-repo-name">{r.nameWithOwner}</span>
-                    {r.isPrivate && <span className="mobile-onboarding-pill">private</span>}
-                  </button>
-                </li>
-              ))}
-            </ul>
-            {shown.length === 0 && <p className="mobile-onboarding-wait">No repositories match.</p>}
+            <div className="mobile-onboarding-repos-head">
+              <label className="mobile-onboarding-search">
+                <Search size={18} aria-hidden />
+                <input
+                  type="search"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder={`Search ${repos.length} repositories`}
+                  disabled={cloning}
+                />
+              </label>
+              {soleOwner && (
+                <div className="mobile-onboarding-owner">
+                  <span>{soleOwner}</span>
+                  {needle && <span>{shown.length} of {repos.length}</span>}
+                </div>
+              )}
+            </div>
+            {shown.length === 0 ? (
+              <p className="mobile-onboarding-wait">No repositories match.</p>
+            ) : (
+              <ul className="mobile-onboarding-repos">
+                {shown.map((r) => {
+                  const [owner, name] = r.nameWithOwner.split('/')
+                  const isSelected = r.url === selected?.url
+                  return (
+                    <li key={r.url}>
+                      <button
+                        className={isSelected ? 'is-selected' : undefined}
+                        aria-pressed={isSelected}
+                        disabled={cloning}
+                        onClick={() => setSelected(r)}
+                      >
+                        <span className="mobile-onboarding-repo-name">
+                          {!soleOwner && <span className="mobile-onboarding-repo-owner">{owner}/</span>}
+                          {name}
+                        </span>
+                        {r.isPrivate && <Lock size={16} className="mobile-onboarding-lock" role="img" aria-label="private" />}
+                        {isSelected && <Check size={18} className="mobile-onboarding-tick" aria-hidden />}
+                      </button>
+                    </li>
+                  )
+                })}
+              </ul>
+            )}
           </>
         )}
       </div>
