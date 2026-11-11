@@ -20,19 +20,34 @@ use std::process::Command;
 /// GUI app. Windows shows one by default for any child process that has no
 /// parent console of its own — every `git`/`gh` call this module makes, run
 /// from the built app rather than a terminal, would otherwise pop one.
+///
+/// `git`/`gh` also never prompt: launched from another app's terminal (Null
+/// IDE, VS Code) they would inherit its `GIT_ASKPASS` and raise their password
+/// dialog from inside our fetch, hanging until the user answers it there. A
+/// credential failure must surface as an error here instead.
 pub(super) fn no_window_command(program: &str) -> Command {
     #[cfg(windows)]
-    {
+    let mut cmd = {
         use std::os::windows::process::CommandExt;
         const CREATE_NO_WINDOW: u32 = 0x08000000;
         let mut cmd = Command::new(program);
         cmd.creation_flags(CREATE_NO_WINDOW);
         cmd
-    }
+    };
     #[cfg(not(windows))]
-    {
-        Command::new(program)
+    let mut cmd = Command::new(program);
+
+    if program == "git" || program == "gh" {
+        cmd.env("GIT_TERMINAL_PROMPT", "0")
+            .env("GH_PROMPT_DISABLED", "1")
+            .env_remove("GIT_ASKPASS")
+            .env_remove("SSH_ASKPASS")
+            .env_remove("VSCODE_GIT_ASKPASS_NODE")
+            .env_remove("VSCODE_GIT_ASKPASS_MAIN")
+            .env_remove("VSCODE_GIT_ASKPASS_EXTRA_ARGS")
+            .env_remove("VSCODE_GIT_IPC_HANDLE");
     }
+    cmd
 }
 
 /// `git -C <workspace> rev-parse --show-toplevel`, classified against the
@@ -1257,6 +1272,18 @@ pub async fn clone_repo(url: String, parent_dir: String) -> Result<String, Strin
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn git_never_prompts_or_inherits_an_askpass() {
+        let cmd = no_window_command("git");
+        let envs: std::collections::HashMap<_, _> = cmd.get_envs().collect();
+        let set = |k: &str| envs.get(std::ffi::OsStr::new(k)).copied().flatten();
+        assert_eq!(set("GIT_TERMINAL_PROMPT"), Some(std::ffi::OsStr::new("0")));
+        assert!(envs.contains_key(std::ffi::OsStr::new("GIT_ASKPASS")));
+        assert_eq!(set("GIT_ASKPASS"), None);
+        assert_eq!(set("VSCODE_GIT_ASKPASS_MAIN"), None);
+        assert!(no_window_command("python").get_envs().next().is_none());
+    }
     use tempfile::tempdir;
 
     // These tests, and the production code they exercise, both shell out to
