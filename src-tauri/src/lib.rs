@@ -14,6 +14,8 @@ pub mod note_text;
 pub mod pdf;
 pub mod properties;
 pub mod sm2;
+#[cfg(target_os = "android")]
+mod tls_android;
 
 use std::path::PathBuf;
 use std::sync::OnceLock;
@@ -198,6 +200,10 @@ pub fn run() {
             }));
             if let Some(guard) = logging::init(&data_dir) {
                 app.manage(guard);
+            }
+            #[cfg(target_os = "android")]
+            if let Err(e) = tls_android::init() {
+                tracing::error!("Android TLS verifier setup failed: {e}");
             }
             let pool = tauri::async_runtime::block_on(db::init_db(&data_dir))
                 .expect("failed to initialise database");

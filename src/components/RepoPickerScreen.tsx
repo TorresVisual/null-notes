@@ -4,6 +4,7 @@ import { useWorkspace } from '../hooks/useWorkspace'
 import { api } from '../lib/tauri'
 import { failure } from '../lib/failure'
 import { useMobileOnboardingStore } from '../store/mobileOnboarding'
+import { useWorkspaceStore } from '../store/workspace'
 import { showToast } from '../store/toast'
 import type { GithubRepo } from '../types'
 import { OnboardingTopBar } from './OnboardingTopBar'
@@ -26,11 +27,18 @@ export function RepoPickerScreen() {
 
   async function clone(repo: GithubRepo) {
     setCloning(true)
+    let clonedPath: string
     try {
-      const clonedPath = await api.git.cloneRepo(repo.url, await documentDir())
-      await openWorkspaceAt(clonedPath)
+      clonedPath = await api.git.cloneRepo(repo.url, await documentDir())
     } catch (e) {
       showToast(failure('clone the repository', e))
+      setCloning(false)
+      return
+    }
+    await openWorkspaceAt(clonedPath)
+    const openError = useWorkspaceStore.getState().folderError
+    if (openError) {
+      showToast(failure('open the cloned repository', openError))
       setCloning(false)
     }
   }

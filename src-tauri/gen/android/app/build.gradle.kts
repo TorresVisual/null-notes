@@ -57,7 +57,31 @@ rust {
     rootDirRel = "../../../"
 }
 
+// rustls-platform-verifier (pulled in by reqwest/gix) calls the Android trust manager through
+// a small Kotlin component that ships inside the Rust crate; Cargo knows where it was downloaded.
+fun rustlsPlatformVerifierRepo(): File {
+    val metadata = providers.exec {
+        commandLine(
+            "cargo", "metadata", "--format-version", "1",
+            "--filter-platform", "aarch64-linux-android",
+            "--manifest-path", File(rootDir, "../../Cargo.toml").path,
+        )
+    }.standardOutput.asText.get()
+    val manifest = Regex("\"manifest_path\":\"([^\"]*rustls-platform-verifier-android[^\"]*)\"")
+        .find(metadata)?.groupValues?.get(1)
+        ?: error("rustls-platform-verifier-android is not in the Android dependency graph")
+    return File(File(manifest.replace("\\\\", "/")).parentFile, "maven")
+}
+
+repositories {
+    maven {
+        url = uri(rustlsPlatformVerifierRepo())
+        metadataSources.artifact()
+    }
+}
+
 dependencies {
+    implementation("rustls:rustls-platform-verifier:latest.release")
     implementation("androidx.webkit:webkit:1.14.0")
     implementation("androidx.appcompat:appcompat:1.7.1")
     implementation("androidx.activity:activity-ktx:1.10.1")

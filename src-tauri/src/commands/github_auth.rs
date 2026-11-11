@@ -72,16 +72,8 @@ struct ApiRepo {
     private: bool,
 }
 
-/// reqwest's default rustls verifier asks the OS through JNI, which panics on Android
-/// until the app has initialised it. Bundled Mozilla roots need no platform setup.
 fn client() -> anyhow::Result<Client> {
-    let roots = webpki_root_certs::TLS_SERVER_ROOT_CERTS
-        .iter()
-        .filter_map(|der| reqwest::Certificate::from_der(der.as_ref()).ok());
-    Ok(Client::builder()
-        .user_agent("null-notes")
-        .tls_certs_only(roots)
-        .build()?)
+    Ok(Client::builder().user_agent("null-notes").build()?)
 }
 
 fn interpret_poll(body: &str) -> anyhow::Result<(PollOutcome, Option<String>)> {
