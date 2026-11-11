@@ -3958,6 +3958,7 @@ dependencies = [
  "tracing-subscriber",
  "unicode-normalization",
  "uuid",
+ "webpki-root-certs",
  "webview2-com",
  "windows",
  "zip",
