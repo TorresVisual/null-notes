@@ -1025,22 +1025,24 @@ pub async fn scan_workspace(
             .map_err(|e| e.to_string())?;
     }
 
-    // A note deleted or moved while the app was closed (git pull, another
-    // editor) keeps its index row, and the tree builds folders from note
-    // paths, so it would resurrect a folder that no longer exists.
+    // The scan decides what the tree shows. An index row it did not see is
+    // stale: deleted or moved while the app was closed (git pull, another
+    // editor), or under a directory the scan now excludes (`node_modules`).
+    // The tree builds folders from note paths, so a stale row would resurrect
+    // a folder that should not be listed.
+    let scanned: std::collections::HashSet<&str> = notes.iter().map(|n| n.path.as_str()).collect();
     let mut indexed = db::notes::list_by_workspace(&db, &workspace)
         .await
         .map_err(|e| e.to_string())?;
-    let mut gone = Vec::new();
-    for note in &indexed {
-        if matches!(tokio::fs::try_exists(&note.path).await, Ok(false)) {
-            gone.push(note.path.clone());
-        }
+    let (kept, stale): (Vec<_>, Vec<_>) = indexed
+        .drain(..)
+        .partition(|n| scanned.contains(n.path.as_str()));
+    for note in &stale {
+        forget_note(&note.path, &db)
+            .await
+            .map_err(|e| e.to_string())?;
     }
-    for path in &gone {
-        forget_note(path, &db).await.map_err(|e| e.to_string())?;
-    }
-    indexed.retain(|n| !gone.contains(&n.path));
+    let indexed = kept;
 
     Ok(WorkspaceTree {
         notes: indexed,
