@@ -3939,6 +3939,7 @@ dependencies = [
  "portable-pty",
  "random_word",
  "regex",
+ "reqwest",
  "serde",
  "serde_json",
  "serde_yaml_ng",

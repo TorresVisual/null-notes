@@ -328,6 +328,8 @@ pub fn run() {
             git_impl::clone_repo,
             commands::git_credentials::get_git_token,
             commands::git_credentials::set_git_token,
+            commands::github_auth::github_device_start,
+            commands::github_auth::github_device_poll,
             commands::terminal::terminal_open,
             commands::terminal::terminal_write,
             commands::terminal::terminal_resize,

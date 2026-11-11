@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core'
-import type { BaseRow, PropertiesResult, PropertyEdit, NoteMetadata, WorkspaceState, WorkspaceTree, SearchPage, SearchSort, AppSettings, GraphLink, GraphTag, RepoMode, CommitOutcome, PushOutcome, PullOutcome, RebaseOutcome, RepoInitOutcome, TemplateMetadata, CrossRefTarget, OpenTask, DueCard, Grade, NoteHistoryEntry, GithubRepo, BacklinkEntry, PrinterInfo, McGradeResult, CardSummary, ErrorLogEntry, TrashEntry, MergeOutcome, MergeSnapshot, CodeLinkStatus, CodeLinkTarget } from '../types'
+import type { BaseRow, PropertiesResult, PropertyEdit, NoteMetadata, WorkspaceState, WorkspaceTree, SearchPage, SearchSort, AppSettings, GraphLink, GraphTag, RepoMode, CommitOutcome, PushOutcome, PullOutcome, RebaseOutcome, RepoInitOutcome, TemplateMetadata, CrossRefTarget, OpenTask, DueCard, Grade, NoteHistoryEntry, GithubRepo, GithubDeviceCode, GithubPollOutcome, BacklinkEntry, PrinterInfo, McGradeResult, CardSummary, ErrorLogEntry, TrashEntry, MergeOutcome, MergeSnapshot, CodeLinkStatus, CodeLinkTarget } from '../types'
 import type { PdfPage, PdfMarkdownImport } from '../pdf/types'
 import { useWorkspaceStore } from '../store/workspace'
 import { sidecarDir } from './pathPrefix'
@@ -238,6 +238,10 @@ export const api = {
       if (isMobile()) args.token = await getStoredGitToken()
       return invoke<string>('clone_repo', args)
     },
+    githubDeviceStart: () =>
+      invoke<GithubDeviceCode>('github_device_start'),
+    githubDevicePoll: (deviceCode: string) =>
+      invoke<GithubPollOutcome>('github_device_poll', { deviceCode }),
     getGitToken: () =>
       invoke<string>('get_git_token'),
     setGitToken: (token: string) =>

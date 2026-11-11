@@ -1,15 +1,11 @@
 import { useState } from 'react'
 import { CornerDownLeft, FolderOpen, GitBranch, History } from 'lucide-react'
-import { documentDir } from '@tauri-apps/api/path'
 import { useWorkspaceStore } from '../store/workspace'
 import { useWorkspace } from '../hooks/useWorkspace'
 import { folderName } from '../lib/pathPrefix'
 import { CloneWorkspaceDialog } from './CloneWorkspaceDialog'
 import { isMobile } from '../lib/platform'
-import { setStoredGitToken } from '../lib/gitCredentials'
-import { api } from '../lib/tauri'
-import { failure } from '../lib/failure'
-import { showToast } from '../store/toast'
+import { TokenCloneForm } from './TokenCloneForm'
 
 export function WorkspacePicker() {
   const recents = useWorkspaceStore((s) => s.recentWorkspaces)
@@ -17,23 +13,6 @@ export function WorkspacePicker() {
   const folderError = useWorkspaceStore((s) => s.folderError)
   const { openWorkspace, openWorkspaceAt } = useWorkspace()
   const [cloning, setCloning] = useState(false)
-  const [onboardUrl, setOnboardUrl] = useState('')
-  const [onboardToken, setOnboardToken] = useState('')
-  const [onboarding, setOnboarding] = useState(false)
-
-  async function handleMobileClone(e: React.FormEvent) {
-    e.preventDefault()
-    setOnboarding(true)
-    try {
-      await setStoredGitToken(onboardToken)
-      const parentDir = await documentDir()
-      const clonedPath = await api.git.cloneRepo(onboardUrl, parentDir)
-      await openWorkspaceAt(clonedPath)
-    } catch (err) {
-      showToast(failure('clone the repository', err))
-      setOnboarding(false)
-    }
-  }
 
   const mobile = isMobile()
   const actions = (
@@ -65,37 +44,7 @@ export function WorkspacePicker() {
         </p>
       )}
 
-      {mobile && (
-        <form className="workspace-picker-onboarding" onSubmit={(e) => void handleMobileClone(e)}>
-          <p className="workspace-picker-subtitle">
-            Clone an existing git-synced notes workspace from your desktop.
-          </p>
-          <label className="workspace-picker-field">
-            Repository URL
-            <input
-              type="url"
-              value={onboardUrl}
-              onChange={(e) => setOnboardUrl(e.target.value)}
-              placeholder="https://github.com/me/notes.git"
-              disabled={onboarding}
-              required
-            />
-          </label>
-          <label className="workspace-picker-field">
-            Personal access token
-            <input
-              type="password"
-              value={onboardToken}
-              onChange={(e) => setOnboardToken(e.target.value)}
-              disabled={onboarding}
-              required
-            />
-          </label>
-          <button className="workspace-picker-browse" type="submit" disabled={onboarding}>
-            <GitBranch size={14} /> {onboarding ? 'Cloning…' : 'Clone workspace'}
-          </button>
-        </form>
-      )}
+      {mobile && <TokenCloneForm />}
 
       {!mobile && recents.length === 0 && (
         <>

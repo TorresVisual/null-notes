@@ -22,6 +22,8 @@ const NEVER_EXPOSED: &[&str] = &[
     "terminal_write",
     "get_git_token",
     "set_git_token",
+    "github_device_start",
+    "github_device_poll",
     "window_close",
     "clone_repo",
     "push_notes",

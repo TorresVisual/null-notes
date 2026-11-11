@@ -178,6 +178,16 @@ export interface GithubRepo {
   isPrivate: boolean
 }
 
+export interface GithubDeviceCode {
+  deviceCode: string
+  userCode: string
+  verificationUri: string
+  expiresIn: number
+  interval: number
+}
+
+export type GithubPollOutcome = 'pending' | 'slowDown' | 'authorized' | 'expired' | 'denied'
+
 export type PdfImportMode = 'pages' | 'markdown'
 
 export type CodeIndentChar = 'space' | 'tab'

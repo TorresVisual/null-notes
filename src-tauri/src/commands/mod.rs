@@ -12,6 +12,7 @@ pub mod export;
 pub mod git;
 pub mod git_credentials;
 pub mod git_mobile;
+pub mod github_auth;
 pub mod identity;
 pub mod ink;
 pub mod jumplist;

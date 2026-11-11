@@ -7,12 +7,14 @@ import { MobileShell } from './MobileShell'
 import { api } from '../lib/tauri'
 import { useWorkspaceStore } from '../store/workspace'
 import { discardIfUntouched } from '../hooks/useQuickNote'
+import { useMobileOnboardingStore } from '../store/mobileOnboarding'
 
 vi.mock('@tauri-apps/plugin-os', () => ({ platform: vi.fn(() => 'android') }))
 vi.mock('@tauri-apps/api/app', () => ({ onBackButtonPress: vi.fn() }))
 vi.mock('../lib/tauri', () => ({ api: { window: { exitApp: vi.fn() } } }))
 vi.mock('../hooks/useQuickNote', () => ({ discardIfUntouched: vi.fn() }))
 vi.mock('./MobileNotes', () => ({ MobileNotes: () => <div>notes-screen</div> }))
+vi.mock('./MobileOnboarding', () => ({ MobileOnboarding: () => <div>onboarding-screen</div> }))
 
 let press: () => void
 
@@ -39,7 +41,8 @@ function setup(over: Partial<React.ComponentProps<typeof MobileShell>> = {}) {
 }
 
 beforeEach(() => {
-  useWorkspaceStore.setState({ activeTab: null, openTabs: [], repoMode: null })
+  useWorkspaceStore.setState({ activeTab: null, openTabs: [], repoMode: null, recentWorkspaces: [] })
+  useMobileOnboardingStore.setState({ step: 'start' })
   vi.mocked(platform).mockReturnValue('android')
   vi.mocked(onBackButtonPress).mockImplementation(async (cb) => {
     press = () => cb({ canGoBack: false })
@@ -191,9 +194,29 @@ describe('MobileShell system Back', () => {
 })
 
 describe('MobileShell without a workspace', () => {
-  it('shows the picker slot and no tab bar', () => {
+  it('shows the sign-in onboarding on first run, with no tab bar', () => {
+    setup({ hasWorkspace: false })
+    expect(screen.getByText('onboarding-screen')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'More' })).not.toBeInTheDocument()
+  })
+
+  it('keeps the picker slot when there are recent workspaces', () => {
+    useWorkspaceStore.setState({ recentWorkspaces: ['/ws'] })
     setup({ hasWorkspace: false })
     expect(screen.getByText('editor-screen')).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'More' })).not.toBeInTheDocument()
+    expect(screen.queryByText('onboarding-screen')).not.toBeInTheDocument()
+  })
+
+  it('Back steps out of an onboarding screen to the start before exiting', async () => {
+    useMobileOnboardingStore.setState({ step: 'repos' })
+    setup({ hasWorkspace: false })
+    await act(async () => {})
+
+    act(() => press())
+    expect(useMobileOnboardingStore.getState().step).toBe('start')
+    expect(api.window.exitApp).not.toHaveBeenCalled()
+
+    act(() => press())
+    expect(api.window.exitApp).toHaveBeenCalledTimes(1)
   })
 })

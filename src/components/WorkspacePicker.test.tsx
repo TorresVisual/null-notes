@@ -72,12 +72,16 @@ describe('WorkspacePicker open failure', () => {
 })
 
 describe('WorkspacePicker on mobile', () => {
-  it('shows the onboarding form instead of the folder picker', () => {
+  beforeEach(() => {
+    useWorkspaceStore.setState({ recentWorkspaces: ['/var/mobile/Documents/old'] })
+  })
+
+  it('shows the token form instead of the folder picker', () => {
     vi.mocked(platform).mockReturnValue('ios')
 
     render(<WorkspacePicker />)
 
-    expect(screen.getByPlaceholderText('https://github.com/me/notes.git')).toBeInTheDocument()
+    expect(screen.getByLabelText('Personal access token')).toBeInTheDocument()
     expect(screen.queryByText('Choose a folder…')).not.toBeInTheDocument()
   })
 

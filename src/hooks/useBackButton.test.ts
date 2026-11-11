@@ -10,10 +10,11 @@ vi.mock('@tauri-apps/plugin-os', () => ({ platform: vi.fn() }))
 vi.mock('@tauri-apps/api/app', () => ({ onBackButtonPress: vi.fn() }))
 vi.mock('../lib/tauri', () => ({ api: { window: { exitApp: vi.fn() } } }))
 
-const idle: BackState = { overlayOpen: false, sheetOpen: false, editorOpen: false, tab: 'home' }
+const idle: BackState = { overlayOpen: false, sheetOpen: false, onboardingStep: false, editorOpen: false, tab: 'home' }
 const handlers = () => ({
   'close-overlay': vi.fn(),
   'close-sheet': vi.fn(),
+  'leave-onboarding-step': vi.fn(),
   'close-editor': vi.fn(),
   'go-home': vi.fn(),
 })

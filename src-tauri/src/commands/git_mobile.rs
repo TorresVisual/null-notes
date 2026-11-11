@@ -5,9 +5,9 @@
 //!
 //! Command names and return types match `git.rs` exactly (reusing its
 //! `pub` types directly) so the frontend never branches on platform for
-//! these calls. `init_notes_repo` and `list_github_repos` are the two
-//! exceptions: explicitly out of mobile v1 scope, stubbed once this module's
-//! surface is complete.
+//! these calls. `init_notes_repo` is the exception: explicitly out of mobile v1
+//! scope, stubbed once this module's surface is complete. `list_github_repos`
+//! is backed by the GitHub API (`github_auth`).
 //!
 //! No `#[tauri::command]` wrappers exist here until every one of the 11
 //! operations has a real implementation: `#[tauri::command]` expands to a
@@ -881,13 +881,11 @@ pub fn checked_init_notes_repo() -> anyhow::Result<RepoInitOutcome> {
     )
 }
 
-/// Out of mobile v1 scope (spec, Credentials: "Mobile onboarding skips the
-/// picker — the user pastes a repository URL directly"). Same error text
-/// desktop already produces when `gh` isn't installed, so any shared
-/// frontend fallback path handles this identically on mobile with zero new
-/// UI code.
+/// Lists the signed-in user's repos through the GitHub API with the stored token
+/// (`github_auth`), since mobile has no `gh`. Errors when not signed in, which the
+/// shared frontend treats like desktop's "gh not available" and falls back to a URL.
 pub fn list_own_github_repos() -> anyhow::Result<Vec<GithubRepo>> {
-    anyhow::bail!("gh not available")
+    crate::commands::github_auth::list_repos()
 }
 
 // Tauri command wrappers. Command names and (mostly) signatures match
@@ -1795,7 +1793,7 @@ local, uncommitted
     }
 
     #[test]
-    fn list_github_repos_is_not_supported_on_mobile() {
+    fn list_github_repos_errors_without_a_stored_token() {
         assert!(list_own_github_repos().is_err());
     }
 

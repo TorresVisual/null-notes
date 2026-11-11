@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { ArrowLeft, Plus } from 'lucide-react'
 import { useWorkspaceStore } from '../store/workspace'
 import { useMobileEditStore } from '../store/mobileEdit'
+import { useMobileOnboardingStore } from '../store/mobileOnboarding'
 import { discardIfUntouched } from '../hooks/useQuickNote'
 import { useBackButton } from '../hooks/useBackButton'
 import type { OverlayKind } from '../hooks/useOverlayManager'
@@ -9,6 +10,7 @@ import type { MobileTab } from '../lib/backNavigation'
 import { MobileTabBar, type TabId } from './MobileTabBar'
 import { MoreSheet } from './MoreSheet'
 import { MobileNotes } from './MobileNotes'
+import { MobileOnboarding } from './MobileOnboarding'
 
 interface MobileShellProps {
   activeOverlay: OverlayKind | null
@@ -54,6 +56,8 @@ export function MobileShell({
   const activeTab = useWorkspaceStore((s) => s.activeTab)
   const setActiveTab = useWorkspaceStore((s) => s.setActiveTab)
   const editorOpen = hasWorkspace && activeTab !== null
+  const onboardingStep = useMobileOnboardingStore((s) => s.step !== 'start')
+  const firstRun = useWorkspaceStore((s) => s.recentWorkspaces.length === 0) && !hasWorkspace
 
   // Dialogs portal to <body>, outside .app-shell, so full-screen overlay CSS
   // keys off the root element rather than a wrapper class.
@@ -71,10 +75,11 @@ export function MobileShell({
   }
 
   useBackButton(
-    { overlayOpen: activeOverlay !== null, sheetOpen: moreOpen, editorOpen, tab },
+    { overlayOpen: activeOverlay !== null, sheetOpen: moreOpen, onboardingStep: firstRun && onboardingStep, editorOpen, tab },
     {
       'close-overlay': closeOverlay,
       'close-sheet': () => setMoreOpen(false),
+      'leave-onboarding-step': () => useMobileOnboardingStore.getState().setStep('start'),
       'close-editor': closeEditor,
       'go-home': () => setTab('home'),
     },
@@ -96,7 +101,7 @@ export function MobileShell({
     openOverlay(kind)
   }
 
-  const screen = !hasWorkspace ? editor : tab === 'notes'
+  const screen = firstRun ? <MobileOnboarding /> : !hasWorkspace ? editor : tab === 'notes'
     ? <MobileNotes onSearchOpen={() => openOverlay('search')} onTemplateOpen={() => openOverlay('template')} />
     : home
 
@@ -117,7 +122,7 @@ export function MobileShell({
         </>
       ) : (
         <>
-          <main className="mobile-screen">{screen}</main>
+          <main className={`mobile-screen${firstRun ? ' mobile-screen--onboarding' : ''}`}>{screen}</main>
           {hasWorkspace && activeOverlay === null && (
             <button className="mobile-fab" aria-label="New note" onClick={onNewNote}>
               <Plus size={24} />
