@@ -1,5 +1,18 @@
 import { describe, it, expect } from 'vitest'
 import { updateTauriConf, updateCargoToml, assertRetaggable, resolveTargets, tagMessages, tagArgs, readTargets, TARGETS } from './release.mjs'
+import { buildArgs } from './release-tui.mjs'
+
+describe('buildArgs', () => {
+  it('passes no target flag for a full bump', () => {
+    expect(buildArgs('patch', [...TARGETS])).toEqual(['patch'])
+  })
+  it('narrows with --only when a target is unticked', () => {
+    expect(buildArgs('minor', ['windows', 'ios'])).toEqual(['minor', '--only', 'windows,ios'])
+  })
+  it('always names targets for a retag', () => {
+    expect(buildArgs('retag', [...TARGETS])).toEqual(['retag', '--only', TARGETS.join(',')])
+  })
+})
 
 describe('updateTauriConf', () => {
   it('replaces the version field and preserves formatting', () => {
