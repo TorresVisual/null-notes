@@ -3857,7 +3857,8 @@ li .fold-toggle { left: -2.4em; }
    hand-rolled `.context-menu` consumer. */
 .context-menu button,
 .context-menu [data-slot="context-menu-item"],
-.context-menu [data-slot="dropdown-menu-item"] {
+.context-menu [data-slot="dropdown-menu-item"],
+.context-menu [data-slot="dropdown-menu-sub-trigger"] {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -3875,7 +3876,9 @@ li .fold-toggle { left: -2.4em; }
 .context-menu [data-slot="context-menu-item"]:hover,
 .context-menu [data-slot="context-menu-item"][data-highlighted],
 .context-menu [data-slot="dropdown-menu-item"]:hover,
-.context-menu [data-slot="dropdown-menu-item"][data-highlighted] { background: var(--bg-hover); }
+.context-menu [data-slot="dropdown-menu-item"][data-highlighted],
+.context-menu [data-slot="dropdown-menu-sub-trigger"][data-highlighted],
+.context-menu [data-slot="dropdown-menu-sub-trigger"][data-state="open"] { background: var(--bg-hover); }
 .context-menu button.danger,
 .context-menu [data-slot="context-menu-item"][data-variant="destructive"] { color: var(--danger); }
 .context-menu hr,
@@ -3894,6 +3897,14 @@ li .fold-toggle { left: -2.4em; }
   color: var(--text-tertiary);
   font-size: 11px;
 }
+
+/* Titlebar File/View menus: denser rows (the lists are long), wider so labels
+   and accelerators never touch, submenu chevron muted like the shortcuts. */
+.titlebar-menu { min-width: 240px; }
+.titlebar-menu [data-slot="dropdown-menu-item"],
+.titlebar-menu [data-slot="dropdown-menu-sub-trigger"] { padding: 4px 10px; }
+.titlebar-menu [data-slot="dropdown-menu-sub-trigger"] svg { margin-left: auto; color: var(--text-tertiary); }
+.titlebar-menu [data-slot="dropdown-menu-shortcut"] { color: var(--text-secondary); }
 
 /* Folder tree */
 .folder-tree {

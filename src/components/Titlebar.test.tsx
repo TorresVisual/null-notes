@@ -43,7 +43,7 @@ describe('Titlebar', () => {
     expect(onCommand).toHaveBeenCalledWith('close-workspace')
   })
 
-  it('lists recent workspaces under Open Workspace, most-recent first', async () => {
+  it('lists recent workspaces in the Open Recent submenu, most-recent first', async () => {
     const user = userEvent.setup()
     render(
       <Titlebar
@@ -53,6 +53,7 @@ describe('Titlebar', () => {
       />,
     )
     await user.click(screen.getByText('File'))
+    await user.click(await screen.findByText('Open Recent'))
     expect(await screen.findByText('Lecture Notes')).toBeInTheDocument()
     expect(screen.getByText('CS 101')).toBeInTheDocument()
   })
@@ -64,7 +65,8 @@ describe('Titlebar', () => {
       <Titlebar title="Null Notes" onCommand={onCommand} recentWorkspaces={['/ws/Lecture Notes']} />,
     )
     await user.click(screen.getByText('File'))
-    await user.click(await screen.findByText('Lecture Notes'))
+    await user.click(await screen.findByText('Open Recent'))
+    fireEvent.click(await screen.findByText('Lecture Notes'))
     expect(onCommand).toHaveBeenCalledWith('open-recent:/ws/Lecture Notes')
   })
 

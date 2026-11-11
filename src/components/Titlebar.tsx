@@ -5,8 +5,12 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuPortal,
   DropdownMenuSeparator,
   DropdownMenuShortcut,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from './ui/dropdown-menu'
 import { folderName } from '../lib/pathPrefix'
@@ -17,7 +21,11 @@ export interface MenuEntry {
   id: string
   label: string
 }
-export type MenuItemSpec = MenuEntry | { separator: true }
+export interface MenuSubmenu {
+  label: string
+  items: MenuEntry[]
+}
+export type MenuItemSpec = MenuEntry | MenuSubmenu | { separator: true }
 
 const SEPARATOR = { separator: true } as const
 
@@ -38,10 +46,19 @@ function commandEntry(id: string): MenuEntry {
 // still hits the flush-before-close path rather than bypassing it. Labels and
 // accelerators come from the keymap registry, not from here.
 export function buildFileMenu(recentWorkspaces: string[]): MenuItemSpec[] {
+  const recent: MenuItemSpec[] = recentWorkspaces.length
+    ? [
+        {
+          label: 'Open Recent',
+          items: recentWorkspaces.map((path) => ({ id: `open-recent:${path}`, label: folderName(path) })),
+        },
+      ]
+    : []
   return [
-    ...entries(['new-note', 'new-folder', 'new-canvas', 'new-agent-canvas', 'new-from-template', '-', 'open-workspace', 'close-workspace']),
-    ...recentWorkspaces.map((path) => ({ id: `open-recent:${path}`, label: folderName(path) })),
+    ...entries(['new-note', 'new-folder', 'new-canvas', 'new-agent-canvas', 'new-from-template', '-', 'open-workspace']),
+    ...recent,
     ...entries([
+      'close-workspace',
       '-',
       'split-tasks',
       'format-note',
@@ -59,36 +76,40 @@ export function buildFileMenu(recentWorkspaces: string[]): MenuItemSpec[] {
   ]
 }
 
-export const VIEW_MENU: MenuItemSpec[] = entries([
-  'home',
-  '-',
-  'search',
-  'quick-switch',
-  'command-palette',
-  'toggle-view',
-  'insert-ink',
-  'graph-view',
-  'toggle-terminal',
-  'toggle-outline',
-  'toggle-outgoing-links',
-  'fold-all',
-  'unfold-all',
-  'toggle-sidebar',
-  '-',
-  'split-editor',
-  'split-editor-down',
-  'focus-next-group',
-  'focus-prev-group',
-  'close-editor-group',
-  'reset-split-ratio',
-  'toggle-split-direction',
-  '-',
-  'task-view',
-  'review',
-  'deck-view',
-  '-',
-  'shortcuts-help',
-])
+export const VIEW_MENU: MenuItemSpec[] = [
+  ...entries([
+    'home',
+    '-',
+    'search',
+    'quick-switch',
+    'command-palette',
+    '-',
+    'toggle-sidebar',
+    'toggle-outline',
+    'toggle-outgoing-links',
+    'toggle-terminal',
+    'graph-view',
+    '-',
+    'toggle-view',
+    'insert-ink',
+    'fold-all',
+    'unfold-all',
+    '-',
+  ]),
+  {
+    label: 'Editor Layout',
+    items: [
+      'split-editor',
+      'split-editor-down',
+      'focus-next-group',
+      'focus-prev-group',
+      'close-editor-group',
+      'reset-split-ratio',
+      'toggle-split-direction',
+    ].map(commandEntry),
+  },
+  ...entries(['-', 'task-view', 'review', 'deck-view', '-', 'shortcuts-help']),
+]
 
 interface TitlebarProps {
   title: string
@@ -154,18 +175,30 @@ interface TitlebarMenuProps {
 
 function TitlebarMenu({ label, items, onCommand }: TitlebarMenuProps) {
   const keymap = useKeymap()
+  const renderEntry = (item: MenuEntry) => (
+    <DropdownMenuItem key={item.id} onSelect={() => onCommand(item.id)}>
+      {item.label}
+      {keymap[item.id] && <DropdownMenuShortcut>{formatCombo(keymap[item.id])}</DropdownMenuShortcut>}
+    </DropdownMenuItem>
+  )
   return (
     <DropdownMenu>
       <DropdownMenuTrigger className="titlebar-menu-trigger">{label}</DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="context-menu">
+      <DropdownMenuContent align="start" className="context-menu titlebar-menu">
         {items.map((item, i) =>
           'separator' in item ? (
             <DropdownMenuSeparator key={i} />
+          ) : 'items' in item ? (
+            <DropdownMenuSub key={item.label}>
+              <DropdownMenuSubTrigger>{item.label}</DropdownMenuSubTrigger>
+              <DropdownMenuPortal>
+                <DropdownMenuSubContent className="context-menu titlebar-menu">
+                  {item.items.map(renderEntry)}
+                </DropdownMenuSubContent>
+              </DropdownMenuPortal>
+            </DropdownMenuSub>
           ) : (
-            <DropdownMenuItem key={item.id} onSelect={() => onCommand(item.id)}>
-              {item.label}
-              {keymap[item.id] && <DropdownMenuShortcut>{formatCombo(keymap[item.id])}</DropdownMenuShortcut>}
-            </DropdownMenuItem>
+            renderEntry(item)
           ),
         )}
       </DropdownMenuContent>
