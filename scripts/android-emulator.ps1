@@ -65,7 +65,17 @@ try {
     }
 
     Write-Host "Installing $($apk.Name)..." -ForegroundColor Cyan
-    & $adb install -r $apk.FullName
+    $ErrorActionPreference = "Continue"
+    $out = (& $adb install -r $apk.FullName 2>&1 | ForEach-Object { "$_" }) -join "`n"
+    Write-Host $out
+    if ($out -match "INSUFFICIENT_STORAGE") {
+        # The ~1 GB debug APK doesn't fit alongside the installed copy. `-k` drops the old
+        # package but keeps its data (OAuth tokens etc.), so the reinstall picks it back up.
+        Write-Host "Not enough space; removing old package but keeping app data..." -ForegroundColor Yellow
+        & $adb shell pm uninstall -k $appId | Out-Null
+        & $adb install $apk.FullName
+    }
+    $ErrorActionPreference = "Stop"
     if ($LASTEXITCODE -ne 0) {
         Write-Error "Install failed. If the signature differs, rerun with -Clean."
         exit $LASTEXITCODE
