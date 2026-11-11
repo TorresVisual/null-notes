@@ -10,7 +10,6 @@ class MainActivity : TauriActivity() {
   override fun onCreate(savedInstanceState: Bundle?) {
     enableEdgeToEdge()
     super.onCreate(savedInstanceState)
-    io.crates.keyring.Keyring.initializeNdkContext(applicationContext)
 
     // This WebView reports no safe-area insets to CSS, and edge-to-edge stops
     // adjustResize from shrinking the content view, so pad the WebView away from
