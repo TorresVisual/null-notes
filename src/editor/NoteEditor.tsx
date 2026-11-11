@@ -19,6 +19,7 @@ import { EditorToolbar } from './toolbar/EditorToolbar'
 import { useKeepCaretVisible, useKeyboardInset, caretScrollProps } from './useKeepCaretVisible'
 import { useMobileEditMode } from './useMobileEditMode'
 import { MobileEditToggle } from './MobileEditToggle'
+import { sameNoteText } from '../lib/sameNoteText'
 import { isMobile } from '../lib/platform'
 import { useInkStore } from '../store/ink'
 import { useSettingsStore } from '../store/settings'
@@ -82,8 +83,12 @@ export function NoteEditor({
     content,
     editorProps: buildEditorProps(spellcheck, spellcheckLanguage),
     onUpdate({ editor }) {
+      // A first selection or focus transaction can append a trailing paragraph, which
+      // serializes to the text already on disk minus its final newline. That is not
+      // an edit, and saving it would rewrite an unchanged note.
       if (isProgrammaticUpdate.current) return
       const markdown = markdownOf(editor)
+      if (sameNoteText(markdown, lastEmitted.current ?? content)) return
       lastEmitted.current = markdown
       onChange(markdown)
     },
@@ -127,6 +132,7 @@ export function NoteEditor({
       editor.commands.setTextSelection({ from: Math.min(anchor, size), to: Math.min(head, size) })
       withInitFlag.isEditorContentInitialized = wasInitialized
       isProgrammaticUpdate.current = false
+      lastEmitted.current = null
     }
   }, [content, editor, notePath])
 
