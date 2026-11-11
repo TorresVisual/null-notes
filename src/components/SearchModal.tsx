@@ -1,5 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { ArrowLeft } from 'lucide-react'
 import type { SearchResult, SearchSort } from '../types'
+import { isMobile } from '../lib/platform'
+import { MobileSearchControls } from './MobileSearchControls'
 import { api } from '../lib/tauri'
 import { useWorkspaceStore } from '../store/workspace'
 import { useWorkspace } from '../hooks/useWorkspace'
@@ -33,10 +36,23 @@ export function SearchModal({ onClose }: SearchModalProps) {
   const addRecentSearch = useWorkspaceStore((s) => s.addRecentSearch)
   const sort = useWorkspaceStore((s) => s.searchSort)
   const setSort = useWorkspaceStore((s) => s.setSearchSort)
+  const setRecentSearches = useWorkspaceStore((s) => s.setRecentSearches)
   const { openWorkspaceAt } = useWorkspace()
   const savedSearch = useBookmarksStore((s) =>
     s.items.some((b) => sameBookmark(b, { kind: 'search', query: query.trim() })),
   )
+  const mobile = isMobile()
+  const inputRef = useRef<HTMLInputElement>(null)
+  const emptyQuery = query.trim() === ''
+
+  function insertOperator(operator: string) {
+    setQuery((q) => (q === '' || q.endsWith(' ') ? q : `${q} `) + operator)
+    inputRef.current?.focus()
+  }
+
+  function toggleSavedSearch() {
+    useBookmarksStore.getState().toggle({ kind: 'search', query: query.trim() })
+  }
 
   useEffect(() => {
     if (!workspacePath) return
@@ -106,33 +122,49 @@ export function SearchModal({ onClose }: SearchModalProps) {
       description="Search every note's title and body"
     >
       <Command shouldFilter={false}>
-        <CommandInput
-          className="search-modal-input"
-          placeholder={'Search notes… ("phrase", OR, -exclude, folder:, tag:, type:)'}
-          value={query}
-          onValueChange={setQuery}
-        />
-        <label className="search-scope-toggle">
-          <input
-            type="checkbox"
-            checked={allWorkspaces}
-            onChange={(e) => setAllWorkspaces(e.target.checked)}
-          />
-          Search all workspaces
-          {query.trim() !== '' && (
-            <button
-              type="button"
-              className="search-save"
-              onClick={(e) => {
-                e.preventDefault()
-                useBookmarksStore.getState().toggle({ kind: 'search', query: query.trim() })
-              }}
-            >
-              {savedSearch ? 'Remove saved search' : 'Save this search'}
+        <div className={mobile ? 'mobile-search-bar' : undefined}>
+          {mobile && (
+            <button type="button" className="mobile-icon-btn" aria-label="Back" onClick={onClose}>
+              <ArrowLeft size={20} />
             </button>
           )}
-        </label>
-        {results.length > 0 && (
+          <CommandInput
+            ref={inputRef}
+            className="search-modal-input"
+            placeholder={mobile ? 'Search notes' : 'Search notes… ("phrase", OR, -exclude, folder:, tag:, type:)'}
+            value={query}
+            onValueChange={setQuery}
+          />
+        </div>
+        {mobile ? (
+          <MobileSearchControls
+            allWorkspaces={allWorkspaces}
+            onScopeChange={setAllWorkspaces}
+            onOperator={insertOperator}
+          />
+        ) : (
+          <label className="search-scope-toggle">
+            <input
+              type="checkbox"
+              checked={allWorkspaces}
+              onChange={(e) => setAllWorkspaces(e.target.checked)}
+            />
+            Search all workspaces
+            {!emptyQuery && (
+              <button
+                type="button"
+                className="search-save"
+                onClick={(e) => {
+                  e.preventDefault()
+                  toggleSavedSearch()
+                }}
+              >
+                {savedSearch ? 'Remove saved search' : 'Save this search'}
+              </button>
+            )}
+          </label>
+        )}
+        {(mobile ? !emptyQuery : results.length > 0) && (
           <div className="search-meta">
             <span>{total} {total === 1 ? 'result' : 'results'}</span>
             <select
@@ -145,10 +177,21 @@ export function SearchModal({ onClose }: SearchModalProps) {
               <option value="modified">Recently modified</option>
               <option value="name">Name (A–Z)</option>
             </select>
+            {mobile && (
+              <button type="button" className="search-save" onClick={toggleSavedSearch}>
+                {savedSearch ? 'Unsave' : 'Save'}
+              </button>
+            )}
+          </div>
+        )}
+        {mobile && emptyQuery && recentSearches.length > 0 && (
+          <div className="mobile-search-section">
+            <span>Recent</span>
+            <button type="button" onClick={() => setRecentSearches([])}>Clear</button>
           </div>
         )}
         <CommandList className="search-results">
-          {query.trim() === '' && recentSearches.length > 0 && (
+          {emptyQuery && recentSearches.length > 0 && (
             <CommandGroup className="search-recent">
               {recentSearches.map((q) => (
                 <CommandItem key={q} value={q} className="search-recent-item items-stretch [&>svg]:hidden" onSelect={() => setQuery(q)}>
@@ -177,7 +220,12 @@ export function SearchModal({ onClose }: SearchModalProps) {
               )}
             </CommandGroup>
           )}
-          {query.trim() !== '' && results.length === 0 && (
+          {mobile && emptyQuery && (
+            <p className="mobile-search-hint">
+              Tap an operator, then type. &ldquo;Quotes&rdquo; match an exact phrase, OR either word, &minus; excludes.
+            </p>
+          )}
+          {!emptyQuery && results.length === 0 && (
             <CommandEmpty className="search-empty">
               No results for &ldquo;{query}&rdquo;
               <span className="empty-state-detail">
