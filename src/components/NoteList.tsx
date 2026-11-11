@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNotesStore } from '../store/notes'
 import { useWorkspaceStore } from '../store/workspace'
 import { FolderTree } from './FolderTree'
-import { buildFolderTree } from '../lib/folderTree'
+import { buildFolderTree, noteFileName } from '../lib/folderTree'
 import { api } from '../lib/tauri'
 import type { NoteMetadata } from '../types'
 
@@ -57,7 +57,7 @@ export function NoteList() {
                 openTab(note.path)
               }}
             >
-              <span className="tree-label" title={note.title}>{note.title}</span>
+              <span className="tree-label" title={noteFileName(note.path)}>{noteFileName(note.path)}</span>
             </li>
           ))}
         </ul>

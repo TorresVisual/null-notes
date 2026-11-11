@@ -31,6 +31,8 @@ interface MutableFolder {
   canvases: string[]
 }
 
+export const noteFileName = (path: string) => folderName(path).replace(/\.md$/i, '')
+
 const naturalCompare = (a: string, b: string) => a.localeCompare(b, undefined, { numeric: true })
 
 function relativeSegments(root: string, path: string): string[] {
@@ -60,8 +62,8 @@ function toTreeEntries(folder: MutableFolder): TreeEntry[] {
     .map((f) => ({ type: 'folder', name: f.name, path: f.path, children: toTreeEntries(f) }))
 
   const noteEntries: NoteTreeNode[] = [...folder.notes]
-    .sort((a, b) => naturalCompare(a.title, b.title))
-    .map((n) => ({ type: 'note', name: n.title, path: n.path, note: n }))
+    .map((n) => ({ type: 'note' as const, name: noteFileName(n.path), path: n.path, note: n }))
+    .sort((a, b) => naturalCompare(a.name, b.name))
 
   const canvasEntries: CanvasTreeNode[] = folder.canvases
     .map((path) => ({ type: 'canvas' as const, name: folderName(path).replace(/\.(canvas|base)$/, ''), path }))

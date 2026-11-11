@@ -7,6 +7,12 @@ function note(title: string, path: string): NoteMetadata {
 }
 
 describe('buildFolderTree', () => {
+  it('names a note by its file, not its heading', () => {
+    const n = { ...note('Some Heading', '/ws/Lecture 1.md') }
+    const tree = buildFolderTree('/ws', [], [n])
+    expect(tree).toEqual([{ type: 'note', name: 'Lecture 1', path: n.path, note: n }])
+  })
+
   it('places root-level notes directly under the root', () => {
     const n = note('Root Note', '/ws/Root Note.md')
     const tree = buildFolderTree('/ws', [], [n])
