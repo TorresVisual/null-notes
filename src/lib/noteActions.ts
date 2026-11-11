@@ -4,6 +4,7 @@ import { writeToClipboard } from './clipboard'
 import { isBasePath } from './canvasPath'
 import { failure } from './failure'
 import { folderName, isUnderPath, sidecarDir } from './pathPrefix'
+import { noteFileName } from './folderTree'
 import { topLevelPaths } from './treeSelection'
 import type { TrashEntry } from '../types'
 import { refreshTree } from '../hooks/useWorkspace'
@@ -42,7 +43,7 @@ export async function moveNoteInto(notePath: string, destFolder: string, workspa
 
 export async function renameNote(path: string): Promise<void> {
   const workspace = workspaceOf(path)
-  const current = useNotesStore.getState().notes.find((n) => n.path === path)?.title
+  const current = noteFileName(path)
   if (!workspace || !current) return
   const newTitle = await promptText('New title:', current)
   if (!newTitle || newTitle === current) return
