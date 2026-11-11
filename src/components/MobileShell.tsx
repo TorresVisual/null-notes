@@ -57,7 +57,6 @@ export function MobileShell({
   const setActiveTab = useWorkspaceStore((s) => s.setActiveTab)
   const editorOpen = hasWorkspace && activeTab !== null
   const onboardingStep = useMobileOnboardingStore((s) => s.step !== 'start')
-  const firstRun = useWorkspaceStore((s) => s.recentWorkspaces.length === 0) && !hasWorkspace
 
   // Dialogs portal to <body>, outside .app-shell, so full-screen overlay CSS
   // keys off the root element rather than a wrapper class.
@@ -75,7 +74,7 @@ export function MobileShell({
   }
 
   useBackButton(
-    { overlayOpen: activeOverlay !== null, sheetOpen: moreOpen, onboardingStep: firstRun && onboardingStep, editorOpen, tab },
+    { overlayOpen: activeOverlay !== null, sheetOpen: moreOpen, onboardingStep: !hasWorkspace && onboardingStep, editorOpen, tab },
     {
       'close-overlay': closeOverlay,
       'close-sheet': () => setMoreOpen(false),
@@ -101,7 +100,7 @@ export function MobileShell({
     openOverlay(kind)
   }
 
-  const screen = firstRun ? <MobileOnboarding /> : !hasWorkspace ? editor : tab === 'notes'
+  const screen = !hasWorkspace ? <MobileOnboarding /> : tab === 'notes'
     ? <MobileNotes onSearchOpen={() => openOverlay('search')} onTemplateOpen={() => openOverlay('template')} />
     : home
 
@@ -122,7 +121,7 @@ export function MobileShell({
         </>
       ) : (
         <>
-          <main className={`mobile-screen${firstRun ? ' mobile-screen--onboarding' : ''}`}>{screen}</main>
+          <main className={`mobile-screen${!hasWorkspace ? ' mobile-screen--onboarding' : ''}`}>{screen}</main>
           {hasWorkspace && activeOverlay === null && (
             <button className="mobile-fab" aria-label="New note" onClick={onNewNote}>
               <Plus size={24} />

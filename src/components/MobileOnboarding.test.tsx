@@ -6,7 +6,8 @@ import { documentDir } from '@tauri-apps/api/path'
 import { MobileOnboarding } from './MobileOnboarding'
 import { useWorkspace } from '../hooks/useWorkspace'
 import { api } from '../lib/tauri'
-import { getStoredGitToken } from '../lib/gitCredentials'
+import { getStoredGitToken, setStoredGitToken } from '../lib/gitCredentials'
+import { useWorkspaceStore } from '../store/workspace'
 import type { GithubDeviceCode, GithubPollOutcome } from '../types'
 
 vi.mock('../hooks/useWorkspace')
@@ -172,6 +173,65 @@ describe('MobileOnboarding repo picker', () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
     render(<MobileOnboarding />)
 
+    await user.click(await screen.findByRole('button', { name: /Clone from GitHub/ }))
+    await user.click(await screen.findByRole('button', { name: 'Sign in again' }))
+
+    expect(await screen.findByText('WDJB-MJHT')).toBeInTheDocument()
+  })
+})
+
+describe('MobileOnboarding token fallback', () => {
+  it('stores the token and clones the typed URL', async () => {
+    vi.mocked(documentDir).mockResolvedValue('/docs')
+    vi.mocked(api.git.cloneRepo).mockResolvedValue('/docs/notes')
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+    render(<MobileOnboarding />)
+
+    await user.click(await screen.findByRole('button', { name: 'Use a token instead' }))
+    await user.type(screen.getByPlaceholderText('https://github.com/me/notes.git'), 'https://github.com/me/notes.git')
+    await user.type(screen.getByLabelText('Personal access token'), 'ghp_abc')
+    await user.click(screen.getByRole('button', { name: /Clone workspace/ }))
+
+    expect(setStoredGitToken).toHaveBeenCalledWith('ghp_abc')
+    expect(api.git.cloneRepo).toHaveBeenCalledWith('https://github.com/me/notes.git', '/docs')
+    expect(openWorkspaceAt).toHaveBeenCalledWith('/docs/notes')
+  })
+})
+
+describe('MobileOnboarding with recent workspaces', () => {
+  beforeEach(() => {
+    useWorkspaceStore.setState({ recentWorkspaces: ['/docs/old-notes'], folderLoading: false, folderError: null })
+  })
+  afterEach(() => {
+    useWorkspaceStore.setState({ recentWorkspaces: [] })
+  })
+
+  it('lists them and opens one on tap', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+    render(<MobileOnboarding />)
+
+    await user.click(await screen.findByRole('button', { name: /old-notes/ }))
+
+    expect(openWorkspaceAt).toHaveBeenCalledWith('/docs/old-notes')
+  })
+
+  it('offers the stored sign-in instead of jumping past them', async () => {
+    vi.mocked(getStoredGitToken).mockResolvedValue('gho_saved')
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+    render(<MobileOnboarding />)
+
+    expect(await screen.findByText('old-notes')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /Clone from GitHub/ }))
+
+    expect(await screen.findByText('me/uni-notes')).toBeInTheDocument()
+    expect(api.git.githubDeviceStart).not.toHaveBeenCalled()
+  })
+
+  it('lets a signed-in user start a fresh sign-in', async () => {
+    vi.mocked(getStoredGitToken).mockResolvedValue('gho_saved')
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+    render(<MobileOnboarding />)
+
     await user.click(await screen.findByRole('button', { name: 'Sign in again' }))
 
     expect(await screen.findByText('WDJB-MJHT')).toBeInTheDocument()
@@ -179,9 +239,12 @@ describe('MobileOnboarding repo picker', () => {
 })
 
 describe('MobileOnboarding after a restart', () => {
-  it('goes straight to the repo picker when a token is already stored', async () => {
+  it('offers the repo picker without a new sign-in when a token is already stored', async () => {
     vi.mocked(getStoredGitToken).mockResolvedValue('gho_saved')
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
     render(<MobileOnboarding />)
+
+    await user.click(await screen.findByRole('button', { name: /Clone from GitHub/ }))
 
     expect(await screen.findByText('me/uni-notes')).toBeInTheDocument()
     expect(api.git.githubDeviceStart).not.toHaveBeenCalled()

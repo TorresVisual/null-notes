@@ -1,21 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, cleanup } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
 import { WorkspacePicker } from './WorkspacePicker'
 import { useWorkspaceStore } from '../store/workspace'
 import { useWorkspace } from '../hooks/useWorkspace'
 import { platform } from '@tauri-apps/plugin-os'
-import { documentDir } from '@tauri-apps/api/path'
-import { api } from '../lib/tauri'
-import { setStoredGitToken } from '../lib/gitCredentials'
-import { showToast } from '../store/toast'
 
 vi.mock('../hooks/useWorkspace')
 vi.mock('@tauri-apps/plugin-os', () => ({ platform: vi.fn() }))
-vi.mock('@tauri-apps/api/path', () => ({ documentDir: vi.fn() }))
-vi.mock('../lib/tauri', () => ({ api: { git: { cloneRepo: vi.fn() } } }))
-vi.mock('../lib/gitCredentials', () => ({ setStoredGitToken: vi.fn() }))
-vi.mock('../store/toast', () => ({ showToast: vi.fn() }))
 
 let mockWorkspace: ReturnType<typeof useWorkspace>
 
@@ -68,51 +59,6 @@ describe('WorkspacePicker open failure', () => {
     render(<WorkspacePicker />)
 
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
-  })
-})
-
-describe('WorkspacePicker on mobile', () => {
-  beforeEach(() => {
-    useWorkspaceStore.setState({ recentWorkspaces: ['/var/mobile/Documents/old'] })
-  })
-
-  it('shows the token form instead of the folder picker', () => {
-    vi.mocked(platform).mockReturnValue('ios')
-
-    render(<WorkspacePicker />)
-
-    expect(screen.getByLabelText('Personal access token')).toBeInTheDocument()
-    expect(screen.queryByText('Choose a folder…')).not.toBeInTheDocument()
-  })
-
-  it('stores the token and clones into the Documents dir on submit', async () => {
-    const user = userEvent.setup()
-    vi.mocked(platform).mockReturnValue('ios')
-    vi.mocked(documentDir).mockResolvedValue('/var/mobile/Documents')
-    vi.mocked(api.git.cloneRepo).mockResolvedValue('/var/mobile/Documents/notes')
-
-    render(<WorkspacePicker />)
-    await user.type(screen.getByPlaceholderText('https://github.com/me/notes.git'), 'https://github.com/me/notes.git')
-    await user.type(screen.getByLabelText('Personal access token'), 'ghp_abc')
-    await user.click(screen.getByRole('button', { name: /Clone workspace/ }))
-
-    expect(setStoredGitToken).toHaveBeenCalledWith('ghp_abc')
-    expect(api.git.cloneRepo).toHaveBeenCalledWith('https://github.com/me/notes.git', '/var/mobile/Documents')
-    expect(mockWorkspace.openWorkspaceAt).toHaveBeenCalledWith('/var/mobile/Documents/notes')
-  })
-
-  it('shows a toast and stays on the form when clone fails', async () => {
-    const user = userEvent.setup()
-    vi.mocked(platform).mockReturnValue('ios')
-    vi.mocked(documentDir).mockResolvedValue('/var/mobile/Documents')
-    vi.mocked(api.git.cloneRepo).mockRejectedValue(new Error('authentication failed'))
-
-    render(<WorkspacePicker />)
-    await user.type(screen.getByPlaceholderText('https://github.com/me/notes.git'), 'https://github.com/me/notes.git')
-    await user.type(screen.getByLabelText('Personal access token'), 'ghp_bad')
-    await user.click(screen.getByRole('button', { name: /Clone workspace/ }))
-
-    expect(showToast).toHaveBeenCalledWith("Couldn't clone the repository: authentication failed")
   })
 })
 

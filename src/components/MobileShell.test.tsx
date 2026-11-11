@@ -200,11 +200,10 @@ describe('MobileShell without a workspace', () => {
     expect(screen.queryByRole('button', { name: 'More' })).not.toBeInTheDocument()
   })
 
-  it('keeps the picker slot when there are recent workspaces', () => {
+  it('still shows the onboarding when there are recent workspaces', () => {
     useWorkspaceStore.setState({ recentWorkspaces: ['/ws'] })
     setup({ hasWorkspace: false })
-    expect(screen.getByText('editor-screen')).toBeInTheDocument()
-    expect(screen.queryByText('onboarding-screen')).not.toBeInTheDocument()
+    expect(screen.getByText('onboarding-screen')).toBeInTheDocument()
   })
 
   it('Back steps out of an onboarding screen to the start before exiting', async () => {

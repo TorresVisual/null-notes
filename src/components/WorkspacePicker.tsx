@@ -4,8 +4,6 @@ import { useWorkspaceStore } from '../store/workspace'
 import { useWorkspace } from '../hooks/useWorkspace'
 import { folderName } from '../lib/pathPrefix'
 import { CloneWorkspaceDialog } from './CloneWorkspaceDialog'
-import { isMobile } from '../lib/platform'
-import { TokenCloneForm } from './TokenCloneForm'
 
 export function WorkspacePicker() {
   const recents = useWorkspaceStore((s) => s.recentWorkspaces)
@@ -14,7 +12,6 @@ export function WorkspacePicker() {
   const { openWorkspace, openWorkspaceAt } = useWorkspace()
   const [cloning, setCloning] = useState(false)
 
-  const mobile = isMobile()
   const actions = (
     <div className={`workspace-picker-actions${recents.length > 0 ? ' workspace-picker-actions--compact' : ''}`}>
       <button className="workspace-picker-browse" onClick={() => void openWorkspace()} disabled={folderLoading}>
@@ -44,9 +41,7 @@ export function WorkspacePicker() {
         </p>
       )}
 
-      {mobile && <TokenCloneForm />}
-
-      {!mobile && recents.length === 0 && (
+      {recents.length === 0 && (
         <>
           <p className="workspace-picker-subtitle">
             Open a folder of Markdown notes to get started.
@@ -61,7 +56,7 @@ export function WorkspacePicker() {
             <h2 className="workspace-picker-heading">
               <History size={13} /> Recent
             </h2>
-            {!mobile && actions}
+            {actions}
           </div>
           <ul className="workspace-picker-recents">
             {recents.map((path) => (
