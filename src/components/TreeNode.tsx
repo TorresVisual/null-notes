@@ -258,7 +258,7 @@ export function TreeNode({ entry, visiblePaths = [] }: TreeNodeProps) {
   }
 
   return (
-    <li className={dragOver ? 'drop-target' : undefined}>
+    <li>
       <ContextMenu>
         <ContextMenuTrigger asChild>
           <div
