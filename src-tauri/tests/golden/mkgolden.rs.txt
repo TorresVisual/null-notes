@@ -38,7 +38,7 @@ async fn mkgolden() {
     let pool = db::init_db(data.path()).await.unwrap();
     let app = mock_app();
     app.manage(pool.clone());
-    scan_workspace(ws.clone(), app.state()).await.unwrap();
+    scan_workspace(ws.clone(), Vec::new(), app.state()).await.unwrap();
     let mut files = Vec::new();
     md_files(ws_dir.path(), &mut files);
     for f in files {

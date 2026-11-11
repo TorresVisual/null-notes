@@ -46,8 +46,8 @@ export const api = {
   notes: {
     list: (workspace: string) =>
       invoke<NoteMetadata[]>('list_notes', { workspace }),
-    scan: (workspace: string) =>
-      invoke<WorkspaceTree>('scan_workspace', { workspace }),
+    scan: (workspace: string, shownDotFolders: string[]) =>
+      invoke<WorkspaceTree>('scan_workspace', { workspace, shownDotFolders }),
     open: (workspace: string, path: string) =>
       invoke<string>('open_note', { workspace, path }),
     save: (workspace: string, path: string, content: string) =>

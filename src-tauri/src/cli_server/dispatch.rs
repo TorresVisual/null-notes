@@ -203,7 +203,11 @@ impl<R: Runtime> Ctx<'_, R> {
             .clone()
             .ok_or_else(|| usage("this command needs a workspace"))?;
         if self.state().take_first_scan(&ws) {
-            notes::scan_workspace(ws.clone(), self.db()).await?;
+            let dir = self.app.path().app_data_dir().map_err(|e| e.to_string())?;
+            let settings = crate::commands::settings::load_settings_from_dir(&dir)
+                .await
+                .map_err(|e| e.to_string())?;
+            notes::scan_workspace(ws.clone(), settings.shown_dot_folders, self.db()).await?;
         }
         Ok(ws)
     }

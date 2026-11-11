@@ -937,6 +937,7 @@ pub(crate) fn is_excluded_dir(name: &str) -> bool {
 pub(super) async fn scan_dir_recursive(
     root: &std::path::Path,
     workspace: &str,
+    shown_dot_folders: &[String],
 ) -> anyhow::Result<(Vec<NoteMetadata>, Vec<String>, Vec<String>)> {
     let mut notes = Vec::new();
     let mut folders = Vec::new();
@@ -957,7 +958,7 @@ pub(super) async fn scan_dir_recursive(
 
             if file_type.is_dir() {
                 let name = entry.file_name().to_string_lossy().into_owned();
-                if is_excluded_dir(&name) {
+                if is_excluded_dir(&name) && !shown_dot_folders.contains(&name) {
                     continue;
                 }
                 folders.push(path.to_string_lossy().into_owned());
@@ -1012,12 +1013,16 @@ pub(super) async fn scan_dir_recursive(
 #[tauri::command]
 pub async fn scan_workspace(
     workspace: String,
+    shown_dot_folders: Vec<String>,
     db: State<'_, DbPool>,
 ) -> Result<WorkspaceTree, String> {
-    let (notes, folders, canvases) =
-        scan_dir_recursive(std::path::Path::new(&workspace), &workspace)
-            .await
-            .map_err(|e| e.to_string())?;
+    let (notes, folders, canvases) = scan_dir_recursive(
+        std::path::Path::new(&workspace),
+        &workspace,
+        &shown_dot_folders,
+    )
+    .await
+    .map_err(|e| e.to_string())?;
 
     for meta in &notes {
         db::notes::index_note(&db, meta)
@@ -4272,7 +4277,7 @@ mod tests {
         std::fs::write(root.join("root-note.md"), "# Root").unwrap();
 
         let ws = root.to_string_lossy().into_owned();
-        let (notes, folders, _) = scan_dir_recursive(root, &ws).await.unwrap();
+        let (notes, folders, _) = scan_dir_recursive(root, &ws, &[]).await.unwrap();
 
         assert_eq!(notes.len(), 2);
         assert_eq!(folders.len(), 1);
@@ -4286,7 +4291,7 @@ mod tests {
         std::fs::write(root.join("lecture-1-notes.md"), "# Lecture 1 Notes\nbody").unwrap();
 
         let ws = root.to_string_lossy().into_owned();
-        let (notes, _, _) = scan_dir_recursive(root, &ws).await.unwrap();
+        let (notes, _, _) = scan_dir_recursive(root, &ws, &[]).await.unwrap();
 
         assert_eq!(notes.len(), 1);
         assert_eq!(notes[0].title, "Lecture 1 Notes");
@@ -4302,10 +4307,29 @@ mod tests {
         std::fs::write(root.join("Note.md"), "# Note").unwrap();
 
         let ws = root.to_string_lossy().into_owned();
-        let (notes, folders, _) = scan_dir_recursive(root, &ws).await.unwrap();
+        let (notes, folders, _) = scan_dir_recursive(root, &ws, &[]).await.unwrap();
 
         assert_eq!(notes.len(), 1);
         assert!(folders.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_scan_dir_recursive_lists_only_the_dot_folders_the_user_chose() {
+        let tmp = tempdir().unwrap();
+        let root = tmp.path();
+        std::fs::create_dir_all(root.join(".null")).unwrap();
+        std::fs::write(root.join(".null/Scratch.md"), "# Scratch").unwrap();
+        std::fs::create_dir_all(root.join(".claude")).unwrap();
+        std::fs::write(root.join(".claude/Rules.md"), "# Rules").unwrap();
+
+        let ws = root.to_string_lossy().into_owned();
+        let shown = [".null".to_string()];
+        let (notes, folders, _) = scan_dir_recursive(root, &ws, &shown).await.unwrap();
+
+        assert_eq!(notes.len(), 1);
+        assert_eq!(notes[0].title, "Scratch");
+        assert_eq!(folders.len(), 1);
+        assert!(folders[0].ends_with(".null"));
     }
 
     #[tokio::test]
@@ -4315,7 +4339,7 @@ mod tests {
         let ws = root.to_string_lossy().into_owned();
         create_folder_at(&ws, "Empty").await.unwrap();
 
-        let (notes, folders, _) = scan_dir_recursive(root, &ws).await.unwrap();
+        let (notes, folders, _) = scan_dir_recursive(root, &ws, &[]).await.unwrap();
 
         assert!(notes.is_empty());
         assert_eq!(folders.len(), 1);
@@ -4331,7 +4355,7 @@ mod tests {
         std::fs::write(root.join("Mine/sub/n.md"), "# n").unwrap();
 
         let ws = root.to_string_lossy().into_owned();
-        let (_, folders, _) = scan_dir_recursive(root, &ws).await.unwrap();
+        let (_, folders, _) = scan_dir_recursive(root, &ws, &[]).await.unwrap();
 
         assert_eq!(folders.len(), 1);
         assert!(folders[0].ends_with("sub"));
@@ -4355,7 +4379,7 @@ mod tests {
         }
 
         let ws = root.to_string_lossy().into_owned();
-        let (notes, folders, mut canvases) = scan_dir_recursive(root, &ws).await.unwrap();
+        let (notes, folders, mut canvases) = scan_dir_recursive(root, &ws, &[]).await.unwrap();
 
         canvases.sort();
         assert!(notes.is_empty());
@@ -4440,7 +4464,7 @@ mod tests {
         std::fs::write(root.join("map.canvas"), "{}").unwrap();
 
         let ws = root.to_string_lossy().into_owned();
-        let (_, folders, mut canvases) = scan_dir_recursive(root, &ws).await.unwrap();
+        let (_, folders, mut canvases) = scan_dir_recursive(root, &ws, &[]).await.unwrap();
 
         canvases.sort();
         assert_eq!(folders.len(), 1);

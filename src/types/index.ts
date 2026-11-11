@@ -228,6 +228,8 @@ export interface AppSettings {
   proseLineHeight: number
   /** Whole-app zoom, in percent. */
   uiZoomPct: number
+  /** Dot-folders the workspace scan lists instead of skipping, e.g. `.null`. */
+  shownDotFolders: string[]
 }
 
 export interface ErrorLogEntry {

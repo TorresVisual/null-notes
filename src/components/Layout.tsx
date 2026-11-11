@@ -576,8 +576,11 @@ export function Layout() {
   }, [keymap, runCommand])
 
   useEffect(() => {
+    // The first scan reads shownDotFolders, so it has to wait for the settings.
+    const settingsReady = api.settings.load().then(setSettings).catch(() => undefined)
     void api.workspace.initialWorkspace().then(async (path) => {
       if (!path) return
+      await settingsReady
       if (await api.workspace.initialSingleNote()) {
         const file = await api.workspace.initialSelectFile()
         if (file) void openSingleNote(path, file)
@@ -590,7 +593,6 @@ export function Layout() {
       })
     })
     void refreshRecents()
-    void api.settings.load().then(setSettings)
   }, [setSettings, openWorkspaceAt, openSingleNote])
 
   useEffect(() => {

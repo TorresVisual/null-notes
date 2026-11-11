@@ -4,6 +4,7 @@ import { confirm, message } from '@tauri-apps/plugin-dialog'
 import { useSettingsStore, DEFAULT_SETTINGS } from '../store/settings'
 import { useWorkspaceStore } from '../store/workspace'
 import { useGitConfig } from '../hooks/useGitConfig'
+import { refreshTree } from '../hooks/useWorkspace'
 import { api } from '../lib/tauri'
 import { failure } from '../lib/failure'
 import { Dialog, DialogContent, DialogTitle } from './ui/dialog'
@@ -354,6 +355,30 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
                   className="settings-text settings-text-wide"
                   value={settings.terminalShell}
                   onChange={(e) => void update({ terminalShell: e.target.value })}
+                />
+              </span>
+            </label>
+
+            <label className="settings-row">
+              <span>
+                Hidden folders to show
+                <small>
+                  Folders starting with <code>.</code> are skipped unless listed here, comma-separated, e.g.{' '}
+                  <code>.null</code>. Stored on this machine only.
+                </small>
+              </span>
+              <span className="settings-row-control">
+                <input
+                  type="text"
+                  className="settings-text settings-text-wide"
+                  defaultValue={settings.shownDotFolders.join(', ')}
+                  onBlur={(e) => {
+                    const shownDotFolders = e.target.value
+                      .split(',')
+                      .map((name) => name.trim())
+                      .filter((name) => name.startsWith('.'))
+                    void update({ shownDotFolders }).then(refreshTree)
+                  }}
                 />
               </span>
             </label>

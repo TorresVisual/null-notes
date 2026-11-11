@@ -94,7 +94,7 @@ async fn large_workspace_timings() {
     let pool = db::init_db(&dir.path().join("app-data")).await.unwrap();
 
     let start = Instant::now();
-    let (notes, _, _) = scan_dir_recursive(&root, &workspace).await.unwrap();
+    let (notes, _, _) = scan_dir_recursive(&root, &workspace, &[]).await.unwrap();
     let scan = start.elapsed();
     let start = Instant::now();
     for meta in &notes {

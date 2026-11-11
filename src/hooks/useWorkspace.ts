@@ -3,6 +3,7 @@ import { open } from '@tauri-apps/plugin-dialog'
 import { api } from '../lib/tauri'
 import { useWorkspaceStore } from '../store/workspace'
 import { useNotesStore } from '../store/notes'
+import { useSettingsStore } from '../store/settings'
 import { useGitAutoPull } from './useGitAutoPull'
 import { useGitAutoCommit } from './useGitAutoCommit'
 import { clearNavigationHistory } from '../lib/navigationHistory'
@@ -11,7 +12,7 @@ import { layoutFromSession, sessionTabs } from '../lib/editorGroups'
 export async function refreshTree(): Promise<void> {
   const path = useWorkspaceStore.getState().path
   if (!path) return
-  const tree = await api.notes.scan(path)
+  const tree = await api.notes.scan(path, useSettingsStore.getState().settings.shownDotFolders)
   useNotesStore.getState().setNotes(tree.notes)
   useNotesStore.getState().setFolders(tree.folders)
   useNotesStore.getState().setCanvases(tree.canvases)
@@ -89,7 +90,7 @@ export function useWorkspace() {
       let tree, session
       try {
         ;[tree, session] = await Promise.all([
-          api.notes.scan(selected),
+          api.notes.scan(selected, useSettingsStore.getState().settings.shownDotFolders),
           api.workspace.load(selected),
         ])
       } catch (e) {

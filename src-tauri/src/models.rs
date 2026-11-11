@@ -600,6 +600,11 @@ pub struct AppSettings {
     /// Whole-app zoom, in percent.
     #[serde(default = "default_ui_zoom_pct")]
     pub ui_zoom_pct: u32,
+    /// Dot-folders the workspace scan lists instead of skipping (e.g. `.null`
+    /// for scratch notes). Every other dot-folder stays hidden. Machine-local,
+    /// like the rest of settings.json.
+    #[serde(default)]
+    pub shown_dot_folders: Vec<String>,
 }
 
 fn default_prose_font_size_px() -> u32 {
@@ -661,6 +666,7 @@ impl Default for AppSettings {
             prose_font_size_px: default_prose_font_size_px(),
             prose_line_height: default_prose_line_height(),
             ui_zoom_pct: default_ui_zoom_pct(),
+            shown_dot_folders: Vec::new(),
         }
     }
 }

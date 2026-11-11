@@ -248,7 +248,7 @@ pub(super) async fn restore_at(
     let (entry, restored) = blocking(move || restore_files(&root, &workspace_owned, &id)).await?;
     let restored_str = restored.to_string_lossy().into_owned();
     if entry.is_folder {
-        let (notes, _, _) = scan_dir_recursive(&restored, workspace).await?;
+        let (notes, _, _) = scan_dir_recursive(&restored, workspace, &[]).await?;
         for note in notes {
             let content = tokio::fs::read_to_string(&note.path).await?;
             index_note_at(&note.path, workspace, &content, db).await?;

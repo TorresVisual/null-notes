@@ -34,6 +34,7 @@ describe('useSettingsStore', () => {
       proseFontSizePx: 18,
       proseLineHeight: 1.8,
       uiZoomPct: 125,
+      shownDotFolders: ['.null'],
     })
     expect(useSettingsStore.getState().settings).toEqual({
       autosaveDebounceMs: 1200,
@@ -56,6 +57,7 @@ describe('useSettingsStore', () => {
       proseFontSizePx: 18,
       proseLineHeight: 1.8,
       uiZoomPct: 125,
+      shownDotFolders: ['.null'],
     })
   })
 })

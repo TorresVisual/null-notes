@@ -123,9 +123,11 @@ mod tests {
             prose_font_size_px: 18,
             prose_line_height: 1.8,
             ui_zoom_pct: 125,
+            shown_dot_folders: vec![".null".to_string()],
         };
         save_settings_to_dir(dir.path(), &original).await.unwrap();
         let loaded = load_settings_from_dir(dir.path()).await.unwrap();
+        assert_eq!(loaded.shown_dot_folders, [".null"]);
         assert!(!loaded.cli_access);
         assert_eq!(loaded.autosave_debounce_ms, 1200);
         assert_eq!(loaded.editor_max_width_px, 960);

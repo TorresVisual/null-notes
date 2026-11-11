@@ -79,7 +79,7 @@ async fn open_golden(version_dir: &Path) {
 
     let app = mock_app();
     app.manage(pool.clone());
-    let tree = scan_workspace(workspace.clone(), app.state())
+    let tree = scan_workspace(workspace.clone(), Vec::new(), app.state())
         .await
         .unwrap();
     assert_eq!(tree.notes.len(), 3, "{version}: notes in tree");

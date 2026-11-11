@@ -22,6 +22,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   proseFontSizePx: 15,
   proseLineHeight: 1.6,
   uiZoomPct: 100,
+  shownDotFolders: [],
 }
 
 interface SettingsStore {
