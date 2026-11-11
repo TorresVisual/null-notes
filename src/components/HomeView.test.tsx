@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { HomeView } from './HomeView'
 import { useWorkspaceStore } from '../store/workspace'
@@ -208,7 +208,10 @@ describe('HomeView on a phone', () => {
   beforeEach(() => vi.mocked(platform).mockReturnValue('android'))
   afterEach(() => vi.mocked(platform).mockReturnValue('windows'))
 
-  it('leads with "N cards due" and a Start review button when cards are due', async () => {
+  const row = (name: RegExp | string) => screen.getByRole('button', { name })
+
+  it('leads with an emphasised "N cards due" row that starts the review', async () => {
+    useNotesStore.setState({ notes: [note('Only', 1)], folders: [], tags: [] })
     listDueCards.mockResolvedValue([dueCard(0), dueCard(1), dueCard(2)])
     listAllCards.mockResolvedValue([summary(0), summary(1), summary(2)])
     const onOpenReview = vi.fn()
@@ -216,54 +219,94 @@ describe('HomeView on a phone', () => {
 
     expect(await screen.findByText('3 cards due')).toBeInTheDocument()
     expect(screen.queryByText(/Nothing outstanding/)).toBeNull()
-    expect(screen.getAllByRole('button', { name: 'Start review' })).toHaveLength(1)
-    fireEvent.click(screen.getByRole('button', { name: 'Start review' }))
+    fireEvent.click(row(/3 cards due/))
     expect(onOpenReview).toHaveBeenCalled()
   })
 
-  it('offers the last-edited note, caught up, when there are cards but none due, and drops it from Continue', async () => {
+  it('continues the last-edited note, and keeps it out of Recent', async () => {
     useNotesStore.setState({ notes: [note('Older', 1), note('Newer', 2)], folders: [], tags: [] })
-    useWorkspaceStore.setState({ openTabs: ['/ws/Older.md', '/ws/Newer.md'] })
-    listAllCards.mockResolvedValue([summary(0)])
     renderHome()
 
-    expect(await screen.findByText('All caught up')).toBeInTheDocument()
-    expect(screen.getByText('Pick up where you left off')).toBeInTheDocument()
-    const hero = screen.getByText('Pick up where you left off').closest('section')!
-    expect(hero).toHaveTextContent('Newer')
-    const continueSection = screen.getByText('Continue').closest('section')!
-    expect(continueSection).not.toHaveTextContent('Newer')
-    expect(continueSection).toHaveTextContent('Older')
+    const continueRow = await screen.findByRole('button', { name: /Continue “Newer”/ })
+    const recent = screen.getByText('Recent').closest('h2')!.nextElementSibling!
+    expect(recent).toHaveTextContent('Older')
+    expect(recent).not.toHaveTextContent('Newer')
 
-    fireEvent.click(within(hero).getByRole('button'))
+    fireEvent.click(continueRow)
     expect(useWorkspaceStore.getState().activeTab).toBe('/ws/Newer.md')
   })
 
-  it('shows no review UI in a workspace with no flashcards', async () => {
+  it('shows the folder of each Recent note under its title', async () => {
+    useNotesStore.setState({
+      notes: [note('Top', 3), { ...note('Deep', 2), path: '/ws/Stochastik/Blatt/Deep.md' }, note('Root', 1)],
+      folders: [],
+      tags: [],
+    })
+    renderHome()
+
+    expect(await screen.findByText('Stochastik / Blatt')).toBeInTheDocument()
+  })
+
+  it('collapses an idle workspace to one calm line, naming only what exists', async () => {
     useNotesStore.setState({ notes: [note('Only', 1)], folders: [], tags: [] })
     renderHome()
 
-    expect(await screen.findByText('Pick up where you left off')).toBeInTheDocument()
-    expect(screen.queryByText('All caught up')).toBeNull()
-    expect(screen.queryByText(/cards? due/)).toBeNull()
-    expect(screen.queryByRole('button', { name: 'Start review' })).toBeNull()
-    expect(screen.queryByRole('button', { name: 'Browse all cards' })).toBeNull()
+    expect(await screen.findByText('No open tasks')).toBeInTheDocument()
+    expect(screen.queryByText(/Cards caught up/)).toBeNull()
+    expect(screen.queryByText(/Git up to date/)).toBeNull()
   })
 
-  it('has no hero at all in an empty workspace', async () => {
-    renderHome()
-
-    await waitFor(() => expect(listAllCards).toHaveBeenCalled())
-    expect(screen.queryByText('Pick up where you left off')).toBeNull()
-    expect(screen.queryByRole('button', { name: 'Start review' })).toBeNull()
-    expect(screen.queryByRole('button', { name: 'Browse all cards' })).toBeNull()
-  })
-
-  it('keeps Browse all cards when the workspace has cards', async () => {
+  it('adds cards and Git to the calm line when the workspace has them', async () => {
+    useNotesStore.setState({ notes: [note('Only', 1)], folders: [], tags: [] })
+    useWorkspaceStore.setState({ repoMode: 'notesOnly' })
     listAllCards.mockResolvedValue([summary(0)])
     renderHome()
 
-    expect(await screen.findByRole('button', { name: 'Browse all cards' })).toBeInTheDocument()
+    expect(await screen.findByText('Cards caught up · No open tasks · Git up to date')).toBeInTheDocument()
+  })
+
+  it('summarises open tasks in one row that opens the task view', async () => {
+    useNotesStore.setState({ notes: [note('Only', 1)], folders: [], tags: [] })
+    listOpenTasks.mockResolvedValue([
+      { notePath: '/ws/a.md', noteTitle: 'A', text: 'Finish proof', position: 0 },
+      { notePath: '/ws/b.md', noteTitle: 'B', text: 'Review notes', position: 3 },
+    ])
+    const onOpenTaskView = vi.fn()
+    render(<HomeView onOpenTaskView={onOpenTaskView} onOpenReview={() => {}} onOpenDeckView={() => {}} onOpenSettings={() => {}} />)
+
+    expect(await screen.findByText('Finish proof, +1')).toBeInTheDocument()
+    expect(screen.queryByText('No open tasks')).toBeNull()
+    fireEvent.click(row(/2 tasks open/))
+    expect(onOpenTaskView).toHaveBeenCalledOnce()
+  })
+
+  it('shows Git only when something needs pushing, and opens settings from it', async () => {
+    useNotesStore.setState({ notes: [note('Only', 1)], folders: [], tags: [] })
+    useWorkspaceStore.setState({ repoMode: 'notesOnly', gitPendingPaths: ['/ws/a.md', '/ws/b.md'] })
+    const onOpenSettings = vi.fn()
+    render(<HomeView onOpenTaskView={() => {}} onOpenReview={() => {}} onOpenDeckView={() => {}} onOpenSettings={onOpenSettings} />)
+
+    fireEvent.click(await screen.findByRole('button', { name: /2 unpushed/ }))
+    expect(onOpenSettings).toHaveBeenCalledOnce()
+    expect(screen.queryByText(/Git up to date/)).toBeNull()
+  })
+
+  it('has no review, study or Git-setup UI on a workspace without cards or a repo', async () => {
+    useNotesStore.setState({ notes: [note('Only', 1)], folders: [], tags: [] })
+    renderHome()
+
+    await screen.findByText('No open tasks')
+    expect(screen.queryByText(/cards? due/)).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Browse all cards' })).toBeNull()
+    expect(screen.queryByText('Not a Git repository.')).toBeNull()
+  })
+
+  it('shows one empty message in an empty workspace', async () => {
+    renderHome()
+
+    await waitFor(() => expect(listAllCards).toHaveBeenCalled())
+    expect(screen.getByText('No notes yet')).toBeInTheDocument()
+    expect(screen.queryByText('Recent')).toBeNull()
   })
 
   it('leaves the desktop layout alone', async () => {
@@ -272,7 +315,7 @@ describe('HomeView on a phone', () => {
     renderHome()
 
     expect(await screen.findByText('Nothing due.')).toBeInTheDocument()
-    expect(screen.queryByText('Pick up where you left off')).toBeNull()
+    expect(screen.queryByText('Up next')).toBeNull()
     expect(screen.getByRole('button', { name: 'Browse all cards' })).toBeInTheDocument()
   })
 })

@@ -625,7 +625,123 @@ button, [role="button"], .tree-row, .tab, .search-result, .slash-menu-item,
   color: var(--bg-raised);
 }
 
-.mobile-screen > .home-view { padding: var(--space-xl) var(--space-lg); }
+/* Phone Home: an "Up next" action list over a Recent list. The bottom padding
+   keeps the last row clear of the fixed .mobile-fab (48px + its offset). */
+.mobile-home {
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-xl) var(--space-lg) calc(48px + var(--space-lg) * 2);
+}
+
+.mobile-home h2 {
+  margin: var(--space-xl) 0 var(--space-xs);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+.mobile-home h2:first-child { margin-top: 0; }
+.mobile-home h2 svg { color: var(--text-tertiary); }
+
+.mobile-home-list { display: flex; flex-direction: column; }
+
+.mobile-home-act,
+.mobile-home-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  width: 100%;
+  min-height: 56px;
+  padding: 0;
+  background: none;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-primary);
+  text-align: left;
+}
+.mobile-home-list > :last-child { border-bottom: 0; }
+
+.mobile-home-act-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: var(--accent-bg);
+  color: var(--accent);
+}
+
+.mobile-home-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.mobile-home-title {
+  font-size: 15px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mobile-home-sub {
+  font-size: 12px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mobile-home-meta {
+  flex-shrink: 0;
+  font-size: 12px;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.mobile-home-go { flex-shrink: 0; color: var(--text-tertiary); }
+
+.mobile-home-act.is-hot {
+  min-height: 64px;
+  padding: 0 var(--space-md);
+  margin-bottom: var(--space-xs);
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  background: var(--accent-bg);
+}
+.mobile-home-act.is-hot .mobile-home-act-icon { background: var(--accent); color: var(--bg-raised); }
+.mobile-home-act.is-hot .mobile-home-title { font-weight: 600; }
+.mobile-home-act.is-hot .mobile-home-go { color: var(--accent); }
+
+.mobile-home-calm {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  min-height: 44px;
+  margin: 0;
+  font: var(--text-empty-state);
+  color: var(--text-secondary);
+}
+.mobile-home-calm svg { color: var(--accent); }
+
+.mobile-home-empty {
+  margin-top: 20vh;
+  text-align: center;
+  font: var(--text-empty-state);
+  color: var(--text-secondary);
+}
+.mobile-home-empty p { margin: 0; }
+.mobile-home-empty .mobile-home-empty-title {
+  margin-bottom: var(--space-sm);
+  font: var(--text-display);
+  color: var(--text-primary);
+}
 
 /* Name over path: a long path squeezed beside the name is unreadable at 393pt. */
 [data-shell='mobile'] .workspace-picker-recents button {
@@ -6086,38 +6202,6 @@ input[type='checkbox']:focus-visible {
   margin-top: var(--space-sm);
 }
 .home-actions .home-view-all { margin-top: 0; }
-
-.home-hero {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: var(--space-md);
-  padding: var(--space-lg);
-  border: 1px solid var(--accent);
-  border-radius: 8px;
-  background: var(--accent-bg);
-}
-
-.home-hero-title {
-  margin: 0;
-  font: var(--text-display);
-  color: var(--text-primary);
-}
-
-.home-hero-sub {
-  margin: 0;
-  font-size: 13px;
-  color: var(--text-secondary);
-}
-
-.home-hero .home-hero-action {
-  min-height: 44px;
-  padding: 0 var(--space-lg);
-  font-size: 14px;
-  background: var(--accent);
-  color: var(--bg-raised);
-}
-.home-hero .home-hero-action:hover { background: var(--accent); }
 
 .home-action-primary {
   background: var(--accent-bg);
