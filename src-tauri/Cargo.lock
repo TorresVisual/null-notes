@@ -3919,7 +3919,7 @@ dependencies = [
 
 [[package]]
 name = "null-notes"
-version = "1.0.12"
+version = "1.0.13"
 dependencies = [
  "android-native-keyring-store",
  "anyhow",
@@ -3933,13 +3933,16 @@ dependencies = [
  "gix-transport",
  "gix-zlib",
  "image 0.24.9",
+ "jni 0.22.4",
  "keyring-core",
+ "ndk-context",
  "notify",
  "pdfium-render",
  "portable-pty",
  "random_word",
  "regex",
  "reqwest",
+ "rustls-platform-verifier",
  "serde",
  "serde_json",
  "serde_yaml_ng",
@@ -3958,7 +3961,6 @@ dependencies = [
  "tracing-subscriber",
  "unicode-normalization",
  "uuid",
- "webpki-root-certs",
  "webview2-com",
  "windows",
  "zip",

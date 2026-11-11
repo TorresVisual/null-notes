@@ -1,6 +1,6 @@
 [package]
 name = "null-notes"
-version = "1.0.12"
+version = "1.0.13"
 description = "A WYSIWYG Markdown note app with inline ink and a PDF import pipeline"
 authors = ["Torres"]
 edition = "2021"
@@ -33,7 +33,6 @@ tokio = { version = "1", features = ["full"] }
 sqlx = { version = "0.8.1", features = ["sqlite", "runtime-tokio-rustls", "macros"] }
 uuid = { version = "1", features = ["v4"] }
 reqwest = { version = "0.13", default-features = false, features = ["blocking", "rustls"] }
-webpki-root-certs = "1"
 regex = "1"
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 image = "0.24"
@@ -76,6 +75,11 @@ apple-native-keyring-store = { version = "1", features = ["protected"] }
 
 [target.'cfg(target_os = "android")'.dependencies]
 android-native-keyring-store = "1"
+# reqwest and gix both verify TLS through the Android trust manager, which needs one JNI
+# handshake at startup (tls_android.rs) or every HTTPS request panics.
+rustls-platform-verifier = "0.7"
+jni = "0.22"
+ndk-context = "0.1"
 
 [target.'cfg(windows)'.dependencies]
 webview2-com = "0.39"
