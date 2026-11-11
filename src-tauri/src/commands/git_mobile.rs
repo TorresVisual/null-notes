@@ -807,8 +807,16 @@ pub fn checked_clone_repo(url: &str, parent_dir: &str, token: &str) -> anyhow::R
     }
     let dest = Path::new(parent_dir).join(dir_name);
     std::fs::create_dir(&dest)?;
+    // A half-cloned folder would make every retry fail with "File exists".
+    if let Err(e) = clone_into(&dest, url, token) {
+        let _ = std::fs::remove_dir_all(&dest);
+        return Err(e);
+    }
+    Ok(dest)
+}
 
-    let mut repo = gix::init(&dest)?;
+fn clone_into(dest: &Path, url: &str, token: &str) -> anyhow::Result<()> {
+    let mut repo = gix::init(dest)?;
     // Every ref write below (the fetch's own `refs/remotes/origin/*` update
     // included) needs a committer identity for its reflog entry. Desktop
     // gets this for free from the machine's `~/.gitconfig`; a fresh iOS
@@ -868,7 +876,7 @@ pub fn checked_clone_repo(url: &str, parent_dir: &str, token: &str) -> anyhow::R
     checkout_tree_to_worktree(&repo, tree_id)?;
     persist_clone_config(repo.git_dir(), url, needs_fallback_identity)?;
 
-    Ok(dest)
+    Ok(())
 }
 
 /// Out of mobile v1 scope (spec, "Out of scope (v1)": no fresh-workspace
@@ -1749,6 +1757,17 @@ local, uncommitted
             .unwrap();
 
         assert!(dest.join("a.md").exists());
+    }
+
+    #[test]
+    fn a_failed_clone_leaves_no_folder_so_a_retry_can_succeed() {
+        let missing = tempfile::tempdir().unwrap();
+        let parent = tempfile::tempdir().unwrap();
+        let url = as_url(&missing.path().join("not-a-repo"));
+
+        assert!(checked_clone_repo(&url, &parent.path().to_string_lossy(), "").is_err());
+
+        assert!(!parent.path().join("not-a-repo").exists());
     }
 
     #[test]
