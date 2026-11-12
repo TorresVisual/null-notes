@@ -420,6 +420,7 @@ button, [role="button"], .tree-row, .tab, .search-result, .slash-menu-item,
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+  overscroll-behavior-y: contain;
   padding-top: var(--safe-top);
 }
 
@@ -1290,6 +1291,7 @@ button, [role="button"], .tree-row, .tab, .search-result, .slash-menu-item,
 }
 
 [data-shell='mobile'] .mobile-screen--editor .editor-scroll {
+  overscroll-behavior-y: contain;
   padding-bottom: calc(72px + var(--safe-bottom));
 }
 

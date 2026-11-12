@@ -232,6 +232,8 @@ export interface AppSettings {
   uiZoomPct: number
   /** Dot-folders the workspace scan lists instead of skipping, e.g. `.null`. */
   shownDotFolders: string[]
+  /** Command id run by a pull-down from the top of a note or Home on mobile; `""` turns the gesture off. */
+  pullDownCommand: string
 }
 
 export interface ErrorLogEntry {

@@ -12,6 +12,10 @@ describe('useSettingsStore', () => {
     expect(useSettingsStore.getState().settings.cliAccess).toBe(true)
   })
 
+  it('pulls down to the command palette by default', () => {
+    expect(useSettingsStore.getState().settings.pullDownCommand).toBe('command-palette')
+  })
+
   it('replaces the settings wholesale', () => {
     useSettingsStore.getState().setSettings({
       autosaveDebounceMs: 1200,
@@ -36,6 +40,7 @@ describe('useSettingsStore', () => {
       proseLineHeight: 1.8,
       uiZoomPct: 125,
       shownDotFolders: ['.null'],
+      pullDownCommand: 'quick-switch',
     })
     expect(useSettingsStore.getState().settings).toEqual({
       autosaveDebounceMs: 1200,
@@ -60,6 +65,7 @@ describe('useSettingsStore', () => {
       proseLineHeight: 1.8,
       uiZoomPct: 125,
       shownDotFolders: ['.null'],
+      pullDownCommand: 'quick-switch',
     })
   })
 })

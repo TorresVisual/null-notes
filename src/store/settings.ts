@@ -24,6 +24,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   proseLineHeight: 1.6,
   uiZoomPct: 100,
   shownDotFolders: [],
+  pullDownCommand: 'command-palette',
 }
 
 interface SettingsStore {

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, cleanup, act } from '@testing-library/react'
+import { render, screen, cleanup, act, fireEvent } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { platform } from '@tauri-apps/plugin-os'
 import { onBackButtonPress } from '@tauri-apps/api/app'
@@ -11,6 +11,7 @@ import { useMobileOnboardingStore } from '../store/mobileOnboarding'
 import { useActionSheetStore } from '../store/actionSheet'
 import { useSettingsNavStore } from '../store/settingsNav'
 import { clearNavigationHistory } from '../lib/navigationHistory'
+import { useSettingsStore, DEFAULT_SETTINGS } from '../store/settings'
 
 vi.mock('@tauri-apps/plugin-os', () => ({ platform: vi.fn(() => 'android') }))
 vi.mock('@tauri-apps/api/app', () => ({ onBackButtonPress: vi.fn() }))
@@ -28,6 +29,7 @@ function setup(over: Partial<React.ComponentProps<typeof MobileShell>> = {}) {
     closeOverlay: vi.fn(),
     onReviewOpen: vi.fn(),
     onNewNote: vi.fn(),
+    runCommand: vi.fn(),
     hasWorkspace: true,
     noteTitle: 'Lecture 7',
     home: <div>home-screen</div>,
@@ -313,5 +315,62 @@ describe('MobileShell without a workspace', () => {
 
     act(() => press())
     expect(api.window.exitApp).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('MobileShell pull-down', () => {
+  function pull(el: Element, from: number, to: number, endX = 100) {
+    fireEvent.touchStart(el, { touches: [{ clientX: 100, clientY: from }] })
+    fireEvent.touchEnd(el, { changedTouches: [{ clientX: endX, clientY: to }] })
+  }
+  const openNote = () => useWorkspaceStore.setState({ activeTab: '/ws/a.md', openTabs: ['/ws/a.md'] })
+
+  beforeEach(() => useSettingsStore.setState({ settings: DEFAULT_SETTINGS }))
+
+  it('runs the configured command when pulled down in the editor', () => {
+    openNote()
+    const { props } = setup()
+    pull(screen.getByText('editor-screen').parentElement as Element, 100, 260)
+    expect(props.runCommand).toHaveBeenCalledWith('command-palette')
+  })
+
+  it('runs it on Home too', () => {
+    const { props } = setup()
+    pull(screen.getByText('home-screen').parentElement as Element, 100, 260)
+    expect(props.runCommand).toHaveBeenCalledWith('command-palette')
+  })
+
+  it('ignores a short drag, a sideways drag and an upward drag', () => {
+    openNote()
+    const { props } = setup()
+    const main = screen.getByText('editor-screen').parentElement as Element
+    pull(main, 100, 150)
+    pull(main, 100, 300, 300)
+    pull(main, 300, 100)
+    expect(props.runCommand).not.toHaveBeenCalled()
+  })
+
+  it('ignores a pull that starts while the content is scrolled', () => {
+    openNote()
+    const { props } = setup()
+    const main = screen.getByText('editor-screen').parentElement as HTMLElement
+    main.scrollTop = 40
+    pull(screen.getByText('editor-screen'), 100, 260)
+    expect(props.runCommand).not.toHaveBeenCalled()
+  })
+
+  it('does nothing when the setting is off', () => {
+    useSettingsStore.setState({ settings: { ...DEFAULT_SETTINGS, pullDownCommand: '' } })
+    openNote()
+    const { props } = setup()
+    pull(screen.getByText('editor-screen').parentElement as Element, 100, 260)
+    expect(props.runCommand).not.toHaveBeenCalled()
+  })
+
+  it('does nothing while an overlay is open', () => {
+    openNote()
+    const { props } = setup({ activeOverlay: 'palette' })
+    pull(screen.getByText('editor-screen').parentElement as Element, 100, 260)
+    expect(props.runCommand).not.toHaveBeenCalled()
   })
 })

@@ -29,6 +29,8 @@ import { ErrorLogDialog } from './ErrorLogDialog'
 import { KeymapSettings } from './KeymapSettings'
 import { MobileSettingsList } from './MobileSettingsList'
 import { NumberControl } from './NumberControl'
+import { COMMANDS } from '../lib/keymap'
+import { availableActions } from './CommandPalette'
 
 interface SettingsPanelProps {
   onClose: () => void
@@ -52,6 +54,11 @@ const MOBILE_SECTIONS: typeof SECTIONS = [
   { id: 'git', label: 'Git', Icon: GitBranch },
   { id: 'advanced', label: 'Advanced', Icon: SlidersHorizontal },
   { id: 'about', label: 'About', Icon: Info },
+]
+
+const pullDownChoices = [
+  ...COMMANDS.filter((c) => c.id === 'command-palette'),
+  ...availableActions({ hasWorkspace: true, hasNote: true, repoMode: true }),
 ]
 
 function clampNumber(raw: number, min: number, max: number): number {
@@ -253,6 +260,28 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
                 />
               </span>
             </label>
+
+            {mobile && (
+            <label className="settings-row">
+              <span>
+                Pull down
+                <small>The command a pull-down from the top of a note or Home runs.</small>
+              </span>
+              <span className="settings-row-control">
+                <select
+                  value={settings.pullDownCommand}
+                  onChange={(e) => void update({ pullDownCommand: e.target.value })}
+                >
+                  <option value="">Off</option>
+                  {pullDownChoices.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.label}
+                    </option>
+                  ))}
+                </select>
+              </span>
+            </label>
+            )}
 
             {!mobile && (
             <label className="settings-row">

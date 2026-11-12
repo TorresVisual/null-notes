@@ -6,6 +6,8 @@ import { useMobileOnboardingStore } from '../store/mobileOnboarding'
 import { useActionSheetStore } from '../store/actionSheet'
 import { discardIfUntouched } from '../hooks/useQuickNote'
 import { useBackButton } from '../hooks/useBackButton'
+import { usePullDown } from '../hooks/usePullDown'
+import { useSettingsStore } from '../store/settings'
 import { clearNavigationHistory, goBack, goForward, useNavigationHistoryStore } from '../lib/navigationHistory'
 import { useSettingsNavStore } from '../store/settingsNav'
 import type { OverlayKind } from '../hooks/useOverlayManager'
@@ -22,6 +24,7 @@ interface MobileShellProps {
   closeOverlay: () => void
   onReviewOpen: () => void
   onNewNote: () => void
+  runCommand: (id: string) => void
   hasWorkspace: boolean
   noteTitle: string
   home: ReactNode
@@ -45,6 +48,7 @@ export function MobileShell({
   closeOverlay,
   onReviewOpen,
   onNewNote,
+  runCommand,
   hasWorkspace,
   noteTitle,
   home,
@@ -100,6 +104,12 @@ export function MobileShell({
     },
   )
 
+  const pullDownCommand = useSettingsStore((s) => s.settings.pullDownCommand)
+  const pullDown = usePullDown(
+    () => runCommand(pullDownCommand),
+    hasWorkspace && pullDownCommand !== '' && activeOverlay === null && !moreOpen && !actionSheetOpen && (editorOpen || tab === 'home'),
+  )
+
   function selectTab(id: TabId) {
     if (id === 'search') openOverlay('search')
     else if (id === 'more') setMoreOpen(true)
@@ -144,11 +154,11 @@ export function MobileShell({
             </button>
           </header>
           {gitBars}
-          <main className="mobile-screen mobile-screen--editor">{editor}</main>
+          <main className="mobile-screen mobile-screen--editor" {...pullDown}>{editor}</main>
         </>
       ) : (
         <>
-          <main className={`mobile-screen${!hasWorkspace ? ' mobile-screen--onboarding' : ''}`}>{screen}</main>
+          <main className={`mobile-screen${!hasWorkspace ? ' mobile-screen--onboarding' : ''}`} {...pullDown}>{screen}</main>
           {hasWorkspace && activeOverlay === null && (
             <button className="mobile-fab" aria-label="New note" onClick={onNewNote}>
               <Plus size={24} />

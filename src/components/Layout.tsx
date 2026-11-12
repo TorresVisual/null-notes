@@ -778,6 +778,7 @@ export function Layout() {
             openOverlay('review')
           }}
           onNewNote={() => void quickNote()}
+          runCommand={(id) => void runCommand(id)}
           hasWorkspace={workspacePath !== null}
           noteTitle={currentNote?.title ?? ''}
           home={

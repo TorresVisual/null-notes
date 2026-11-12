@@ -609,6 +609,10 @@ pub struct AppSettings {
     /// like the rest of settings.json.
     #[serde(default)]
     pub shown_dot_folders: Vec<String>,
+    /// Command id a pull-down from the top of a note or Home runs on mobile;
+    /// empty turns the gesture off. Machine-local, like the rest of settings.json.
+    #[serde(default = "default_pull_down_command")]
+    pub pull_down_command: String,
 }
 
 fn default_prose_font_size_px() -> u32 {
@@ -621,6 +625,10 @@ fn default_prose_line_height() -> f32 {
 
 fn default_ui_zoom_pct() -> u32 {
     100
+}
+
+fn default_pull_down_command() -> String {
+    "command-palette".to_string()
 }
 
 fn default_cli_access() -> bool {
@@ -672,6 +680,7 @@ impl Default for AppSettings {
             prose_line_height: default_prose_line_height(),
             ui_zoom_pct: default_ui_zoom_pct(),
             shown_dot_folders: Vec::new(),
+            pull_down_command: default_pull_down_command(),
         }
     }
 }

@@ -27,6 +27,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   proseLineHeight: 1.6,
   uiZoomPct: 100,
   shownDotFolders: [],
+  pullDownCommand: 'command-palette',
 }
 
 const EMPTY_STATE: WorkspaceState = {
