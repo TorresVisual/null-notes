@@ -18,6 +18,8 @@ The drawer is removed: `src/store/mobileSidebar.ts` and the `mobile` branches in
 
 Rejected: a shared `useAppSession` hook extracted from `Layout` (cleaner, but a refactor of desktop code for no desktop benefit); CSS-only reflow (cannot change navigation).
 
+Rejected (#243): an Obsidian-style tab counter and tab switcher. The shell is deliberately single-note, with one `activeTab` and no open-notes list. Moving between notes is covered by back/forward history in the editor top bar (#241), the quick switcher (#240) and the Notes/Search tabs. A switcher would add a second list of "open" notes to keep in sync with the buffers and the editor-group layout, for a phone workflow that rarely holds more than one note open. Revisit if users report losing their place between notes.
+
 ## Screens
 
 | Tab | Screen | Built from |
