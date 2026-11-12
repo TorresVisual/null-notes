@@ -535,7 +535,7 @@ Generated from [feature-inventory.json](feature-inventory.json) (the source of t
 | ID | Feature | Status | Source | Issue | Note |
 |---|---|---|---|---|---|
 | MB-001 | Mobile apps (iOS, iPadOS, Android) | Partial | [mobile](https://obsidian.md/help/mobile) | - | Mobile shell works with open layout/keyboard bugs. |
-| MB-002 | Mobile editing toolbar, quick action, navigation bar, widgets, share extension | Partial | [mobile](https://obsidian.md/help/mobile) | #240, #241, #242, #243, #244, #245 | Verified 2026-11-12, see [mobile-parity.md](mobile-parity.md). Widgets and share extension not audited. |
+| MB-002 | Mobile editing toolbar, quick action, navigation bar, widgets, share extension | Partial | [mobile](https://obsidian.md/help/mobile) | #240, #241, #242, #243, #244, #245 | Re-audited 2026-11-12 after the issues landed, see [mobile-parity.md](mobile-parity.md). Widgets and share extension not audited. |
 
 ## Onboarding and documentation
 

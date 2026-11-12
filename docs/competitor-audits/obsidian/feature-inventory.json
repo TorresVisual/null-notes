@@ -4391,7 +4391,7 @@
    "dependencies": "none stated",
    "implementation_status": "partial",
    "implementation_evidence": "MobileShell.tsx, MobileTabBar.tsx, MoreSheet.tsx; EditorToolbar.tsx pinned above the keyboard",
-   "gap_description": "Toolbar is fixed (no customization, undo/redo, indent/outdent); no quick action, mobile history back/forward, tab switcher, palette/quick-switcher entry point or sidebar gesture. More sheet covers the ribbon. See mobile-parity.md.",
+   "gap_description": "Re-audited after #240-#245. Toolbar holds only editing items (no arbitrary commands, reorder by buttons); quick switcher is separate from the new-note FAB; no left file sidebar (Notes tab instead); tab switcher rejected (#243). Widgets and share extension not audited. See mobile-parity.md.",
    "issue_status": "filed",
    "issue_reference": "#240, #241, #242, #243, #244, #245",
    "issue_note": "Filed from #229.",
