@@ -251,6 +251,12 @@ const COMMANDS: Cmd[] = [
     },
   },
   {
+    title: 'Inline Code',
+    description: 'Monospace span for identifiers like getNotebooks',
+    aliases: ['code', 'field', 'identifier'],
+    run: ({ editor, range }) => editor.chain().focus().deleteRange(range).toggleCode().run(),
+  },
+  {
     title: 'Inline Math',
     description: 'LaTeX math inside a line of text',
     run: ({ editor, range }) =>
