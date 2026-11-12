@@ -30,6 +30,15 @@ pub async fn index_note(pool: &SqlitePool, note: &NoteMetadata) -> Result<()> {
     Ok(())
 }
 
+/// Paths whose content has been indexed. Only `index_note_content` writes
+/// `notes_fts`, so a note missing here has had no tasks/tags/links extracted.
+pub async fn content_indexed_paths(pool: &SqlitePool) -> Result<std::collections::HashSet<String>> {
+    let paths: Vec<String> = sqlx::query_scalar("SELECT path FROM notes_fts")
+        .fetch_all(pool)
+        .await?;
+    Ok(paths.into_iter().collect())
+}
+
 pub async fn remove_note(pool: &SqlitePool, path: &str) -> Result<()> {
     sqlx::query("DELETE FROM notes WHERE path = ?")
         .bind(path)

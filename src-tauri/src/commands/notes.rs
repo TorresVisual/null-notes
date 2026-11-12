@@ -1010,6 +1010,42 @@ pub(super) async fn scan_dir_recursive(
     Ok((notes, folders, canvases))
 }
 
+// A scan only writes each note's title row. Notes that reached this machine
+// without a save or reindex (clone, pull, sync) would otherwise have no tasks,
+// tags, links or search text. Those, and notes whose file is newer than their
+// row, get a full index; a note indexed in-app has `updated_at >= mtime` and is
+// skipped. Must run before the scan overwrites `updated_at` with the mtime.
+async fn index_unindexed_notes(
+    notes: &[NoteMetadata],
+    workspace: &str,
+    db: &DbPool,
+) -> anyhow::Result<()> {
+    let indexed = db::notes::content_indexed_paths(db).await?;
+    let previous: std::collections::HashMap<String, i64> =
+        db::notes::list_by_workspace(db, workspace)
+            .await?
+            .into_iter()
+            .map(|n| (n.path, n.updated_at))
+            .collect();
+    for meta in notes {
+        let stale = !indexed.contains(&meta.path)
+            || previous
+                .get(&meta.path)
+                .is_none_or(|&at| meta.updated_at > at);
+        if !stale {
+            continue;
+        }
+        let result = match read_note(Path::new(&meta.path)).await {
+            Ok(content) => index_note_at(&meta.path, workspace, &content, db).await,
+            Err(e) => Err(e),
+        };
+        if let Err(e) = result {
+            tracing::warn!(path = %meta.path, error = %e, "scan could not index note content");
+        }
+    }
+    Ok(())
+}
+
 #[tauri::command]
 pub async fn scan_workspace(
     workspace: String,
@@ -1023,6 +1059,10 @@ pub async fn scan_workspace(
     )
     .await
     .map_err(|e| e.to_string())?;
+
+    index_unindexed_notes(&notes, &workspace, &db)
+        .await
+        .map_err(|e| e.to_string())?;
 
     for meta in &notes {
         db::notes::index_note(&db, meta)
@@ -5271,6 +5311,54 @@ mod save_tests {
         .unwrap();
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].path, note.to_string_lossy());
+    }
+
+    #[tokio::test]
+    async fn test_scan_indexes_tasks_of_notes_never_saved_here() {
+        let tmp = tempdir().unwrap();
+        let ws = tmp.path().to_string_lossy().into_owned();
+        let note = tmp.path().join("Pulled.md");
+        std::fs::write(&note, "# Pulled\n\n- [ ] from another machine\n").unwrap();
+        let meta = NoteMetadata {
+            id: "id".into(),
+            title: "Pulled".into(),
+            path: note.to_string_lossy().into_owned(),
+            workspace: ws.clone(),
+            updated_at: 1000,
+        };
+
+        let pool = sqlx::sqlite::SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect("sqlite::memory:")
+            .await
+            .unwrap();
+        run_migrations(&pool).await.unwrap();
+        db::notes::index_note(&pool, &meta).await.unwrap();
+        assert!(db::notes::open_tasks(&pool, &ws).await.unwrap().is_empty());
+
+        index_unindexed_notes(std::slice::from_ref(&meta), &ws, &pool)
+            .await
+            .unwrap();
+        let open = db::notes::open_tasks(&pool, &ws).await.unwrap();
+        assert_eq!(open.len(), 1);
+        assert_eq!(open[0].text, "from another machine");
+
+        std::fs::write(&note, "# Pulled\n\n- [ ] a\n- [ ] b\n").unwrap();
+        index_unindexed_notes(std::slice::from_ref(&meta), &ws, &pool)
+            .await
+            .unwrap();
+        assert_eq!(
+            db::notes::open_tasks(&pool, &ws).await.unwrap().len(),
+            1,
+            "a note already indexed at or after its mtime is not re-read"
+        );
+
+        let newer = NoteMetadata {
+            updated_at: i64::MAX,
+            ..meta
+        };
+        index_unindexed_notes(&[newer], &ws, &pool).await.unwrap();
+        assert_eq!(db::notes::open_tasks(&pool, &ws).await.unwrap().len(), 2);
     }
 
     #[tokio::test]
