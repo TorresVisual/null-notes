@@ -46,12 +46,12 @@ Granularity: a feature is a capability with its own acceptance test (for example
 | Status | Count |
 |---|---|
 | Implemented | 58 |
-| Partially implemented | 36 |
+| Partially implemented | 37 |
 | Missing | 80 |
 | Not applicable (with rationale) | 28 |
-| Unverified | 9 |
+| Unverified | 8 |
 
-Per-category counts are in [feature-inventory.md](feature-inventory.md). Unverified entries (not counted as gaps, no issue filed): ED-004 Shift+Enter/line breaks, ED-019 nested callouts, ED-022 paste without formatting, LK-007 link from selection, FL-004 vault rename/remove, FL-006 symlinks, FL-021 backup guidance, MB-002 mobile toolbar parity, ON-003 accessibility baseline.
+Per-category counts are in [feature-inventory.md](feature-inventory.md). Unverified entries (not counted as gaps, no issue filed): ED-004 Shift+Enter/line breaks, ED-019 nested callouts, ED-022 paste without formatting, LK-007 link from selection, FL-004 vault rename/remove, FL-006 symlinks, FL-021 backup guidance, ON-003 accessibility baseline.
 
 ## Confirmed gaps
 

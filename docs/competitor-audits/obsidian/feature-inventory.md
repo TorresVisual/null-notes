@@ -17,7 +17,7 @@ Generated from [feature-inventory.json](feature-inventory.json) (the source of t
 | Extending and automation | 8 | 0 | 0 | 3 | 5 | 0 |
 | Web capture | 5 | 0 | 0 | 0 | 5 | 0 |
 | Sync, publish and services | 10 | 0 | 0 | 0 | 10 | 0 |
-| Mobile | 2 | 0 | 1 | 0 | 0 | 1 |
+| Mobile | 2 | 0 | 2 | 0 | 0 | 0 |
 | Onboarding and documentation | 3 | 0 | 2 | 0 | 0 | 1 |
 | **Total** | **211** | 58 | 36 | 80 | 28 | 9 |
 
@@ -535,7 +535,7 @@ Generated from [feature-inventory.json](feature-inventory.json) (the source of t
 | ID | Feature | Status | Source | Issue | Note |
 |---|---|---|---|---|---|
 | MB-001 | Mobile apps (iOS, iPadOS, Android) | Partial | [mobile](https://obsidian.md/help/mobile) | - | Mobile shell works with open layout/keyboard bugs. |
-| MB-002 | Mobile editing toolbar, quick action, navigation bar, widgets, share extension | Unverified | [mobile](https://obsidian.md/help/mobile) | - | Parity with Obsidian mobile UI features not verified (Help pages for iOS/Android/mobile read at heading level). |
+| MB-002 | Mobile editing toolbar, quick action, navigation bar, widgets, share extension | Partial | [mobile](https://obsidian.md/help/mobile) | #240, #241, #242, #243, #244, #245 | Verified 2026-11-12, see [mobile-parity.md](mobile-parity.md). Widgets and share extension not audited. |
 
 ## Onboarding and documentation
 

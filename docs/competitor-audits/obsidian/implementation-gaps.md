@@ -261,6 +261,7 @@ Priorities are suggested (P0 critical, P1 high, P2 medium, P3 low) and exist onl
 | ID | Feature | Status | Reason not filed |
 |---|---|---|---|
 | MB-001 | Mobile apps (iOS, iPadOS, Android) | partial | Existing mobile issues track the gaps. |
+| MB-002 | Mobile editing toolbar, quick action, navigation bar, widgets, share extension | partial | Filed: #240-#245, see [mobile-parity.md](mobile-parity.md). |
 
 ### Onboarding and documentation
 
