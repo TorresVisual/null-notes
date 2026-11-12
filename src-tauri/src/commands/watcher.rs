@@ -34,7 +34,12 @@ fn is_bookmarks_path(path: &Path) -> bool {
     path.file_name().and_then(|n| n.to_str()) == Some(super::bookmarks::BOOKMARKS_FILE)
 }
 
+// inotify (Android, Linux) reports a file being opened or closed after a read.
+// Re-indexing reads the file, so counting those would loop forever.
 fn note_paths(event: &Event) -> Vec<PathBuf> {
+    if event.kind.is_access() {
+        return Vec::new();
+    }
     event
         .paths
         .iter()
@@ -119,6 +124,22 @@ pub fn watch_workspace(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_note_paths_ignores_read_only_access_events() {
+        use notify::event::{AccessKind, AccessMode};
+        use notify::EventKind;
+        let note = PathBuf::from("/ws/a.md");
+        for kind in [
+            EventKind::Access(AccessKind::Open(AccessMode::Any)),
+            EventKind::Access(AccessKind::Close(AccessMode::Read)),
+        ] {
+            assert!(note_paths(&Event::new(kind).add_path(note.clone())).is_empty());
+        }
+        let modified =
+            Event::new(EventKind::Modify(notify::event::ModifyKind::Any)).add_path(note.clone());
+        assert_eq!(note_paths(&modified), vec![note]);
+    }
 
     #[test]
     fn test_is_note_path_accepts_markdown() {
