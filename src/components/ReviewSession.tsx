@@ -76,13 +76,15 @@ export function ReviewSession({ onClose, mode = { kind: 'due' }, onSwitchCategor
   // Lets the header offer a one-click switch to another category without
   // leaving the review overlay — Deck View computes the same buckets, but
   // going back there and clicking Cram again was the whole friction (#27).
-  useEffect(() => {
+  function loadCategories() {
     if (!workspacePath || cramStreak === null) return
     api.notes
       .listAllCards(workspacePath)
-      .then((cards) => setCategories(groupCardsByStreak(cards)))
+      .then((cards) => setCategories(groupCardsByStreak(cards.filter((c) => !c.suspended))))
       .catch(() => {})
-  }, [workspacePath, cramStreak])
+  }
+
+  useEffect(loadCategories, [workspacePath, cramStreak])
 
   // Cram and tag sessions are drills over cards that aren't necessarily due,
   // so they're shuffled; the due queue keeps the backend's due-date order.
@@ -123,6 +125,7 @@ export function ReviewSession({ onClose, mode = { kind: 'due' }, onSwitchCategor
   // `front` pulls the undone card back to the head of a shuffled queue.
   function refetch(front?: UndoableGrade) {
     if (!workspacePath) return
+    loadCategories()
     void fetchQueue(workspacePath).then((fetched) => {
       const at = front
         ? fetched.findIndex(
@@ -351,7 +354,7 @@ export function ReviewSession({ onClose, mode = { kind: 'due' }, onSwitchCategor
             )}
           </div>
         </div>
-        {cramStreak !== null && categories.length > 1 && onSwitchCategory && (
+        {cramStreak !== null && categories.some((c) => c.streak !== cramStreak || c.struggling !== cramStruggling) && onSwitchCategory && (
           <div className="review-cram-categories">
             {categories.map(({ streak, count, struggling }) => (
               <button

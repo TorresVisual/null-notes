@@ -374,6 +374,24 @@ describe('ReviewSession — cram mode', () => {
     await waitFor(() => screen.getByText('Q1'))
     expect(screen.queryByText('Category 2 (1)')).not.toBeInTheDocument()
   })
+
+  it('refreshes the category chips after the last card of a category is graded', async () => {
+    const inCategory: CardSummary = { notePath: '/ws/a.md', noteTitle: 'A', kind: 'qa', front: 'Q1', back: 'A1', position: 0, due: '2026-01-01', interval: 0, streak: 2, lapses: 0, suspended: false, tags: [] }
+    const fresh: CardSummary = { ...inCategory, notePath: '/ws/b.md', noteTitle: 'B', front: 'Q2', streak: 0 }
+    vi.mocked(api.notes.listCramCards).mockResolvedValueOnce([cards[0]!]).mockResolvedValue([])
+    vi.mocked(api.notes.listAllCards)
+      .mockResolvedValueOnce([inCategory, fresh])
+      .mockResolvedValue([fresh])
+    render(<ReviewSession onClose={vi.fn()} mode={{ kind: 'cram', streak: 2, struggling: false }} onSwitchCategory={vi.fn()} />)
+
+    await waitFor(() => screen.getByText('Category 2 (1)'))
+    fireEvent.click(screen.getByText('Reveal answer'))
+    fireEvent.click(screen.getByText('Good'))
+
+    await waitFor(() => expect(screen.getByText('No cards in this category.')).toBeInTheDocument())
+    await waitFor(() => expect(screen.queryByText('Category 2 (1)')).not.toBeInTheDocument())
+    expect(screen.getByText('New (1)')).toBeInTheDocument()
+  })
 })
 
 describe('ReviewSession — tag mode', () => {
