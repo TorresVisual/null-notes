@@ -1,9 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
+import { platform } from '@tauri-apps/plugin-os'
 import { ReviewSession } from './ReviewSession'
 import { api } from '../lib/tauri'
 import { useWorkspaceStore } from '../store/workspace'
 import type { CardSummary, DueCard } from '../types'
+
+vi.mock('@tauri-apps/plugin-os', () => ({ platform: vi.fn(() => 'windows') }))
 
 vi.mock('../lib/tauri', () => ({
   api: {
@@ -391,5 +394,54 @@ describe('ReviewSession — tag mode', () => {
     vi.mocked(api.notes.listTagCards).mockResolvedValue([])
     render(<ReviewSession onClose={vi.fn()} mode={{ kind: 'tags', tags: ['algo'] }} />)
     await waitFor(() => expect(screen.getByText('No cards with these tags.')).toBeInTheDocument())
+  })
+})
+
+describe('ReviewSession — phone', () => {
+  beforeEach(() => {
+    vi.mocked(platform).mockReturnValue('android')
+  })
+
+  afterEach(() => {
+    vi.mocked(platform).mockReturnValue('windows')
+  })
+
+  it('reveals on a tap anywhere on the card and pins the grades to the dock', async () => {
+    render(<ReviewSession onClose={vi.fn()} />)
+    await waitFor(() => screen.getByText('Q1'))
+    expect(screen.getByText('Show answer').closest('.review-dock')).not.toBeNull()
+    fireEvent.click(screen.getByText('Q1'))
+    expect(screen.getByText('A1')).toBeInTheDocument()
+    expect(screen.getByText('Good').closest('.review-dock')).not.toBeNull()
+  })
+
+  it('keeps Open note, Suspend and the workspace scope behind the ⋯ sheet', async () => {
+    render(<ReviewSession onClose={vi.fn()} />)
+    await waitFor(() => screen.getByText('Q1'))
+    expect(screen.queryByText('Suspend')).toBeNull()
+    expect(screen.queryByText('Review all workspaces')).toBeNull()
+
+    fireEvent.click(screen.getByLabelText('Review options'))
+    expect(screen.getByText('Open note')).toBeInTheDocument()
+    fireEvent.click(screen.getByText('Suspend card'))
+    await waitFor(() => expect(api.notes.setCardSuspended).toHaveBeenCalledWith('/ws/a.md', 0, true, '/ws'))
+  })
+
+  it('offers undo after a grade', async () => {
+    render(<ReviewSession onClose={vi.fn()} />)
+    await waitFor(() => screen.getByText('Q1'))
+    fireEvent.click(screen.getByText('Q1'))
+    fireEvent.click(screen.getByText('Good'))
+    await waitFor(() => expect(screen.getByText('Card graded')).toBeInTheDocument())
+    fireEvent.click(screen.getByText('Undo'))
+    await waitFor(() => expect(api.notes.restoreCardSchedule).toHaveBeenCalled())
+  })
+
+  it('closes from the back arrow', async () => {
+    const onClose = vi.fn()
+    render(<ReviewSession onClose={onClose} />)
+    await waitFor(() => screen.getByText('Q1'))
+    fireEvent.click(screen.getByLabelText('Close review'))
+    expect(onClose).toHaveBeenCalled()
   })
 })

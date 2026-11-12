@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
-import { X } from 'lucide-react'
+import { ArrowLeft, MoreHorizontal, X } from 'lucide-react'
 import { LoadingStatus } from './LoadingStatus'
 import { Dialog, DialogContent, DialogTitle } from './ui/dialog'
 import { api } from '../lib/tauri'
 import { useWorkspaceStore } from '../store/workspace'
 import { requestCardHighlight } from '../lib/cardJump'
 import { CardText } from './CardText'
+import { ReviewMenuSheet } from './ReviewMenuSheet'
+import { isMobile } from '../lib/platform'
 import { groupCardsByStreak, type CardStreakGroup } from '../lib/cardGroups'
 import type { DueCard, Grade } from '../types'
 
@@ -68,6 +70,8 @@ export function ReviewSession({ onClose, mode = { kind: 'due' }, onSwitchCategor
   const [categories, setCategories] = useState<CardStreakGroup[]>([])
   const [allWorkspaces, setAllWorkspaces] = useState(false)
   const [lastGrade, setLastGrade] = useState<UndoableGrade | null>(null)
+  const [menuOpen, setMenuOpen] = useState(false)
+  const mobile = isMobile()
 
   // Lets the header offer a one-click switch to another category without
   // leaving the review overlay — Deck View computes the same buckets, but
@@ -174,6 +178,7 @@ export function ReviewSession({ onClose, mode = { kind: 'due' }, onSwitchCategor
 
   function suspend() {
     if (!workspacePath || !current) return
+    setMenuOpen(false)
     const notePath = current.notePath
     void api.notes
       .setCardSuspended(notePath, current.position, true, current.workspace)
@@ -276,6 +281,32 @@ export function ReviewSession({ onClose, mode = { kind: 'due' }, onSwitchCategor
     return ''
   }
 
+  const actions = !current ? null : current.kind === 'mc' ? (
+    mcResult === null ? (
+      <button className="review-card-reveal" disabled={picked.size === 0 || mcSubmitting} onClick={submitMc}>
+        Submit
+      </button>
+    ) : (
+      <button className="review-card-reveal" onClick={() => refetch()}>
+        Next
+      </button>
+    )
+  ) : revealed ? (
+    <div className="review-card-grades">
+      {GRADES.map(({ grade: g, label }) => (
+        <button key={g} className={`review-card-grade review-card-grade-${g}`} onClick={() => grade(g)}>
+          {label}
+        </button>
+      ))}
+    </div>
+  ) : (
+    <button className="review-card-reveal" onClick={() => setRevealed(true)}>
+      {mobile ? 'Show answer' : 'Reveal answer'}
+    </button>
+  )
+  const canOpenNote = current !== undefined && current.workspace === workspacePath
+  const dueMode = cramStreak === null && tagsKey === null
+
   return (
     <Dialog open onOpenChange={(next) => !next && onClose()}>
       <DialogContent
@@ -289,6 +320,11 @@ export function ReviewSession({ onClose, mode = { kind: 'due' }, onSwitchCategor
         }}
       >
         <div className="settings-panel-header">
+          {mobile && (
+            <button className="settings-panel-close review-back" onClick={onClose} aria-label="Close review">
+              <ArrowLeft size={20} />
+            </button>
+          )}
           <DialogTitle asChild>
             <h2>
               {cramStreak !== null
@@ -299,14 +335,20 @@ export function ReviewSession({ onClose, mode = { kind: 'due' }, onSwitchCategor
             </h2>
           </DialogTitle>
           <div className="review-header-actions">
-            {lastGrade && (
+            {!mobile && lastGrade && (
               <button className="review-card-suspend" onClick={undo} title="Undo last grade (Ctrl+Z)">
                 Undo
               </button>
             )}
-            <button className="settings-panel-close" onClick={onClose} aria-label="Close review" title="Close review">
-              <X size={16} />
-            </button>
+            {mobile ? (
+              <button className="settings-panel-close" onClick={() => setMenuOpen(true)} aria-label="Review options">
+                <MoreHorizontal size={20} />
+              </button>
+            ) : (
+              <button className="settings-panel-close" onClick={onClose} aria-label="Close review" title="Close review">
+                <X size={16} />
+              </button>
+            )}
           </div>
         </div>
         {cramStreak !== null && categories.length > 1 && onSwitchCategory && (
@@ -322,7 +364,7 @@ export function ReviewSession({ onClose, mode = { kind: 'due' }, onSwitchCategor
             ))}
           </div>
         )}
-        {cramStreak === null && tagsKey === null && (
+        {!mobile && dueMode && (
           <label className="search-scope-toggle">
             <input
               type="checkbox"
@@ -345,7 +387,10 @@ export function ReviewSession({ onClose, mode = { kind: 'due' }, onSwitchCategor
                 : 'All done for today.'}
           </p>
         ) : (
-          <div className="review-card">
+          <div
+            className="review-card"
+            onClick={mobile && !revealed && current.kind !== 'mc' ? () => setRevealed(true) : undefined}
+          >
             <div className="review-card-header">
               <p className="review-card-note">
                 {current.noteTitle}
@@ -353,7 +398,7 @@ export function ReviewSession({ onClose, mode = { kind: 'due' }, onSwitchCategor
                   <span className="search-result-workspace">{current.workspace.split(/[/\\]/).pop()}</span>
                 )}
               </p>
-              {current.workspace === workspacePath && (
+              {!mobile && canOpenNote && (
                 <button
                   className="review-card-suspend"
                   onClick={openCardNote}
@@ -362,14 +407,16 @@ export function ReviewSession({ onClose, mode = { kind: 'due' }, onSwitchCategor
                   Open note
                 </button>
               )}
-              <button
-                className="review-card-suspend"
-                onClick={suspend}
-                aria-label="Suspend card"
-                title="Suspend card from review queue"
-              >
-                Suspend
-              </button>
+              {!mobile && (
+                <button
+                  className="review-card-suspend"
+                  onClick={suspend}
+                  aria-label="Suspend card"
+                  title="Suspend card from review queue"
+                >
+                  Suspend
+                </button>
+              )}
             </div>
             {/* An occlusion back is the same image with the answer outlined, so
                 keeping the front above it would show the picture twice. */}
@@ -379,59 +426,54 @@ export function ReviewSession({ onClose, mode = { kind: 'due' }, onSwitchCategor
               </p>
             )}
             {current.kind === 'mc' ? (
-              <>
-                <ul className="review-card-options">
-                  {optionOrder.map((optionIndex) => {
-                    const opt = current.options[optionIndex]!
-                    return (
-                      <li key={optionIndex} className={`review-card-option${optionClass(optionIndex)}`}>
-                        <label>
-                          <input
-                            type="checkbox"
-                            checked={picked.has(optionIndex)}
-                            disabled={mcResult !== null}
-                            onChange={() => togglePick(optionIndex)}
-                            aria-label={opt}
-                          />
-                          <CardText text={opt} notePath={current.notePath} />
-                        </label>
-                      </li>
-                    )
-                  })}
-                </ul>
-                {mcResult === null ? (
-                  <button
-                    className="review-card-reveal"
-                    disabled={picked.size === 0 || mcSubmitting}
-                    onClick={submitMc}
-                  >
-                    Submit
-                  </button>
-                ) : (
-                  <button className="review-card-reveal" onClick={() => refetch()}>
-                    Next
-                  </button>
-                )}
-              </>
-            ) : revealed ? (
-              <>
+              <ul className="review-card-options">
+                {optionOrder.map((optionIndex) => {
+                  const opt = current.options[optionIndex]!
+                  return (
+                    <li key={optionIndex} className={`review-card-option${optionClass(optionIndex)}`}>
+                      <label>
+                        <input
+                          type="checkbox"
+                          checked={picked.has(optionIndex)}
+                          disabled={mcResult !== null}
+                          onChange={() => togglePick(optionIndex)}
+                          aria-label={opt}
+                        />
+                        <CardText text={opt} notePath={current.notePath} />
+                      </label>
+                    </li>
+                  )
+                })}
+              </ul>
+            ) : (
+              revealed && (
                 <p className="review-card-back">
                   <CardText text={current.back} notePath={current.notePath} />
                 </p>
-                <div className="review-card-grades">
-                  {GRADES.map(({ grade: g, label }) => (
-                    <button key={g} className="review-card-grade" onClick={() => grade(g)}>
-                      {label}
-                    </button>
-                  ))}
-                </div>
-              </>
-            ) : (
-              <button className="review-card-reveal" onClick={() => setRevealed(true)}>
-                Reveal answer
-              </button>
+              )
             )}
+            {!mobile && actions}
           </div>
+        )}
+        {mobile && current && !isLoading && !error && (
+          <>
+            {lastGrade && !revealed && mcResult === null && (
+              <div className="review-undo-toast">
+                <span>Card graded</span>
+                <button onClick={undo}>Undo</button>
+              </div>
+            )}
+            <div className="review-dock">{actions}</div>
+          </>
+        )}
+        {mobile && menuOpen && (
+          <ReviewMenuSheet
+            onClose={() => setMenuOpen(false)}
+            onOpenNote={canOpenNote ? openCardNote : null}
+            onSuspend={current ? suspend : null}
+            allWorkspaces={dueMode ? allWorkspaces : null}
+            onToggleAllWorkspaces={setAllWorkspaces}
+          />
         )}
       </DialogContent>
     </Dialog>

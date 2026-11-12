@@ -693,6 +693,87 @@ button, [role="button"], .tree-row, .tab, .search-result, .slash-menu-item,
   padding-bottom: calc(var(--space-lg) + var(--safe-bottom));
 }
 
+/* Review on a phone: the card scrolls, the answer/grade controls are pinned
+   to the thumb zone. Rare actions live in the ⋯ sheet (ReviewMenuSheet). */
+[data-shell='mobile'] .review-session { overflow: hidden; gap: var(--space-md); }
+[data-shell='mobile'] .review-session .settings-panel-header h2 {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+[data-shell='mobile'] .review-session .settings-panel-close { min-width: 44px; min-height: 44px; }
+[data-shell='mobile'] .review-card { flex: 1; min-height: 0; overflow-y: auto; padding: var(--space-md) 0; }
+[data-shell='mobile'] .review-card-front,
+[data-shell='mobile'] .review-card-back { font-size: 20px; }
+[data-shell='mobile'] .review-cram-categories { flex-wrap: nowrap; overflow-x: auto; flex-shrink: 0; }
+[data-shell='mobile'] .review-cram-category {
+  flex: 0 0 auto;
+  min-height: 36px;
+  padding: 0 14px;
+  border-radius: 18px;
+  font-size: 13px;
+}
+[data-shell='mobile'] .review-card-option label { min-height: 52px; padding: 0 14px; font-size: 16px; }
+[data-shell='mobile'] .review-card-option input { width: 22px; height: 22px; }
+
+.review-dock {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  padding-top: var(--space-md);
+  border-top: 1px solid var(--border);
+}
+[data-shell='mobile'] .review-dock .review-card-reveal {
+  align-self: stretch;
+  min-height: 54px;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--accent-bg);
+}
+[data-shell='mobile'] .review-dock .review-card-reveal:disabled { opacity: 0.5; }
+[data-shell='mobile'] .review-card-grades {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-areas: 'hard easy' 'again good';
+}
+[data-shell='mobile'] .review-card-grade { min-height: 44px; font-size: 14px; }
+[data-shell='mobile'] .review-card-grade-hard { grid-area: hard; }
+[data-shell='mobile'] .review-card-grade-easy { grid-area: easy; }
+[data-shell='mobile'] .review-card-grade-again,
+[data-shell='mobile'] .review-card-grade-good { min-height: 60px; font-size: 16px; font-weight: 600; }
+[data-shell='mobile'] .review-card-grade-again { grid-area: again; color: var(--danger); border-color: var(--danger); }
+[data-shell='mobile'] .review-card-grade-good { grid-area: good; color: var(--accent); border-color: var(--accent); }
+
+.review-undo-toast {
+  position: absolute;
+  left: var(--space-lg);
+  right: var(--space-lg);
+  bottom: calc(var(--safe-bottom) + 100px);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 48px;
+  padding: 0 var(--space-md);
+  background: var(--bg-hover);
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  font-size: 14px;
+}
+.review-undo-toast button {
+  min-height: 44px;
+  padding: 0 var(--space-md);
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-weight: 600;
+}
+.review-menu-toggle { justify-content: space-between; cursor: pointer; }
+.review-menu-toggle input { width: 22px; height: 22px; }
+
 .mobile-search-bar { display: flex; align-items: center; flex-shrink: 0; padding: 0 var(--space-sm); }
 
 [data-shell='mobile'] .mobile-search-bar .search-modal-input-wrap {
