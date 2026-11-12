@@ -693,6 +693,54 @@ button, [role="button"], .tree-row, .tab, .search-result, .slash-menu-item,
   padding-bottom: calc(var(--space-lg) + var(--safe-bottom));
 }
 
+/* Tasks on a phone: full-bleed 48px rows, a 44px checkbox hit zone around the
+   22px box, sticky one-line note headers. */
+[data-shell='mobile'] .task-view .settings-panel-header h2 { flex: 1; }
+[data-shell='mobile'] .task-view-list { gap: 0; margin: 0 calc(-1 * var(--space-lg)); }
+[data-shell='mobile'] .task-view-note-title {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  width: 100%;
+  padding: var(--space-md) var(--space-lg) var(--space-xs);
+  background: var(--bg-raised);
+  font-weight: 600;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+[data-shell='mobile'] .task-view-item {
+  min-height: 48px;
+  padding: 0 0 0 17px;
+  border-bottom: 1px solid var(--border);
+}
+[data-shell='mobile'] .task-view-item:last-child { border-bottom: 0; }
+[data-shell='mobile'] .task-view-item input[type='checkbox'] {
+  position: relative;
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  margin-right: var(--space-md);
+  border-width: 2px;
+  border-radius: 6px;
+}
+[data-shell='mobile'] .task-view-item input[type='checkbox']::before {
+  content: '';
+  position: absolute;
+  inset: -13px -11px;
+}
+[data-shell='mobile'] .task-view-item input[type='checkbox']:checked::after { width: 6px; height: 11px; }
+[data-shell='mobile'] .task-view-item-text {
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  font-size: 15px;
+  line-height: 1.35;
+  padding: 10px var(--space-lg) 10px 0;
+}
+[data-shell='mobile'] .task-view-item-text:hover { text-decoration: none; }
+
 /* Review on a phone: the card scrolls, the answer/grade controls are pinned
    to the thumb zone. Rare actions live in the ⋯ sheet (ReviewMenuSheet). */
 [data-shell='mobile'] .review-session { overflow: hidden; gap: var(--space-md); }
