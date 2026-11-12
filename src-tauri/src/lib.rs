@@ -356,6 +356,7 @@ pub fn run() {
             commands::workspace::save_workspace,
             commands::workspace::recent_workspaces,
             commands::workspace::remember_workspace,
+            commands::workspace::delete_workspace,
             commands::workspace::initial_workspace,
             commands::workspace::initial_select_file,
             commands::workspace::initial_single_note,

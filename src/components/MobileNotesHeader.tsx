@@ -1,7 +1,8 @@
-import { ArrowLeftRight, ChevronDown, Ellipsis, FolderOpen, FolderPlus, LayoutTemplate, PenLine } from 'lucide-react'
+import { ArrowLeftRight, ChevronDown, Ellipsis, FolderOpen, FolderPlus, LayoutTemplate, PenLine, Trash2 } from 'lucide-react'
 import { useWorkspaceStore } from '../store/workspace'
 import { useActionSheetStore } from '../store/actionSheet'
 import { useWorkspace } from '../hooks/useWorkspace'
+import { useDeleteLocalWorkspace } from '../hooks/useDeleteLocalWorkspace'
 import { useCreateFolder } from '../hooks/useCreateFolder'
 import { useCreateCanvasNote } from '../hooks/useCreateCanvasNote'
 import { folderName } from '../lib/pathPrefix'
@@ -18,6 +19,7 @@ export function MobileNotesHeader({ onTemplateOpen }: MobileNotesHeaderProps) {
   const { openWorkspaceAt, closeWorkspace } = useWorkspace()
   const createFolder = useCreateFolder()
   const createCanvasNote = useCreateCanvasNote()
+  const deleteLocalCopy = useDeleteLocalWorkspace()
 
   const others = recentWorkspaces.filter((p) => p !== workspacePath)
   const name = workspacePath ? folderName(workspacePath) : ''
@@ -68,6 +70,7 @@ export function MobileNotesHeader({ onTemplateOpen }: MobileNotesHeaderProps) {
                 onSelect: () => void handleCreateCanvas(),
               },
               { label: 'From template…', icon: LayoutTemplate, onSelect: onTemplateOpen },
+              { label: 'Delete local copy…', icon: Trash2, onSelect: () => void deleteLocalCopy(), destructive: true },
             ],
           })
         }

@@ -1,7 +1,14 @@
 import { useMemo, type ReactNode } from 'react'
-import { Check, ChevronRight, Clock, GitBranch, Layers, ListTodo } from 'lucide-react'
+import { Check, ChevronRight, Clock, GitBranch, GitMerge, Layers, ListTodo, Trash2 } from 'lucide-react'
 import { useWorkspaceStore } from '../store/workspace'
 import { useNotesStore } from '../store/notes'
+import { useActionSheetStore } from '../store/actionSheet'
+import { showToast } from '../store/toast'
+import { useGitAutoPull } from '../hooks/useGitAutoPull'
+import { useDeleteLocalWorkspace } from '../hooks/useDeleteLocalWorkspace'
+import { withGitLock } from '../lib/git'
+import { api } from '../lib/tauri'
+import { failure } from '../lib/failure'
 import { noteFolderSegments } from '../lib/pathPrefix'
 import { relativeTime } from '../lib/relativeTime'
 import type { OpenTask } from '../types'
@@ -45,6 +52,34 @@ export function MobileHome({ tasks, dueCount, hasCards, onOpenTaskView, onOpenRe
   const repoMode = useWorkspaceStore((s) => s.repoMode)
   const gitDiverged = useWorkspaceStore((s) => s.gitDiverged)
   const gitPendingCount = useWorkspaceStore((s) => s.gitPendingPaths.length)
+
+  const openSheet = useActionSheetStore((s) => s.open)
+  const { checkForUpdates } = useGitAutoPull()
+  const deleteLocalCopy = useDeleteLocalWorkspace()
+
+  async function rebaseAndSync() {
+    if (!workspace) return
+    try {
+      const outcome = await withGitLock(() => api.git.rebaseOntoRemote(workspace))
+      if (outcome.kind === 'aborted') showToast(failure('rebase onto the remote', outcome.output))
+    } catch (e) {
+      showToast(failure('rebase onto the remote', e))
+    }
+    await checkForUpdates(workspace)
+  }
+
+  function openDivergedSheet() {
+    if (!gitDiverged) return
+    const { localPaths, remotePaths } = gitDiverged
+    const disjoint = localPaths.length > 0 && remotePaths.length > 0 && !localPaths.some((p) => remotePaths.includes(p))
+    openSheet({
+      title: `${gitDiverged.ahead} ahead, ${gitDiverged.behind} behind`,
+      actions: [
+        ...(disjoint ? [{ label: 'Rebase and sync', icon: GitMerge, onSelect: () => void rebaseAndSync() }] : []),
+        { label: 'Delete local copy…', icon: Trash2, onSelect: () => void deleteLocalCopy(), destructive: true },
+      ],
+    })
+  }
 
   const sorted = useMemo(() => [...notes].sort((a, b) => b.updatedAt - a.updatedAt), [notes])
   const last = sorted[0]
@@ -95,7 +130,14 @@ export function MobileHome({ tasks, dueCount, hasCards, onOpenTaskView, onOpenRe
             onClick={onOpenTaskView}
           />
         )}
-        {gitAlert && <UpNextRow icon={<GitBranch size={18} />} title={gitAlert} sub="Open Git settings" onClick={onOpenSettings} />}
+        {gitAlert && (
+          <UpNextRow
+            icon={<GitBranch size={18} />}
+            title={gitAlert}
+            sub={gitDiverged ? 'Resolve' : 'Open Git settings'}
+            onClick={gitDiverged ? openDivergedSheet : onOpenSettings}
+          />
+        )}
         {calm && (
           <p className="mobile-home-calm">
             <Check size={16} />

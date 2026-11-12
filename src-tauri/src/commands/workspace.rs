@@ -58,6 +58,31 @@ async fn push_recent(dir: &Path, workspace: &str) -> anyhow::Result<Vec<String>>
     Ok(recents)
 }
 
+// Only a folder the app itself opened (it is in the recents file) can be
+// deleted, so a compromised or buggy caller cannot point this at an arbitrary
+// path. Already-gone folders are just forgotten.
+async fn delete_recent_workspace(dir: &Path, workspace: &str) -> anyhow::Result<Vec<String>> {
+    let recents = read_recents(dir).await?;
+    if !recents.iter().any(|p| p == workspace) {
+        anyhow::bail!("not a known workspace: {workspace}");
+    }
+    if Path::new(workspace).parent().is_none() {
+        anyhow::bail!("refusing to delete a filesystem root");
+    }
+    match tokio::fs::remove_dir_all(workspace).await {
+        Ok(()) => {}
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+        Err(e) => return Err(e.into()),
+    }
+    let remaining: Vec<String> = recents.into_iter().filter(|p| p != workspace).collect();
+    tokio::fs::write(
+        dir.join(RECENTS_FILE),
+        serde_json::to_string_pretty(&remaining)?,
+    )
+    .await?;
+    Ok(remaining)
+}
+
 // A single `--workspace=<path>` token, not a `--workspace <path>` pair: some
 // launchers in the E2E toolchain reorder and re-split multi-token argv lists,
 // which silently detaches a flag from its value. One token can't be reordered
@@ -183,6 +208,14 @@ pub async fn remember_workspace(app: AppHandle, path: String) -> Result<Vec<Stri
 }
 
 #[tauri::command]
+pub async fn delete_workspace(app: AppHandle, path: String) -> Result<Vec<String>, String> {
+    let dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    delete_recent_workspace(&dir, &path)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub async fn load_workspace(path: String) -> Result<WorkspaceState, String> {
     load_workspace_from_dir(&path)
         .await
@@ -291,6 +324,36 @@ mod tests {
 
         assert_eq!(present_recents(config.path()).await.unwrap(), vec![live]);
         assert_eq!(read_recents(config.path()).await.unwrap().len(), 2);
+    }
+
+    #[tokio::test]
+    async fn test_delete_removes_a_known_workspace_and_forgets_it() {
+        let config = tempdir().unwrap();
+        let parent = tempdir().unwrap();
+        let ws = parent.path().join("notes");
+        std::fs::create_dir_all(ws.join(".git")).unwrap();
+        std::fs::write(ws.join("a.md"), "x").unwrap();
+        let ws = ws.to_string_lossy().into_owned();
+        push_recent(config.path(), &ws).await.unwrap();
+        push_recent(config.path(), "/ws/other").await.unwrap();
+
+        let remaining = delete_recent_workspace(config.path(), &ws).await.unwrap();
+
+        assert!(!Path::new(&ws).exists());
+        assert_eq!(remaining, vec!["/ws/other".to_string()]);
+    }
+
+    #[tokio::test]
+    async fn test_delete_refuses_a_path_that_is_not_a_recent_workspace() {
+        let config = tempdir().unwrap();
+        let stranger = tempdir().unwrap();
+        std::fs::write(stranger.path().join("a.md"), "x").unwrap();
+
+        let result =
+            delete_recent_workspace(config.path(), &stranger.path().to_string_lossy()).await;
+
+        assert!(result.is_err());
+        assert!(stranger.path().join("a.md").exists());
     }
 
     #[tokio::test]

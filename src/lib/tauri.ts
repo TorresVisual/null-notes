@@ -199,6 +199,8 @@ export const api = {
       invoke<string[]>('recent_workspaces'),
     remember: (path: string) =>
       invoke<string[]>('remember_workspace', { path }),
+    delete: (path: string) =>
+      invoke<string[]>('delete_workspace', { path }),
     initialWorkspace: () =>
       invoke<string | null>('initial_workspace'),
     initialSelectFile: () =>

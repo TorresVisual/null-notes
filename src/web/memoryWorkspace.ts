@@ -63,6 +63,7 @@ export const commands: Record<string, Command> = {
   initial_single_note: () => false,
   recent_workspaces: () => recents,
   remember_workspace: ({ path }) => (recents = [String(path), ...recents.filter((p) => p !== path)]),
+  delete_workspace: ({ path }) => (recents = recents.filter((p) => p !== path)),
   load_workspace: () => state,
   save_workspace: (args) => void (state = args.state as WorkspaceState),
   load_settings: () => settings,
