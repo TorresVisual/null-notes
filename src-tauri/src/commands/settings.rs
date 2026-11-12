@@ -107,6 +107,7 @@ mod tests {
             editor_max_width_px: 960,
             spellcheck: true,
             spellcheck_language: "en".to_string(),
+            spellcheck_words: vec!["cout".to_string()],
             pdf_import_mode: crate::models::PdfImportMode::Markdown,
             editor_command: "nvim +{line} {file}".to_string(),
             terminal_shell: "wsl -d Ubuntu".to_string(),

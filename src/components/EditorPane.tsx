@@ -15,6 +15,10 @@ import { useWorkspaceStore } from '../store/workspace'
 import { useNotesStore } from '../store/notes'
 import { useSettingsStore } from '../store/settings'
 import { joinFrontmatter, splitFrontmatter } from '../lib/frontmatter'
+import { api } from '../lib/tauri'
+import { normaliseLanguage } from '../lib/spellTokens'
+import { useProperties } from '../hooks/useProperties'
+import { showToast } from '../store/toast'
 import type { SaveState } from '../hooks/useNote'
 
 export interface EditorPaneProps {
@@ -81,6 +85,15 @@ export const EditorPane = forwardRef<HTMLDivElement, EditorPaneProps>(function E
   // The WYSIWYG editor only ever sees the body; the YAML block is re-attached
   // on every change so it reaches disk untouched. Raw view edits the whole file.
   const { frontmatter, body } = splitFrontmatter(content)
+  const { properties } = useProperties(content)
+  // A note's own `lang` wins over the app default, so a German lecture and an
+  // English paper each keep their dictionary, and the choice travels with the note.
+  const spellLanguage = normaliseLanguage(properties['lang']) ?? settings.spellcheckLanguage
+  const setNoteLanguage = (language: 'de' | 'en') =>
+    void api.properties
+      .edit(content, { type: 'set', key: 'lang', value: language })
+      .then(onSave)
+      .catch((e: unknown) => showToast(`Couldn't set the note language: ${e instanceof Error ? e.message : String(e)}`))
 
   return (
     <div className="editor-scroll" ref={scrollRef}>
@@ -99,7 +112,8 @@ export const EditorPane = forwardRef<HTMLDivElement, EditorPaneProps>(function E
               content={body}
               notePath={notePath}
               spellcheck={settings.spellcheck}
-              spellcheckLanguage={settings.spellcheckLanguage}
+              spellcheckLanguage={spellLanguage}
+              onSpellcheckLanguageChange={setNoteLanguage}
               onChange={(markdown) => onSave(joinFrontmatter(frontmatter, markdown))}
               onFlashcardCommand={onFlashcardCommand}
               onDiagramCommand={onDiagramCommand}

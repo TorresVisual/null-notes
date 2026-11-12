@@ -537,6 +537,10 @@ pub struct AppSettings {
     /// language pack's call, not this app's.
     #[serde(default = "default_spellcheck_language")]
     pub spellcheck_language: String,
+    /// Words the user added from the spellcheck menu. Machine-local like the
+    /// rest of settings.json; it never touches a note.
+    #[serde(default)]
+    pub spellcheck_words: Vec<String>,
     /// Remembered so the import dialog opens on whichever mode was used last.
     #[serde(default)]
     pub pdf_import_mode: PdfImportMode,
@@ -650,6 +654,7 @@ impl Default for AppSettings {
             editor_max_width_px: 800,
             spellcheck: false,
             spellcheck_language: default_spellcheck_language(),
+            spellcheck_words: Vec::new(),
             pdf_import_mode: PdfImportMode::Pages,
             editor_command: String::new(),
             terminal_shell: String::new(),

@@ -210,7 +210,7 @@ Each custom node type lives in its own file under `src/editor/extensions/`. Expo
 
 Markdown conversion has no central serializer — `tiptap-markdown` drives it, and each node carries its own `addStorage().markdown.serialize/parse`. A node without one serializes as escaped plain text.
 
-Spellcheck is one editor-wide setting on the ProseMirror root; non-prose nodes (code, maths, mermaid, tags, wiki-links) set `spellcheck="false"` and rely on attribute inheritance to opt out. A new node that renders non-prose text needs the same, or it gets underlined.
+Spellcheck is not the WebView's: native checking is forced off on the rich editor and the `Spellcheck` extension draws its own squiggles from the Hunspell dictionaries bundled in the Rust backend (`src-tauri/dictionaries/`, `spell.rs`; `de` and `en`, plus `tech.txt` for CS terms). A note's `lang` frontmatter property picks the dictionary, falling back to `spellcheckLanguage`; the personal dictionary is `spellcheckWords` in `settings.json`. A new node that renders non-prose text must be added to `NON_PROSE_NODES` (or `NON_PROSE_MARKS`) in `Spellcheck.ts`, or it gets underlined. The raw Markdown `<textarea>` still uses native checking. `de.*` is GPL-2.0/3.0 (igerman98), `en.*` MIT/BSD — licence texts sit beside them.
 
 Key handling that must run *before* the keymap plugins (and so before StarterKit's `ListKeymap`) lives in `NoteEditor`'s `editorProps`, not in an extension — ProseMirror checks direct props first. Any test of key behaviour has to mount with those same `editorProps`, or it exercises an editor the app never builds.
 

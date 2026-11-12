@@ -198,8 +198,10 @@ export interface AppSettings {
   autosaveDebounceMs: number
   editorMaxWidthPx: number
   spellcheck: boolean
-  /** BCP-47 tag; becomes the editor's `lang`, which is what picks the dictionary. */
+  /** Default dictionary for notes without their own `lang` property: `de` or `en`. */
   spellcheckLanguage: string
+  /** Words added from the spellcheck menu; never flagged again. */
+  spellcheckWords: string[]
   pdfImportMode: PdfImportMode
   /** Launch template for code deep links, with {file} and {line} placeholders. */
   editorCommand: string

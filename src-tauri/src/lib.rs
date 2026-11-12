@@ -14,6 +14,7 @@ pub mod note_text;
 pub mod pdf;
 pub mod properties;
 pub mod sm2;
+pub mod spell;
 #[cfg(target_os = "android")]
 mod tls_android;
 
@@ -360,6 +361,8 @@ pub fn run() {
             commands::workspace::initial_single_note,
             commands::settings::load_settings,
             commands::settings::save_settings,
+            commands::spell::spell_check,
+            commands::spell::spell_suggest,
             commands::error_log::record_error,
             commands::error_log::list_errors,
             commands::error_log::clear_errors,

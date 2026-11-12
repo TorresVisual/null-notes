@@ -3,6 +3,9 @@ import type { Editor } from '@tiptap/core'
 
 interface EditorStatusBarProps {
   editor: Editor
+  /** Set while spellcheck is on; the chip shows it and flips it on click. */
+  language?: 'de' | 'en'
+  onLanguageChange?: (language: 'de' | 'en') => void
 }
 
 interface EditorStatus {
@@ -52,7 +55,7 @@ function getEditorStatus(editor: Editor): EditorStatus {
   }
 }
 
-export function EditorStatusBar({ editor }: EditorStatusBarProps) {
+export function EditorStatusBar({ editor, language, onLanguageChange }: EditorStatusBarProps) {
   const [status, setStatus] = useState(() => getEditorStatus(editor))
 
   // getEditorStatus walks the whole document for a word count, so on a large
@@ -79,6 +82,17 @@ export function EditorStatusBar({ editor }: EditorStatusBarProps) {
       <span>{status.block}</span>
       <span>Ln {status.line}, Col {status.column}</span>
       <span>{status.words} {status.words === 1 ? 'word' : 'words'}</span>
+      {language && onLanguageChange && (
+        <button
+          type="button"
+          className="editor-status-language"
+          title="Spellcheck language for this note. Click to switch."
+          aria-label={`Spellcheck language: ${language === 'de' ? 'German' : 'English'}. Switch.`}
+          onClick={() => onLanguageChange(language === 'de' ? 'en' : 'de')}
+        >
+          {language.toUpperCase()}
+        </button>
+      )}
     </div>
   )
 }

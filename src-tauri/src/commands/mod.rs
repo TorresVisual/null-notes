@@ -23,6 +23,7 @@ mod perf_bench;
 pub mod printing;
 pub mod scheduler;
 pub mod settings;
+pub mod spell;
 pub mod terminal;
 pub mod trash;
 pub mod versions;

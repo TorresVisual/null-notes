@@ -257,6 +257,12 @@ export const api = {
     save: (settings: AppSettings) =>
       invoke<void>('save_settings', { settings }),
   },
+  spell: {
+    check: (lang: string, words: string[]) =>
+      invoke<string[]>('spell_check', { lang, words }),
+    suggest: (lang: string, word: string) =>
+      invoke<string[]>('spell_suggest', { lang, word }),
+  },
   trash: {
     list: (workspace: string) =>
       invoke<TrashEntry[]>('list_trash', { workspace }),

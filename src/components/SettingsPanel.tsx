@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { normaliseLanguage } from '../lib/spellTokens'
 import { GitBranch, Info, Keyboard, SpellCheck, SquarePen, Wrench, X, type LucideIcon } from 'lucide-react'
 import { confirm, message } from '@tauri-apps/plugin-dialog'
 import { useSettingsStore, DEFAULT_SETTINGS } from '../store/settings'
@@ -302,18 +303,36 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
 
             <label className="settings-row">
               <span>
-                Spellcheck language
+                Default language
                 <small>
-                  A BCP-47 tag (<code>de</code>, <code>en</code>, <code>en-GB</code>). Whether squiggles appear at
-                  all is the OS language pack&apos;s call, not this app&apos;s.
+                  For notes without a <code>lang</code> property. Switch a single note with the DE/EN chip at the
+                  bottom of the editor.
                 </small>
               </span>
               <span className="settings-row-control">
-                <input
-                  type="text"
-                  className="settings-text"
-                  value={settings.spellcheckLanguage}
-                  onChange={(e) => void update({ spellcheckLanguage: e.target.value.trim() })}
+                <select
+                  value={normaliseLanguage(settings.spellcheckLanguage) ?? 'en'}
+                  onChange={(e) => void update({ spellcheckLanguage: e.target.value })}
+                >
+                  <option value="de">Deutsch</option>
+                  <option value="en">English</option>
+                </select>
+              </span>
+            </label>
+
+            <label className="settings-row">
+              <span>
+                Personal dictionary
+                <small>One word per line. Add words from the right-click menu on a squiggle.</small>
+              </span>
+              <span className="settings-row-control">
+                <textarea
+                  className="settings-words"
+                  spellCheck={false}
+                  defaultValue={settings.spellcheckWords.join('\n')}
+                  onBlur={(e) =>
+                    void update({ spellcheckWords: e.target.value.split('\n').map((w) => w.trim()).filter(Boolean) })
+                  }
                 />
               </span>
             </label>

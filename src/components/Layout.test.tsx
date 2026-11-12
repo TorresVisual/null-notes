@@ -49,6 +49,7 @@ vi.mock('../lib/tauri', () => ({
         editorMaxWidthPx: 800,
         spellcheck: false,
         spellcheckLanguage: 'de',
+        spellcheckWords: [],
         pdfImportMode: 'pages',
         editorCommand: 'code -g {file}:{line}',
         terminalShell: 'powershell',

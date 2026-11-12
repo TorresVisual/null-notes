@@ -43,6 +43,7 @@ import { NoteContext } from './NoteContext'
 import { SlashCommands } from './SlashCommands'
 import { CodeBlockEditor } from './CodeBlockEditor'
 import { Underline } from './Underline'
+import { Spellcheck } from './Spellcheck'
 import { Subscript } from './Subscript'
 import { Superscript } from './Superscript'
 import { Highlight } from './Highlight'
@@ -254,6 +255,7 @@ export const coreExtensions = [
   CrossRef,
   NoteContext,
   SlashCommands,
+  Spellcheck,
   // Typography marks
   Underline,
   Subscript,

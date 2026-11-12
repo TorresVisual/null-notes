@@ -22,6 +22,9 @@ import { MobileEditToggle } from './MobileEditToggle'
 import { sameNoteText } from '../lib/sameNoteText'
 import { isMobile } from '../lib/platform'
 import { useInkStore } from '../store/ink'
+import { configureSpellcheck, type SpellMenuTarget } from './extensions/Spellcheck'
+import { SpellMenu } from './SpellMenu'
+import { normaliseLanguage } from '../lib/spellTokens'
 import { useSettingsStore } from '../store/settings'
 
 interface NoteEditorProps {
@@ -29,6 +32,7 @@ interface NoteEditorProps {
   notePath: string
   spellcheck: boolean
   spellcheckLanguage: string
+  onSpellcheckLanguageChange?: (language: 'de' | 'en') => void
   onChange: (markdown: string) => void
   onFlashcardCommand: (editor: Editor, range: Range) => void
   // Optional — tests that don't exercise diagram insertion can omit it;
@@ -36,12 +40,12 @@ interface NoteEditorProps {
   onDiagramCommand?: (editor: Editor, range: Range | null) => void
 }
 
-// `lang` is the only thing that tells the WebView which dictionary to check
-// against; without it the note inherits index.html's `lang="en"`, and German
-// prose comes back underlined word for word.
-function buildEditorProps(spellcheck: boolean, language: string) {
+// Native spellcheck stays off: the Spellcheck extension draws its own squiggles
+// from bundled dictionaries, and the WebView's would double them up. `lang` is
+// still set for assistive tech and hyphenation.
+function buildEditorProps(language: string) {
   return {
-    attributes: { spellcheck: String(spellcheck), lang: language, role: 'textbox', 'aria-label': 'Note', 'aria-multiline': 'true' },
+    attributes: { spellcheck: 'false', lang: language, role: 'textbox', 'aria-label': 'Note', 'aria-multiline': 'true' },
     handleKeyDown: handleEditorKeyDown,
     handleTextInput: handleEditorTextInput,
     ...caretScrollProps(isMobile()),
@@ -62,6 +66,7 @@ export function NoteEditor({
   notePath,
   spellcheck,
   spellcheckLanguage,
+  onSpellcheckLanguageChange,
   onChange,
   onFlashcardCommand,
   onDiagramCommand,
@@ -72,6 +77,9 @@ export function NoteEditor({
   const codeFontSizePx = useSettingsStore((s) => s.settings.codeFontSizePx)
   const proseFontSizePx = useSettingsStore((s) => s.settings.proseFontSizePx)
   const proseLineHeight = useSettingsStore((s) => s.settings.proseLineHeight)
+  const spellcheckWords = useSettingsStore((s) => s.settings.spellcheckWords)
+  const language = normaliseLanguage(spellcheckLanguage) ?? 'en'
+  const [spellMenu, setSpellMenu] = useState<SpellMenuTarget | null>(null)
   // Set alongside every onChange, so the content-sync effect below can tell
   // "this update came back from our own typing" from "content changed out
   // from under us" with a === check instead of re-serializing the whole
@@ -81,7 +89,7 @@ export function NoteEditor({
   const editor = useEditor({
     extensions: extensionsFor(notePath),
     content,
-    editorProps: buildEditorProps(spellcheck, spellcheckLanguage),
+    editorProps: buildEditorProps(spellcheckLanguage),
     onUpdate({ editor }) {
       // A first selection or focus transaction can append a trailing paragraph, which
       // serializes to the text already on disk minus its final newline. That is not
@@ -103,8 +111,14 @@ export function NoteEditor({
   // keystroke — the option itself has to change. setOptions rather than
   // useEditor deps, which would rebuild the editor and drop the cursor.
   useEffect(() => {
-    editor?.setOptions({ editorProps: buildEditorProps(spellcheck, spellcheckLanguage) })
-  }, [editor, spellcheck, spellcheckLanguage])
+    editor?.setOptions({ editorProps: buildEditorProps(spellcheckLanguage) })
+  }, [editor, spellcheckLanguage])
+
+  useEffect(() => {
+    if (!editor) return
+    editor.storage.spellcheck.onMenu = setSpellMenu
+    configureSpellcheck(editor, { enabled: spellcheck, lang: language, personal: spellcheckWords })
+  }, [editor, spellcheck, language, spellcheckWords])
 
   useEffect(() => {
     if (!editor) return
@@ -298,7 +312,14 @@ export function NoteEditor({
       />
       {isMobile() && <MobileEditToggle readOnly={readOnly} onEdit={startEditing} onDone={stopEditing} />}
       {editor && <BlockHandle editor={editor} />}
-      {editor && <EditorStatusBar editor={editor} />}
+      {editor && (
+        <EditorStatusBar
+          editor={editor}
+          language={spellcheck ? language : undefined}
+          onLanguageChange={onSpellcheckLanguageChange}
+        />
+      )}
+      {editor && spellMenu && <SpellMenu editor={editor} target={spellMenu} onClose={() => setSpellMenu(null)} />}
     </div>
   )
 }

@@ -9,6 +9,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   editorMaxWidthPx: 800,
   spellcheck: false,
   spellcheckLanguage: 'en-US',
+  spellcheckWords: [],
   pdfImportMode: 'pages',
   editorCommand: '',
   terminalShell: '',

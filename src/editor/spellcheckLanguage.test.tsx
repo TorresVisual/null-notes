@@ -11,12 +11,12 @@ function editorRoot(container: HTMLElement): HTMLElement {
   return el as HTMLElement
 }
 
-// The WebView picks its dictionary from `lang`, and nothing else. Without one
-// the note inherits index.html's `lang="en"`, so German prose is checked
-// against English and comes back underlined word for word — which reads as
-// spellcheck being broken rather than as being pointed at the wrong language.
-describe('the editor tells the WebView which dictionary to use', () => {
-  it('puts the configured language on the rich editor', async () => {
+// The rich editor draws its own squiggles (Spellcheck extension), so the
+// WebView's native checker must stay off or every word is underlined twice.
+// `lang` is still set for assistive tech; the raw editor is a plain <textarea>
+// and keeps native checking, where `lang` is what picks the dictionary.
+describe('the editor language attributes', () => {
+  it('puts the configured language on the rich editor and turns native checking off', async () => {
     const { container } = render(
       <NoteEditor
         content="Rechtschreibung"
@@ -29,7 +29,7 @@ describe('the editor tells the WebView which dictionary to use', () => {
     )
 
     await waitFor(() => expect(editorRoot(container).getAttribute('lang')).toBe('de'))
-    expect(editorRoot(container).getAttribute('spellcheck')).toBe('true')
+    expect(editorRoot(container).getAttribute('spellcheck')).toBe('false')
   })
 
   // ProseMirror re-applies editorProps.attributes on every state update, so a
