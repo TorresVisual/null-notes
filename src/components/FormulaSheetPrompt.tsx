@@ -5,7 +5,10 @@ import { failure } from '../lib/failure'
 import { useWorkspaceStore } from '../store/workspace'
 import { useNotesStore } from '../store/notes'
 import { parseSearchQuery } from '../lib/searchQuery'
+import { folderScopeArg } from '../lib/formulaScope'
+import { isMobile } from '../lib/platform'
 import { Dialog, DialogContent, DialogTitle } from './ui/dialog'
+import { FormulaScopePicker, type FormulaScope } from './FormulaScopePicker'
 
 interface FormulaSheetPromptProps {
   kind?: 'formula' | 'solutions'
@@ -22,13 +25,17 @@ export function FormulaSheetPrompt({ kind = 'formula', onClose }: FormulaSheetPr
   const workspacePath = useWorkspaceStore((s) => s.path)
   const openTab = useWorkspaceStore((s) => s.openTab)
   const addNote = useNotesStore((s) => s.addNote)
+  const mobile = isMobile()
   const [query, setQuery] = useState('')
+  const [scope, setScope] = useState<FormulaScope>({ folder: null, tag: null })
   const [error, setError] = useState<string | null>(null)
   const [isGenerating, setIsGenerating] = useState(false)
 
   async function generate() {
     if (!workspacePath || isGenerating) return
-    const { folder, tag } = parseSearchQuery(query)
+    const { folder, tag } = mobile
+      ? { folder: scope.folder && folderScopeArg(scope.folder), tag: scope.tag }
+      : parseSearchQuery(query)
     setIsGenerating(true)
     setError(null)
     try {
@@ -55,26 +62,32 @@ export function FormulaSheetPrompt({ kind = 'formula', onClose }: FormulaSheetPr
             <X size={16} />
           </button>
         </div>
-        <p className="formula-sheet-prompt-hint">
-          Narrow with <code>folder:</code> or <code>tag:</code> — leave blank for the whole workspace.
-        </p>
-        <input
-          type="text"
-          className="formula-sheet-prompt-input"
-          value={query}
-          placeholder="folder:Course101"
-          autoFocus
-          disabled={isGenerating}
-          onChange={(e) => setQuery(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') void generate()
-          }}
-        />
+        {mobile ? (
+          <FormulaScopePicker scope={scope} disabled={isGenerating} onChange={setScope} />
+        ) : (
+          <>
+            <p className="formula-sheet-prompt-hint">
+              Narrow with <code>folder:</code> or <code>tag:</code> — leave blank for the whole workspace.
+            </p>
+            <input
+              type="text"
+              className="formula-sheet-prompt-input"
+              value={query}
+              placeholder="folder:Course101"
+              autoFocus
+              disabled={isGenerating}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') void generate()
+              }}
+            />
+          </>
+        )}
         {error && <p className="formula-sheet-prompt-error">{error}</p>}
         <div className="formula-sheet-prompt-actions">
-          <button className="dialog-action" onClick={onClose}>Cancel</button>
+          {!mobile && <button className="dialog-action" onClick={onClose}>Cancel</button>}
           <button className="dialog-action-primary" onClick={() => void generate()} disabled={isGenerating}>
-            {isGenerating ? 'Generating…' : 'Generate'}
+            {isGenerating ? 'Generating…' : mobile ? `Generate ${noun.toLowerCase()}` : 'Generate'}
           </button>
         </div>
       </DialogContent>

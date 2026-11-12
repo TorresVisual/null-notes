@@ -705,6 +705,71 @@ button, [role="button"], .tree-row, .tab, .search-result, .slash-menu-item,
   padding-bottom: calc(var(--space-lg) + var(--safe-bottom));
 }
 
+/* Formula sheet on a phone: a scope list instead of typed folder:/tag: syntax,
+   with Generate full-width on the bottom edge. */
+[data-shell='mobile'] .formula-sheet-prompt .settings-panel-header h2 { flex: 1; }
+.mobile-scope {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+.mobile-scope-label {
+  margin-top: var(--space-sm);
+  color: var(--text-tertiary);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.mobile-scope-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  min-height: 48px;
+  padding: 0 var(--space-md);
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-size: 15px;
+  text-align: left;
+}
+.mobile-scope-row[aria-checked='true'] { background: var(--accent-bg); border-color: var(--accent); }
+.mobile-scope-row:disabled, .mobile-scope-chip:disabled { opacity: var(--disabled-opacity); }
+.mobile-scope-dot {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--border-strong);
+  border-radius: 50%;
+}
+.mobile-scope-row[aria-checked='true'] .mobile-scope-dot {
+  border-color: var(--accent);
+  background: radial-gradient(var(--accent) 45%, transparent 50%);
+}
+.mobile-scope-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mobile-scope-meta { margin-left: auto; color: var(--text-tertiary); font-size: 12px; }
+.mobile-scope-chips { display: flex; flex-wrap: wrap; gap: var(--space-sm); }
+.mobile-scope-chip {
+  min-height: 44px;
+  padding: 0 14px;
+  background: none;
+  border: 1px solid var(--border-strong);
+  border-radius: 22px;
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+.mobile-scope-chip[aria-checked='true'] { background: var(--accent-bg); border-color: var(--accent); color: var(--accent); }
+[data-shell='mobile'] .formula-sheet-prompt-actions .dialog-action-primary {
+  width: 100%;
+  min-height: 48px;
+  font-size: 15px;
+  border-radius: 6px;
+}
+
 /* Tasks on a phone: full-bleed 48px rows, a 44px checkbox hit zone around the
    22px box, sticky one-line note headers. */
 [data-shell='mobile'] .task-view .settings-panel-header h2 { flex: 1; }
