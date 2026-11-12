@@ -1,23 +1,38 @@
 import { useEffect, useState } from 'react'
 import { normaliseLanguage } from '../lib/spellTokens'
-import { GitBranch, Info, Keyboard, SpellCheck, SquarePen, Wrench, X, type LucideIcon } from 'lucide-react'
+import {
+  ArrowLeft,
+  GitBranch,
+  Info,
+  Keyboard,
+  Layers,
+  SlidersHorizontal,
+  SpellCheck,
+  SquarePen,
+  Wrench,
+  X,
+  type LucideIcon,
+} from 'lucide-react'
 import { confirm, message } from '@tauri-apps/plugin-dialog'
 import { useSettingsStore, DEFAULT_SETTINGS } from '../store/settings'
+import { useSettingsNavStore, type SectionId } from '../store/settingsNav'
 import { useWorkspaceStore } from '../store/workspace'
 import { useGitConfig } from '../hooks/useGitConfig'
 import { refreshTree } from '../hooks/useWorkspace'
 import { api } from '../lib/tauri'
 import { failure } from '../lib/failure'
+import { isMobile } from '../lib/platform'
+import { settingsSummary } from '../lib/settingsSummary'
 import { Dialog, DialogContent, DialogTitle } from './ui/dialog'
 import { AboutSettings } from './AboutSettings'
 import { ErrorLogDialog } from './ErrorLogDialog'
 import { KeymapSettings } from './KeymapSettings'
+import { MobileSettingsList } from './MobileSettingsList'
+import { NumberControl } from './NumberControl'
 
 interface SettingsPanelProps {
   onClose: () => void
 }
-
-type SectionId = 'editor' | 'writing' | 'tools' | 'shortcuts' | 'git' | 'about'
 
 const SECTIONS: { id: SectionId; label: string; Icon: LucideIcon }[] = [
   { id: 'editor', label: 'Editor', Icon: SquarePen },
@@ -25,6 +40,17 @@ const SECTIONS: { id: SectionId; label: string; Icon: LucideIcon }[] = [
   { id: 'tools', label: 'Tools', Icon: Wrench },
   { id: 'shortcuts', label: 'Shortcuts', Icon: Keyboard },
   { id: 'git', label: 'Git', Icon: GitBranch },
+  { id: 'about', label: 'About', Icon: Info },
+]
+
+// Tools splits in two on a phone: running code, the editor and terminal launchers and the CLI
+// pipe don't exist there, and what's left is two small topics. Shortcuts has no keyboard to serve.
+const MOBILE_SECTIONS: typeof SECTIONS = [
+  { id: 'editor', label: 'Editor', Icon: SquarePen },
+  { id: 'writing', label: 'Writing', Icon: SpellCheck },
+  { id: 'flashcards', label: 'Flashcards', Icon: Layers },
+  { id: 'git', label: 'Git', Icon: GitBranch },
+  { id: 'advanced', label: 'Advanced', Icon: SlidersHorizontal },
   { id: 'about', label: 'About', Icon: Info },
 ]
 
@@ -46,8 +72,15 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
   const { updateGit } = useGitConfig()
   const [error, setError] = useState<string | null>(null)
   const [showErrorLog, setShowErrorLog] = useState(false)
-  const [section, setSection] = useState<SectionId>('editor')
+  const mobile = isMobile()
+  const [localSection, setLocalSection] = useState<SectionId>('editor')
+  const navSection = useSettingsNavStore((s) => s.section)
+  const setNavSection = useSettingsNavStore((s) => s.setSection)
   const [fsrsRetention, setFsrsRetention] = useState<number | null>(null)
+  useEffect(() => {
+    if (!mobile) return
+    return () => setNavSection(null)
+  }, [mobile, setNavSection])
   useEffect(() => {
     if (!workspacePath) return
     void api.scheduler.get(workspacePath).then((s) => setFsrsRetention(s.scheduler === 'fsrs' ? s.retention : null))
@@ -57,9 +90,20 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
     setFsrsRetention(fsrs ? retention : null)
     void api.scheduler.set(workspacePath, fsrs, retention)
   }
-  const hasGit = Boolean(workspacePath && repoMode === null) || Boolean(repoMode)
-  const sections = SECTIONS.filter((s) => s.id !== 'git' || hasGit)
-  const currentId: SectionId = sections.some((s) => s.id === section) ? section : 'editor'
+  const hasGit = mobile ? Boolean(repoMode) : Boolean(workspacePath && repoMode === null) || Boolean(repoMode)
+  const sections = (mobile ? MOBILE_SECTIONS : SECTIONS).filter((s) => s.id !== 'git' || hasGit)
+  const section = mobile ? navSection : localSection
+  const currentId: SectionId = section !== null && sections.some((s) => s.id === section) ? section : 'editor'
+  const showList = mobile && section === null
+  const inTools = currentId === 'tools'
+  const showAdvanced = inTools || currentId === 'advanced'
+  const showFlashcards = inTools || currentId === 'flashcards'
+  const selectSection = mobile ? setNavSection : setLocalSection
+
+  async function resetToDefaults() {
+    const proceed = await confirm('Reset every setting on this page to its default value?')
+    if (proceed) await update(DEFAULT_SETTINGS)
+  }
 
   async function update(patch: Partial<typeof settings>) {
     const next = { ...settings, ...patch }
@@ -76,6 +120,18 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
     <>
     <Dialog open onOpenChange={(next) => !next && onClose()}>
       <DialogContent className="settings-panel settings-panel--lg" showCloseButton={false}>
+        {showList && (
+          <MobileSettingsList
+            sections={sections.map((s) => ({
+              ...s,
+              summary: settingsSummary(s.id, { settings, fsrsRetention, gitAutoCommit }),
+            }))}
+            onSelect={selectSection}
+            onReset={() => void resetToDefaults()}
+            onClose={onClose}
+          />
+        )}
+        {!mobile && (
         <nav className="settings-nav" aria-label="Settings sections">
           <DialogTitle asChild>
             <h2>Settings</h2>
@@ -85,32 +141,37 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
               key={id}
               className={`settings-nav-item${id === currentId ? ' is-active' : ''}`}
               aria-current={id === currentId ? 'page' : undefined}
-              onClick={() => setSection(id)}
+              onClick={() => selectSection(id)}
             >
               <Icon size={15} />
               {label}
             </button>
           ))}
-          <button
-            className="settings-reset settings-nav-reset"
-            onClick={() => {
-              void (async () => {
-                const proceed = await confirm('Reset every setting on this page to its default value?')
-                if (proceed) await update(DEFAULT_SETTINGS)
-              })()
-            }}
-          >
+          <button className="settings-reset settings-nav-reset" onClick={() => void resetToDefaults()}>
             Reset to defaults
           </button>
         </nav>
+        )}
 
+        {!showList && (
         <div className="settings-content">
+        {mobile ? (
+          <header className="mobile-topbar">
+            <button className="mobile-topbar-back" onClick={() => setNavSection(null)} aria-label="Back to settings">
+              <ArrowLeft size={20} />
+            </button>
+            <DialogTitle asChild>
+              <h2 className="mobile-topbar-title">{sections.find((s) => s.id === currentId)?.label}</h2>
+            </DialogTitle>
+          </header>
+        ) : (
         <div className="settings-panel-header">
           <h3>{sections.find((s) => s.id === currentId)?.label}</h3>
           <button className="settings-panel-close" onClick={onClose} aria-label="Close settings" title="Close settings">
             <X size={16} />
           </button>
         </div>
+        )}
 
         <div className="settings-panel-body">
           {currentId === 'editor' && (
@@ -136,6 +197,7 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
               </span>
             </label>
 
+            {!mobile && (
             <label className="settings-row">
               <span>
                 Editor width
@@ -155,6 +217,7 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
                 <span className="settings-unit">px</span>
               </span>
             </label>
+            )}
 
             <label className="settings-row">
               <span>
@@ -162,15 +225,13 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
                 <small>Base size of note text; headings, lists and tables scale with it.</small>
               </span>
               <span className="settings-row-control">
-                <input
-                  type="number"
+                <NumberControl
+                  label="Text size"
                   min={12}
                   max={28}
                   step={1}
                   value={settings.proseFontSizePx}
-                  onChange={(e) =>
-                    void update({ proseFontSizePx: clampNumber(Number(e.target.value), 12, 28) })
-                  }
+                  onChange={(v) => void update({ proseFontSizePx: clampNumber(v, 12, 28) })}
                 />
                 <span className="settings-unit">px</span>
               </span>
@@ -182,19 +243,18 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
                 <small>Line height of note text, as a multiple of its size.</small>
               </span>
               <span className="settings-row-control">
-                <input
-                  type="number"
+                <NumberControl
+                  label="Line spacing"
                   min={1.0}
                   max={2.4}
                   step={0.1}
                   value={settings.proseLineHeight}
-                  onChange={(e) =>
-                    void update({ proseLineHeight: clampNumber(Number(e.target.value), 1.0, 2.4) })
-                  }
+                  onChange={(v) => void update({ proseLineHeight: clampNumber(v, 1.0, 2.4) })}
                 />
               </span>
             </label>
 
+            {!mobile && (
             <label className="settings-row">
               <span>
                 Zoom
@@ -214,10 +274,12 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
                 <span className="settings-unit">%</span>
               </span>
             </label>
+            )}
           </div>
 
           <h4 className="settings-group-title">Code blocks</h4>
           <div className="settings-card">
+            {!mobile && (
             <label className="settings-row">
               <span>
                 Code block indent
@@ -245,6 +307,7 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
                 )}
               </span>
             </label>
+            )}
 
             <label className="settings-row">
               <span>
@@ -268,15 +331,13 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
                 <small>Independent of the editor&apos;s own text size above.</small>
               </span>
               <span className="settings-row-control">
-                <input
-                  type="number"
+                <NumberControl
+                  label="Code block font size"
                   min={10}
                   max={24}
                   step={1}
                   value={settings.codeFontSizePx}
-                  onChange={(e) =>
-                    void update({ codeFontSizePx: clampNumber(Number(e.target.value), 10, 24) })
-                  }
+                  onChange={(v) => void update({ codeFontSizePx: clampNumber(v, 10, 24) })}
                 />
                 <span className="settings-unit">px</span>
               </span>
@@ -339,9 +400,11 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
           </div>
           )}
 
-          {currentId === 'tools' && (
+          {(showAdvanced || showFlashcards) && (
           <>
+          {showAdvanced && (
           <div className="settings-card">
+            {!mobile && (
             <label className="settings-row">
               <span>
                 Editor command
@@ -359,7 +422,9 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
                 />
               </span>
             </label>
+            )}
 
+            {!mobile && (
             <label className="settings-row">
               <span>
                 Terminal shell
@@ -377,6 +442,7 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
                 />
               </span>
             </label>
+            )}
 
             <label className="settings-row">
               <span>
@@ -420,6 +486,7 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
               </span>
             </label>
 
+            {!mobile && (
             <label className="settings-row">
               <span>
                 Python command
@@ -437,7 +504,9 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
                 />
               </span>
             </label>
+            )}
 
+            {!mobile && (
             <label className="settings-row">
               <span>
                 C++ compiler command
@@ -455,7 +524,9 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
                 />
               </span>
             </label>
+            )}
 
+            {!mobile && (
             <label className="settings-row">
               <span>
                 Run timeout (seconds)
@@ -471,12 +542,14 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
                 />
               </span>
             </label>
+            )}
 
           </div>
+          )}
 
-          {workspacePath && (
+          {showFlashcards && workspacePath && (
             <>
-              <h4 className="settings-group-title">Flashcards</h4>
+              {!mobile && <h4 className="settings-group-title">Flashcards</h4>}
               <div className="settings-card">
                 <label className="settings-row">
                   <span>
@@ -518,6 +591,8 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
             </>
           )}
 
+          {inTools && (
+          <>
           <h4 className="settings-group-title">Command line</h4>
           <div className="settings-card">
             <label className="settings-row">
@@ -538,6 +613,11 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
             </label>
           </div>
 
+          </>
+          )}
+
+          {showAdvanced && (
+          <>
           <h4 className="settings-group-title">Diagnostics</h4>
           <div className="settings-card">
             <label className="settings-row">
@@ -554,6 +634,8 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
           </div>
           </>
           )}
+          </>
+          )}
 
           {currentId === 'shortcuts' && (
             <KeymapSettings overrides={settings.keymap} onChange={(keymap) => void update({ keymap })} />
@@ -561,7 +643,7 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
 
           {currentId === 'git' && (
             <div className="settings-card">
-              {repoMode === null && workspacePath && (
+              {!mobile && repoMode === null && workspacePath && (
                 <div className="settings-row">
                   <span>
                     This workspace isn&apos;t a Git repository yet
@@ -636,6 +718,7 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
                     </span>
                   </label>
 
+                  {!mobile && (
                   <label className="settings-row">
                     <span>
                       Skip commit hooks
@@ -652,6 +735,7 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
                       />
                     </span>
                   </label>
+                  )}
 
                   {(repoMode === 'notesOnly' || repoMode === 'notesMonorepo') && (
                     <label className="settings-row">
@@ -732,6 +816,7 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
           {error && <p className="settings-error">{error}</p>}
         </div>
         </div>
+        )}
       </DialogContent>
     </Dialog>
     {showErrorLog && <ErrorLogDialog onClose={() => setShowErrorLog(false)} />}

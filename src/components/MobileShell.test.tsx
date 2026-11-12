@@ -9,6 +9,7 @@ import { useWorkspaceStore } from '../store/workspace'
 import { discardIfUntouched } from '../hooks/useQuickNote'
 import { useMobileOnboardingStore } from '../store/mobileOnboarding'
 import { useActionSheetStore } from '../store/actionSheet'
+import { useSettingsNavStore } from '../store/settingsNav'
 
 vi.mock('@tauri-apps/plugin-os', () => ({ platform: vi.fn(() => 'android') }))
 vi.mock('@tauri-apps/api/app', () => ({ onBackButtonPress: vi.fn() }))
@@ -198,6 +199,23 @@ describe('MobileShell system Back', () => {
 
     act(() => press())
     expect(api.window.exitApp).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('MobileShell Back inside Settings', () => {
+  afterEach(() => useSettingsNavStore.setState({ section: null }))
+
+  it('steps from an open settings section to the section list before closing the overlay', async () => {
+    useSettingsNavStore.setState({ section: 'editor' })
+    const { props } = setup({ activeOverlay: 'settings' })
+    await act(async () => {})
+
+    act(() => press())
+    expect(useSettingsNavStore.getState().section).toBeNull()
+    expect(props.closeOverlay).not.toHaveBeenCalled()
+
+    act(() => press())
+    expect(props.closeOverlay).toHaveBeenCalledTimes(1)
   })
 })
 

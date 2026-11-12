@@ -1159,23 +1159,118 @@ button, [role="button"], .tree-row, .tab, .search-result, .slash-menu-item,
 [data-shell='mobile'] .search-recent-item { display: flex; align-items: center; min-height: 52px; padding: 0 var(--space-lg); font-size: 15px; border-bottom: 1px solid var(--border); }
 [data-shell='mobile'] .search-more { min-height: 52px; display: flex; align-items: center; padding: 0 var(--space-lg); font-size: 15px; }
 
-[data-shell='mobile'] .settings-panel--lg { flex-direction: column; }
-[data-shell='mobile'] .settings-nav {
-  width: auto;
-  flex-direction: row;
-  align-items: center;
-  padding: 0 var(--space-md) var(--space-sm);
-  border-right: 0;
-  border-bottom: 1px solid var(--border);
-  overflow: auto hidden;
+/* Settings on a phone is a stack: a list of sections, then one section per screen
+   (Back steps section → list → closed). The topbar carries the safe-top inset, so the
+   panel's own full-screen padding is dropped. */
+[data-shell='mobile'] .settings-panel--lg {
+  flex-direction: column;
+  padding: 0 0 var(--safe-bottom);
 }
-[data-shell='mobile'] .settings-nav > * { flex-shrink: 0; white-space: nowrap; }
-[data-shell='mobile'] .settings-nav-reset { margin: 0 0 0 auto; }
-[data-shell='mobile'] .settings-panel-header { flex-direction: row; }
-[data-shell='mobile'] .settings-panel-close {
-  order: -1;
-  min-width: 44px;
+[data-shell='mobile'] .settings-panel .mobile-topbar-title { font-size: 15px; font-weight: 600; }
+
+[data-shell='mobile'] .settings-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+  padding: var(--space-lg);
+}
+[data-shell='mobile'] .settings-list-group {
+  background: var(--bg-base);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+[data-shell='mobile'] .settings-list-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  min-height: 60px;
+  padding: 0 var(--space-lg);
+  background: none;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-primary);
+  font-size: 15px;
+  text-align: left;
+}
+[data-shell='mobile'] .settings-list-row:last-child { border-bottom: 0; }
+[data-shell='mobile'] .settings-list-row:active { background: var(--bg-hover); }
+[data-shell='mobile'] .settings-list-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  border-radius: 8px;
+  background: var(--accent-bg);
+  color: var(--accent);
+}
+[data-shell='mobile'] .settings-list-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+[data-shell='mobile'] .settings-list-text small {
+  font-size: 12px;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+[data-shell='mobile'] .settings-list-chevron { flex-shrink: 0; color: var(--text-tertiary); }
+[data-shell='mobile'] .settings-list-reset { margin-top: auto; width: 100%; min-height: 48px; }
+
+[data-shell='mobile'] .settings-content .settings-panel-body { padding: var(--space-lg); gap: var(--space-md); }
+[data-shell='mobile'] .settings-card > .settings-row { min-height: 64px; gap: var(--space-lg); }
+[data-shell='mobile'] .settings-row-control input:not([type='checkbox']),
+[data-shell='mobile'] .settings-row-control select {
   min-height: 44px;
+  padding: 0 12px;
+  font-size: 16px;
+}
+/* A free-text control has no room beside its label: it takes its own full-width line. */
+[data-shell='mobile'] .settings-row:has(.settings-text-wide, .settings-words) {
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-sm);
+}
+[data-shell='mobile'] .settings-row-control input.settings-text-wide,
+[data-shell='mobile'] .settings-row-control textarea.settings-words { width: 100%; }
+
+[data-shell='mobile'] .settings-stepper {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  box-sizing: content-box;
+  height: 44px;
+  background: var(--bg-hover);
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+}
+[data-shell='mobile'] .settings-stepper button {
+  width: 44px;
+  height: 100%;
+  background: none;
+  border: 0;
+  color: var(--text-secondary);
+  font-size: 18px;
+}
+[data-shell='mobile'] .settings-stepper button:active { color: var(--text-primary); }
+[data-shell='mobile'] .settings-stepper button:disabled { opacity: var(--disabled-opacity); }
+[data-shell='mobile'] .settings-stepper output {
+  min-width: 40px;
+  padding: 0 var(--space-sm);
+  border-inline: 1px solid var(--border-strong);
+  color: var(--text-primary);
+  font-size: 15px;
+  line-height: 42px;
+  text-align: center;
 }
 
 /* The viewport bottom is the keyboard top (MainActivity lifts the WebView), so

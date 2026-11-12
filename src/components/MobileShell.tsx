@@ -6,6 +6,7 @@ import { useMobileOnboardingStore } from '../store/mobileOnboarding'
 import { useActionSheetStore } from '../store/actionSheet'
 import { discardIfUntouched } from '../hooks/useQuickNote'
 import { useBackButton } from '../hooks/useBackButton'
+import { useSettingsNavStore } from '../store/settingsNav'
 import type { OverlayKind } from '../hooks/useOverlayManager'
 import type { MobileTab } from '../lib/backNavigation'
 import { MobileTabBar, type TabId } from './MobileTabBar'
@@ -80,7 +81,11 @@ export function MobileShell({
   useBackButton(
     { overlayOpen: activeOverlay !== null, sheetOpen: moreOpen || actionSheetOpen, onboardingStep: !hasWorkspace && onboardingStep, editorOpen, tab },
     {
-      'close-overlay': closeOverlay,
+      'close-overlay': () => {
+        const nav = useSettingsNavStore.getState()
+        if (activeOverlay === 'settings' && nav.section !== null) nav.setSection(null)
+        else closeOverlay()
+      },
       'close-sheet': () => {
         setMoreOpen(false)
         useActionSheetStore.getState().close()
