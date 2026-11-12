@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Pencil, X } from 'lucide-react'
+import { ArrowLeft, Pencil, X } from 'lucide-react'
 import { LoadingStatus } from './LoadingStatus'
 import { api } from '../lib/tauri'
 import { failure } from '../lib/failure'
@@ -9,6 +9,8 @@ import { groupCardsByNote, groupCardsByStreak } from '../lib/cardGroups'
 import { requestCardHighlight } from '../lib/cardJump'
 import { CardText } from './CardText'
 import { DueForecast } from './DueForecast'
+import { DeckMobileBody, type CardFilter } from './DeckMobileBody'
+import { isMobile } from '../lib/platform'
 import type { CardSummary } from '../types'
 
 interface DeckViewProps {
@@ -32,7 +34,8 @@ export function DeckView({ onClose, onOpenCram, onOpenTagReview }: DeckViewProps
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [activeTags, setActiveTags] = useState<Set<string>>(new Set())
-  const [suspendedFilter, setSuspendedFilter] = useState<'all' | 'suspended'>('all')
+  const [cardFilter, setCardFilter] = useState<CardFilter>('all')
+  const mobile = isMobile()
 
   useEffect(() => {
     if (!workspacePath) return
@@ -53,11 +56,12 @@ export function DeckView({ onClose, onOpenCram, onOpenTagReview }: DeckViewProps
   const filtered = useMemo(
     () =>
       cards.filter((c) => {
-        if (suspendedFilter === 'suspended' && !c.suspended) return false
+        if (cardFilter === 'suspended' && !c.suspended) return false
+        if (cardFilter === 'due' && (c.suspended || !isDueToday(c.due))) return false
         if (activeTags.size > 0 && !c.tags.some((t) => activeTags.has(t))) return false
         return true
       }),
-    [cards, suspendedFilter, activeTags],
+    [cards, cardFilter, activeTags],
   )
 
   const groups = useMemo(() => groupCardsByNote(filtered), [filtered])
@@ -115,9 +119,9 @@ export function DeckView({ onClose, onOpenCram, onOpenTagReview }: DeckViewProps
     }
   }
 
-  async function toggleSuspend(e: React.MouseEvent, c: CardSummary) {
-    e.preventDefault()
-    e.stopPropagation()
+  async function toggleSuspend(c: CardSummary, e?: React.MouseEvent) {
+    e?.preventDefault()
+    e?.stopPropagation()
     if (!workspacePath) return
     try {
       await api.notes.setCardSuspended(c.notePath, c.position, !c.suspended, workspacePath)
@@ -141,13 +145,38 @@ export function DeckView({ onClose, onOpenCram, onOpenTagReview }: DeckViewProps
         <div className="settings-panel-header">
           <h2>All Cards</h2>
           <button className="settings-panel-close" onClick={onClose} aria-label="Close deck view" title="Close deck view">
-            <X size={16} />
+            {mobile ? <ArrowLeft size={20} /> : <X size={16} />}
           </button>
         </div>
         {isLoading ? (
           <LoadingStatus />
         ) : error ? (
           <p className="empty-state">{error}</p>
+        ) : mobile ? (
+          <DeckMobileBody
+            cardCount={cards.length}
+            groups={groups}
+            filteredCount={filtered.length}
+            categories={categories}
+            forecastCards={activeCardsForCategories}
+            allTags={allTags}
+            activeTags={activeTags}
+            filter={cardFilter}
+            dueCount={dueCount}
+            masteredCount={masteredCount}
+            suspendedCount={suspendedCount}
+            onToggleTag={toggleTag}
+            onFilter={setCardFilter}
+            onClearFilters={() => {
+              setCardFilter('all')
+              setActiveTags(new Set())
+            }}
+            onCram={onOpenCram}
+            onTagReview={onOpenTagReview}
+            onOpenCard={openNote}
+            onToggleSuspend={(card) => void toggleSuspend(card)}
+            onClose={onClose}
+          />
         ) : cards.length === 0 ? (
           <p className="empty-state">No flashcards in this workspace yet.</p>
         ) : (
@@ -158,8 +187,8 @@ export function DeckView({ onClose, onOpenCram, onOpenTagReview }: DeckViewProps
               <span>{masteredCount} mastered</span>
               {suspendedCount > 0 && (
                 <button
-                  className={`deck-view-suspended-filter${suspendedFilter === 'suspended' ? ' deck-view-suspended-filter-active' : ''}`}
-                  onClick={() => setSuspendedFilter((prev) => (prev === 'suspended' ? 'all' : 'suspended'))}
+                  className={`deck-view-suspended-filter${cardFilter === 'suspended' ? ' deck-view-suspended-filter-active' : ''}`}
+                  onClick={() => setCardFilter((prev) => (prev === 'suspended' ? 'all' : 'suspended'))}
                 >
                   {suspendedCount} suspended
                 </button>
@@ -229,7 +258,7 @@ export function DeckView({ onClose, onOpenCram, onOpenTagReview }: DeckViewProps
                         {c.suspended && <span className="deck-view-suspended-badge">Suspended</span>}
                         <button
                           className="deck-view-suspend-btn"
-                          onClick={(e) => toggleSuspend(e, c)}
+                          onClick={(e) => toggleSuspend(c, e)}
                           aria-label={c.suspended ? `Unsuspend card ${c.front}` : `Suspend card ${c.front}`}
                           title={c.suspended ? 'Unsuspend card' : 'Suspend card'}
                         >

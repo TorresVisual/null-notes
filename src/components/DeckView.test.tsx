@@ -1,9 +1,12 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { platform } from '@tauri-apps/plugin-os'
 import { DeckView } from './DeckView'
 import { api } from '../lib/tauri'
 import { useWorkspaceStore } from '../store/workspace'
 import type { CardSummary } from '../types'
+
+vi.mock('@tauri-apps/plugin-os', () => ({ platform: vi.fn(() => 'windows') }))
 
 vi.mock('../lib/tauri', () => ({
   api: { notes: { listAllCards: vi.fn(), setCardSuspended: vi.fn() } },
@@ -180,5 +183,60 @@ describe('DeckView forecast', () => {
 
     fireEvent.click(screen.getByLabelText('cs'))
     expect(forecast.querySelector('.deck-view-forecast-count')?.textContent).toBe('1')
+  })
+})
+
+describe('DeckView — phone', () => {
+  beforeEach(() => {
+    vi.mocked(platform).mockReturnValue('android')
+  })
+
+  afterEach(() => {
+    vi.mocked(platform).mockReturnValue('windows')
+  })
+
+  it('starts a cram session from a category row on the Study tab', async () => {
+    const onOpenCram = vi.fn()
+    render(<DeckView onClose={vi.fn()} onOpenCram={onOpenCram} onOpenTagReview={vi.fn()} />)
+    await waitFor(() => screen.getByText('Cram by category'))
+    fireEvent.click(screen.getByLabelText('Cram New'))
+    expect(onOpenCram).toHaveBeenCalledWith(0, false)
+  })
+
+  it('lists cards with a status line on the Cards tab and suspends through the sheet', async () => {
+    vi.mocked(api.notes.setCardSuspended).mockResolvedValue(undefined)
+    render(<DeckView onClose={vi.fn()} onOpenCram={vi.fn()} onOpenTagReview={vi.fn()} />)
+    await waitFor(() => screen.getByRole('tab', { name: /Cards/ }))
+    fireEvent.click(screen.getByRole('tab', { name: /Cards/ }))
+    expect(screen.getByText('Q1')).toBeInTheDocument()
+    expect(screen.getByText('New')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByLabelText('Options for card Q1'))
+    fireEvent.click(screen.getByText('Suspend card'))
+    await waitFor(() => expect(api.notes.setCardSuspended).toHaveBeenCalledWith('/ws/a.md', 0, true, '/ws'))
+  })
+
+  it('pins a tag-review button once a tag chip is selected', async () => {
+    const onOpenTagReview = vi.fn()
+    render(<DeckView onClose={vi.fn()} onOpenCram={vi.fn()} onOpenTagReview={onOpenTagReview} />)
+    await waitFor(() => screen.getByRole('button', { name: 'cs' }))
+    fireEvent.click(screen.getByRole('button', { name: 'cs' }))
+    fireEvent.click(screen.getByText('Review tag: cs'))
+    expect(onOpenTagReview).toHaveBeenCalledWith(['cs'])
+  })
+
+  it('explains how to write a card when the workspace has none, and clears empty filters', async () => {
+    vi.mocked(api.notes.listAllCards).mockResolvedValueOnce([])
+    const { unmount } = render(<DeckView onClose={vi.fn()} onOpenCram={vi.fn()} onOpenTagReview={vi.fn()} />)
+    await waitFor(() => expect(screen.getByText('No flashcards yet')).toBeInTheDocument())
+    unmount()
+
+    render(<DeckView onClose={vi.fn()} onOpenCram={vi.fn()} onOpenTagReview={vi.fn()} />)
+    await waitFor(() => screen.getByRole('tab', { name: /Cards/ }))
+    fireEvent.click(screen.getByRole('tab', { name: /Cards/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Suspended (0)' }))
+    expect(screen.getByText('No suspended cards.')).toBeInTheDocument()
+    fireEvent.click(screen.getByText('Clear filters'))
+    expect(screen.getByText('Q1')).toBeInTheDocument()
   })
 })
