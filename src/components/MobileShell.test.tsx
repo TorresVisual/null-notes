@@ -100,6 +100,13 @@ describe('MobileShell More sheet', () => {
     expect(screen.queryByRole('dialog', { name: 'More' })).not.toBeInTheDocument()
   })
 
+  it('reaches Deck View (and so cram) from the sheet', async () => {
+    const { props } = setup()
+    await userEvent.click(screen.getByRole('button', { name: 'More' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Deck & cram' }))
+    expect(props.openOverlay).toHaveBeenCalledWith('deck')
+  })
+
   it('offers Sync now only when a sync handler exists', async () => {
     const { unmount } = setup({ onSyncNow: null })
     await userEvent.click(screen.getByRole('button', { name: 'More' }))
