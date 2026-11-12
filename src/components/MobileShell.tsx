@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { ArrowLeft, Plus } from 'lucide-react'
+import { ArrowLeft, FileSearch, Plus, Terminal } from 'lucide-react'
 import { useWorkspaceStore } from '../store/workspace'
 import { useMobileEditStore } from '../store/mobileEdit'
 import { useMobileOnboardingStore } from '../store/mobileOnboarding'
@@ -127,6 +127,12 @@ export function MobileShell({
             </button>
             <span className="mobile-topbar-title">{noteTitle}</span>
             {saveStatus}
+            <button className="mobile-topbar-back" aria-label="Quick switcher" onClick={() => openOverlay('switcher')}>
+              <FileSearch size={20} />
+            </button>
+            <button className="mobile-topbar-back" aria-label="Command palette" onClick={() => openOverlay('palette')}>
+              <Terminal size={20} />
+            </button>
           </header>
           {gitBars}
           <main className="mobile-screen mobile-screen--editor">{editor}</main>

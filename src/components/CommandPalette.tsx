@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import { COMMANDS, formatCombo, type CommandDef } from '../lib/keymap'
 import { useKeymap } from '../hooks/useKeymap'
+import { isMobile } from '../lib/platform'
 import { Command, CommandDialog, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandShortcut } from './ui/command'
 
 export interface PaletteContext {
@@ -32,11 +33,40 @@ const NEEDS_NOTE = new Set([
   'prev-tab',
 ])
 
+const DESKTOP_ONLY = new Set([
+  'exit',
+  'open-workspace',
+  'toggle-terminal',
+  'toggle-sidebar',
+  'toggle-focus-mode',
+  'split-editor',
+  'split-editor-down',
+  'focus-next-group',
+  'focus-prev-group',
+  'close-editor-group',
+  'reset-split-ratio',
+  'toggle-split-direction',
+  'zoom-in',
+  'zoom-out',
+  'zoom-reset',
+  'print',
+  'shortcuts-help',
+  'close-tab',
+  'toggle-pin-tab',
+  'reopen-closed-tab',
+  'next-tab',
+  'prev-tab',
+  'note-reveal',
+  'note-open-external',
+])
+
 export function availableActions({ hasWorkspace, hasNote, repoMode, tabPinned }: PaletteContext): CommandDef[] {
+  const mobile = isMobile()
   return COMMANDS
     .filter(
       (item) =>
         item.id !== 'command-palette' &&
+        !(mobile && (DESKTOP_ONLY.has(item.id) || item.id.startsWith('goto-tab:'))) &&
         (hasWorkspace || NO_WORKSPACE_NEEDED.has(item.id)) &&
         (hasNote || !(NEEDS_NOTE.has(item.id) || item.id.startsWith('goto-tab:') || item.id.startsWith('note-'))) &&
         (repoMode || item.id !== 'sync-now'),
@@ -83,7 +113,7 @@ export function CommandPalette({ hasWorkspace, hasNote, repoMode, tabPinned, onR
                 onSelect={() => run(a.id)}
               >
                 <span className="palette-label">{a.label}</span>
-                {keymap[a.id] && (
+                {!isMobile() && keymap[a.id] && (
                   <CommandShortcut className="palette-shortcut">{formatCombo(keymap[a.id])}</CommandShortcut>
                 )}
               </CommandItem>

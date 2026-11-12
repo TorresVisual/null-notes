@@ -108,6 +108,25 @@ describe('MobileShell More sheet', () => {
     expect(props.openOverlay).toHaveBeenCalledWith('deck')
   })
 
+  it('reaches the quick switcher and command palette from the sheet', async () => {
+    const { props } = setup()
+    await userEvent.click(screen.getByRole('button', { name: 'More' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Quick switcher' }))
+    expect(props.openOverlay).toHaveBeenCalledWith('switcher')
+    await userEvent.click(screen.getByRole('button', { name: 'More' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Command palette' }))
+    expect(props.openOverlay).toHaveBeenCalledWith('palette')
+  })
+
+  it('reaches them from the editor top bar, where the tab bar is hidden', async () => {
+    useWorkspaceStore.setState({ activeTab: '/ws/a.md', openTabs: ['/ws/a.md'] })
+    const { props } = setup()
+    await userEvent.click(screen.getByRole('button', { name: 'Quick switcher' }))
+    expect(props.openOverlay).toHaveBeenCalledWith('switcher')
+    await userEvent.click(screen.getByRole('button', { name: 'Command palette' }))
+    expect(props.openOverlay).toHaveBeenCalledWith('palette')
+  })
+
   it('offers Sync now only when a sync handler exists', async () => {
     const { unmount } = setup({ onSyncNow: null })
     await userEvent.click(screen.getByRole('button', { name: 'More' }))

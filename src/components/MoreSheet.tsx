@@ -1,4 +1,4 @@
-import { GraduationCap, Layers, ListChecks, Network, RefreshCw, Settings, SquareFunction, type LucideIcon } from 'lucide-react'
+import { FileSearch, GraduationCap, Layers, ListChecks, Network, RefreshCw, Settings, SquareFunction, Terminal, type LucideIcon } from 'lucide-react'
 import type { OverlayKind } from '../hooks/useOverlayManager'
 
 interface Item {
@@ -8,6 +8,8 @@ interface Item {
 }
 
 const ITEMS: Item[] = [
+  { kind: 'switcher', label: 'Quick switcher', icon: FileSearch },
+  { kind: 'palette', label: 'Command palette', icon: Terminal },
   { kind: 'deck', label: 'Deck & cram', icon: Layers },
   { kind: 'task', label: 'Tasks', icon: ListChecks },
   { kind: 'graph', label: 'Graph view', icon: Network },

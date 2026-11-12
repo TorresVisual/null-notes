@@ -1,5 +1,8 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
+import { platform } from '@tauri-apps/plugin-os'
 import { availableActions } from './CommandPalette'
+
+vi.mock('@tauri-apps/plugin-os', () => ({ platform: vi.fn(() => 'windows') }))
 
 const ids = (ctx: Parameters<typeof availableActions>[0]) => availableActions(ctx).map((a) => a.id)
 
@@ -23,6 +26,17 @@ describe('availableActions', () => {
   it('offers New Agent Canvas whenever a workspace is open', () => {
     expect(ids({ hasWorkspace: true, hasNote: false, repoMode: false })).toContain('new-agent-canvas')
     expect(ids({ hasWorkspace: false, hasNote: false, repoMode: false })).not.toContain('new-agent-canvas')
+  })
+
+  it('hides window and keyboard commands on mobile', () => {
+    vi.mocked(platform).mockReturnValue('android')
+    const mobile = ids({ hasWorkspace: true, hasNote: true, repoMode: false })
+    expect(mobile).toContain('note-duplicate')
+    for (const id of ['split-editor', 'zoom-in', 'close-tab', 'goto-tab:1', 'note-reveal', 'exit']) {
+      expect(mobile).not.toContain(id)
+    }
+    vi.mocked(platform).mockReturnValue('windows')
+    expect(ids({ hasWorkspace: true, hasNote: true, repoMode: false })).toContain('split-editor')
   })
 
   it('shows Sync Now only in a git repo, and never lists the palette itself', () => {
