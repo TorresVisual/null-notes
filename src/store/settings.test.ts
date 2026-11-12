@@ -41,6 +41,7 @@ describe('useSettingsStore', () => {
       uiZoomPct: 125,
       shownDotFolders: ['.null'],
       pullDownCommand: 'quick-switch',
+      mobileToolbar: ['undo', 'bold'],
     })
     expect(useSettingsStore.getState().settings).toEqual({
       autosaveDebounceMs: 1200,
@@ -66,6 +67,7 @@ describe('useSettingsStore', () => {
       uiZoomPct: 125,
       shownDotFolders: ['.null'],
       pullDownCommand: 'quick-switch',
+      mobileToolbar: ['undo', 'bold'],
     })
   })
 })

@@ -613,6 +613,11 @@ pub struct AppSettings {
     /// empty turns the gesture off. Machine-local, like the rest of settings.json.
     #[serde(default = "default_pull_down_command")]
     pub pull_down_command: String,
+    /// Ordered item ids in the mobile editing toolbar; `None` is the built-in
+    /// default list, so items added later reach people who never customised it.
+    /// Machine-local, like the rest of settings.json.
+    #[serde(default)]
+    pub mobile_toolbar: Option<Vec<String>>,
 }
 
 fn default_prose_font_size_px() -> u32 {
@@ -681,6 +686,7 @@ impl Default for AppSettings {
             ui_zoom_pct: default_ui_zoom_pct(),
             shown_dot_folders: Vec::new(),
             pull_down_command: default_pull_down_command(),
+            mobile_toolbar: None,
         }
     }
 }

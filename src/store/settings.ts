@@ -25,6 +25,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   uiZoomPct: 100,
   shownDotFolders: [],
   pullDownCommand: 'command-palette',
+  mobileToolbar: null,
 }
 
 interface SettingsStore {

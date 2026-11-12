@@ -3728,6 +3728,25 @@ li .fold-toggle { left: -2.4em; }
   .dialog-action, .dialog-action-primary { min-height: 44px; padding: 0 16px; }
 }
 
+.toolbar-button:disabled { opacity: var(--disabled-opacity); cursor: default; }
+
+/* Settings > Editor > Editing toolbar (mobile): one row per item, every button a 44px target. */
+.toolbar-settings { display: flex; flex-direction: column; gap: var(--space-sm); padding: 14px var(--space-lg); }
+.toolbar-settings-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-lg); }
+.toolbar-settings-head > span { display: flex; flex-direction: column; gap: 2px; font-size: 13px; color: var(--text-primary); }
+.toolbar-settings-head small { font-size: 12px; line-height: 1.45; color: var(--text-secondary); font-weight: 400; }
+.toolbar-settings-head .settings-reset { min-height: 44px; padding: 0 var(--space-lg); }
+.toolbar-settings-subhead { margin: var(--space-sm) 0 0; font-size: 12px; color: var(--text-tertiary); }
+.toolbar-settings-list { list-style: none; margin: 0; padding: 0; }
+.toolbar-settings-row { display: flex; align-items: center; gap: var(--space-sm); min-height: 44px; color: var(--text-secondary); }
+.toolbar-settings-row > span { flex: 1; min-width: 0; font-size: 14px; color: var(--text-primary); }
+.toolbar-settings-row button {
+  width: 44px; height: 44px; display: flex; align-items: center; justify-content: center;
+  background: transparent; border: 0; border-radius: 4px; color: var(--text-secondary);
+}
+.toolbar-settings-row button:active { background: var(--bg-hover); color: var(--text-primary); }
+.toolbar-settings-row button:disabled { opacity: var(--disabled-opacity); }
+
 .toolbar-button:hover, .toolbar-button[aria-expanded='true'] { background: var(--bg-hover); color: var(--text-primary); }
 .toolbar-button.active { background: var(--accent-bg); border-color: var(--accent); color: var(--accent); }
 .toolbar-button.active:hover { background: var(--accent-bg-hover); }

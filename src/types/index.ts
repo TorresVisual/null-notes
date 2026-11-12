@@ -234,6 +234,8 @@ export interface AppSettings {
   shownDotFolders: string[]
   /** Command id run by a pull-down from the top of a note or Home on mobile; `""` turns the gesture off. */
   pullDownCommand: string
+  /** Ordered item ids in the mobile editing toolbar; `null` means the built-in default list. */
+  mobileToolbar: string[] | null
 }
 
 export interface ErrorLogEntry {

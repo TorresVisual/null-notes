@@ -126,12 +126,17 @@ mod tests {
             ui_zoom_pct: 125,
             shown_dot_folders: vec![".null".to_string()],
             pull_down_command: "quick-switch".to_string(),
+            mobile_toolbar: Some(vec!["undo".to_string(), "bold".to_string()]),
         };
         save_settings_to_dir(dir.path(), &original).await.unwrap();
         let loaded = load_settings_from_dir(dir.path()).await.unwrap();
         assert_eq!(loaded.shown_dot_folders, [".null"]);
         assert!(!loaded.cli_access);
         assert_eq!(loaded.pull_down_command, "quick-switch");
+        assert_eq!(
+            loaded.mobile_toolbar,
+            Some(vec!["undo".to_string(), "bold".to_string()])
+        );
         assert_eq!(loaded.autosave_debounce_ms, 1200);
         assert_eq!(loaded.editor_max_width_px, 960);
         assert!(loaded.spellcheck);
@@ -316,6 +321,7 @@ mod tests {
         // in settings.json turns it off.
         assert!(loaded.cli_access);
         assert_eq!(loaded.pull_down_command, "command-palette");
+        assert_eq!(loaded.mobile_toolbar, None);
     }
 
     #[test]

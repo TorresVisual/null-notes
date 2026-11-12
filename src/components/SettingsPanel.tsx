@@ -29,6 +29,7 @@ import { ErrorLogDialog } from './ErrorLogDialog'
 import { KeymapSettings } from './KeymapSettings'
 import { MobileSettingsList } from './MobileSettingsList'
 import { NumberControl } from './NumberControl'
+import { ToolbarSettings } from './ToolbarSettings'
 import { COMMANDS } from '../lib/keymap'
 import { availableActions } from './CommandPalette'
 
@@ -281,6 +282,10 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
                 </select>
               </span>
             </label>
+            )}
+
+            {mobile && (
+              <ToolbarSettings saved={settings.mobileToolbar} onChange={(mobileToolbar) => void update({ mobileToolbar })} />
             )}
 
             {!mobile && (

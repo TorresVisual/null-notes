@@ -28,6 +28,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   uiZoomPct: 100,
   shownDotFolders: [],
   pullDownCommand: 'command-palette',
+  mobileToolbar: null,
 }
 
 const EMPTY_STATE: WorkspaceState = {

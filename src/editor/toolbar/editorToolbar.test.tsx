@@ -261,13 +261,13 @@ describe('the phone toolbar', () => {
     )
   }
 
-  it('keeps the formatting and insert groups but drops the exercise-sheet group on a phone', () => {
+  it('shows the one customisable item group but drops the exercise-sheet group on a phone', () => {
     vi.mocked(platform).mockReturnValue('android')
     useMobileEditStore.setState({ editingPath: '/a.md' })
     const { getByRole, queryByRole } = mountNote()
 
-    expect(getByRole('group', { name: 'Formatting' })).toBeInTheDocument()
-    expect(getByRole('group', { name: 'Insert' })).toBeInTheDocument()
+    expect(getByRole('group', { name: 'Formatting and insert' })).toBeInTheDocument()
+    expect(queryByRole('group', { name: 'Formatting' })).toBeNull()
     expect(queryByRole('group', { name: 'Exercise sheet' })).toBeNull()
   })
 

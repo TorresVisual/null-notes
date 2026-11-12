@@ -6,6 +6,7 @@ import { InkToolGroup } from './InkToolGroup'
 import { TextFormatGroup } from './TextFormatGroup'
 import { InsertGroup } from './InsertGroup'
 import { SheetGroup } from './SheetGroup'
+import { MobileToolbarItems } from './MobileToolbarItems'
 import { insertInk } from './insertInk'
 import { report } from '../splitIntoTasks'
 import { isMobile } from '../../lib/platform'
@@ -77,13 +78,14 @@ export function EditorToolbar({ editor, notePath }: EditorToolbarProps) {
       ) : (
         <>
           <div className="editor-toolbar-scroll">
-            {editor && !codeBlockState.active && (
+            {editor && mobile && <MobileToolbarItems editor={editor} notePath={notePath} />}
+            {editor && !mobile && !codeBlockState.active && (
               <>
                 <TextFormatGroup editor={editor} />
                 <span className="toolbar-sep" aria-hidden />
               </>
             )}
-            {editor && <InsertGroup editor={editor} notePath={notePath} />}
+            {editor && !mobile && <InsertGroup editor={editor} notePath={notePath} />}
             {editor && !mobile && (
               <>
                 <span className="toolbar-sep" aria-hidden />
