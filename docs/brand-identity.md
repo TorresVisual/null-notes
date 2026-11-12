@@ -36,4 +36,15 @@ Source files: `logos/concept-null-notes.svg` (original hand-drawn concept), `log
 
 **Lesson for next time this kind of bug shows up:** check actual pixel values before trusting a visual glance or a plausible-sounding theory — a thumbnail rendered small enough, or eyeballed quickly, can hide a fully-opaque corner that a two-line PIL/`.NET` pixel read exposes immediately. And separately: rebuild the Rust binary (`cargo clean -p null-notes && cargo build` in `src-tauri/`, or fully quit and relaunch `tauri dev`) before concluding an icon-visual bug is fixed — the icon is embedded into the exe at compile time, so a stale binary shows a stale icon regardless of what's correct on disk.
 
-`npx tauri icon` also produces Windows Store/MSIX tile assets (`Square*Logo.png`, `StoreLogo.png`) and Android/iOS variants as part of its default output — none of them are referenced anywhere in this project (it ships via NSIS/MSI, not a store), and the small Store tile sizes in particular bake in Microsoft's own safe-zone padding (a real, separate, unrelated padding convention). These are deleted after every regeneration rather than committed.
+`npx tauri icon` also produces Windows Store/MSIX tile assets (`Square*Logo.png`, `StoreLogo.png`) — none of them are referenced anywhere in this project (it ships via NSIS/MSI, not a store), and the small Store tile sizes in particular bake in Microsoft's own safe-zone padding (a real, separate, unrelated padding convention). These are deleted after every regeneration rather than committed.
+
+**Mobile icons are the exception: they are used, and live in `src-tauri/gen/`.** `tauri android init` / `tauri ios init` write the stock Tauri icon into `gen/android/.../res` and `gen/apple/Assets.xcassets/AppIcon.appiconset`, so after any re-init the mobile icons must be regenerated from `logos/mobile/manifest.json` and copied over:
+
+```
+cd src-tauri
+npx tauri icon ../logos/mobile/manifest.json -o <tmp dir>
+# copy <tmp>/android/* -> gen/android/app/src/main/res/   (delete the stock drawable/ic_launcher_background.xml and drawable-v24/ic_launcher_foreground.xml)
+# copy <tmp>/ios/*     -> gen/apple/Assets.xcassets/AppIcon.appiconset/
+```
+
+The manifest feeds each platform what it needs: iOS applies its own corner mask, so it gets an opaque square (`bg_color` `#0d0f12` fills the rounded master's corners); Android's adaptive icon gets `app-icon-fg.svg` (the mark alone, scaled to 70% so it sits inside the 66/108 safe zone) over a solid `#0d0f12` background layer.
