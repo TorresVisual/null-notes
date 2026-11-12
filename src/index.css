@@ -667,6 +667,20 @@ button, [role="button"], .tree-row, .tab, .search-result, .slash-menu-item,
   text-overflow: ellipsis;
 }
 
+.mobile-sheet-heading {
+  margin: var(--space-sm) 0 var(--space-xs);
+  padding: 0 var(--space-md);
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.mobile-sheet-empty {
+  margin: 0;
+  padding: var(--space-sm) var(--space-md);
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
 .mobile-sheet-action.is-danger { color: var(--danger); }
 
 .mobile-sheet-action {

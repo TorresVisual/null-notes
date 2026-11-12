@@ -15,7 +15,13 @@ import { useSettingsStore, DEFAULT_SETTINGS } from '../store/settings'
 
 vi.mock('@tauri-apps/plugin-os', () => ({ platform: vi.fn(() => 'android') }))
 vi.mock('@tauri-apps/api/app', () => ({ onBackButtonPress: vi.fn() }))
-vi.mock('../lib/tauri', () => ({ api: { window: { exitApp: vi.fn() } } }))
+vi.mock('../lib/tauri', () => ({
+  api: {
+    window: { exitApp: vi.fn() },
+    notes: { backlinksForWithContext: vi.fn(() => Promise.resolve([{ note: { path: '/ws/b.md', title: 'Linker' }, snippet: '' }])) },
+  },
+}))
+vi.mock('../hooks/useNote', () => ({ useNote: () => ({ content: '# Intro\n\n## Details\n' }) }))
 vi.mock('../hooks/useQuickNote', () => ({ discardIfUntouched: vi.fn() }))
 vi.mock('./MobileNotes', () => ({ MobileNotes: () => <div>notes-screen</div> }))
 vi.mock('./MobileOnboarding', () => ({ MobileOnboarding: () => <div>onboarding-screen</div> }))
@@ -372,5 +378,47 @@ describe('MobileShell pull-down', () => {
     const { props } = setup({ activeOverlay: 'palette' })
     pull(screen.getByText('editor-screen').parentElement as Element, 100, 260)
     expect(props.runCommand).not.toHaveBeenCalled()
+  })
+})
+
+describe('MobileShell outline sheet', () => {
+  const openNote = () => useWorkspaceStore.setState({ activeTab: '/ws/a.md', openTabs: ['/ws/a.md'], path: '/ws' })
+
+  it('opens from the top bar and lists headings and backlinks', async () => {
+    openNote()
+    setup()
+    await userEvent.click(screen.getByRole('button', { name: 'Outline and backlinks' }))
+    expect(screen.getByRole('button', { name: 'Intro' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Details' })).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: 'Linker' })).toBeInTheDocument()
+  })
+
+  it('opens from a right-edge swipe and closes on system Back', async () => {
+    openNote()
+    const { container } = setup()
+    await act(async () => {})
+    const shell = container.querySelector('.mobile-shell') as Element
+    Object.defineProperty(window, 'innerWidth', { value: 400, configurable: true })
+    fireEvent.touchStart(shell, { touches: [{ clientX: 398, clientY: 300 }] })
+    fireEvent.touchEnd(shell, { changedTouches: [{ clientX: 250, clientY: 300 }] })
+    expect(screen.getByRole('dialog', { name: 'Outline and backlinks' })).toBeInTheDocument()
+    act(() => press())
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(useWorkspaceStore.getState().activeTab).toBe('/ws/a.md')
+  })
+
+  it('opens a backlink and closes the sheet', async () => {
+    openNote()
+    setup()
+    await userEvent.click(screen.getByRole('button', { name: 'Outline and backlinks' }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Linker' }))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(useWorkspaceStore.getState().activeTab).toBe('/ws/b.md')
+  })
+
+  it('is not offered on a canvas', () => {
+    useWorkspaceStore.setState({ activeTab: '/ws/c.canvas', openTabs: ['/ws/c.canvas'] })
+    setup()
+    expect(screen.queryByRole('button', { name: 'Outline and backlinks' })).not.toBeInTheDocument()
   })
 })

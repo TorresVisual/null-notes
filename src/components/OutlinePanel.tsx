@@ -29,6 +29,12 @@ function tickWidth(level: number): number {
   return Math.max(6, 20 - (level - 1) * 4)
 }
 
+export function jumpToHeading(container: ParentNode | null | undefined, index: number) {
+  const el = container?.querySelectorAll<HTMLElement>(HEADING_SELECTOR)[index]
+  el?.dispatchEvent(new Event(REVEAL_FOLD_EVENT, { bubbles: true }))
+  el?.scrollIntoView({ block: 'start', behavior: 'smooth' })
+}
+
 export function OutlinePanel({ content, containerRef, notePath: notePathProp }: OutlinePanelProps) {
   const headings = useMemo(() => parseHeadings(content), [content])
   const [activeIndex, setActiveIndex] = useState<number | null>(null)
@@ -68,13 +74,6 @@ export function OutlinePanel({ content, containerRef, notePath: notePathProp }: 
     return () => document.removeEventListener('selectionchange', updateActiveFromSelection)
   }, [containerRef, headings.length])
 
-  function jump(index: number) {
-    const els = containerRef.current?.querySelectorAll<HTMLElement>(HEADING_SELECTOR)
-    const el = els?.[index]
-    el?.dispatchEvent(new Event(REVEAL_FOLD_EVENT, { bubbles: true }))
-    el?.scrollIntoView({ block: 'start', behavior: 'smooth' })
-  }
-
   return (
     <div
       className="outline-panel"
@@ -113,7 +112,7 @@ export function OutlinePanel({ content, containerRef, notePath: notePathProp }: 
                       <button
                         className={`outline-item${i === activeIndex ? ' active' : ''}`}
                         style={{ paddingLeft: 8 + (h.level - 1) * 12 }}
-                        onClick={() => jump(i)}
+                        onClick={() => jumpToHeading(containerRef.current, i)}
                       >
                         {h.text || '(untitled heading)'}
                       </button>

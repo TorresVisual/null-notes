@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { ArrowLeft, ArrowRight, FileSearch, Plus, Terminal } from 'lucide-react'
+import { ArrowLeft, ArrowRight, FileSearch, ListTree, Plus, Terminal } from 'lucide-react'
 import { useWorkspaceStore } from '../store/workspace'
 import { useMobileEditStore } from '../store/mobileEdit'
 import { useMobileOnboardingStore } from '../store/mobileOnboarding'
@@ -7,6 +7,8 @@ import { useActionSheetStore } from '../store/actionSheet'
 import { discardIfUntouched } from '../hooks/useQuickNote'
 import { useBackButton } from '../hooks/useBackButton'
 import { usePullDown } from '../hooks/usePullDown'
+import { useEdgeSwipe } from '../hooks/useEdgeSwipe'
+import { isBasePath, isCanvasPath } from '../lib/canvasPath'
 import { useSettingsStore } from '../store/settings'
 import { clearNavigationHistory, goBack, goForward, useNavigationHistoryStore } from '../lib/navigationHistory'
 import { useSettingsNavStore } from '../store/settingsNav'
@@ -15,6 +17,7 @@ import type { MobileTab } from '../lib/backNavigation'
 import { MobileTabBar, type TabId } from './MobileTabBar'
 import { MoreSheet } from './MoreSheet'
 import { ActionSheet } from './ActionSheet'
+import { NoteOutlineSheet } from './NoteOutlineSheet'
 import { MobileNotes } from './MobileNotes'
 import { MobileOnboarding } from './MobileOnboarding'
 
@@ -61,9 +64,11 @@ export function MobileShell({
 }: MobileShellProps) {
   const [tab, setTab] = useState<MobileTab>('home')
   const [moreOpen, setMoreOpen] = useState(false)
+  const [outlineOpen, setOutlineOpen] = useState(false)
   const activeTab = useWorkspaceStore((s) => s.activeTab)
   const setActiveTab = useWorkspaceStore((s) => s.setActiveTab)
   const editorOpen = hasWorkspace && activeTab !== null
+  const outlineAvailable = editorOpen && !isCanvasPath(activeTab) && !isBasePath(activeTab)
   const onboardingStep = useMobileOnboardingStore((s) => s.step !== 'start')
 
   // Dialogs portal to <body>, outside .app-shell, so full-screen overlay CSS
@@ -86,7 +91,7 @@ export function MobileShell({
   const actionSheetOpen = useActionSheetStore((s) => s.sheet !== null)
 
   useBackButton(
-    { overlayOpen: activeOverlay !== null, sheetOpen: moreOpen || actionSheetOpen, onboardingStep: !hasWorkspace && onboardingStep, editorOpen, noteHistory: canGoBack, tab },
+    { overlayOpen: activeOverlay !== null, sheetOpen: moreOpen || actionSheetOpen || outlineOpen, onboardingStep: !hasWorkspace && onboardingStep, editorOpen, noteHistory: canGoBack, tab },
     {
       'close-overlay': () => {
         const nav = useSettingsNavStore.getState()
@@ -95,6 +100,7 @@ export function MobileShell({
       },
       'close-sheet': () => {
         setMoreOpen(false)
+        setOutlineOpen(false)
         useActionSheetStore.getState().close()
       },
       'leave-onboarding-step': () => useMobileOnboardingStore.getState().setStep('start'),
@@ -107,7 +113,12 @@ export function MobileShell({
   const pullDownCommand = useSettingsStore((s) => s.settings.pullDownCommand)
   const pullDown = usePullDown(
     () => runCommand(pullDownCommand),
-    hasWorkspace && pullDownCommand !== '' && activeOverlay === null && !moreOpen && !actionSheetOpen && (editorOpen || tab === 'home'),
+    hasWorkspace && pullDownCommand !== '' && activeOverlay === null && !moreOpen && !outlineOpen && !actionSheetOpen && (editorOpen || tab === 'home'),
+  )
+
+  const edgeSwipe = useEdgeSwipe(
+    () => setOutlineOpen(true),
+    outlineAvailable && activeOverlay === null && !moreOpen && !outlineOpen && !actionSheetOpen,
   )
 
   function selectTab(id: TabId) {
@@ -131,7 +142,7 @@ export function MobileShell({
     : home
 
   return (
-    <div className="app-shell mobile-shell">
+    <div className="app-shell mobile-shell" {...edgeSwipe}>
       {overlays}
       {editorOpen ? (
         <>
@@ -146,6 +157,11 @@ export function MobileShell({
             )}
             <span className="mobile-topbar-title">{noteTitle}</span>
             {saveStatus}
+            {outlineAvailable && (
+              <button className="mobile-topbar-back" aria-label="Outline and backlinks" onClick={() => setOutlineOpen(true)}>
+                <ListTree size={20} />
+              </button>
+            )}
             <button className="mobile-topbar-back" aria-label="Quick switcher" onClick={() => openOverlay('switcher')}>
               <FileSearch size={20} />
             </button>
@@ -174,6 +190,9 @@ export function MobileShell({
         </>
       )}
       <ActionSheet />
+      {outlineOpen && outlineAvailable && activeTab && (
+        <NoteOutlineSheet notePath={activeTab} noteTitle={noteTitle} onClose={() => setOutlineOpen(false)} />
+      )}
       {moreOpen && (
         <MoreSheet
           onClose={() => setMoreOpen(false)}
