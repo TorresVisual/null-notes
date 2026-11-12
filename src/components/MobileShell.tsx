@@ -1,11 +1,12 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { ArrowLeft, FileSearch, Plus, Terminal } from 'lucide-react'
+import { ArrowLeft, ArrowRight, FileSearch, Plus, Terminal } from 'lucide-react'
 import { useWorkspaceStore } from '../store/workspace'
 import { useMobileEditStore } from '../store/mobileEdit'
 import { useMobileOnboardingStore } from '../store/mobileOnboarding'
 import { useActionSheetStore } from '../store/actionSheet'
 import { discardIfUntouched } from '../hooks/useQuickNote'
 import { useBackButton } from '../hooks/useBackButton'
+import { clearNavigationHistory, goBack, goForward, useNavigationHistoryStore } from '../lib/navigationHistory'
 import { useSettingsNavStore } from '../store/settingsNav'
 import type { OverlayKind } from '../hooks/useOverlayManager'
 import type { MobileTab } from '../lib/backNavigation'
@@ -74,12 +75,14 @@ export function MobileShell({
     useMobileEditStore.getState().stopEditing()
     if (activeTab) void discardIfUntouched(activeTab)
     setActiveTab(null)
+    clearNavigationHistory()
   }
 
+  const { canGoBack, canGoForward } = useNavigationHistoryStore()
   const actionSheetOpen = useActionSheetStore((s) => s.sheet !== null)
 
   useBackButton(
-    { overlayOpen: activeOverlay !== null, sheetOpen: moreOpen || actionSheetOpen, onboardingStep: !hasWorkspace && onboardingStep, editorOpen, tab },
+    { overlayOpen: activeOverlay !== null, sheetOpen: moreOpen || actionSheetOpen, onboardingStep: !hasWorkspace && onboardingStep, editorOpen, noteHistory: canGoBack, tab },
     {
       'close-overlay': () => {
         const nav = useSettingsNavStore.getState()
@@ -91,6 +94,7 @@ export function MobileShell({
         useActionSheetStore.getState().close()
       },
       'leave-onboarding-step': () => useMobileOnboardingStore.getState().setStep('start'),
+      'previous-note': goBack,
       'close-editor': closeEditor,
       'go-home': () => setTab('home'),
     },
@@ -122,9 +126,14 @@ export function MobileShell({
       {editorOpen ? (
         <>
           <header className="mobile-topbar">
-            <button className="mobile-topbar-back" aria-label="Back" onClick={closeEditor}>
+            <button className="mobile-topbar-back" aria-label="Back" onClick={canGoBack ? goBack : closeEditor}>
               <ArrowLeft size={20} />
             </button>
+            {canGoForward && (
+              <button className="mobile-topbar-back" aria-label="Forward" onClick={goForward}>
+                <ArrowRight size={20} />
+              </button>
+            )}
             <span className="mobile-topbar-title">{noteTitle}</span>
             {saveStatus}
             <button className="mobile-topbar-back" aria-label="Quick switcher" onClick={() => openOverlay('switcher')}>

@@ -10,6 +10,7 @@ import { discardIfUntouched } from '../hooks/useQuickNote'
 import { useMobileOnboardingStore } from '../store/mobileOnboarding'
 import { useActionSheetStore } from '../store/actionSheet'
 import { useSettingsNavStore } from '../store/settingsNav'
+import { clearNavigationHistory } from '../lib/navigationHistory'
 
 vi.mock('@tauri-apps/plugin-os', () => ({ platform: vi.fn(() => 'android') }))
 vi.mock('@tauri-apps/api/app', () => ({ onBackButtonPress: vi.fn() }))
@@ -44,6 +45,7 @@ function setup(over: Partial<React.ComponentProps<typeof MobileShell>> = {}) {
 
 beforeEach(() => {
   useWorkspaceStore.setState({ activeTab: null, openTabs: [], repoMode: null, recentWorkspaces: [] })
+  clearNavigationHistory()
   useMobileOnboardingStore.setState({ step: 'start' })
   vi.mocked(platform).mockReturnValue('android')
   vi.mocked(onBackButtonPress).mockImplementation(async (cb) => {
@@ -196,6 +198,41 @@ describe('leaving a quick note', () => {
     act(() => useWorkspaceStore.setState({ activeTab: '/ws/b.md', openTabs: ['/ws/a.md', '/ws/b.md'] }))
     act(() => press())
     expect(discardIfUntouched).toHaveBeenLastCalledWith('/ws/b.md')
+  })
+})
+
+describe('note history in the editor', () => {
+  const openLinked = () => {
+    useWorkspaceStore.setState({ activeTab: '/ws/a.md', openTabs: ['/ws/a.md'] })
+    setup()
+    act(() => useWorkspaceStore.getState().openTab('/ws/b.md'))
+  }
+
+  it('steps back and forward between notes from the top bar', async () => {
+    openLinked()
+    await userEvent.click(screen.getByRole('button', { name: 'Back' }))
+    expect(useWorkspaceStore.getState().activeTab).toBe('/ws/a.md')
+    await userEvent.click(screen.getByRole('button', { name: 'Forward' }))
+    expect(useWorkspaceStore.getState().activeTab).toBe('/ws/b.md')
+    expect(screen.queryByRole('button', { name: 'Forward' })).toBeNull()
+  })
+
+  it('system Back steps through history before it closes the editor', async () => {
+    openLinked()
+    await act(async () => {})
+    act(() => press())
+    expect(useWorkspaceStore.getState().activeTab).toBe('/ws/a.md')
+    act(() => press())
+    expect(useWorkspaceStore.getState().activeTab).toBeNull()
+  })
+
+  it('does not carry history across a closed editor', async () => {
+    openLinked()
+    await userEvent.click(screen.getByRole('button', { name: 'Back' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Back' }))
+    act(() => useWorkspaceStore.getState().openTab('/ws/c.md'))
+    await userEvent.click(screen.getByRole('button', { name: 'Back' }))
+    expect(useWorkspaceStore.getState().activeTab).toBeNull()
   })
 })
 
