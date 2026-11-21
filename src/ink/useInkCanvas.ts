@@ -29,6 +29,10 @@ import {
   selectionIn,
   translatePolygon,
   translateSelection,
+  duplicateSelection,
+  scaleSelection,
+  scalePolygon,
+  resizeFactor,
   deleteSelection as removeSelection,
 } from './lasso'
 import type { LassoPoint, Selection } from './lasso'
@@ -36,6 +40,8 @@ import { useInkStore, activePenOf } from '../store/ink'
 import type { InkBackdrop } from './InkEditorOverlay'
 import type { PreviewShape } from './shapePreview'
 import type { InkData, Stroke, Shape, TextItem, Tool, Point } from './types'
+
+const DUPLICATE_OFFSET = 24
 
 const SHAPE_TOOLS: Tool[] = ['line', 'circle', 'rect', 'arrow']
 
@@ -130,6 +136,21 @@ interface PointerLike {
 
 export function isEraserTip(e: PointerLike): boolean {
   return (e.buttons & ERASER_BUTTONS_MASK) !== 0 || e.button === ERASER_BUTTON
+}
+
+// The pen's barrel button is the lasso for as long as it is held, the way its
+// eraser end is the eraser — the toolbar's tool never changes. It is reported
+// in `buttons` bit 1 whether or not the tip is down, and only a pen has one: a
+// mouse right-click is not this.
+const BARREL_BUTTONS_MASK = 2
+
+export function isBarrelButton(e: { pointerType: string; buttons: number }): boolean {
+  return e.pointerType === 'pen' && (e.buttons & BARREL_BUTTONS_MASK) !== 0
+}
+
+function toolFor(e: PointerEvent, tool: Tool): Tool {
+  if (isEraserTip(e)) return 'eraser'
+  return isBarrelButton(e) ? 'lasso' : tool
 }
 
 // Touch pans and pinches, so it never draws; pen and mouse do.
@@ -337,6 +358,10 @@ export function useInkCanvas(
   const previewLine = useRef<RecognizedLine | null>(null)
   const dragSnapshot = useRef<InkData | null>(null)
   const dragFrom = useRef<LassoPoint | null>(null)
+  // What the pen is doing is decided when the tip lands. The buttons can change
+  // under it mid-gesture, and flipping tool halfway would cut the gesture short.
+  const gestureTool = useRef<Tool | null>(null)
+  const resizeFrom = useRef<{ snapshot: InkData; polygon: LassoPoint[]; frame: Bounds } | null>(null)
   const textDragFrom = useRef<{ id: string; x: number; y: number; moved: boolean } | null>(null)
   const textDragSnapshot = useRef<InkData | null>(null)
 
@@ -470,7 +495,8 @@ export function useInkCanvas(
     setFuture([...future, inkData])
     setInkData(previous)
     save(previous)
-  }, [history, future, inkData, save])
+    clearSelection()
+  }, [history, future, inkData, save, clearSelection])
 
   const redo = useCallback(() => {
     const next = future[future.length - 1]
@@ -479,7 +505,8 @@ export function useInkCanvas(
     setHistory([...history, inkData])
     setInkData(next)
     save(next)
-  }, [history, future, inkData, save])
+    clearSelection()
+  }, [history, future, inkData, save, clearSelection])
 
   const startNewText = useCallback(
     (x: number, y: number) => {
@@ -684,12 +711,17 @@ export function useInkCanvas(
     (e: PointerEvent) => {
       if (!isDrawingPointer(e) || (e.pointerType === 'mouse' && e.button !== 0)) return
       capturePointer(canvasRef.current, e.pointerId)
-      const activeTool = isEraserTip(e) ? 'eraser' : tool
+      const activeTool = toolFor(e, tool)
+      gestureTool.current = activeTool
       const at = toWorld(e)
 
       // The straightedge is grabbed before any tool gets a look in — landing on
       // it always means "put it somewhere else", whatever is in your hand.
       if (!isEraserTip(e) && grabRuler(at.x, at.y)) return
+
+      // A marquee left floating after you reach for another tool is clutter —
+      // and the lasso tool itself decides below whether this press keeps it.
+      if (activeTool !== 'lasso' && !isSelectionEmpty(selection)) clearSelection()
 
       if (activeTool === 'eraser') {
         eraseSnapshot.current = inkData
@@ -751,7 +783,7 @@ export function useInkCanvas(
   const handlePointerMove = useCallback(
     (e: PointerEvent) => {
       if (!isDrawingPointer(e)) return
-      const activeTool = isEraserTip(e) ? 'eraser' : tool
+      const activeTool = gestureTool.current ?? toolFor(e, tool)
       const at = toWorld(e)
 
       if (rulerGrab.current) {
@@ -834,6 +866,7 @@ export function useInkCanvas(
     (e: PointerEvent) => {
       if (!isDrawingPointer(e)) return
       releasePointer(canvasRef.current, e.pointerId)
+      gestureTool.current = null
       cancelRedraw()
 
       // Where the ruler ends up is not an edit to the note, so it costs no
@@ -962,6 +995,49 @@ export function useInkCanvas(
     clearSelection()
   }, [selection, inkData, commit, clearSelection])
 
+  const selectionFrame = useMemo<Bounds | null>(
+    () => (lassoPolygon && !isSelectionEmpty(selection) ? boundsOfPoints(lassoPolygon) : null),
+    [lassoPolygon, selection],
+  )
+
+  const duplicateSelected = useCallback(() => {
+    if (isSelectionEmpty(selection)) return
+    const copy = duplicateSelection(inkData, selection, DUPLICATE_OFFSET, DUPLICATE_OFFSET, () => crypto.randomUUID())
+    commit(copy.data)
+    setSelection(copy.selection)
+    setLassoPolygon((polygon) => (polygon ? translatePolygon(polygon, DUPLICATE_OFFSET, DUPLICATE_OFFSET) : polygon))
+  }, [selection, inkData, commit])
+
+  // Resizing scales from the state at the moment the handle was grabbed, not
+  // from the last sample, so a long drag cannot accumulate rounding drift and
+  // dragging back to where it began restores the original exactly.
+  const beginResize = useCallback(() => {
+    if (!selectionFrame || !lassoPolygon) return
+    resizeFrom.current = { snapshot: inkData, polygon: lassoPolygon, frame: selectionFrame }
+  }, [selectionFrame, lassoPolygon, inkData])
+
+  const resizeTo = useCallback(
+    (x: number, y: number) => {
+      const grab = resizeFrom.current
+      if (!grab) return
+      const factor = resizeFactor(grab.frame, x, y)
+      const { minX, minY } = grab.frame
+      setInkData(scaleSelection(grab.snapshot, selection, factor, minX, minY))
+      setLassoPolygon(scalePolygon(grab.polygon, factor, minX, minY))
+    },
+    [selection],
+  )
+
+  // One history entry and one write per resize, however long the drag.
+  const endResize = useCallback(() => {
+    const grab = resizeFrom.current
+    resizeFrom.current = null
+    if (!grab || inkDataRef.current === grab.snapshot) return
+    setHistory((past) => [...past, grab.snapshot])
+    setFuture([])
+    save(inkDataRef.current)
+  }, [save])
+
   useEffect(() => {
     if (isSelectionEmpty(selection)) return
     // Every mounted canvas hears window keydown; only the one the user last
@@ -997,7 +1073,12 @@ export function useInkCanvas(
     setTool: selectTool,
     selection,
     hasSelection: !isSelectionEmpty(selection),
+    selectionFrame,
     deleteSelected,
+    duplicateSelected,
+    beginResize,
+    resizeTo,
+    endResize,
     pens,
     activePenId,
     selectPen,

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
-import { useInkCanvas, isEraserTip, toInk } from './useInkCanvas'
+import { useInkCanvas, isBarrelButton, isEraserTip, toInk } from './useInkCanvas'
 import { DEFAULT_PENS } from './pens'
 import { useInkStore } from '../store/ink'
 
@@ -50,6 +50,32 @@ describe('isEraserTip', () => {
 
   it('does not mistake the barrel button for the eraser', () => {
     expect(isEraserTip({ button: 2, buttons: 2 })).toBe(false)
+  })
+})
+
+// The lasso rides on the pen's barrel button, held while the tip is down
+// (buttons = 1 | 2) — hovering with it held must not count, and a mouse
+// right-click is not a pen.
+describe('isBarrelButton', () => {
+  it('detects the barrel button with the tip down', () => {
+    expect(isBarrelButton({ pointerType: 'pen', buttons: 3 })).toBe(true)
+  })
+
+  it('detects the barrel button while hovering', () => {
+    expect(isBarrelButton({ pointerType: 'pen', buttons: 2 })).toBe(true)
+  })
+
+  it('leaves a plain pen tip alone', () => {
+    expect(isBarrelButton({ pointerType: 'pen', buttons: 1 })).toBe(false)
+    expect(isBarrelButton({ pointerType: 'pen', buttons: 0 })).toBe(false)
+  })
+
+  it('leaves the eraser button alone', () => {
+    expect(isBarrelButton({ pointerType: 'pen', buttons: 32 })).toBe(false)
+  })
+
+  it('is not a mouse right-click', () => {
+    expect(isBarrelButton({ pointerType: 'mouse', buttons: 2 })).toBe(false)
   })
 })
 

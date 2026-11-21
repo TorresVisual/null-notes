@@ -98,6 +98,70 @@ export function translateSelection(
   }
 }
 
+// The copies land offset so they read as copies rather than as nothing having
+// happened, and are what ends up selected — one drag from where you want them.
+export function duplicateSelection(
+  data: InkData,
+  selection: Selection,
+  dx: number,
+  dy: number,
+  newId: () => string,
+): { data: InkData; selection: Selection } {
+  const strokes = data.strokes
+    .filter((s) => selection.strokeIds.includes(s.id))
+    .map((s) => ({ ...s, id: newId(), points: s.points.map((p) => ({ ...p, x: p.x + dx, y: p.y + dy })) }))
+  const shapes = data.shapes
+    .filter((s) => selection.shapeIds.includes(s.id))
+    .map((s) => ({ ...s, id: newId(), x1: s.x1 + dx, y1: s.y1 + dy, x2: s.x2 + dx, y2: s.y2 + dy }))
+  return {
+    data: { ...data, strokes: [...data.strokes, ...strokes], shapes: [...data.shapes, ...shapes] },
+    selection: { strokeIds: strokes.map((s) => s.id), shapeIds: shapes.map((s) => s.id) },
+  }
+}
+
+// Geometry scales, line width does not: enlarging a drawing should not also
+// fatten the pen it was drawn with.
+export function scaleSelection(
+  data: InkData,
+  selection: Selection,
+  factor: number,
+  ax: number,
+  ay: number,
+): InkData {
+  const sx = (x: number) => ax + (x - ax) * factor
+  const sy = (y: number) => ay + (y - ay) * factor
+  return {
+    ...data,
+    strokes: data.strokes.map((s) =>
+      selection.strokeIds.includes(s.id)
+        ? { ...s, points: s.points.map((p) => ({ ...p, x: sx(p.x), y: sy(p.y) })) }
+        : s,
+    ),
+    shapes: data.shapes.map((s) =>
+      selection.shapeIds.includes(s.id)
+        ? { ...s, x1: sx(s.x1), y1: sy(s.y1), x2: sx(s.x2), y2: sy(s.y2) }
+        : s,
+    ),
+  }
+}
+
+export function scalePolygon(polygon: LassoPoint[], factor: number, ax: number, ay: number): LassoPoint[] {
+  return polygon.map((p) => ({ x: ax + (p.x - ax) * factor, y: ay + (p.y - ay) * factor }))
+}
+
+const MIN_RESIZE_FACTOR = 0.1
+
+// The pointer's progress along the frame's own top-left → bottom-right diagonal,
+// so the aspect ratio holds however the pen wanders sideways.
+export function resizeFactor(frame: Bounds, x: number, y: number): number {
+  const dx = frame.maxX - frame.minX
+  const dy = frame.maxY - frame.minY
+  const length = dx * dx + dy * dy
+  if (length === 0) return 1
+  const along = ((x - frame.minX) * dx + (y - frame.minY) * dy) / length
+  return Math.max(MIN_RESIZE_FACTOR, along)
+}
+
 export function deleteSelection(data: InkData, selection: Selection): InkData {
   return {
     ...data,

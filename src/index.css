@@ -5316,6 +5316,46 @@ li > .folder-tree.tree-guide {
   transform: translate(-50%, -50%);
 }
 
+/* The lasso marquee's actions. Both ride over the canvas at the marquee's own
+   screen position; the handle is centred on the corner it scales from. */
+.ink-selection-bar {
+  position: absolute;
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  background: var(--bg-raised);
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+.ink-selection-bar button {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.ink-selection-bar button:hover { background: var(--accent-bg-hover); }
+.ink-selection-bar button.danger:hover { color: var(--danger); }
+
+.ink-resize-handle {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  transform: translate(-50%, -50%);
+  background: var(--accent);
+  border: 2px solid var(--bg-base);
+  border-radius: 50%;
+  cursor: nwse-resize;
+}
+
 /* Positioned over the canvas at the item's own (x, y) — top baseline, matching
    `drawTextItem`'s `ctx.textBaseline = 'top'` so the box lines up with where
    the committed text will actually render. Grows with its own content

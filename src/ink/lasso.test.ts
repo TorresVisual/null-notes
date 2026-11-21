@@ -7,6 +7,10 @@ import {
   translateSelection,
   translatePolygon,
   deleteSelection,
+  duplicateSelection,
+  scaleSelection,
+  scalePolygon,
+  resizeFactor,
   selectionBounds,
   isSelectionEmpty,
   EMPTY_SELECTION,
@@ -159,6 +163,93 @@ describe('translateSelection', () => {
 describe('translatePolygon', () => {
   it('carries the marquee along with what it holds', () => {
     expect(translatePolygon([{ x: 0, y: 0 }], 5, 7)).toEqual([{ x: 5, y: 7 }])
+  })
+})
+
+describe('duplicateSelection', () => {
+  const data: InkData = {
+    originX: 0,
+    originY: 0,
+    width: 800,
+    height: 600,
+    strokes: [stroke('a', [[10, 10]]), stroke('b', [[50, 50]])],
+    shapes: [rect],
+    texts: [],
+  }
+  const ids = () => {
+    let n = 0
+    return () => `new${++n}`
+  }
+
+  it('adds offset copies with fresh ids and leaves the originals where they were', () => {
+    const { data: next } = duplicateSelection(data, { strokeIds: ['a'], shapeIds: ['r1'] }, 20, 30, ids())
+    expect(next.strokes.map((s) => s.id)).toEqual(['a', 'b', 'new1'])
+    expect(next.strokes[0]?.points[0]).toMatchObject({ x: 10, y: 10 })
+    expect(next.strokes[2]?.points[0]).toMatchObject({ x: 30, y: 40, pressure: 0.5 })
+    expect(next.shapes.map((s) => s.id)).toEqual(['r1', 'new2'])
+    expect(next.shapes[1]).toMatchObject({ x1: 30, y1: 40, x2: 60, y2: 70 })
+  })
+
+  it('selects the copies so they can be dragged straight away', () => {
+    const { selection } = duplicateSelection(data, { strokeIds: ['a'], shapeIds: ['r1'] }, 20, 30, ids())
+    expect(selection).toEqual({ strokeIds: ['new1'], shapeIds: ['new2'] })
+  })
+})
+
+describe('scaleSelection', () => {
+  const data: InkData = {
+    originX: 0,
+    originY: 0,
+    width: 800,
+    height: 600,
+    strokes: [stroke('a', [[20, 20], [40, 60]]), stroke('b', [[20, 20]])],
+    shapes: [rect],
+    texts: [],
+  }
+
+  it('scales selected points about the anchor and keeps pressure and width', () => {
+    const scaled = scaleSelection(data, { strokeIds: ['a'], shapeIds: [] }, 2, 10, 10)
+    expect(scaled.strokes[0]?.points[0]).toMatchObject({ x: 30, y: 30, pressure: 0.5 })
+    expect(scaled.strokes[0]?.points[1]).toMatchObject({ x: 70, y: 110 })
+    expect(scaled.strokes[0]?.size).toBe(2)
+  })
+
+  it('leaves what is not selected alone', () => {
+    const scaled = scaleSelection(data, { strokeIds: ['a'], shapeIds: [] }, 2, 10, 10)
+    expect(scaled.strokes[1]).toBe(data.strokes[1])
+    expect(scaled.shapes[0]).toBe(data.shapes[0])
+  })
+
+  it('scales both corners of a shape', () => {
+    const scaled = scaleSelection(data, { strokeIds: [], shapeIds: ['r1'] }, 0.5, 10, 10)
+    expect(scaled.shapes[0]).toMatchObject({ x1: 10, y1: 10, x2: 25, y2: 25 })
+  })
+})
+
+describe('scalePolygon', () => {
+  it('carries the marquee along with what it holds', () => {
+    expect(scalePolygon([{ x: 30, y: 50 }], 2, 10, 10)).toEqual([{ x: 50, y: 90 }])
+  })
+})
+
+describe('resizeFactor', () => {
+  const frame = { minX: 10, minY: 10, maxX: 110, maxY: 60 }
+
+  it('is 1 with the pointer on the corner it started on', () => {
+    expect(resizeFactor(frame, 110, 60)).toBeCloseTo(1)
+  })
+
+  it('grows as the corner is dragged outwards along the diagonal', () => {
+    expect(resizeFactor(frame, 210, 110)).toBeCloseTo(2)
+  })
+
+  it('never collapses the selection to nothing', () => {
+    expect(resizeFactor(frame, 0, 0)).toBeGreaterThan(0)
+    expect(resizeFactor(frame, 10, 10)).toBeGreaterThan(0)
+  })
+
+  it('holds still for a frame with no extent', () => {
+    expect(resizeFactor({ minX: 5, minY: 5, maxX: 5, maxY: 5 }, 50, 50)).toBe(1)
   })
 })
 

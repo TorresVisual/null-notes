@@ -4,6 +4,7 @@ import { useInkCanvas, isDrawingPointer, isEraserTip, toInk } from './useInkCanv
 import { pinchZoom, distanceBetween } from './zoom'
 import { panBy, zoomAbout, worldToScreen } from './camera'
 import { inkBounds } from './bounds'
+import { SelectionOverlay } from './SelectionOverlay'
 import type { Bounds } from './bounds'
 import { useCamera } from '../hooks/useCamera'
 import { useInkStore } from '../store/ink'
@@ -41,7 +42,12 @@ export function InkCanvas({ svgPath, backdrop, onSaved, autoActivate = false }: 
     canvasRef,
     tool,
     hasSelection,
+    selectionFrame,
     deleteSelected,
+    duplicateSelected,
+    beginResize,
+    resizeTo,
+    endResize,
     eraserSize,
     ruler,
     toggleRuler,
@@ -210,8 +216,21 @@ export function InkCanvas({ svgPath, backdrop, onSaved, autoActivate = false }: 
       onPointerUp={handlePointerUp}
       onPointerCancel={handlePointerUp}
       onPointerLeave={handlePointerLeave}
+      onContextMenu={(e) => e.preventDefault()}
     >
       <canvas ref={canvasRef} className="ink-canvas" style={{ touchAction: 'none' }} />
+      {selectionFrame && (
+        <SelectionOverlay
+          frame={selectionFrame}
+          camera={camera}
+          toWorld={worldPoint}
+          onDuplicate={duplicateSelected}
+          onDelete={deleteSelected}
+          onResizeStart={beginResize}
+          onResize={resizeTo}
+          onResizeEnd={endResize}
+        />
+      )}
       {cursorPos && (
         <div
           className="ink-eraser-cursor"
