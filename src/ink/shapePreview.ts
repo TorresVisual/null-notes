@@ -6,10 +6,12 @@ export interface PreviewShape {
   y2: number
   color: string
   size: number
+  opacity?: number
 }
 
 export function drawShapePreview(ctx: CanvasRenderingContext2D, shape: PreviewShape): void {
   ctx.save()
+  ctx.globalAlpha = shape.opacity ?? 1
   ctx.strokeStyle = shape.color
   ctx.lineWidth = shape.size
   ctx.beginPath()

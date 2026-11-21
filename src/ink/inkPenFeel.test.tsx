@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest'
-import { render, cleanup, createEvent, fireEvent, waitFor } from '@testing-library/react'
+import { render, cleanup, createEvent, fireEvent, waitFor, act } from '@testing-library/react'
 import { InkCanvas } from './InkCanvas'
 import { useInkStore } from '../store/ink'
 import { DEFAULT_PENS } from './pens'
@@ -57,7 +57,7 @@ function installFakeContext() {
   const spy = vi
     .spyOn(HTMLCanvasElement.prototype, 'getContext')
     .mockImplementation((() => ctx) as unknown as HTMLCanvasElement['getContext'])
-  return { calls, restore: () => spy.mockRestore() }
+  return { calls, state, restore: () => spy.mockRestore() }
 }
 
 type PointerKind = 'pen' | 'mouse' | 'touch'
@@ -132,9 +132,9 @@ describe('frame batching', () => {
       fake.calls.fill = 0
 
       at(canvas, 'pointerDown', 10, 400)
-      at(canvas, 'pointerMove', 40, 410)
-      at(canvas, 'pointerMove', 70, 420)
-      at(canvas, 'pointerMove', 100, 430)
+      at(canvas, 'pointerMove', 40, 440)
+      at(canvas, 'pointerMove', 70, 400)
+      at(canvas, 'pointerMove', 100, 440)
       await waitFor(() => expect(fake.calls.fill).toBeGreaterThan(0))
 
       expect(fake.calls.fill).toBe(1)
@@ -154,6 +154,97 @@ describe('frame batching', () => {
     } finally {
       cancel.mockRestore()
     }
+  })
+})
+
+describe('auto-straighten', () => {
+  const PEN = DEFAULT_PENS[0]
+  const HIGHLIGHTER = DEFAULT_PENS.find((pen) => pen.opacity < 1)
+
+  // Wobbles by a pixel or two over 290 units: hand-drawn, but plainly a line.
+  const STRAIGHT: Array<[number, number]> = [[60, 101], [120, 99], [180, 100], [240, 101], [300, 100]]
+
+  function drawStraight(canvas: Element, moves = STRAIGHT) {
+    at(canvas, 'pointerDown', 10, 100)
+    for (const [x, y] of moves) at(canvas, 'pointerMove', x, y)
+  }
+
+  function undoHandle() {
+    const handle = useInkStore.getState().activeCanvas
+    if (!handle) throw new Error('no active canvas')
+    return handle
+  }
+
+  it('previews the corrected line while drawing, with no write and no history entry', async () => {
+    const fake = installFakeContext()
+    try {
+      const { canvas } = await mountCanvas()
+      fake.calls.fill = 0
+      fake.state.strokeStyle = ''
+
+      drawStraight(canvas)
+      await waitFor(() => expect(fake.state.strokeStyle).toBe(PEN.color))
+
+      expect(fake.calls.fill).toBe(0)
+      expect(write).not.toHaveBeenCalled()
+      expect(undoHandle().canUndo).toBe(false)
+    } finally {
+      fake.restore()
+    }
+  })
+
+  it('goes back to drawing freehand when the stroke bends away from the line', async () => {
+    const fake = installFakeContext()
+    try {
+      const { canvas } = await mountCanvas()
+      drawStraight(canvas)
+      fake.calls.fill = 0
+      at(canvas, 'pointerMove', 330, 200)
+      at(canvas, 'pointerMove', 340, 300)
+      await waitFor(() => expect(fake.calls.fill).toBeGreaterThan(0))
+    } finally {
+      fake.restore()
+    }
+  })
+
+  it('commits the corrected line on release, as one undoable step that redo restores', async () => {
+    const { canvas } = await mountCanvas()
+    drawStraight(canvas)
+    at(canvas, 'pointerUp', 300, 100)
+
+    const saved = lastWrite()
+    expect(saved.strokes).toHaveLength(0)
+    expect(saved.shapes).toHaveLength(1)
+    expect(saved.shapes[0]).toMatchObject({ kind: 'line', color: PEN.color, size: PEN.size })
+    expect(saved.shapes[0]!.x1).toBeCloseTo(10, 0)
+    expect(saved.shapes[0]!.x2).toBeCloseTo(300, 0)
+    expect(write).toHaveBeenCalledTimes(1)
+
+    act(() => undoHandle().undo())
+    expect(lastWrite().shapes).toHaveLength(0)
+    expect(undoHandle().canUndo).toBe(false)
+
+    act(() => undoHandle().redo())
+    expect(lastWrite().shapes).toEqual(saved.shapes)
+  })
+
+  it('commits the original stroke, untouched, when it is not a line', async () => {
+    const { canvas } = await mountCanvas()
+    drawBent(canvas)
+
+    const saved = lastWrite()
+    expect(saved.shapes).toHaveLength(0)
+    expect(saved.strokes[0]!.points.map((p) => [p.x, p.y])).toEqual([[10, 10], [60, 80], [110, 10]])
+  })
+
+  it('keeps a highlighter stroke translucent when it straightens', async () => {
+    if (!HIGHLIGHTER) throw new Error('no translucent default pen')
+    useInkStore.setState({ activePenId: HIGHLIGHTER.id })
+    const { canvas } = await mountCanvas()
+    drawStraight(canvas)
+    at(canvas, 'pointerUp', 300, 100)
+
+    expect(lastWrite().shapes[0]).toMatchObject({ color: HIGHLIGHTER.color, size: HIGHLIGHTER.size, opacity: HIGHLIGHTER.opacity })
   })
 })
 

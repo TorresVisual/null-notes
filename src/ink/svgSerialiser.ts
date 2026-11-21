@@ -32,7 +32,8 @@ export function strokeToPath(stroke: Stroke): string {
 }
 
 export function shapeToElement(shape: Shape): string {
-  const base = `data-id="${shape.id}" data-kind="${shape.kind}" data-x1="${shape.x1}" data-y1="${shape.y1}" data-x2="${shape.x2}" data-y2="${shape.y2}" data-color="${shape.color}" data-size="${shape.size}" stroke="${shape.color}" stroke-width="${shape.size}" fill="none"`
+  const opacity = shape.opacity === undefined ? '' : ` data-opacity="${shape.opacity}" stroke-opacity="${shape.opacity}"`
+  const base = `data-id="${shape.id}" data-kind="${shape.kind}" data-x1="${shape.x1}" data-y1="${shape.y1}" data-x2="${shape.x2}" data-y2="${shape.y2}" data-color="${shape.color}" data-size="${shape.size}"${opacity} stroke="${shape.color}" stroke-width="${shape.size}" fill="none"`
   switch (shape.kind) {
     case 'line':
       return `<line ${base} x1="${shape.x1}" y1="${shape.y1}" x2="${shape.x2}" y2="${shape.y2}" />`
@@ -141,6 +142,7 @@ export function svgToInkData(svg: string): InkData {
   const shapes: Shape[] = []
   for (const selector of ['line[data-id]', 'rect[data-id]', 'ellipse[data-id]', 'path[data-kind="arrow"]']) {
     for (const el of doc.querySelectorAll(selector)) {
+      const opacity = el.getAttribute('data-opacity')
       shapes.push({
         id: el.getAttribute('data-id') ?? '',
         kind: el.getAttribute('data-kind') as Shape['kind'],
@@ -150,6 +152,7 @@ export function svgToInkData(svg: string): InkData {
         y2: Number(el.getAttribute('data-y2') ?? 0),
         color: el.getAttribute('data-color') ?? '#000000',
         size: Number(el.getAttribute('data-size') ?? 2),
+        ...(opacity === null ? {} : { opacity: Number(opacity) }),
       })
     }
   }

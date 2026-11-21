@@ -25,6 +25,18 @@ describe('drawShapePreview', () => {
     expect(ctx.stroke).toHaveBeenCalled()
   })
 
+  it('strokes at the shape opacity, and fully opaque when it has none', () => {
+    const alphaAtStroke: number[] = []
+    const ctx = createMockCtx()
+    ctx.globalAlpha = 1
+    vi.mocked(ctx.stroke).mockImplementation(() => {
+      alphaAtStroke.push(ctx.globalAlpha)
+    })
+    drawShapePreview(ctx, { kind: 'line', x1: 0, y1: 0, x2: 10, y2: 10, color: '#ff0', size: 8, opacity: 0.4 })
+    drawShapePreview(ctx, { kind: 'line', x1: 0, y1: 0, x2: 10, y2: 10, color: '#000', size: 2 })
+    expect(alphaAtStroke).toEqual([0.4, 1])
+  })
+
   it('draws a rect via ctx.rect with normalized bounds', () => {
     const ctx = createMockCtx()
     drawShapePreview(ctx, { kind: 'rect', x1: 10, y1: 10, x2: 0, y2: 0, color: '#000', size: 2 })

@@ -18,7 +18,8 @@ import { pointInTextItem, translateTextItem, boundsOfTextItem } from './textBoun
 import { MIN_EXTENT, extentOf, boundsOfPoints, type Bounds } from './bounds'
 import { isVisible, screenToWorld } from './camera'
 import type { Camera, Viewport } from './camera'
-import { straightLineEnds } from './straighten'
+import { recognizeLine } from './lineRecognition/lineRecognition'
+import type { RecognizedLine } from './lineRecognition/types'
 import { paintOrder } from './paintOrder'
 import { strokeOptions } from './strokeOptions'
 import {
@@ -331,6 +332,9 @@ export function useInkCanvas(
   const lassoPath = useRef<LassoPoint[]>([])
   const rulerGrab = useRef<{ kind: RulerGrab; x: number; y: number } | null>(null)
   const snapping = useRef(false)
+  // The straight line currently standing in for the stroke being drawn. Only
+  // a preview: inkData and history are untouched until the pen lifts.
+  const previewLine = useRef<RecognizedLine | null>(null)
   const dragSnapshot = useRef<InkData | null>(null)
   const dragFrom = useRef<LassoPoint | null>(null)
   const textDragFrom = useRef<{ id: string; x: number; y: number; moved: boolean } | null>(null)
@@ -735,6 +739,7 @@ export function useInkCanvas(
       // Judged once, at the start: a stroke that drifted on and off the edge
       // partway through would be worse than one that never snapped at all.
       snapping.current = ruler !== null && shouldSnap(start, ruler)
+      previewLine.current = null
       currentStroke.current = [start]
     },
     [
@@ -817,9 +822,12 @@ export function useInkCanvas(
       for (const ce of events) {
         currentStroke.current.push({ ...toWorld(ce), pressure: ce.pressure })
       }
-      scheduleRedraw(snappedPoints(currentStroke.current))
+      const points = snappedPoints(currentStroke.current)
+      previewLine.current = recognizeLine(points, previewLine.current !== null)
+      const line = previewLine.current
+      scheduleRedraw(line ? [] : points, line ? { kind: 'line', x1: line.x1, y1: line.y1, x2: line.x2, y2: line.y2, color, size, opacity } : null)
     },
-    [tool, size, color, eraseAt, scheduleRedraw, toWorld, selection, snappedPoints, dragRuler],
+    [tool, size, color, opacity, eraseAt, scheduleRedraw, toWorld, selection, snappedPoints, dragRuler],
   )
 
   const handlePointerUp = useCallback(
@@ -918,13 +926,23 @@ export function useInkCanvas(
       currentStroke.current = []
       snapping.current = false
 
-      // A completed pen stroke that is nearly straight becomes an actual
-      // line, the same object a user would get from the line tool — matches
-      // OneNote's auto-straighten rather than leaving a wobbly freehand line
-      // that merely looks straight.
-      const straight = straightLineEnds(points)
+      // Re-judged on the whole stroke, with the preview's hysteresis, so what
+      // lands is what was showing: a line the preview held onto is not
+      // dropped to freehand by the stricter start-of-line limit on release.
+      const straight = recognizeLine(points, previewLine.current !== null)
+      previewLine.current = null
       if (straight) {
-        const shape: Shape = { id: crypto.randomUUID(), kind: 'line', ...straight, color, size }
+        const shape: Shape = {
+          id: crypto.randomUUID(),
+          kind: 'line',
+          x1: straight.x1,
+          y1: straight.y1,
+          x2: straight.x2,
+          y2: straight.y2,
+          color,
+          size,
+          opacity,
+        }
         commit({ ...inkData, shapes: [...inkData.shapes, shape] })
         return
       }

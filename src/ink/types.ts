@@ -49,6 +49,9 @@ export interface Shape {
   y2: number
   color: string
   size: number
+  /** Only a straightened pen stroke sets this (a highlighter line stays
+   *  translucent); the line/rect/circle/arrow tools leave it off, meaning 1. */
+  opacity?: number
 }
 
 // A typed label, not a stroke — placed at a point rather than drawn along a

@@ -60,6 +60,21 @@ describe('shapeToElement', () => {
     expect(shapeToElement(circle)).toContain('<ellipse')
   })
 
+  it('writes opacity only when the shape has one, so existing files are byte-identical', () => {
+    expect(shapeToElement(shape)).not.toContain('opacity')
+    const faint: Shape = { ...shape, kind: 'line', opacity: 0.4 }
+    expect(shapeToElement(faint)).toContain('data-opacity="0.4"')
+    expect(shapeToElement(faint)).toContain('stroke-opacity="0.4"')
+  })
+
+  it('round-trips a shape opacity and loads a shape without one as undefined', () => {
+    const faint: Shape = { ...shape, id: 'faint', kind: 'line', opacity: 0.4 }
+    const data: InkData = { originX: 0, originY: 0, width: 800, height: 600, strokes: [], shapes: [shape, faint], texts: [] }
+    const restored = svgToInkData(inkDataToSvg(data))
+    expect(restored.shapes.find((s) => s.id === 'sh1')?.opacity).toBeUndefined()
+    expect(restored.shapes.find((s) => s.id === 'faint')?.opacity).toBe(0.4)
+  })
+
   it('returns a path element with an arrowhead for arrow kind', () => {
     const arrow: Shape = { ...shape, id: 'sh4', kind: 'arrow' }
     const result = shapeToElement(arrow)
